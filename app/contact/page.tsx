@@ -8,7 +8,7 @@ export default function ContactPage() {
           Pour une demande de partenariat, un signalement de bug ou une question generale,
           tu peux nous contacter a l&apos;adresse suivante :
         </p>
-        <p className="text-lg font-bold text-cyan-300">contact@chibaskogames.com</p>
+        <p className="text-lg font-bold text-cyan-300">chibasko06@gmail.com</p>
         <p>
           Tu peux aussi utiliser cette page comme point d&apos;accroche avant d&apos;ajouter plus tard
           un vrai formulaire de contact relie a Supabase ou a un service mail.
