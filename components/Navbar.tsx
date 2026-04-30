@@ -108,19 +108,6 @@ export function Navbar() {
 
   return (
     <header className="border-b border-cyan-950/70 bg-black/85 backdrop-blur">
-      <div className="border-b border-zinc-900/80">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-zinc-500">
-          <span>Jeux navigateur gratuits</span>
-          <div className="flex items-center gap-4">
-            <Link href="/contact" className="hover:text-cyan-300 transition-colors">
-              Contact
-            </Link>
-            <Link href="/mentions-legales" className="hover:text-cyan-300 transition-colors">
-              Mentions
-            </Link>
-          </div>
-        </div>
-      </div>
 
       <nav className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
         <ChibaskoLogo />
