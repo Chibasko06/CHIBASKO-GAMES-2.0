@@ -98,8 +98,8 @@ export default function GamesCatalog({
             >
               <option value="popular">Popularite</option>
               <option value="recent">Plus recents</option>
-              <option value="title-asc">A a Z</option>
-              <option value="title-desc">Z a A</option>
+              <option value="title-asc">A à Z</option>
+              <option value="title-desc">Z à A</option>
             </select>
           </label>
         </div>
