@@ -8,8 +8,7 @@ export default function Footer() {
         <div className="space-y-4">
           <ChibaskoLogo compact />
           <p className="max-w-md text-sm leading-6 text-zinc-400">
-            ChibaskoGames rassemble des jeux gratuits accessibles direct dans le navigateur,
-            avec une navigation arcade, des favoris et un profil joueur simple.
+            ChibaskoGames rassemble des jeux 100% gratuits accessibles directement depuis votre navigateur, avec une navigation simplifiée, des favoris et un profil joueur pour une expérience plus immersive !
           </p>
         </div>
 

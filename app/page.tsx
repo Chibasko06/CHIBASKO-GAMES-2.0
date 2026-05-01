@@ -15,16 +15,15 @@ export default async function Home() {
         <div className="grid gap-8 px-6 py-8 md:px-10 md:py-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
           <div className="space-y-6">
             <p className="text-[11px] uppercase tracking-[0.45em] text-cyan-300/75">
-              Portail arcade Chibasko
+              Chibasko Games Version 2.0
             </p>
             <div className="space-y-4">
               <h1 className="max-w-2xl text-4xl font-black uppercase leading-none text-white md:text-6xl">
-                Le terrain de jeu
-                <span className="block text-cyan-400"> browser arcade</span>
+                Votre navigateur devient
+                <span className="block text-cyan-400"> votre console</span>
               </h1>
               <p className="max-w-xl text-base leading-7 text-zinc-300">
-                Explore les categories, retrouve les hits du moment et garde tes jeux preferes
-                dans ton profil joueur ChibaskoGames.
+                Accédez à des centaines de jeux gratuits sans aucune installation. Créez votre profil, gagnez de l'XP et grimpez dans le classement.
               </p>
             </div>
 
@@ -45,16 +44,16 @@ export default async function Home() {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
-                <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Sans install</p>
-                <p className="mt-2 text-sm text-zinc-300">Partie directe depuis le navigateur.</p>
+                <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Sans attente</p>
+                <p className="mt-2 text-sm text-zinc-300">Cliquez, jouez. Aucun téléchargement ni installation requis.</p>
               </div>
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
-                <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Categories</p>
-                <p className="mt-2 text-sm text-zinc-300">Action, reflexion, sport et plus encore.</p>
+                <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">100% gratuit</p>
+                <p className="mt-2 text-sm text-zinc-300">Tous nos jeux sont accessibles librement, sans frais cachés.</p>
               </div>
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
                 <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Compte joueur</p>
-                <p className="mt-2 text-sm text-zinc-300">Favoris, historique et progression.</p>
+                <p className="mt-2 text-sm text-zinc-300">Sauvegardez vos scores, vos favoris et votre XP sur votre compte.</p>
               </div>
             </div>
           </div>
