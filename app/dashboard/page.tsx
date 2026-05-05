@@ -259,6 +259,37 @@ export default function DashboardPage() {
       return
     }
 
+    let activeSession = session
+
+    if (!activeSession) {
+      const {
+        data: { session: fetchedSession },
+      } = await supabase.auth.getSession()
+
+      activeSession = fetchedSession
+    }
+
+    if (!activeSession) {
+      const {
+        data: refreshedData,
+        error: refreshError,
+      } = await supabase.auth.refreshSession()
+
+      if (refreshError) {
+        setPasswordMessage(refreshError.message)
+        setSavingPassword(false)
+        return
+      }
+
+      activeSession = refreshedData.session
+    }
+
+    if (!activeSession) {
+      setPasswordMessage('Session introuvable. Reconnecte-toi puis reessaie.')
+      setSavingPassword(false)
+      return
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({
       password: passwordForm.nextPassword,
     })
@@ -298,21 +329,17 @@ export default function DashboardPage() {
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/75">Espace joueur</p>
         <h1 className="mt-3 text-3xl font-black uppercase text-white md:text-4xl">Tableau de bord</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-          Gere ton pseudo, ton avatar, ton mot de passe et retrouve rapidement tes favoris et
-          tes derniers jeux vus.
+          Gere ton compte, ton profil public et ton activite de joueur depuis un seul espace.
         </p>
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-cyan-950/60 bg-black/25 p-4">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Profil</p>
-            <p className="mt-2 text-sm text-zinc-300">Pseudo, bio et avatar visibles sur ton espace joueur.</p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <div className="rounded-full border border-cyan-900 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
+            {profile?.xp_points ?? 0} XP
           </div>
-          <div className="rounded-2xl border border-cyan-950/60 bg-black/25 p-4">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Securite</p>
-            <p className="mt-2 text-sm text-zinc-300">Verification par ancien mot de passe avant toute modification.</p>
+          <div className="rounded-full border border-zinc-800 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-300">
+            {favoriteCount} favoris
           </div>
-          <div className="rounded-2xl border border-cyan-950/60 bg-black/25 p-4">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Activite</p>
-            <p className="mt-2 text-sm text-zinc-300">Favoris, commentaires et derniers jeux vus reunis au meme endroit.</p>
+          <div className="rounded-full border border-zinc-800 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-300">
+            {commentCount} commentaires
           </div>
         </div>
       </section>
@@ -321,21 +348,6 @@ export default function DashboardPage() {
         <ProfileCard profile={profile} stats={{ favoriteCount, commentCount }} />
 
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Total XP</p>
-              <p className="mt-2 text-3xl font-black text-cyan-400">{profile?.xp_points ?? 0}</p>
-            </div>
-            <div className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Favoris</p>
-              <p className="mt-2 text-3xl font-black text-cyan-400">{favoriteCount}</p>
-            </div>
-            <div className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Commentaires</p>
-              <p className="mt-2 text-3xl font-black text-cyan-400">{commentCount}</p>
-            </div>
-          </div>
-
           <section className="rounded-[24px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(17,24,39,0.92),rgba(9,9,11,0.95))] p-6">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Mon profil</h2>
@@ -360,6 +372,24 @@ export default function DashboardPage() {
             {profile ? (
               isEditingProfile ? (
                 <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="rounded-[22px] border border-cyan-950/60 bg-black/30 p-5 md:col-span-2">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-cyan-400/70 bg-zinc-900">
+                        {profile.avatar_url ? (
+                          <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-2xl font-black text-cyan-300">{(draftProfile.username || profile.username || 'J')[0]?.toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Apercu public</p>
+                        <p className="mt-2 text-lg font-black text-white">{draftProfile.username || 'Pseudo joueur'}</p>
+                        <p className="mt-2 text-sm leading-6 text-zinc-400 line-clamp-2">
+                          {draftProfile.bio || 'Ta bio apparaitra ici une fois enregistree.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   <input
                     value={draftProfile.username}
                     onChange={(event) => setDraftProfile((current) => ({ ...current, username: event.target.value }))}
@@ -417,9 +447,18 @@ export default function DashboardPage() {
                   </div>
                   <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)]">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Avatar</p>
-                    <p className="mt-2 text-sm text-zinc-300">
-                      {profile.avatar_url ? 'Avatar personnalise actif' : 'Aucun avatar personnalise'}
-                    </p>
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-cyan-700 bg-zinc-900">
+                        {profile.avatar_url ? (
+                          <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-black text-cyan-300">{profile.username[0]?.toUpperCase()}</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-zinc-300">
+                        {profile.avatar_url ? 'Avatar personnalise actif' : 'Aucun avatar personnalise'}
+                      </p>
+                    </div>
                   </div>
                   <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)] md:col-span-2">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Bio</p>

@@ -19,22 +19,41 @@ const emptyForm: ContactFormState = {
 export default function ContactPage() {
   const [form, setForm] = useState<ContactFormState>(emptyForm)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setFeedback(null)
 
     if (!form.firstName || !form.lastName || !form.email || !form.message) {
       setFeedback('Remplis tous les champs avant d envoyer ton message.')
       return
     }
 
-    const subject = encodeURIComponent(`Contact Chibasko Games - ${form.firstName} ${form.lastName}`)
-    const body = encodeURIComponent(
-      `Nom: ${form.lastName}\nPrenom: ${form.firstName}\nEmail: ${form.email}\n\nMessage:\n${form.message}`
-    )
+    setSending(true)
 
-    window.location.href = `mailto:chibasko06@gmail.com?subject=${subject}&body=${body}`
-    setFeedback('Ton logiciel mail va s ouvrir avec le message pre-rempli.')
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      })
+
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Impossible d envoyer le message.')
+      }
+
+      setForm(emptyForm)
+      setFeedback('Ton message a bien ete envoye.')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Impossible d envoyer le message.')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -43,7 +62,7 @@ export default function ContactPage() {
       <h1 className="mt-3 text-4xl font-black uppercase text-white">Nous contacter</h1>
       <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-400">
         Une question, un bug, une idee de partenariat ou un retour sur un jeu ? Remplis ce
-        formulaire et ton message sera prepare pour etre envoye a l adresse Chibasko Games.
+        formulaire et ton message sera envoye directement a l equipe Chibasko Games.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -81,9 +100,10 @@ export default function ContactPage() {
         ) : null}
         <button
           type="submit"
-          className="rounded-full bg-cyan-400 px-6 py-4 font-black uppercase tracking-[0.2em] text-black md:col-span-2"
+          disabled={sending}
+          className="rounded-full bg-cyan-400 px-6 py-4 font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2"
         >
-          Preparer l email
+          {sending ? 'Envoi en cours...' : 'Envoyer le message'}
         </button>
       </form>
 
