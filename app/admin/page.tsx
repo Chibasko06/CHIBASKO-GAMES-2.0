@@ -5,8 +5,11 @@ import { uploadAdminAvatar } from '@/lib/avatarUpload'
 import { supabase } from '@/lib/supabaseClient'
 import { Tables } from '@/types/database'
 
-type Game = Tables<'games'>
+type Game = Tables<'games'> & {
+  game_categories?: { category_id: string }[]
+}
 type AdminUser = Tables<'profiles'> & { email: string | null }
+type Category = Tables<'categories'> & { games_count?: number; game_categories?: { game_id: string }[] }
 
 type GameFormState = {
   title: string
@@ -21,6 +24,7 @@ type GameFormState = {
   provider_name: string
   source_page_url: string
   is_published: boolean
+  category_ids: string[]
 }
 
 type UserFormState = {
@@ -28,6 +32,11 @@ type UserFormState = {
   avatar_url: string
   bio: string
   xp_points: number
+}
+
+type CategoryFormState = {
+  name: string
+  slug: string
 }
 
 type ImportState = {
@@ -48,6 +57,7 @@ const emptyGameForm: GameFormState = {
   provider_name: '',
   source_page_url: '',
   is_published: true,
+  category_ids: [],
 }
 
 const emptyUserForm: UserFormState = {
@@ -57,11 +67,25 @@ const emptyUserForm: UserFormState = {
   xp_points: 0,
 }
 
+const emptyCategoryForm: CategoryFormState = {
+  name: '',
+  slug: '',
+}
+
 const defaultImportState: ImportState = {
   dataFilePath:
-    'C:\\Users\\chiba\\OneDrive - Université Paris-Saclay\\Documents\\Projet_perso\\CHIBASKO-GAMES\\JavaScript\\game-data.js',
+    'C:\\Users\\chiba\\OneDrive - UniversitÃ© Paris-Saclay\\Documents\\Projet_perso\\CHIBASKO-GAMES\\JavaScript\\game-data.js',
   imagesDirectoryPath:
-    'C:\\Users\\chiba\\OneDrive - Université Paris-Saclay\\Documents\\Projet_perso\\CHIBASKO-GAMES\\images',
+    'C:\\Users\\chiba\\OneDrive - UniversitÃ© Paris-Saclay\\Documents\\Projet_perso\\CHIBASKO-GAMES\\images',
+}
+
+function slugifyCategory(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 function toGameFormState(game: Game): GameFormState {
@@ -78,6 +102,7 @@ function toGameFormState(game: Game): GameFormState {
     provider_name: game.provider_name || '',
     source_page_url: game.source_page_url || '',
     is_published: game.is_published,
+    category_ids: (game.game_categories ?? []).map((entry) => entry.category_id),
   }
 }
 
@@ -90,18 +115,30 @@ function toUserFormState(user: AdminUser): UserFormState {
   }
 }
 
+function toCategoryFormState(category: Category): CategoryFormState {
+  return {
+    name: category.name,
+    slug: category.slug,
+  }
+}
+
 export default function AdminPage() {
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [games, setGames] = useState<Game[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [gameForm, setGameForm] = useState<GameFormState>(emptyGameForm)
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
+  const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm)
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [loadingGames, setLoadingGames] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(true)
+  const [loadingCategories, setLoadingCategories] = useState(true)
   const [savingGame, setSavingGame] = useState(false)
   const [savingUser, setSavingUser] = useState(false)
+  const [savingCategory, setSavingCategory] = useState(false)
   const [uploadingUserAvatar, setUploadingUserAvatar] = useState(false)
   const [importing, setImporting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -164,6 +201,27 @@ export default function AdminPage() {
     }
   }, [authorizedFetch])
 
+  const loadCategories = useCallback(async () => {
+    setLoadingCategories(true)
+
+    try {
+      const response = await authorizedFetch('/api/admin/categories')
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Acces admin refuse.')
+      }
+
+      setCategories(payload.categories || [])
+      setErrorMessage(null)
+    } catch (error) {
+      setCategories([])
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur categories.')
+    } finally {
+      setLoadingCategories(false)
+    }
+  }, [authorizedFetch])
+
   useEffect(() => {
     const bootstrap = async () => {
       const {
@@ -176,8 +234,8 @@ export default function AdminPage() {
       if (!token) {
         setLoadingGames(false)
         setLoadingUsers(false)
+        setLoadingCategories(false)
         setErrorMessage('Connecte-toi avec un compte admin pour acceder a cet espace.')
-        return
       }
     }
 
@@ -202,13 +260,13 @@ export default function AdminPage() {
     }
 
     const refreshAdminPanels = async () => {
-      await Promise.all([loadGames(), loadUsers()])
+      await Promise.all([loadGames(), loadUsers(), loadCategories()])
     }
 
     void refreshAdminPanels()
-  }, [sessionToken, loadGames, loadUsers])
+  }, [sessionToken, loadGames, loadUsers, loadCategories])
 
-  const handleGameChange = (field: keyof GameFormState, value: string | boolean) => {
+  const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
     setGameForm((current) => ({
       ...current,
       [field]: value,
@@ -222,6 +280,15 @@ export default function AdminPage() {
     }))
   }
 
+  const handleCategoryToggle = (categoryId: string) => {
+    setGameForm((current) => ({
+      ...current,
+      category_ids: current.category_ids.includes(categoryId)
+        ? current.category_ids.filter((id) => id !== categoryId)
+        : [...current.category_ids, categoryId],
+    }))
+  }
+
   const resetGameForm = () => {
     setGameForm(emptyGameForm)
     setEditingGameId(null)
@@ -230,6 +297,11 @@ export default function AdminPage() {
   const resetUserForm = () => {
     setUserForm(emptyUserForm)
     setEditingUserId(null)
+  }
+
+  const resetCategoryForm = () => {
+    setCategoryForm(emptyCategoryForm)
+    setEditingCategoryId(null)
   }
 
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -255,7 +327,7 @@ export default function AdminPage() {
       }
 
       resetGameForm()
-      await loadGames()
+      await Promise.all([loadGames(), loadCategories()])
       setErrorMessage(null)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur lors de la sauvegarde du jeu.')
@@ -298,6 +370,40 @@ export default function AdminPage() {
     }
   }
 
+  const handleCategorySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSavingCategory(true)
+
+    try {
+      const endpoint = editingCategoryId ? `/api/admin/categories/${editingCategoryId}` : '/api/admin/categories'
+      const method = editingCategoryId ? 'PATCH' : 'POST'
+      const response = await authorizedFetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: categoryForm.name,
+          slug: categoryForm.slug || slugifyCategory(categoryForm.name),
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erreur categorie.')
+      }
+
+      resetCategoryForm()
+      await loadCategories()
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur categorie.')
+    } finally {
+      setSavingCategory(false)
+    }
+  }
+
   const startEditGame = (game: Game) => {
     setEditingGameId(game.id)
     setGameForm(toGameFormState(game))
@@ -307,6 +413,12 @@ export default function AdminPage() {
   const startEditUser = (user: AdminUser) => {
     setEditingUserId(user.id)
     setUserForm(toUserFormState(user))
+    setErrorMessage(null)
+  }
+
+  const startEditCategory = (category: Category) => {
+    setEditingCategoryId(category.id)
+    setCategoryForm(toCategoryFormState(category))
     setErrorMessage(null)
   }
 
@@ -328,7 +440,7 @@ export default function AdminPage() {
         resetGameForm()
       }
 
-      await loadGames()
+      await Promise.all([loadGames(), loadCategories()])
       setErrorMessage(null)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur lors de la suppression du jeu.')
@@ -361,6 +473,37 @@ export default function AdminPage() {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur lors de la suppression de l utilisateur.')
     } finally {
       setSavingUser(false)
+    }
+  }
+
+  const handleDeleteCategory = async (id: string) => {
+    setSavingCategory(true)
+
+    try {
+      const response = await authorizedFetch(`/api/admin/categories/${id}`, {
+        method: 'DELETE',
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erreur lors de la suppression de la categorie.')
+      }
+
+      if (editingCategoryId === id) {
+        resetCategoryForm()
+      }
+
+      setGameForm((current) => ({
+        ...current,
+        category_ids: current.category_ids.filter((categoryId) => categoryId !== id),
+      }))
+      await Promise.all([loadCategories(), loadGames()])
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur lors de la suppression de la categorie.')
+    } finally {
+      setSavingCategory(false)
     }
   }
 
@@ -455,11 +598,11 @@ export default function AdminPage() {
   return (
     <main className="space-y-8">
       <section className="border border-zinc-800 bg-zinc-950 p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-black uppercase text-cyan-500 mb-2">Admin Chibasko Games</h1>
+            <h1 className="mb-2 text-2xl font-black uppercase text-cyan-500">Admin Chibasko Games</h1>
             <p className="text-zinc-400">
-              Interface complete pour piloter les jeux, les profils joueurs et les exports.
+              Gere le catalogue, les categories, les profils joueurs et les imports.
             </p>
           </div>
           <div className="flex gap-3">
@@ -479,23 +622,19 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
-        {errorMessage ? (
-          <p className="text-sm text-red-400 mt-4">{errorMessage}</p>
-        ) : null}
-        {importMessage ? (
-          <p className="text-sm text-cyan-300 mt-2">{importMessage}</p>
-        ) : null}
+        {errorMessage ? <p className="mt-4 text-sm text-red-400">{errorMessage}</p> : null}
+        {importMessage ? <p className="mt-2 text-sm text-cyan-300">{importMessage}</p> : null}
       </section>
 
       <section className="border border-zinc-800 bg-zinc-950 p-6">
         <div className="mb-6">
           <h2 className="text-lg font-black uppercase text-white">Import v1</h2>
-          <p className="text-zinc-400 mt-2">
+          <p className="mt-2 text-zinc-400">
             Lit ton ancien `game-data.js`, copie les miniatures dans `public/games` et reinjecte les jeux dans la v2.
           </p>
         </div>
 
-        <form onSubmit={handleImportV1} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleImportV1} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <input
             value={importState.dataFilePath}
             onChange={(e) => handleImportChange('dataFilePath', e.target.value)}
@@ -511,16 +650,16 @@ export default function AdminPage() {
           <button
             type="submit"
             disabled={importing}
-            className="md:col-span-2 bg-cyan-600 py-3 font-black text-black disabled:opacity-60 disabled:cursor-not-allowed"
+            className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2"
           >
             {importing ? 'IMPORT EN COURS...' : 'IMPORTER LES JEUX V1'}
           </button>
         </form>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-8">
+      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
             <h2 className="text-lg font-black uppercase text-white">
               {editingGameId ? 'Modifier un jeu' : 'Ajouter un jeu'}
             </h2>
@@ -535,7 +674,7 @@ export default function AdminPage() {
             ) : null}
           </div>
 
-          <form onSubmit={handleGameSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleGameSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <input value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             <input value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             <input value={gameForm.game_url} onChange={(e) => handleGameChange('game_url', e.target.value)} placeholder="URL du jeu" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" required />
@@ -546,64 +685,176 @@ export default function AdminPage() {
             <input value={gameForm.technology} onChange={(e) => handleGameChange('technology', e.target.value)} placeholder="Technologie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.provider_name} onChange={(e) => handleGameChange('provider_name', e.target.value)} placeholder="Provider" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.source_page_url} onChange={(e) => handleGameChange('source_page_url', e.target.value)} placeholder="Source page URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <textarea value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2 min-h-36" />
+            <textarea value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
+
+            <div className="border border-zinc-800 bg-black/40 p-4 md:col-span-2">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-300">Categories du jeu</p>
+                <span className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+                  {gameForm.category_ids.length} selection
+                </span>
+              </div>
+              {loadingCategories ? (
+                <p className="text-sm text-zinc-500">Chargement des categories...</p>
+              ) : categories.length === 0 ? (
+                <p className="text-sm text-zinc-500">Ajoute d abord une categorie plus bas.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {categories.map((category) => (
+                    <label key={category.id} className="flex items-center gap-3 border border-zinc-800 px-3 py-2 text-sm text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={gameForm.category_ids.includes(category.id)}
+                        onChange={() => handleCategoryToggle(category.id)}
+                      />
+                      <span>{category.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <label className="flex items-center gap-3 text-sm text-zinc-300 md:col-span-2">
               <input type="checkbox" checked={gameForm.is_published} onChange={(e) => handleGameChange('is_published', e.target.checked)} />
               Jeu publie sur le site
             </label>
-            <button type="submit" disabled={savingGame} className="md:col-span-2 bg-cyan-600 py-3 font-black text-black disabled:opacity-60 disabled:cursor-not-allowed">
+            <button type="submit" disabled={savingGame} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2">
               {savingGame ? 'SAUVEGARDE...' : editingGameId ? 'METTRE A JOUR LE JEU' : 'AJOUTER LE JEU'}
             </button>
           </form>
         </div>
 
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <h2 className="text-lg font-black uppercase text-white">Catalogue admin</h2>
-            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{games.length} jeux</span>
+        <div className="space-y-8">
+          <div className="border border-zinc-800 bg-zinc-950 p-6">
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-black uppercase text-white">Catalogue admin</h2>
+              <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{games.length} jeux</span>
+            </div>
+
+            {loadingGames ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="h-20 animate-pulse border border-zinc-800 bg-zinc-900" />
+                ))}
+              </div>
+            ) : (
+              <div className="max-h-[560px] space-y-3 overflow-y-auto pr-1">
+                {games.map((game) => (
+                  <article key={game.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-bold text-white">{game.title}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">{game.slug}</p>
+                      </div>
+                      <span className={`text-[10px] uppercase tracking-[0.3em] ${game.is_published ? 'text-cyan-400' : 'text-zinc-500'}`}>
+                        {game.is_published ? 'Publie' : 'Brouillon'}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-xs text-zinc-400">
+                      <p>{game.developer_name || 'Developpeur non renseigne'}</p>
+                      <p>{game.technology || 'Technologie non renseignee'}</p>
+                      <p>
+                        Categories:{' '}
+                        {(game.game_categories ?? []).length > 0 ? `${(game.game_categories ?? []).length} liees` : 'Aucune'}
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => startEditGame(game)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
+                        Editer
+                      </button>
+                      <button type="button" onClick={() => void handleDeleteGame(game.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
+                        Supprimer
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
 
-          {loadingGames ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="h-20 bg-zinc-900 border border-zinc-800 animate-pulse" />
-              ))}
+          <div className="border border-zinc-800 bg-zinc-950 p-6">
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-black uppercase text-white">
+                {editingCategoryId ? 'Modifier une categorie' : 'Ajouter une categorie'}
+              </h2>
+              {editingCategoryId ? (
+                <button
+                  type="button"
+                  onClick={resetCategoryForm}
+                  className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300"
+                >
+                  Annuler
+                </button>
+              ) : null}
             </div>
-          ) : (
-            <div className="space-y-3 max-h-[900px] overflow-y-auto pr-1">
-              {games.map((game) => (
-                <article key={game.id} className="border border-zinc-800 bg-black/30 p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-bold text-white">{game.title}</p>
-                      <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mt-1">{game.slug}</p>
+
+            <form onSubmit={handleCategorySubmit} className="space-y-4">
+              <input
+                value={categoryForm.name}
+                onChange={(event) => {
+                  const nextName = event.target.value
+                  setCategoryForm((current) => ({
+                    ...current,
+                    name: nextName,
+                    slug: current.slug ? current.slug : slugifyCategory(nextName),
+                  }))
+                }}
+                placeholder="Nom de categorie"
+                className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
+                required
+              />
+              <input
+                value={categoryForm.slug}
+                onChange={(event) => setCategoryForm((current) => ({ ...current, slug: slugifyCategory(event.target.value) }))}
+                placeholder="Slug categorie"
+                className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
+                required
+              />
+              <button
+                type="submit"
+                disabled={savingCategory}
+                className="w-full bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingCategory ? 'SAUVEGARDE...' : editingCategoryId ? 'METTRE A JOUR LA CATEGORIE' : 'AJOUTER LA CATEGORIE'}
+              </button>
+            </form>
+
+            <div className="mt-6 space-y-3">
+              {loadingCategories ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-16 animate-pulse border border-zinc-800 bg-zinc-900" />
+                ))
+              ) : categories.length === 0 ? (
+                <p className="text-sm text-zinc-500">Aucune categorie pour le moment.</p>
+              ) : (
+                categories.map((category) => (
+                  <article key={category.id} className="border border-zinc-800 bg-black/30 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-bold text-white">{category.name}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">{category.slug}</p>
+                        <p className="mt-2 text-xs text-zinc-400">{category.games_count ?? 0} jeux rattaches</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => startEditCategory(category)} className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
+                          Editer
+                        </button>
+                        <button type="button" onClick={() => void handleDeleteCategory(category.id)} className="border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
+                          Supprimer
+                        </button>
+                      </div>
                     </div>
-                    <span className={`text-[10px] uppercase tracking-[0.3em] ${game.is_published ? 'text-cyan-400' : 'text-zinc-500'}`}>
-                      {game.is_published ? 'Publie' : 'Brouillon'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-zinc-400 space-y-1">
-                    <p>{game.developer_name || 'Developpeur non renseigne'}</p>
-                    <p>{game.technology || 'Technologie non renseignee'}</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={() => startEditGame(game)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
-                      Editer
-                    </button>
-                    <button type="button" onClick={() => void handleDeleteGame(game.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
-                      Supprimer
-                    </button>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                ))
+              )}
             </div>
-          )}
+          </div>
         </div>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-8">
+      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
             <h2 className="text-lg font-black uppercase text-white">
               {editingUserId ? 'Modifier un joueur' : 'Selectionne un joueur'}
             </h2>
@@ -627,15 +878,15 @@ export default function AdminPage() {
               <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
             </label>
             <input value={userForm.xp_points} onChange={(e) => handleUserChange('xp_points', Number(e.target.value) || 0)} placeholder="XP" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 min-h-32" />
-            <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:opacity-60 disabled:cursor-not-allowed">
+            <textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
               {savingUser ? 'MISE A JOUR...' : 'METTRE A JOUR LE JOUEUR'}
             </button>
           </form>
         </div>
 
         <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
             <h2 className="text-lg font-black uppercase text-white">Utilisateurs</h2>
             <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{users.length} comptes</span>
           </div>
@@ -643,18 +894,18 @@ export default function AdminPage() {
           {loadingUsers ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="h-24 bg-zinc-900 border border-zinc-800 animate-pulse" />
+                <div key={index} className="h-24 animate-pulse border border-zinc-800 bg-zinc-900" />
               ))}
             </div>
           ) : (
-            <div className="space-y-3 max-h-[900px] overflow-y-auto pr-1">
+            <div className="max-h-[900px] space-y-3 overflow-y-auto pr-1">
               {users.map((user) => (
-                <article key={user.id} className="border border-zinc-800 bg-black/30 p-4 space-y-3">
+                <article key={user.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
                   <div>
                     <p className="font-bold text-white">{user.username}</p>
-                    <p className="text-xs text-zinc-500 mt-1">{user.email || 'Email non disponible'}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{user.email || 'Email non disponible'}</p>
                   </div>
-                  <div className="text-xs text-zinc-400 space-y-1">
+                  <div className="space-y-1 text-xs text-zinc-400">
                     <p>Pseudo: {user.username}</p>
                     <p>XP: {user.xp_points}</p>
                     <p>Bio: {user.bio || 'Aucune bio'}</p>

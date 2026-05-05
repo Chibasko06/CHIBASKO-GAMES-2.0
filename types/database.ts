@@ -150,6 +150,48 @@ export type Database = {
           },
         ]
       }
+      game_reactions: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          reaction: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          reaction: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          reaction?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'game_reactions_game_id_fkey'
+            columns: ['game_id']
+            isOneToOne: false
+            referencedRelation: 'games'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'game_reactions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       games: {
         Row: {
           created_at: string
@@ -286,8 +328,10 @@ export type Database = {
         Returns: {
           average_rating: number
           comments_count: number
+          dislikes_count: number
           favorites_count: number
           game_id: string
+          likes_count: number
           ratings_count: number
         }[]
       }
@@ -307,12 +351,6 @@ export type Database = {
         }[]
       }
       increment_game_view: {
-        Args: {
-          p_game_id: string
-        }
-        Returns: number
-      }
-      record_game_play: {
         Args: {
           p_game_id: string
         }

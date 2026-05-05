@@ -1,14 +1,16 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from 'react'
+import { ChangeEvent, useEffect, useRef, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
 import { uploadOwnAvatar } from '@/lib/avatarUpload'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
-import { Tables } from '@/types/database'
+import { Database, Tables } from '@/types/database'
 
 type Profile = Tables<'profiles'>
 type FavoriteEntry = Awaited<ReturnType<typeof getFavoriteGames>>[number]
@@ -27,7 +29,9 @@ const emptyPasswordForm: PasswordForm = {
 }
 
 export default function DashboardPage() {
+  const pathname = usePathname()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [savedProfile, setSavedProfile] = useState<Profile | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -40,6 +44,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
   const [passwordForm, setPasswordForm] = useState<PasswordForm>(emptyPasswordForm)
+  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -77,6 +82,7 @@ export default function DashboardPage() {
       if (mounted) {
         setNeedsAuth(false)
         setProfile(profileData)
+        setSavedProfile(profileData)
         setFavoriteCount(favoritesTotal ?? 0)
         setCommentCount(reviewsTotal ?? 0)
         setRecentFavorites(favoriteEntries.slice(0, 4))
@@ -89,14 +95,87 @@ export default function DashboardPage() {
       void loadDashboard()
     }
 
+    const handleFocus = () => {
+      void loadDashboard()
+    }
+
     void loadDashboard()
     window.addEventListener('favorites-updated', handleFavoritesUpdate)
+    window.addEventListener('focus', handleFocus)
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void loadDashboard()
+    })
 
     return () => {
       mounted = false
       window.removeEventListener('favorites-updated', handleFavoritesUpdate)
+      window.removeEventListener('focus', handleFocus)
+      subscription.unsubscribe()
     }
-  }, [])
+  }, [pathname])
+
+  useEffect(() => {
+    if (!profile || !savedProfile) {
+      return
+    }
+
+    if (
+      profile.username === savedProfile.username &&
+      (profile.bio || '') === (savedProfile.bio || '')
+    ) {
+      return
+    }
+
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+    }
+
+    autosaveTimeoutRef.current = setTimeout(() => {
+      void (async () => {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+          return
+        }
+
+        setSavingProfile(true)
+        const normalizedUsername = profile.username.trim()
+
+        const { error, data } = await supabase
+          .from('profiles')
+          .update({
+            username: normalizedUsername,
+            display_name: normalizedUsername,
+            bio: profile.bio || null,
+          })
+          .eq('id', user.id)
+          .select('*')
+          .single()
+
+        if (error) {
+          setProfileMessage(error.message)
+          setSavingProfile(false)
+          return
+        }
+
+        setProfile(data)
+        setSavedProfile(data)
+        setProfileMessage('Profil enregistre automatiquement.')
+        setSavingProfile(false)
+      })()
+    }, 700)
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
+    }
+  }, [profile, savedProfile])
 
   const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -136,6 +215,7 @@ export default function DashboardPage() {
       }
 
       setProfile(updatedProfile)
+      setSavedProfile(updatedProfile)
       setProfileMessage('Avatar mis a jour.')
     } catch (error) {
       setProfileMessage(error instanceof Error ? error.message : 'Impossible d envoyer l avatar.')
@@ -143,46 +223,6 @@ export default function DashboardPage() {
       setUploadingAvatar(false)
       event.target.value = ''
     }
-  }
-
-  const handleProfileSave = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user || !profile) {
-      setProfileMessage('Connecte-toi pour modifier ton profil.')
-      return
-    }
-
-    setSavingProfile(true)
-    setProfileMessage(null)
-    await ensureProfile()
-
-    const normalizedUsername = profile.username.trim()
-
-    const { error: profileError, data: updatedProfile } = await supabase
-      .from('profiles')
-      .update({
-        username: normalizedUsername,
-        display_name: normalizedUsername,
-        bio: profile.bio || null,
-      })
-      .eq('id', user.id)
-      .select('*')
-      .single()
-
-    if (profileError) {
-      setProfileMessage(profileError.message)
-      setSavingProfile(false)
-      return
-    }
-
-    setProfile(updatedProfile)
-    setProfileMessage('Profil mis a jour avec succes.')
-    setSavingProfile(false)
   }
 
   const handlePasswordChange = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -215,10 +255,23 @@ export default function DashboardPage() {
 
     setSavingPassword(true)
 
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
+    const verificationClient = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    )
+
+    const { error: verifyError } = await verificationClient.auth.signInWithPassword({
       email: user.email,
       password: passwordForm.currentPassword,
     })
+
+    await verificationClient.auth.signOut()
 
     if (verifyError) {
       setPasswordMessage('Ancien mot de passe incorrect.')
@@ -253,9 +306,6 @@ export default function DashboardPage() {
             <Link href="/login" className="rounded-full bg-cyan-400 px-5 py-3 font-bold text-black">
               Connexion
             </Link>
-            <Link href="/register" className="rounded-full border border-cyan-700 px-5 py-3 font-bold text-white">
-              Inscription
-            </Link>
           </div>
         </div>
       </main>
@@ -269,7 +319,7 @@ export default function DashboardPage() {
         <h1 className="mt-3 text-3xl font-black uppercase text-white md:text-4xl">Tableau de bord</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
           Gere ton pseudo, ton avatar, ton mot de passe et retrouve rapidement tes favoris et
-          tes dernieres sessions.
+          tes derniers jeux vus.
         </p>
       </section>
 
@@ -295,7 +345,7 @@ export default function DashboardPage() {
           <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-6">
             <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Mon profil</h2>
             {profile ? (
-              <form onSubmit={handleProfileSave} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <input
                   value={profile.username || ''}
                   onChange={(event) => setProfile((current) => current ? { ...current, username: event.target.value } : current)}
@@ -315,17 +365,24 @@ export default function DashboardPage() {
                   placeholder="Bio"
                   className="min-h-32 rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500 md:col-span-2"
                 />
-                {profileMessage ? (
-                  <p className="text-sm text-cyan-300 md:col-span-2">{profileMessage}</p>
-                ) : null}
-                <button
-                  type="submit"
-                  disabled={savingProfile || uploadingAvatar}
-                  className="rounded-full bg-cyan-400 py-4 font-black uppercase tracking-[0.2em] text-black disabled:opacity-60 disabled:cursor-not-allowed md:col-span-2"
-                >
-                  {savingProfile ? 'Mise a jour...' : 'Enregistrer le profil'}
-                </button>
-              </form>
+                <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+                  <div className="text-zinc-400">
+                    {savingProfile ? 'Enregistrement automatique...' : profileMessage || 'Les modifications sont enregistrees automatiquement.'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (savedProfile) {
+                        setProfile(savedProfile)
+                        setProfileMessage('Profil revenu aux valeurs enregistrees.')
+                      }
+                    }}
+                    className="rounded-full border border-zinc-700 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-200"
+                  >
+                    Annuler mes changements
+                  </button>
+                </div>
+              </div>
             ) : (
               <p className="mt-5 text-zinc-500">Chargement du profil...</p>
             )}
@@ -399,7 +456,7 @@ export default function DashboardPage() {
 
         <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Derniers jeux lances</h2>
+            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Derniers jeux vus</h2>
             <Link href="/games" className="text-xs text-zinc-400 hover:text-cyan-400">
               Explorer
             </Link>
@@ -417,13 +474,13 @@ export default function DashboardPage() {
                   <p className="mt-1 text-xs text-zinc-500">
                     {entry.played_at
                       ? new Date(entry.played_at).toLocaleString('fr-FR')
-                      : 'Session enregistree'}
+                      : 'Vue enregistree'}
                   </p>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-zinc-500">Aucune session enregistree pour le moment.</p>
+            <p className="text-sm text-zinc-500">Aucune visite enregistree pour le moment.</p>
           )}
         </section>
       </div>

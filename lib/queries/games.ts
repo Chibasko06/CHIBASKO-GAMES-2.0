@@ -3,7 +3,6 @@ import { supabase } from '../supabaseClient'
 
 export type Game = Tables<'games'>
 export type Category = Tables<'categories'>
-export type GameReview = Tables<'game_reviews'>
 
 type GameCategoryRow = {
   game_id?: string
@@ -16,18 +15,15 @@ export type GamePublicStat = {
   ratings_count: number
   average_rating: number
   comments_count: number
+  likes_count: number
+  dislikes_count: number
 }
 
 export type GameWithCategories = Game & {
   categories: Category[]
 }
 
-export type GameWithCategoriesAndStats = GameWithCategories & {
-  favorites_count: number
-  ratings_count: number
-  average_rating: number
-  comments_count: number
-}
+export type GameWithCategoriesAndStats = GameWithCategories & GamePublicStat
 
 export type HomepageHighlight = {
   label: string
@@ -60,6 +56,8 @@ export async function getGamePublicStats() {
     ratings_count: Number(row.ratings_count ?? 0),
     average_rating: Number(row.average_rating ?? 0),
     comments_count: Number(row.comments_count ?? 0),
+    likes_count: Number(row.likes_count ?? 0),
+    dislikes_count: Number(row.dislikes_count ?? 0),
   }))
 }
 
@@ -70,20 +68,23 @@ function mergeGamesWithStats(
   const statsByGameId = new Map(stats.map((row) => [row.game_id, row]))
 
   return games.map((game) => {
-    const gameStat = statsByGameId.get(game.id)
+    const stat = statsByGameId.get(game.id)
 
     return {
       ...game,
-      favorites_count: gameStat?.favorites_count ?? 0,
-      ratings_count: gameStat?.ratings_count ?? 0,
-      average_rating: gameStat?.average_rating ?? 0,
-      comments_count: gameStat?.comments_count ?? 0,
+      game_id: game.id,
+      favorites_count: stat?.favorites_count ?? 0,
+      ratings_count: stat?.ratings_count ?? 0,
+      average_rating: stat?.average_rating ?? 0,
+      comments_count: stat?.comments_count ?? 0,
+      likes_count: stat?.likes_count ?? 0,
+      dislikes_count: stat?.dislikes_count ?? 0,
     }
   })
 }
 
 export async function getGamesCatalog() {
-  const [{ data: games }, { data: categoryLinks }] = await Promise.all([
+  const [{ data: games }, { data: categoryLinks }, stats] = await Promise.all([
     supabase
       .from('games')
       .select('*')
@@ -92,6 +93,7 @@ export async function getGamesCatalog() {
     supabase
       .from('game_categories')
       .select('game_id, categories(*)'),
+    getGamePublicStats(),
   ])
 
   const categoriesByGameId = new Map<string, Category[]>()
@@ -106,24 +108,27 @@ export async function getGamesCatalog() {
     categoriesByGameId.set(link.game_id, current)
   }
 
-  return (games ?? []).map((game) => ({
+  const catalog = (games ?? []).map((game) => ({
     ...withFallbackThumbnail(game),
     categories: categoriesByGameId.get(game.id) ?? [],
   }))
+
+  return mergeGamesWithStats(catalog, stats)
 }
 
 export async function getGames() {
-  const [games, stats] = await Promise.all([
-    getGamesCatalog(),
-    getGamePublicStats(),
-  ])
+  const games = await getGamesCatalog()
 
-  return mergeGamesWithStats(games, stats).sort((left, right) => {
-    if ((right.play_count ?? 0) !== (left.play_count ?? 0)) {
-      return (right.play_count ?? 0) - (left.play_count ?? 0)
+  return games.sort((left, right) => {
+    if ((right.views_count ?? 0) !== (left.views_count ?? 0)) {
+      return (right.views_count ?? 0) - (left.views_count ?? 0)
     }
 
-    return (right.views_count ?? 0) - (left.views_count ?? 0)
+    if (right.likes_count !== left.likes_count) {
+      return right.likes_count - left.likes_count
+    }
+
+    return right.average_rating - left.average_rating
   })
 }
 
@@ -150,12 +155,9 @@ export async function getHomepageHighlights() {
 
       return right.ratings_count - left.ratings_count
     })[0] ?? mostViewed
-
-  const usedIds = new Set([mostViewed.id, mostFavorited.id, bestRated.id])
-  const randomPool = games.filter((game) => !usedIds.has(game.id))
+  const teamPickPool = games.filter((game) => ![mostViewed.id, mostFavorited.id, bestRated.id].includes(game.id))
   const teamPick =
-    randomPool[Math.floor(Math.random() * randomPool.length)] ??
-    games[Math.floor(Math.random() * games.length)]
+    teamPickPool[Math.floor(Math.random() * Math.max(teamPickPool.length, 1))] ?? mostViewed
 
   return [
     {
@@ -175,7 +177,7 @@ export async function getHomepageHighlights() {
     },
     {
       label: 'Selection equipe',
-      description: 'Choix surprise du moment',
+      description: 'Choix du moment',
       game: teamPick,
     },
   ] satisfies HomepageHighlight[]
@@ -202,10 +204,7 @@ export async function getGamesByCategory(limitPerCategory = 4) {
 }
 
 export async function getGameBySlug(slug: string) {
-  const [games, stats] = await Promise.all([
-    getGamesCatalog(),
-    getGamePublicStats(),
-  ])
+  const games = await getGamesCatalog()
 
   const game = games.find((entry) => entry.slug === slug)
 
@@ -213,7 +212,7 @@ export async function getGameBySlug(slug: string) {
     return null
   }
 
-  return mergeGamesWithStats([game], stats)[0]
+  return game
 }
 
 export async function getGameReviews(gameId: string) {

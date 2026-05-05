@@ -1,9 +1,12 @@
 import FavoriteButton from '@/components/FavoriteButton'
 import GameReviews from '@/components/GameReviews'
+import GameViewport from '@/components/GameViewport'
 import PlaySessionTracker from '@/components/PlaySessionTracker'
 import { getGameBySlug } from '@/lib/queries/games'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
 
 export default async function GamePage({
   params,
@@ -46,26 +49,25 @@ export default async function GamePage({
           <p className="mt-2 text-2xl font-black text-white">{game.views_count}</p>
         </div>
         <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Favoris</p>
-          <p className="mt-2 text-2xl font-black text-white">{game.favorites_count}</p>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Likes</p>
+          <p className="mt-2 text-2xl font-black text-white">{game.likes_count}</p>
+        </div>
+        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Dislikes</p>
+          <p className="mt-2 text-2xl font-black text-white">{game.dislikes_count}</p>
         </div>
         <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Note moyenne</p>
           <p className="mt-2 text-2xl font-black text-white">{game.average_rating.toFixed(1)} / 5</p>
         </div>
-        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Commentaires</p>
-          <p className="mt-2 text-2xl font-black text-white">{game.comments_count}</p>
-        </div>
       </div>
 
-      <div className="aspect-video overflow-hidden rounded-[24px] border border-cyan-900/50 bg-black">
-        <iframe
-          src={game.game_url}
-          className="h-full w-full"
-          allowFullScreen
-        />
-      </div>
+      <GameViewport
+        gameId={game.id}
+        gameUrl={game.game_url}
+        initialLikes={game.likes_count}
+        initialDislikes={game.dislikes_count}
+      />
 
       <p className="text-zinc-400">
         {game.description ?? 'Aucune description disponible.'}
@@ -93,9 +95,9 @@ export default async function GamePage({
           <p className="text-base font-bold text-white">{game.provider_name || 'Non renseigne'}</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">Stats gameplay</p>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">Communaute</p>
           <p className="text-base font-bold text-white">
-            {game.play_count} parties • {game.ratings_count} notes
+            {game.favorites_count} favoris • {game.ratings_count} notes • {game.comments_count} commentaires
           </p>
         </div>
       </div>

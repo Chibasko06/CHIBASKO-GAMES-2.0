@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from('games')
-    .select('*')
+    .select('*, game_categories(category_id)')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
 
   const { supabaseAdmin } = adminCheck
   const body = await request.json()
+  const categoryIds = Array.isArray(body.category_ids)
+    ? body.category_ids.filter((value: unknown): value is string => typeof value === 'string')
+    : []
 
   const payload = {
     title: body.title,
@@ -55,6 +58,17 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (categoryIds.length > 0) {
+    const { error: categoriesError } = await supabaseAdmin
+      .from('game_categories')
+      .insert(categoryIds.map((categoryId: string) => ({ game_id: data.id, category_id: categoryId })))
+
+    if (categoriesError) {
+      await supabaseAdmin.from('games').delete().eq('id', data.id)
+      return NextResponse.json({ error: categoriesError.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ game: data })

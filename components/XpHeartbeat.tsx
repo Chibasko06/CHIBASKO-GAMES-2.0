@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
-const XP_SYNC_INTERVAL_MS = 60_000
+const XP_SYNC_INTERVAL_MS = 300_000
 
 export default function XpHeartbeat() {
   useEffect(() => {

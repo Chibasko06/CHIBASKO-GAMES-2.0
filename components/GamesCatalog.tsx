@@ -2,12 +2,12 @@
 
 import { useDeferredValue, useState } from 'react'
 import { GameCard } from '@/components/GameCard'
-import type { Category, GameWithCategories } from '@/lib/queries/games'
+import type { Category, GameWithCategoriesAndStats } from '@/lib/queries/games'
 
 type SortOption = 'popular' | 'recent' | 'title-asc' | 'title-desc'
 
 type Props = {
-  games: GameWithCategories[]
+  games: GameWithCategoriesAndStats[]
   categories: Category[]
   initialCategorySlug?: string
 }
@@ -64,11 +64,11 @@ export default function GamesCatalog({
         return right.title.localeCompare(left.title, 'fr', { sensitivity: 'base' })
       }
 
-      if ((right.play_count ?? 0) !== (left.play_count ?? 0)) {
-        return (right.play_count ?? 0) - (left.play_count ?? 0)
+      if ((right.views_count ?? 0) !== (left.views_count ?? 0)) {
+        return (right.views_count ?? 0) - (left.views_count ?? 0)
       }
 
-      return (right.views_count ?? 0) - (left.views_count ?? 0)
+      return (right.likes_count ?? 0) - (left.likes_count ?? 0)
     })
 
   return (

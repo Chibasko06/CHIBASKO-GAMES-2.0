@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import { GameCard } from '@/components/GameCard'
+import HomeHeroActions from '@/components/HomeHeroActions'
 import { getFeaturedGames, getGamesByCategory, getHomepageHighlights } from '@/lib/queries/games'
+
+export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   const [featuredGames, categorySections, homepageHighlights] = await Promise.all([
@@ -23,24 +26,11 @@ export default async function Home() {
                 <span className="block text-cyan-400"> votre console</span>
               </h1>
               <p className="max-w-xl text-base leading-7 text-zinc-300">
-                Accédez à des centaines de jeux gratuits sans aucune installation. Créez votre profil, gagnez de l'XP et grimpez dans le classement.
+                Accédez à des centaines de jeux gratuits sans aucune installation. Créez votre profil, gagnez de l&apos;XP et grimpez dans le classement.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/games"
-                className="rounded-full bg-cyan-400 px-6 py-3 text-sm font-black uppercase tracking-[0.2em] text-black transition hover:bg-cyan-300"
-              >
-                Explorer les jeux
-              </Link>
-              <Link
-                href="/register"
-                className="rounded-full border border-cyan-700/70 px-6 py-3 text-sm font-black uppercase tracking-[0.2em] text-cyan-200 transition hover:bg-zinc-900"
-              >
-                Creer un compte
-              </Link>
-            </div>
+            <HomeHeroActions />
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">

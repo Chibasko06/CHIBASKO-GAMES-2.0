@@ -447,3 +447,89 @@ on conflict (slug) do nothing;
 insert into public.categories (name, slug)
 values ('Classique', 'classique')
 on conflict (slug) do nothing;
+
+
+
+
+
+--test, generation du sql depuis supabase
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.categories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE CHECK (char_length(TRIM(BOTH FROM name)) > 0),
+  slug text NOT NULL UNIQUE CHECK (char_length(TRIM(BOTH FROM slug)) > 0),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT categories_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.favorites (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  game_id uuid NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT favorites_pkey PRIMARY KEY (id),
+  CONSTRAINT favorites_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT favorites_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id)
+);
+CREATE TABLE public.game_categories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  game_id uuid NOT NULL,
+  category_id uuid NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT game_categories_pkey PRIMARY KEY (id),
+  CONSTRAINT game_categories_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id),
+  CONSTRAINT game_categories_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
+);
+CREATE TABLE public.game_reviews (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  game_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment text NOT NULL CHECK (char_length(TRIM(BOTH FROM comment)) > 0),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT game_reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT game_reviews_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id),
+  CONSTRAINT game_reviews_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.games (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL CHECK (char_length(TRIM(BOTH FROM title)) > 0),
+  slug text NOT NULL UNIQUE CHECK (char_length(TRIM(BOTH FROM slug)) > 0),
+  game_url text NOT NULL,
+  thumbnail_url text,
+  description text,
+  developer_name text,
+  release_date_text text,
+  mobile_compatible text,
+  technology text,
+  provider_name text,
+  source_page_url text,
+  views_count integer NOT NULL DEFAULT 0 CHECK (views_count >= 0),
+  play_count integer NOT NULL DEFAULT 0 CHECK (play_count >= 0),
+  is_published boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT games_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.play_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  game_id uuid NOT NULL,
+  played_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT play_history_pkey PRIMARY KEY (id),
+  CONSTRAINT play_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT play_history_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  username text NOT NULL UNIQUE CHECK (char_length(TRIM(BOTH FROM username)) > 0),
+  display_name text,
+  avatar_url text,
+  bio text,
+  xp_points integer NOT NULL DEFAULT 0 CHECK (xp_points >= 0),
+  last_xp_tick_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);

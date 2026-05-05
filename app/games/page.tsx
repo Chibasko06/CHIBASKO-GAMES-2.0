@@ -1,6 +1,8 @@
 import GamesCatalog from '@/components/GamesCatalog'
 import { getCategories, getGamesCatalog } from '@/lib/queries/games'
 
+export const dynamic = 'force-dynamic'
+
 export default async function GamesPage({
   searchParams,
 }: {

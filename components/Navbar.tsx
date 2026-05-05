@@ -119,6 +119,9 @@ export function Navbar() {
           <Link href="/games" className="rounded-full border border-transparent px-4 py-2 hover:border-cyan-900 hover:text-cyan-300 transition-colors">
             Jeux
           </Link>
+          <Link href="/players" className="rounded-full border border-transparent px-4 py-2 hover:border-cyan-900 hover:text-cyan-300 transition-colors">
+            Communaute
+          </Link>
           <Link href="/contact" className="rounded-full border border-transparent px-4 py-2 hover:border-cyan-900 hover:text-cyan-300 transition-colors">
             Contact
           </Link>

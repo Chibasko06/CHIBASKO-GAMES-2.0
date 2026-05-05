@@ -39,6 +39,16 @@ export default function GameReviews({ gameId }: Props) {
     }
 
     void loadReviews()
+
+    const handleFocus = () => {
+      void loadReviews()
+    }
+
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [gameId])
 
   const averageRating = reviews.length

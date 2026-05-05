@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -9,6 +10,19 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const load = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      setAlreadyLoggedIn(Boolean(user))
+    }
+
+    void load()
+  }, [])
 
   const handleLogin = async () => {
     setLoading(true)
@@ -23,6 +37,25 @@ export default function LoginPage() {
 
     await ensureProfile(data.session)
     window.location.href = '/'
+  }
+
+  if (alreadyLoggedIn) {
+    return (
+      <div className="mx-auto max-w-md rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 text-center">
+        <h1 className="text-2xl font-black uppercase text-white">Tu es deja connecte</h1>
+        <p className="mt-4 text-sm leading-6 text-zinc-400">
+          Pas besoin de te reconnecter. Tu peux retourner sur ton profil ou parcourir le catalogue.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Link href="/dashboard" className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase text-black">
+            Mon profil
+          </Link>
+          <Link href="/games" className="rounded-full border border-cyan-700 px-5 py-3 text-sm font-black uppercase text-cyan-200">
+            Les jeux
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (

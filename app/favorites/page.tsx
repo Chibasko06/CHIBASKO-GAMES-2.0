@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { GameCard } from '@/components/GameCard'
 import { getFavoriteGames } from '@/lib/queries/favorites'
@@ -11,6 +12,7 @@ import { Tables } from '@/types/database'
 type Game = Tables<'games'>
 
 export default function FavoritesPage() {
+  const pathname = usePathname()
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
@@ -42,17 +44,30 @@ export default function FavoritesPage() {
     }
 
     const handleFavoritesUpdate = () => {
-      loadFavorites()
+      void loadFavorites()
     }
 
-    loadFavorites()
+    const handleFocus = () => {
+      void loadFavorites()
+    }
+
+    void loadFavorites()
     window.addEventListener('favorites-updated', handleFavoritesUpdate)
+    window.addEventListener('focus', handleFocus)
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void loadFavorites()
+    })
 
     return () => {
       mounted = false
       window.removeEventListener('favorites-updated', handleFavoritesUpdate)
+      window.removeEventListener('focus', handleFocus)
+      subscription.unsubscribe()
     }
-  }, [])
+  }, [pathname])
 
   return (
     <div className="space-y-6">

@@ -8,8 +8,9 @@ type Props = {
     thumbnail_url: string | null
     categories?: { id: string; name: string; slug: string }[]
     description?: string | null
-    play_count?: number
     views_count?: number
+    likes_count?: number
+    dislikes_count?: number
     developer_name?: string | null
     technology?: string | null
   }
@@ -48,10 +49,10 @@ export function GameCard({ game }: Props) {
           {game.description ? (
             <p className="text-xs text-zinc-400 line-clamp-2">{game.description}</p>
           ) : null}
-          <div className="space-y-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-            <div className="flex items-center gap-3">
-              <span>{game.play_count ?? 0} parties</span>
+          <div className="space-y-1 text-[10px] uppercase text-zinc-500">
+            <div className="flex items-center tracking-[0.2em] gap-3">
               <span>{game.views_count ?? 0} vues</span>
+              <span>{game.likes_count ?? 0} likes</span>
             </div>
             {game.developer_name || game.technology ? (
               <div className="flex items-center gap-2">

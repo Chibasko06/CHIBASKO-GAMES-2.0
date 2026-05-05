@@ -14,6 +14,9 @@ export async function PATCH(
   const { id } = await params
   const { supabaseAdmin } = adminCheck
   const body = await request.json()
+  const categoryIds = Array.isArray(body.category_ids)
+    ? body.category_ids.filter((value: unknown): value is string => typeof value === 'string')
+    : []
 
   const payload = {
     title: body.title,
@@ -39,6 +42,25 @@ export async function PATCH(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  const { error: deleteRelationsError } = await supabaseAdmin
+    .from('game_categories')
+    .delete()
+    .eq('game_id', id)
+
+  if (deleteRelationsError) {
+    return NextResponse.json({ error: deleteRelationsError.message }, { status: 500 })
+  }
+
+  if (categoryIds.length > 0) {
+    const { error: categoriesError } = await supabaseAdmin
+      .from('game_categories')
+      .insert(categoryIds.map((categoryId: string) => ({ game_id: id, category_id: categoryId })))
+
+    if (categoriesError) {
+      return NextResponse.json({ error: categoriesError.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ game: data })
