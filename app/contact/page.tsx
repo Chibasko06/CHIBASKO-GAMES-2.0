@@ -20,6 +20,7 @@ export default function ContactPage() {
   const [form, setForm] = useState<ContactFormState>(emptyForm)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const formSubmitUrl = 'https://formsubmit.co/ajax/chibasko06@gmail.com'
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -33,12 +34,20 @@ export default function ContactPage() {
     setSending(true)
 
     try {
-      const response = await fetch('/api/contact', {
+      const response = await fetch(formSubmitUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          name: `${form.firstName} ${form.lastName}`,
+          email: form.email,
+          message: `Nom: ${form.lastName}\nPrenom: ${form.firstName}\nEmail: ${form.email}\n\nMessage:\n${form.message}`,
+          _subject: `Contact Chibasko Games - ${form.firstName} ${form.lastName}`,
+          _captcha: 'false',
+          _template: 'table',
+        }),
       })
 
       const payload = await response.json().catch(() => null)
@@ -62,7 +71,7 @@ export default function ContactPage() {
       <h1 className="mt-3 text-4xl font-black uppercase text-white">Nous contacter</h1>
       <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-400">
         Une question, un bug, une idee de partenariat ou un retour sur un jeu ? Remplis ce
-        formulaire et ton message sera envoye directement a l equipe Chibasko Games.
+        formulaire et ton message sera envoye directement a l equipe Chibasko Games via FormSubmit.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
