@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function HomeHeroActions() {
@@ -11,9 +12,7 @@ export default function HomeHeroActions() {
     let mounted = true
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getClientSessionUser()
 
       if (mounted) {
         setIsLoggedIn(Boolean(user))

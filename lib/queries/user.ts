@@ -1,3 +1,4 @@
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { supabase } from '../supabaseClient'
 
 export async function signUp(email: string, password: string) {
@@ -9,6 +10,5 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function getCurrentUser() {
-  const { data } = await supabase.auth.getUser()
-  return data.user
+  return await getClientSessionUser()
 }

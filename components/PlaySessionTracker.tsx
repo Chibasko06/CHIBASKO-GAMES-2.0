@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from 'react'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -25,9 +26,7 @@ export default function PlaySessionTracker({ gameId }: Props) {
         }
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getClientSessionUser()
 
       if (!user || window.sessionStorage.getItem(historyStorageKey)) {
         return

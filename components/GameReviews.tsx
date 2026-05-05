@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -73,9 +74,7 @@ export default function GameReviews({ gameId }: Props) {
 
     setMessage(null)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getClientSessionUser()
 
     if (!user) {
       setNeedsAuth(true)

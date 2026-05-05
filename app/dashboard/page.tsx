@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
 import { uploadOwnAvatar } from '@/lib/avatarUpload'
@@ -52,9 +53,7 @@ export default function DashboardPage() {
 
     const loadDashboard = async () => {
       const requestId = ++requestIdRef.current
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getClientSessionUser()
 
       if (!user) {
         if (mounted && requestId === requestIdRef.current) {
@@ -137,9 +136,7 @@ export default function DashboardPage() {
 
     autosaveTimeoutRef.current = setTimeout(() => {
       void (async () => {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+        const user = await getClientSessionUser()
 
         if (!user) {
           return
@@ -191,9 +188,7 @@ export default function DashboardPage() {
       return
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getClientSessionUser()
 
     if (!user) {
       setProfileMessage('Connecte-toi pour importer un avatar.')
@@ -231,9 +226,7 @@ export default function DashboardPage() {
     event.preventDefault()
     setPasswordMessage(null)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getClientSessionUser()
 
     if (!user?.email) {
       setPasswordMessage('Impossible de verifier ton compte.')

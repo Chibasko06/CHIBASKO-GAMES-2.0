@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { addFavorite, isFavorite, removeFavorite } from '@/lib/queries/favorites'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
@@ -21,9 +22,7 @@ export default function FavoriteButton({ gameId }: Props) {
 
     const checkFavorite = async () => {
       const requestId = ++requestIdRef.current
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getClientSessionUser()
 
       if (!mounted || requestId !== requestIdRef.current) {
         return

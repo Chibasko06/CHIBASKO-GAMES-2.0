@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useEffect } from 'react'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -14,9 +15,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getClientSessionUser()
 
       setAlreadyLoggedIn(Boolean(user))
     }

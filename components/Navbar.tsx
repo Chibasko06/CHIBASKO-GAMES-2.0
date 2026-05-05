@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
+import { getClientSession, getClientSessionUser } from '@/lib/clientAuth'
 import { supabase } from '@/lib/supabaseClient'
 import UserDropdown from '@/components/UserDropdown'
 import ChibaskoLogo from '@/components/ChibaskoLogo'
@@ -17,9 +18,7 @@ export function Navbar() {
     let mounted = true
 
     const loadUser = async () => {
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
+      const currentUser = await getClientSessionUser()
 
       if (mounted) {
         setUser(currentUser)
@@ -37,9 +36,7 @@ export function Navbar() {
           setAvatarUrl(profile?.avatar_url ?? null)
         }
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
+        const session = await getClientSession()
 
         if (session?.access_token) {
           const response = await fetch('/api/admin/status', {

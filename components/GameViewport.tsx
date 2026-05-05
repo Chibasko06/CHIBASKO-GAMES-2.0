@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -30,9 +31,7 @@ export default function GameViewport({
     let mounted = true
 
     const loadReaction = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getClientSessionUser()
 
       if (!user) {
         if (mounted) {
@@ -79,9 +78,7 @@ export default function GameViewport({
       return
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getClientSessionUser()
 
     if (!user) {
       alert('Connecte-toi pour liker ou disliker un jeu.')

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { getClientSessionUser } from '@/lib/clientAuth'
 import { supabase } from '@/lib/supabaseClient'
 import { GameCard } from '@/components/GameCard'
 import { getFavoriteGames } from '@/lib/queries/favorites'
@@ -23,9 +24,7 @@ export default function FavoritesPage() {
 
     const loadFavorites = async () => {
       const requestId = ++requestIdRef.current
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getClientSessionUser()
 
       if (!user) {
         if (mounted && requestId === requestIdRef.current) {
