@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { getClientSessionUser } from '@/lib/clientAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/components/AuthProvider'
 import { GameCard } from '@/components/GameCard'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { ensureProfile } from '@/lib/profileSync'
@@ -14,6 +13,7 @@ type Game = Tables<'games'>
 
 export default function FavoritesPage() {
   const pathname = usePathname()
+  const { loading: authLoading, user } = useAuth()
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
@@ -24,12 +24,11 @@ export default function FavoritesPage() {
 
     const loadFavorites = async () => {
       const requestId = ++requestIdRef.current
-      const user = await getClientSessionUser()
 
       if (!user) {
         if (mounted && requestId === requestIdRef.current) {
-          setNeedsAuth(true)
-          setLoading(false)
+          setNeedsAuth(!authLoading)
+          setLoading(authLoading)
         }
         return
       }
@@ -56,19 +55,12 @@ export default function FavoritesPage() {
     window.addEventListener('favorites-updated', handleFavoritesUpdate)
     window.addEventListener('focus', handleFocus)
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void loadFavorites()
-    })
-
     return () => {
       mounted = false
       window.removeEventListener('favorites-updated', handleFavoritesUpdate)
       window.removeEventListener('focus', handleFocus)
-      subscription.unsubscribe()
     }
-  }, [pathname])
+  }, [authLoading, pathname, user])
 
   return (
     <div className="space-y-6">

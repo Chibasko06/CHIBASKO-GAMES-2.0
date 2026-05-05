@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
-import { getClientSessionUser } from '@/lib/clientAuth'
+import { useAuth } from '@/components/AuthProvider'
 import { addFavorite, isFavorite, removeFavorite } from '@/lib/queries/favorites'
 import { ensureProfile } from '@/lib/profileSync'
-import { supabase } from '@/lib/supabaseClient'
 
 type Props = {
   gameId: string
 }
 
 export default function FavoriteButton({ gameId }: Props) {
+  const { loading: authLoading, session, user } = useAuth()
   const [isGameFavorite, setIsGameFavorite] = useState(false)
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
@@ -22,7 +22,6 @@ export default function FavoriteButton({ gameId }: Props) {
 
     const checkFavorite = async () => {
       const requestId = ++requestIdRef.current
-      const user = await getClientSessionUser()
 
       if (!mounted || requestId !== requestIdRef.current) {
         return
@@ -31,11 +30,15 @@ export default function FavoriteButton({ gameId }: Props) {
       if (!user) {
         setUserId(null)
         setIsGameFavorite(false)
-        setLoading(false)
+        setLoading(authLoading)
         return
       }
 
-      await ensureProfile()
+      if (!session) {
+        return
+      }
+
+      await ensureProfile(session)
       const favorite = await isFavorite(user.id, gameId)
 
       if (!mounted || requestId !== requestIdRef.current) {
@@ -49,17 +52,10 @@ export default function FavoriteButton({ gameId }: Props) {
 
     void checkFavorite()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void checkFavorite()
-    })
-
     return () => {
       mounted = false
-      subscription.unsubscribe()
     }
-  }, [gameId])
+  }, [authLoading, gameId, session, user])
 
   const notifyFavoriteChange = (favorite: boolean) => {
     window.dispatchEvent(

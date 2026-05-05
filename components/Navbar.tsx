@@ -2,15 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { User } from '@supabase/supabase-js'
-import { getClientSession, getClientSessionUser } from '@/lib/clientAuth'
+import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabaseClient'
 import UserDropdown from '@/components/UserDropdown'
 import ChibaskoLogo from '@/components/ChibaskoLogo'
 
 export function Navbar() {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, session, loading } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
@@ -18,25 +16,16 @@ export function Navbar() {
     let mounted = true
 
     const loadUser = async () => {
-      const currentUser = await getClientSessionUser()
-
-      if (mounted) {
-        setUser(currentUser)
-        setLoading(false)
-      }
-
-      if (currentUser) {
+      if (user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('avatar_url')
-          .eq('id', currentUser.id)
+          .eq('id', user.id)
           .maybeSingle()
 
         if (mounted) {
           setAvatarUrl(profile?.avatar_url ?? null)
         }
-
-        const session = await getClientSession()
 
         if (session?.access_token) {
           const response = await fetch('/api/admin/status', {
@@ -59,49 +48,10 @@ export function Navbar() {
 
     void loadUser()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (mounted) {
-        setUser(session?.user ?? null)
-        setLoading(false)
-      }
-
-      if (session?.access_token) {
-        if (session.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('avatar_url')
-            .eq('id', session.user.id)
-            .maybeSingle()
-
-          if (mounted) {
-            setAvatarUrl(profile?.avatar_url ?? null)
-          }
-        }
-
-        const response = await fetch('/api/admin/status', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        })
-
-        const payload = await response.json()
-
-        if (mounted) {
-          setIsAdmin(Boolean(payload.isAdmin))
-        }
-      } else if (mounted) {
-        setIsAdmin(false)
-        setAvatarUrl(null)
-      }
-    })
-
     return () => {
       mounted = false
-      subscription.unsubscribe()
     }
-  }, [])
+  }, [session, user])
 
   return (
     <header className="border-b border-cyan-950/70 bg-black/85 backdrop-blur">

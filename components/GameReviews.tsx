@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
-import { getClientSessionUser } from '@/lib/clientAuth'
+import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -21,6 +21,7 @@ type Props = {
 }
 
 export default function GameReviews({ gameId }: Props) {
+  const { session, user } = useAuth()
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -74,8 +75,6 @@ export default function GameReviews({ gameId }: Props) {
 
     setMessage(null)
 
-    const user = await getClientSessionUser()
-
     if (!user) {
       setNeedsAuth(true)
       setMessage('Connecte-toi pour laisser un commentaire.')
@@ -88,7 +87,7 @@ export default function GameReviews({ gameId }: Props) {
     }
 
     setSubmitting(true)
-    const profileSync = await ensureProfile()
+    const profileSync = await ensureProfile(session)
 
     if (!profileSync.ok) {
       setMessage('Impossible de preparer ton profil pour publier le commentaire.')

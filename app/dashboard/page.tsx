@@ -4,8 +4,8 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/components/AuthProvider'
 import ProfileCard from '@/components/ProfileCard'
-import { getClientSessionUser } from '@/lib/clientAuth'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
 import { uploadOwnAvatar } from '@/lib/avatarUpload'
@@ -31,6 +31,7 @@ const emptyPasswordForm: PasswordForm = {
 
 export default function DashboardPage() {
   const pathname = usePathname()
+  const { loading: authLoading, session, user } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [savedProfile, setSavedProfile] = useState<Profile | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -53,17 +54,20 @@ export default function DashboardPage() {
 
     const loadDashboard = async () => {
       const requestId = ++requestIdRef.current
-      const user = await getClientSessionUser()
 
       if (!user) {
         if (mounted && requestId === requestIdRef.current) {
-          setNeedsAuth(true)
-          setLoading(false)
+          setNeedsAuth(!authLoading)
+          setLoading(authLoading)
         }
         return
       }
 
-      await ensureProfile()
+      if (!session) {
+        return
+      }
+
+      await ensureProfile(session)
       await supabase.rpc('sync_profile_xp')
 
       const [
@@ -104,19 +108,12 @@ export default function DashboardPage() {
     window.addEventListener('favorites-updated', handleFavoritesUpdate)
     window.addEventListener('focus', handleFocus)
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void loadDashboard()
-    })
-
     return () => {
       mounted = false
       window.removeEventListener('favorites-updated', handleFavoritesUpdate)
       window.removeEventListener('focus', handleFocus)
-      subscription.unsubscribe()
     }
-  }, [pathname])
+  }, [authLoading, pathname, session, user])
 
   useEffect(() => {
     if (!profile || !savedProfile) {
@@ -136,8 +133,6 @@ export default function DashboardPage() {
 
     autosaveTimeoutRef.current = setTimeout(() => {
       void (async () => {
-        const user = await getClientSessionUser()
-
         if (!user) {
           return
         }
@@ -174,7 +169,7 @@ export default function DashboardPage() {
         clearTimeout(autosaveTimeoutRef.current)
       }
     }
-  }, [profile, savedProfile])
+  }, [profile, savedProfile, user])
 
   const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -187,8 +182,6 @@ export default function DashboardPage() {
       setProfileMessage('Choisis une vraie image pour ton avatar.')
       return
     }
-
-    const user = await getClientSessionUser()
 
     if (!user) {
       setProfileMessage('Connecte-toi pour importer un avatar.')
@@ -225,8 +218,6 @@ export default function DashboardPage() {
   const handlePasswordChange = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setPasswordMessage(null)
-
-    const user = await getClientSessionUser()
 
     if (!user?.email) {
       setPasswordMessage('Impossible de verifier ton compte.')

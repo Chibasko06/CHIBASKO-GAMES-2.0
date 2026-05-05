@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useEffect } from 'react'
-import { getClientSessionUser } from '@/lib/clientAuth'
+import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -11,17 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
-
-  useEffect(() => {
-    const load = async () => {
-      const user = await getClientSessionUser()
-
-      setAlreadyLoggedIn(Boolean(user))
-    }
-
-    void load()
-  }, [])
+  const { loading: authLoading, user } = useAuth()
 
   const handleLogin = async () => {
     setLoading(true)
@@ -38,7 +27,7 @@ export default function LoginPage() {
     window.location.href = '/'
   }
 
-  if (alreadyLoggedIn) {
+  if (!authLoading && user) {
     return (
       <div className="mx-auto max-w-md rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 text-center">
         <h1 className="text-2xl font-black uppercase text-white">Tu es deja connecte</h1>

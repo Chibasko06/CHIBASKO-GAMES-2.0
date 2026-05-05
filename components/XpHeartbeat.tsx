@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect } from 'react'
-import { getClientSessionUser } from '@/lib/clientAuth'
+import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabaseClient'
 
 const XP_SYNC_INTERVAL_MS = 300_000
 
 export default function XpHeartbeat() {
+  const { loading, user } = useAuth()
+
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null
 
     const syncXp = async () => {
-      const user = await getClientSessionUser()
-
       if (!user) {
         return
       }
@@ -28,30 +28,21 @@ export default function XpHeartbeat() {
       }, XP_SYNC_INTERVAL_MS)
     }
 
-    void start()
+    if (!loading && user) {
+      void start()
+    }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user && intervalId) {
-        clearInterval(intervalId)
-        intervalId = null
-        return
-      }
-
-      if (session?.user && !intervalId) {
-        void start()
-      }
-    })
+    if (!loading && !user && intervalId) {
+      clearInterval(intervalId)
+      intervalId = null
+    }
 
     return () => {
       if (intervalId) {
         clearInterval(intervalId)
       }
-
-      subscription.unsubscribe()
     }
-  }, [])
+  }, [loading, user])
 
   return null
 }

@@ -1,39 +1,10 @@
 "use client";
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { getClientSessionUser } from '@/lib/clientAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/components/AuthProvider'
 
 export default function HomeHeroActions() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-
-    const load = async () => {
-      const user = await getClientSessionUser()
-
-      if (mounted) {
-        setIsLoggedIn(Boolean(user))
-      }
-    }
-
-    void load()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        setIsLoggedIn(Boolean(session?.user))
-      }
-    })
-
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [])
+  const { loading, user } = useAuth()
 
   return (
     <div className="flex flex-wrap gap-3">
@@ -43,7 +14,9 @@ export default function HomeHeroActions() {
       >
         Explorer les jeux
       </Link>
-      {isLoggedIn ? (
+      {loading ? (
+        <div className="h-[52px] w-48 rounded-full border border-zinc-800 bg-zinc-950/80 animate-pulse" />
+      ) : user ? (
         <Link
           href="/dashboard"
           className="rounded-full border border-cyan-700/70 px-6 py-3 text-sm font-black uppercase tracking-[0.2em] text-cyan-200 transition hover:bg-zinc-900"

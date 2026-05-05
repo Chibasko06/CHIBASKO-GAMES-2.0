@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from 'react'
-import { getClientSessionUser } from '@/lib/clientAuth'
+import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -10,6 +10,8 @@ type Props = {
 }
 
 export default function PlaySessionTracker({ gameId }: Props) {
+  const { session, user } = useAuth()
+
   useEffect(() => {
     let cancelled = false
 
@@ -26,15 +28,13 @@ export default function PlaySessionTracker({ gameId }: Props) {
         }
       }
 
-      const user = await getClientSessionUser()
-
       if (!user || window.sessionStorage.getItem(historyStorageKey)) {
         return
       }
 
       window.sessionStorage.setItem(historyStorageKey, 'pending')
 
-      const profileSync = await ensureProfile()
+      const profileSync = await ensureProfile(session)
 
       if (!profileSync.ok) {
         window.sessionStorage.removeItem(historyStorageKey)
@@ -61,7 +61,7 @@ export default function PlaySessionTracker({ gameId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [gameId])
+  }, [gameId, session, user])
 
   return null
 }

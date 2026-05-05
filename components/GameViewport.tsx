@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
-import { getClientSessionUser } from '@/lib/clientAuth'
+import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -20,6 +20,7 @@ export default function GameViewport({
   initialLikes,
   initialDislikes,
 }: Props) {
+  const { session, user } = useAuth()
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const [likes, setLikes] = useState(initialLikes)
   const [dislikes, setDislikes] = useState(initialDislikes)
@@ -31,8 +32,6 @@ export default function GameViewport({
     let mounted = true
 
     const loadReaction = async () => {
-      const user = await getClientSessionUser()
-
       if (!user) {
         if (mounted) {
           setReaction(null)
@@ -57,7 +56,7 @@ export default function GameViewport({
     return () => {
       mounted = false
     }
-  }, [gameId])
+  }, [gameId, user])
 
   const syncCounts = async () => {
     const requestId = ++requestIdRef.current
@@ -78,8 +77,6 @@ export default function GameViewport({
       return
     }
 
-    const user = await getClientSessionUser()
-
     if (!user) {
       alert('Connecte-toi pour liker ou disliker un jeu.')
       return
@@ -89,7 +86,7 @@ export default function GameViewport({
     const previousReaction = reaction
     const previousLikes = likes
     const previousDislikes = dislikes
-    const profileSync = await ensureProfile()
+    const profileSync = await ensureProfile(session)
 
     if (!profileSync.ok) {
       setPending(false)
