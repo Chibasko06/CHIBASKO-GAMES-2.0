@@ -24,6 +24,7 @@ export default function GameViewport({
   const [dislikes, setDislikes] = useState(initialDislikes)
   const [reaction, setReaction] = useState<Reaction>(null)
   const [pending, setPending] = useState(false)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     let mounted = true
@@ -34,6 +35,9 @@ export default function GameViewport({
       } = await supabase.auth.getUser()
 
       if (!user) {
+        if (mounted) {
+          setReaction(null)
+        }
         return
       }
 
@@ -57,15 +61,24 @@ export default function GameViewport({
   }, [gameId])
 
   const syncCounts = async () => {
+    const requestId = ++requestIdRef.current
     const { data } = await supabase.rpc('get_game_public_stats')
     const gameStats = (data as Array<{ game_id: string; likes_count: number; dislikes_count: number }> | null)
       ?.find((entry) => entry.game_id === gameId)
+
+    if (requestId !== requestIdRef.current) {
+      return
+    }
 
     setLikes(Number(gameStats?.likes_count ?? 0))
     setDislikes(Number(gameStats?.dislikes_count ?? 0))
   }
 
   const applyReaction = async (nextReaction: Exclude<Reaction, null>) => {
+    if (pending) {
+      return
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -76,6 +89,9 @@ export default function GameViewport({
     }
 
     setPending(true)
+    const previousReaction = reaction
+    const previousLikes = likes
+    const previousDislikes = dislikes
     const profileSync = await ensureProfile()
 
     if (!profileSync.ok) {
@@ -84,14 +100,37 @@ export default function GameViewport({
     }
 
     if (reaction === nextReaction) {
-      await supabase
+      setReaction(null)
+      setLikes((current) => nextReaction === 'like' ? Math.max(current - 1, 0) : current)
+      setDislikes((current) => nextReaction === 'dislike' ? Math.max(current - 1, 0) : current)
+
+      const { error } = await supabase
         .from('game_reactions')
         .delete()
         .eq('game_id', gameId)
         .eq('user_id', user.id)
-      setReaction(null)
+
+      if (error) {
+        setReaction(previousReaction)
+        setLikes(previousLikes)
+        setDislikes(previousDislikes)
+        setPending(false)
+        return
+      }
     } else {
-      await supabase
+      setReaction(nextReaction)
+      setLikes((current) => {
+        const removed = previousReaction === 'like' ? 1 : 0
+        const added = nextReaction === 'like' ? 1 : 0
+        return Math.max(current - removed + added, 0)
+      })
+      setDislikes((current) => {
+        const removed = previousReaction === 'dislike' ? 1 : 0
+        const added = nextReaction === 'dislike' ? 1 : 0
+        return Math.max(current - removed + added, 0)
+      })
+
+      const { error } = await supabase
         .from('game_reactions')
         .upsert(
           {
@@ -103,7 +142,14 @@ export default function GameViewport({
             onConflict: 'user_id,game_id',
           }
         )
-      setReaction(nextReaction)
+
+      if (error) {
+        setReaction(previousReaction)
+        setLikes(previousLikes)
+        setDislikes(previousDislikes)
+        setPending(false)
+        return
+      }
     }
 
     await syncCounts()

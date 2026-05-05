@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -27,12 +27,20 @@ export default function GameReviews({ gameId }: Props) {
   const [message, setMessage] = useState<string | null>(null)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
+    let mounted = true
+
     const loadReviews = async () => {
+      const requestId = ++requestIdRef.current
       const { data } = await supabase.rpc('get_game_reviews', {
         p_game_id: gameId,
       })
+
+      if (!mounted || requestId !== requestIdRef.current) {
+        return
+      }
 
       setReviews((data as Review[] | null) ?? [])
       setLoading(false)
@@ -47,6 +55,7 @@ export default function GameReviews({ gameId }: Props) {
     window.addEventListener('focus', handleFocus)
 
     return () => {
+      mounted = false
       window.removeEventListener('focus', handleFocus)
     }
   }, [gameId])
@@ -57,6 +66,11 @@ export default function GameReviews({ gameId }: Props) {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (submitting) {
+      return
+    }
+
     setMessage(null)
 
     const {
@@ -107,11 +121,14 @@ export default function GameReviews({ gameId }: Props) {
       return
     }
 
+    const requestId = ++requestIdRef.current
     const { data } = await supabase.rpc('get_game_reviews', {
       p_game_id: gameId,
     })
 
-    setReviews((data as Review[] | null) ?? [])
+    if (requestId === requestIdRef.current) {
+      setReviews((data as Review[] | null) ?? [])
+    }
     setComment('')
     setRating(5)
     setNeedsAuth(false)

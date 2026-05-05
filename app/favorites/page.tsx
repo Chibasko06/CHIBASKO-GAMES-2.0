@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -16,17 +16,19 @@ export default function FavoritesPage() {
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     let mounted = true
 
     const loadFavorites = async () => {
+      const requestId = ++requestIdRef.current
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
       if (!user) {
-        if (mounted) {
+        if (mounted && requestId === requestIdRef.current) {
           setNeedsAuth(true)
           setLoading(false)
         }
@@ -36,7 +38,7 @@ export default function FavoritesPage() {
       await ensureProfile()
       const favoriteEntries = await getFavoriteGames(user.id)
 
-      if (mounted) {
+      if (mounted && requestId === requestIdRef.current) {
         setNeedsAuth(false)
         setGames(favoriteEntries.map((entry) => entry.game))
         setLoading(false)

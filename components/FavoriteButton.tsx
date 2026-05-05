@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { addFavorite, isFavorite, removeFavorite } from '@/lib/queries/favorites'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
@@ -14,16 +14,18 @@ export default function FavoriteButton({ gameId }: Props) {
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     let mounted = true
 
     const checkFavorite = async () => {
+      const requestId = ++requestIdRef.current
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
-      if (!mounted) {
+      if (!mounted || requestId !== requestIdRef.current) {
         return
       }
 
@@ -37,7 +39,7 @@ export default function FavoriteButton({ gameId }: Props) {
       await ensureProfile()
       const favorite = await isFavorite(user.id, gameId)
 
-      if (!mounted) {
+      if (!mounted || requestId !== requestIdRef.current) {
         return
       }
 
@@ -48,8 +50,15 @@ export default function FavoriteButton({ gameId }: Props) {
 
     void checkFavorite()
 
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void checkFavorite()
+    })
+
     return () => {
       mounted = false
+      subscription.unsubscribe()
     }
   }, [gameId])
 
@@ -62,16 +71,24 @@ export default function FavoriteButton({ gameId }: Props) {
   }
 
   const toggleFavorite = async () => {
+    if (pending) {
+      return
+    }
+
     if (!userId) {
       alert('Connecte-toi pour ajouter ce jeu en favori.')
       return
     }
 
     setPending(true)
+    const previousValue = isGameFavorite
+    const nextValue = !previousValue
+    setIsGameFavorite(nextValue)
 
     const profileSync = await ensureProfile()
 
     if (!profileSync.ok) {
+      setIsGameFavorite(previousValue)
       alert('Impossible de preparer ton profil joueur pour les favoris.')
       setPending(false)
       return
@@ -81,18 +98,18 @@ export default function FavoriteButton({ gameId }: Props) {
       const { error } = await removeFavorite(userId, gameId)
 
       if (error) {
+        setIsGameFavorite(previousValue)
         alert(error.message)
       } else {
-        setIsGameFavorite(false)
         notifyFavoriteChange(false)
       }
     } else {
       const { error } = await addFavorite(userId, gameId)
 
       if (error) {
+        setIsGameFavorite(previousValue)
         alert(error.message)
       } else {
-        setIsGameFavorite(true)
         notifyFavoriteChange(true)
       }
     }

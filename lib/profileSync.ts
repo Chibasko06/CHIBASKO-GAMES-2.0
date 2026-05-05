@@ -1,7 +1,18 @@
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabaseClient'
 
-export async function ensureProfile(sessionOverride?: Session | null) {
+type ProfileSyncResult =
+  | { ok: false; error: string }
+  | { ok: true; profile: unknown }
+
+let inFlightProfileSync: Promise<ProfileSyncResult> | null = null
+
+export async function ensureProfile(sessionOverride?: Session | null): Promise<ProfileSyncResult> {
+  if (!sessionOverride && inFlightProfileSync) {
+    return inFlightProfileSync
+  }
+
+  const runSync = async (): Promise<ProfileSyncResult> => {
   const session =
     sessionOverride ??
     (
@@ -23,7 +34,7 @@ export async function ensureProfile(sessionOverride?: Session | null) {
     const payload = await response.json().catch(() => null)
     return {
       ok: false,
-      error: payload?.error || 'Profile sync failed',
+      error: String(payload?.error || 'Profile sync failed'),
     }
   }
 
@@ -33,4 +44,15 @@ export async function ensureProfile(sessionOverride?: Session | null) {
     ok: true,
     profile: payload.profile,
   }
+  }
+
+  if (sessionOverride) {
+    return runSync()
+  }
+
+  inFlightProfileSync = runSync().finally(() => {
+    inFlightProfileSync = null
+  })
+
+  return inFlightProfileSync
 }

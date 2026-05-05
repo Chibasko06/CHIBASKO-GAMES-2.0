@@ -45,17 +45,19 @@ export default function DashboardPage() {
   const [needsAuth, setNeedsAuth] = useState(false)
   const [passwordForm, setPasswordForm] = useState<PasswordForm>(emptyPasswordForm)
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     let mounted = true
 
     const loadDashboard = async () => {
+      const requestId = ++requestIdRef.current
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
       if (!user) {
-        if (mounted) {
+        if (mounted && requestId === requestIdRef.current) {
           setNeedsAuth(true)
           setLoading(false)
         }
@@ -79,7 +81,7 @@ export default function DashboardPage() {
         supabase.from('game_reviews').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
       ])
 
-      if (mounted) {
+      if (mounted && requestId === requestIdRef.current) {
         setNeedsAuth(false)
         setProfile(profileData)
         setSavedProfile(profileData)

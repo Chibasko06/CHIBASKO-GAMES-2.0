@@ -10,13 +10,19 @@ type Props = {
 
 export default function PlaySessionTracker({ gameId }: Props) {
   useEffect(() => {
+    let cancelled = false
+
     const trackView = async () => {
       const viewStorageKey = `chibaskogames:viewed:${gameId}`
       const historyStorageKey = `chibaskogames:history:${gameId}`
 
       if (!window.sessionStorage.getItem(viewStorageKey)) {
+        window.sessionStorage.setItem(viewStorageKey, 'pending')
         await supabase.rpc('increment_game_view', { p_game_id: gameId })
-        window.sessionStorage.setItem(viewStorageKey, '1')
+        if (!cancelled) {
+          window.sessionStorage.setItem(viewStorageKey, '1')
+          window.dispatchEvent(new CustomEvent('game-viewed', { detail: { gameId } }))
+        }
       }
 
       const {
@@ -27,21 +33,35 @@ export default function PlaySessionTracker({ gameId }: Props) {
         return
       }
 
+      window.sessionStorage.setItem(historyStorageKey, 'pending')
+
       const profileSync = await ensureProfile()
 
       if (!profileSync.ok) {
+        window.sessionStorage.removeItem(historyStorageKey)
         return
       }
 
-      await supabase.from('play_history').insert({
+      const { error } = await supabase.from('play_history').insert({
         user_id: user.id,
         game_id: gameId,
       })
 
-      window.sessionStorage.setItem(historyStorageKey, '1')
+      if (error) {
+        window.sessionStorage.removeItem(historyStorageKey)
+        return
+      }
+
+      if (!cancelled) {
+        window.sessionStorage.setItem(historyStorageKey, '1')
+      }
     }
 
     void trackView()
+
+    return () => {
+      cancelled = true
+    }
   }, [gameId])
 
   return null
