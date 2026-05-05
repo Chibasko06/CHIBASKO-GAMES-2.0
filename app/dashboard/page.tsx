@@ -301,6 +301,20 @@ export default function DashboardPage() {
           Gere ton pseudo, ton avatar, ton mot de passe et retrouve rapidement tes favoris et
           tes derniers jeux vus.
         </p>
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-cyan-950/60 bg-black/25 p-4">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Profil</p>
+            <p className="mt-2 text-sm text-zinc-300">Pseudo, bio et avatar visibles sur ton espace joueur.</p>
+          </div>
+          <div className="rounded-2xl border border-cyan-950/60 bg-black/25 p-4">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Securite</p>
+            <p className="mt-2 text-sm text-zinc-300">Verification par ancien mot de passe avant toute modification.</p>
+          </div>
+          <div className="rounded-2xl border border-cyan-950/60 bg-black/25 p-4">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Activite</p>
+            <p className="mt-2 text-sm text-zinc-300">Favoris, commentaires et derniers jeux vus reunis au meme endroit.</p>
+          </div>
+        </div>
       </section>
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
@@ -322,7 +336,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-6">
+          <section className="rounded-[24px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(17,24,39,0.92),rgba(9,9,11,0.95))] p-6">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Mon profil</h2>
               {!isEditingProfile && profile ? (
@@ -397,17 +411,17 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl border border-zinc-800 bg-black/40 p-4">
+                  <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)]">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo</p>
                     <p className="mt-2 text-lg font-black text-white">{profile.username}</p>
                   </div>
-                  <div className="rounded-2xl border border-zinc-800 bg-black/40 p-4">
+                  <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)]">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Avatar</p>
                     <p className="mt-2 text-sm text-zinc-300">
                       {profile.avatar_url ? 'Avatar personnalise actif' : 'Aucun avatar personnalise'}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-zinc-800 bg-black/40 p-4 md:col-span-2">
+                  <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)] md:col-span-2">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Bio</p>
                     <p className="mt-2 text-sm leading-6 text-zinc-300">
                       {profile.bio || 'Aucune bio pour le moment.'}
@@ -423,39 +437,71 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-6">
-            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Securite du compte</h2>
-            <form onSubmit={handlePasswordChange} className="mt-5 grid grid-cols-1 gap-4">
-              <input
-                type="password"
-                value={passwordForm.currentPassword}
-                onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))}
-                placeholder="Ancien mot de passe"
-                className="rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-              />
-              <input
-                type="password"
-                value={passwordForm.nextPassword}
-                onChange={(event) => setPasswordForm((current) => ({ ...current, nextPassword: event.target.value }))}
-                placeholder="Nouveau mot de passe"
-                className="rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-              />
-              <input
-                type="password"
-                value={passwordForm.confirmPassword}
-                onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
-                placeholder="Confirmer le nouveau mot de passe"
-                className="rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-              />
+          <section className="rounded-[24px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(16,21,32,0.94),rgba(9,9,11,0.98))] p-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Securite du compte</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                  L ancien mot de passe est demande avant toute mise a jour pour eviter les changements non voulus.
+                </p>
+              </div>
+              <div className="rounded-full border border-cyan-900 bg-black/30 px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
+                verification obligatoire
+              </div>
+            </div>
+
+            <form onSubmit={handlePasswordChange} className="mt-6 grid grid-cols-1 gap-4">
+              <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
+                <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">
+                  Ancien mot de passe
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))}
+                  placeholder="Saisis ton mot de passe actuel"
+                  className="mt-3 w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
+                  <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">
+                    Nouveau mot de passe
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.nextPassword}
+                    onChange={(event) => setPasswordForm((current) => ({ ...current, nextPassword: event.target.value }))}
+                    placeholder="Au moins 8 caracteres"
+                    className="mt-3 w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
+                  <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">
+                    Confirmation
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                    placeholder="Retape le nouveau mot de passe"
+                    className="mt-3 w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
               {passwordMessage ? (
                 <p className="text-sm text-cyan-300">{passwordMessage}</p>
-              ) : null}
+              ) : (
+                <p className="text-sm text-zinc-500">
+                  Le mot de passe n est modifie que si l ancien est correct et si les deux nouveaux champs correspondent.
+                </p>
+              )}
               <button
                 type="submit"
                 disabled={savingPassword}
-                className="rounded-full border border-cyan-700 py-4 font-black uppercase tracking-[0.2em] text-cyan-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-full border border-cyan-700 bg-black/20 py-4 font-black uppercase tracking-[0.2em] text-cyan-200 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {savingPassword ? 'Verification...' : 'Changer le mot de passe'}
+                {savingPassword ? 'Verification...' : 'Mettre a jour le mot de passe'}
               </button>
             </form>
           </section>
