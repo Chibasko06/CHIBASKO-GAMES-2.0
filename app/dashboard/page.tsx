@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
@@ -11,23 +10,11 @@ import { getRecentPlayHistory } from '@/lib/queries/history'
 import { uploadOwnAvatar } from '@/lib/avatarUpload'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
-import { Database, Tables } from '@/types/database'
+import { Tables } from '@/types/database'
 
 type Profile = Tables<'profiles'>
 type FavoriteEntry = Awaited<ReturnType<typeof getFavoriteGames>>[number]
 type HistoryEntry = Awaited<ReturnType<typeof getRecentPlayHistory>>[number]
-
-type PasswordForm = {
-  currentPassword: string
-  nextPassword: string
-  confirmPassword: string
-}
-
-const emptyPasswordForm: PasswordForm = {
-  currentPassword: '',
-  nextPassword: '',
-  confirmPassword: '',
-}
 
 export default function DashboardPage() {
   const pathname = usePathname()
@@ -50,7 +37,6 @@ export default function DashboardPage() {
   const [recentHistory, setRecentHistory] = useState<HistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
-  const [passwordForm, setPasswordForm] = useState<PasswordForm>(emptyPasswordForm)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -209,99 +195,30 @@ export default function DashboardPage() {
     }
   }
 
-  const handlePasswordChange = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const handlePasswordResetEmail = async () => {
     setPasswordMessage(null)
 
     if (!user?.email) {
-      setPasswordMessage('Impossible de verifier ton compte.')
-      return
-    }
-
-    if (!passwordForm.currentPassword || !passwordForm.nextPassword || !passwordForm.confirmPassword) {
-      setPasswordMessage('Remplis tous les champs de securite.')
-      return
-    }
-
-    if (passwordForm.nextPassword !== passwordForm.confirmPassword) {
-      setPasswordMessage('Les deux nouveaux mots de passe doivent etre identiques.')
-      return
-    }
-
-    if (passwordForm.nextPassword.length < 8) {
-      setPasswordMessage('Le nouveau mot de passe doit faire au moins 8 caracteres.')
+      setPasswordMessage('Impossible de retrouver l email de ton compte.')
       return
     }
 
     setSavingPassword(true)
 
-    const verificationClient = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    )
+    const redirectTo =
+      typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined
 
-    const { error: verifyError } = await verificationClient.auth.signInWithPassword({
-      email: user.email,
-      password: passwordForm.currentPassword,
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo,
     })
 
-    await verificationClient.auth.signOut()
-
-    if (verifyError) {
-      setPasswordMessage('Ancien mot de passe incorrect.')
+    if (error) {
+      setPasswordMessage(error.message)
       setSavingPassword(false)
       return
     }
 
-    let activeSession = session
-
-    if (!activeSession) {
-      const {
-        data: { session: fetchedSession },
-      } = await supabase.auth.getSession()
-
-      activeSession = fetchedSession
-    }
-
-    if (!activeSession) {
-      const {
-        data: refreshedData,
-        error: refreshError,
-      } = await supabase.auth.refreshSession()
-
-      if (refreshError) {
-        setPasswordMessage(refreshError.message)
-        setSavingPassword(false)
-        return
-      }
-
-      activeSession = refreshedData.session
-    }
-
-    if (!activeSession) {
-      setPasswordMessage('Session introuvable. Reconnecte-toi puis reessaie.')
-      setSavingPassword(false)
-      return
-    }
-
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: passwordForm.nextPassword,
-    })
-
-    if (updateError) {
-      setPasswordMessage(updateError.message)
-      setSavingPassword(false)
-      return
-    }
-
-    setPasswordForm(emptyPasswordForm)
-    setPasswordMessage('Mot de passe mis a jour.')
+    setPasswordMessage(`Un lien de reinitialisation a ete envoye a ${user.email}.`)
     setSavingPassword(false)
   }
 
@@ -481,68 +398,49 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Securite du compte</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-                  L ancien mot de passe est demande avant toute mise a jour pour eviter les changements non voulus.
+                  Recois un lien securise par email pour choisir un nouveau mot de passe sans rester bloque dans le dashboard.
                 </p>
               </div>
               <div className="rounded-full border border-cyan-900 bg-black/30 px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
-                verification obligatoire
+                reset par email
               </div>
             </div>
 
-            <form onSubmit={handlePasswordChange} className="mt-6 grid grid-cols-1 gap-4">
-              <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
-                <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">
-                  Ancien mot de passe
-                </label>
-                <input
-                  type="password"
-                  value={passwordForm.currentPassword}
-                  onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))}
-                  placeholder="Saisis ton mot de passe actuel"
-                  className="mt-3 w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
-                  <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">
-                    Nouveau mot de passe
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordForm.nextPassword}
-                    onChange={(event) => setPasswordForm((current) => ({ ...current, nextPassword: event.target.value }))}
-                    placeholder="Au moins 8 caracteres"
-                    className="mt-3 w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-                  />
-                </div>
-                <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
-                  <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">
-                    Confirmation
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
-                    placeholder="Retape le nouveau mot de passe"
-                    className="mt-3 w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-                  />
-                </div>
-              </div>
-              {passwordMessage ? (
-                <p className="text-sm text-cyan-300">{passwordMessage}</p>
-              ) : (
-                <p className="text-sm text-zinc-500">
-                  Le mot de passe n est modifie que si l ancien est correct et si les deux nouveaux champs correspondent.
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">Email du compte</p>
+                <p className="mt-3 text-base font-bold text-white">{user?.email || 'Email indisponible'}</p>
+                <p className="mt-3 text-sm leading-6 text-zinc-400">
+                  Clique sur le bouton pour recevoir un lien de reinitialisation. Le mail ouvrira ensuite la page securisee du site pour choisir ton nouveau mot de passe.
                 </p>
-              )}
-              <button
-                type="submit"
-                disabled={savingPassword}
-                className="rounded-full border border-cyan-700 bg-black/20 py-4 font-black uppercase tracking-[0.2em] text-cyan-200 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {savingPassword ? 'Verification...' : 'Mettre a jour le mot de passe'}
-              </button>
-            </form>
+              </div>
+              <div className="rounded-[22px] border border-cyan-900/70 bg-cyan-950/20 p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">Action rapide</p>
+                <p className="mt-3 text-sm leading-6 text-zinc-300">
+                  Pratique si tu as oublie ton mot de passe ou si la session courante devient capricieuse.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handlePasswordResetEmail()}
+                  disabled={savingPassword}
+                  className="mt-5 w-full rounded-full border border-cyan-700 bg-black/20 py-4 font-black uppercase tracking-[0.2em] text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingPassword ? 'Envoi du lien...' : 'Recevoir un lien de reset'}
+                </button>
+              </div>
+            </div>
+
+            {passwordMessage ? (
+              <p className="mt-4 text-sm text-cyan-300">{passwordMessage}</p>
+            ) : (
+              <p className="mt-4 text-sm text-zinc-500">
+                Tu peux aussi lancer cette action depuis{' '}
+                <Link href="/login" className="text-cyan-300 hover:text-cyan-200">
+                  la page de connexion
+                </Link>
+                .
+              </p>
+            )}
           </section>
         </div>
       </div>

@@ -10,21 +10,51 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resettingPassword, setResettingPassword] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
   const { loading: authLoading, user } = useAuth()
 
   const handleLogin = async () => {
+    setMessage(null)
     setLoading(true)
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      alert(error.message)
+      setMessage(error.message)
       setLoading(false)
       return
     }
 
     await ensureProfile(data.session)
     window.location.href = '/'
+  }
+
+  const handleForgotPassword = async () => {
+    setMessage(null)
+
+    if (!email.trim()) {
+      setMessage('Renseigne ton email pour recevoir le lien de reinitialisation.')
+      return
+    }
+
+    setResettingPassword(true)
+
+    const redirectTo =
+      typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    })
+
+    if (error) {
+      setMessage(error.message)
+      setResettingPassword(false)
+      return
+    }
+
+    setMessage('Un email de reinitialisation vient d etre envoye si ce compte existe.')
+    setResettingPassword(false)
   }
 
   if (!authLoading && user) {
@@ -69,13 +99,26 @@ export default function LoginPage() {
           onChange={(event) => setPassword(event.target.value)}
         />
 
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={resettingPassword}
+            className="text-sm text-cyan-300 transition hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {resettingPassword ? 'Envoi du lien...' : 'Mot de passe oublie ?'}
+          </button>
+        </div>
+
         <button
           onClick={handleLogin}
-          disabled={loading}
+          disabled={loading || resettingPassword}
           className="w-full rounded-full bg-cyan-400 py-4 text-sm font-black uppercase tracking-[0.2em] text-black disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? 'Connexion...' : 'Connexion'}
         </button>
+
+        {message ? <p className="text-sm text-cyan-300">{message}</p> : null}
 
         <p className="text-sm text-zinc-400">
           Pas encore de compte ?{' '}
