@@ -429,18 +429,6 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-
-            {passwordMessage ? (
-              <p className="mt-4 text-sm text-cyan-300">{passwordMessage}</p>
-            ) : (
-              <p className="mt-4 text-sm text-zinc-500">
-                Tu peux aussi lancer cette action depuis{' '}
-                <Link href="/login" className="text-cyan-300 hover:text-cyan-200">
-                  la page de connexion
-                </Link>
-                .
-              </p>
-            )}
           </section>
         </div>
       </div>
