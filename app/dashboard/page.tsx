@@ -34,6 +34,11 @@ export default function DashboardPage() {
   const { loading: authLoading, session, user } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [savedProfile, setSavedProfile] = useState<Profile | null>(null)
+  const [draftProfile, setDraftProfile] = useState<{ username: string; bio: string }>({
+    username: '',
+    bio: '',
+  })
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -46,7 +51,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
   const [passwordForm, setPasswordForm] = useState<PasswordForm>(emptyPasswordForm)
-  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -88,6 +92,10 @@ export default function DashboardPage() {
         setNeedsAuth(false)
         setProfile(profileData)
         setSavedProfile(profileData)
+        setDraftProfile({
+          username: profileData?.username || '',
+          bio: profileData?.bio || '',
+        })
         setFavoriteCount(favoritesTotal ?? 0)
         setCommentCount(reviewsTotal ?? 0)
         setRecentFavorites(favoriteEntries.slice(0, 4))
@@ -115,61 +123,42 @@ export default function DashboardPage() {
     }
   }, [authLoading, pathname, session, user])
 
-  useEffect(() => {
-    if (!profile || !savedProfile) {
+  const handleProfileSave = async () => {
+    if (!user || !profile) {
       return
     }
 
-    if (
-      profile.username === savedProfile.username &&
-      (profile.bio || '') === (savedProfile.bio || '')
-    ) {
+    setSavingProfile(true)
+    setProfileMessage(null)
+    const normalizedUsername = draftProfile.username.trim()
+
+    const { error, data } = await supabase
+      .from('profiles')
+      .update({
+        username: normalizedUsername,
+        display_name: normalizedUsername,
+        bio: draftProfile.bio.trim() || null,
+      })
+      .eq('id', user.id)
+      .select('*')
+      .single()
+
+    if (error) {
+      setProfileMessage(error.message)
+      setSavingProfile(false)
       return
     }
 
-    if (autosaveTimeoutRef.current) {
-      clearTimeout(autosaveTimeoutRef.current)
-    }
-
-    autosaveTimeoutRef.current = setTimeout(() => {
-      void (async () => {
-        if (!user) {
-          return
-        }
-
-        setSavingProfile(true)
-        const normalizedUsername = profile.username.trim()
-
-        const { error, data } = await supabase
-          .from('profiles')
-          .update({
-            username: normalizedUsername,
-            display_name: normalizedUsername,
-            bio: profile.bio || null,
-          })
-          .eq('id', user.id)
-          .select('*')
-          .single()
-
-        if (error) {
-          setProfileMessage(error.message)
-          setSavingProfile(false)
-          return
-        }
-
-        setProfile(data)
-        setSavedProfile(data)
-        setProfileMessage('Profil enregistre automatiquement.')
-        setSavingProfile(false)
-      })()
-    }, 700)
-
-    return () => {
-      if (autosaveTimeoutRef.current) {
-        clearTimeout(autosaveTimeoutRef.current)
-      }
-    }
-  }, [profile, savedProfile, user])
+    setProfile(data)
+    setSavedProfile(data)
+    setDraftProfile({
+      username: data.username || '',
+      bio: data.bio || '',
+    })
+    setIsEditingProfile(false)
+    setProfileMessage('Profil mis a jour.')
+    setSavingProfile(false)
+  }
 
   const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -206,6 +195,11 @@ export default function DashboardPage() {
 
       setProfile(updatedProfile)
       setSavedProfile(updatedProfile)
+      setDraftProfile((current) => ({
+        ...current,
+        username: updatedProfile.username || current.username,
+        bio: updatedProfile.bio || '',
+      }))
       setProfileMessage('Avatar mis a jour.')
     } catch (error) {
       setProfileMessage(error instanceof Error ? error.message : 'Impossible d envoyer l avatar.')
@@ -329,46 +323,101 @@ export default function DashboardPage() {
           </div>
 
           <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-6">
-            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Mon profil</h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Mon profil</h2>
+              {!isEditingProfile && profile ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraftProfile({
+                      username: profile.username || '',
+                      bio: profile.bio || '',
+                    })
+                    setProfileMessage(null)
+                    setIsEditingProfile(true)
+                  }}
+                  className="rounded-full border border-cyan-800 px-3 py-2 text-xs font-black text-cyan-300"
+                  title="Editer mon profil"
+                >
+                  ✎
+                </button>
+              ) : null}
+            </div>
             {profile ? (
-              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <input
-                  value={profile.username || ''}
-                  onChange={(event) => setProfile((current) => current ? { ...current, username: event.target.value } : current)}
-                  placeholder="Pseudo"
-                  className="rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-                />
-                <label className="flex min-h-[60px] cursor-pointer items-center justify-between rounded-2xl border border-zinc-800 bg-black/60 px-4 text-sm text-zinc-300 transition hover:border-cyan-700">
-                  <span>{uploadingAvatar ? 'Envoi de l avatar...' : 'Choisir un avatar rond'}</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-                  <span className="rounded-full border border-cyan-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
-                    Importer
-                  </span>
-                </label>
-                <textarea
-                  value={profile.bio || ''}
-                  onChange={(event) => setProfile((current) => current ? { ...current, bio: event.target.value } : current)}
-                  placeholder="Bio"
-                  className="min-h-32 rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500 md:col-span-2"
-                />
-                <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 text-sm">
-                  <div className="text-zinc-400">
-                    {savingProfile ? 'Enregistrement automatique...' : profileMessage || 'Les modifications sont enregistrees automatiquement.'}
+              isEditingProfile ? (
+                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <input
+                    value={draftProfile.username}
+                    onChange={(event) => setDraftProfile((current) => ({ ...current, username: event.target.value }))}
+                    placeholder="Pseudo"
+                    className="rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
+                  />
+                  <label className="flex min-h-[60px] cursor-pointer items-center justify-between rounded-2xl border border-zinc-800 bg-black/60 px-4 text-sm text-zinc-300 transition hover:border-cyan-700">
+                    <span>{uploadingAvatar ? 'Envoi de l avatar...' : 'Choisir un avatar rond'}</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                    <span className="rounded-full border border-cyan-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
+                      Importer
+                    </span>
+                  </label>
+                  <textarea
+                    value={draftProfile.bio}
+                    onChange={(event) => setDraftProfile((current) => ({ ...current, bio: event.target.value }))}
+                    placeholder="Bio"
+                    className="min-h-32 rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500 md:col-span-2"
+                  />
+                  <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <div className="text-zinc-400">
+                      {savingProfile ? 'Sauvegarde du profil...' : profileMessage || 'Modifie puis enregistre si tout te va.'}
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftProfile({
+                            username: savedProfile?.username || '',
+                            bio: savedProfile?.bio || '',
+                          })
+                          setIsEditingProfile(false)
+                          setProfileMessage('Modifications annulees.')
+                        }}
+                        className="rounded-full border border-zinc-700 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-200"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleProfileSave()}
+                        disabled={savingProfile || !draftProfile.username.trim()}
+                        className="rounded-full bg-cyan-400 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Save
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (savedProfile) {
-                        setProfile(savedProfile)
-                        setProfileMessage('Profil revenu aux valeurs enregistrees.')
-                      }
-                    }}
-                    className="rounded-full border border-zinc-700 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-200"
-                  >
-                    Annuler mes changements
-                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-zinc-800 bg-black/40 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo</p>
+                    <p className="mt-2 text-lg font-black text-white">{profile.username}</p>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-800 bg-black/40 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Avatar</p>
+                    <p className="mt-2 text-sm text-zinc-300">
+                      {profile.avatar_url ? 'Avatar personnalise actif' : 'Aucun avatar personnalise'}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-800 bg-black/40 p-4 md:col-span-2">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Bio</p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-300">
+                      {profile.bio || 'Aucune bio pour le moment.'}
+                    </p>
+                  </div>
+                  {profileMessage ? (
+                    <div className="md:col-span-2 text-sm text-cyan-300">{profileMessage}</div>
+                  ) : null}
+                </div>
+              )
             ) : (
               <p className="mt-5 text-zinc-500">Chargement du profil...</p>
             )}

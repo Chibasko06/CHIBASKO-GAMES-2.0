@@ -66,6 +66,17 @@ export default function GameReviews({ gameId }: Props) {
     ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
     : 0
 
+  const refreshReviews = async () => {
+    const requestId = ++requestIdRef.current
+    const { data } = await supabase.rpc('get_game_reviews', {
+      p_game_id: gameId,
+    })
+
+    if (requestId === requestIdRef.current) {
+      setReviews((data as Review[] | null) ?? [])
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -119,18 +130,36 @@ export default function GameReviews({ gameId }: Props) {
       return
     }
 
-    const requestId = ++requestIdRef.current
-    const { data } = await supabase.rpc('get_game_reviews', {
-      p_game_id: gameId,
-    })
-
-    if (requestId === requestIdRef.current) {
-      setReviews((data as Review[] | null) ?? [])
-    }
+    await refreshReviews()
     setComment('')
     setRating(5)
     setNeedsAuth(false)
     setMessage('Ton avis a ete publie.')
+    setSubmitting(false)
+  }
+
+  const handleDelete = async (reviewId: string) => {
+    if (!user || submitting) {
+      return
+    }
+
+    setSubmitting(true)
+    setMessage(null)
+
+    const { error } = await supabase
+      .from('game_reviews')
+      .delete()
+      .eq('id', reviewId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      setMessage(error.message)
+      setSubmitting(false)
+      return
+    }
+
+    await refreshReviews()
+    setMessage('Ton commentaire a ete supprime.')
     setSubmitting(false)
   }
 
@@ -215,6 +244,17 @@ export default function GameReviews({ gameId }: Props) {
                     <p className="text-xs text-zinc-500">
                       {new Date(review.updated_at || review.created_at).toLocaleString('fr-FR')}
                     </p>
+                    {user?.id === review.user_id ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(review.id)}
+                        disabled={submitting}
+                        className="ml-auto rounded-full border border-red-900 px-3 py-1 text-xs font-bold text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        title="Supprimer mon commentaire"
+                      >
+                        🗑
+                      </button>
+                    ) : null}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-zinc-300">{review.comment}</p>
                 </div>

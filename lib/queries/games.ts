@@ -146,6 +146,7 @@ export async function getHomepageHighlights() {
 
   const mostViewed = [...games].sort((left, right) => (right.views_count ?? 0) - (left.views_count ?? 0))[0]
   const mostFavorited = [...games].sort((left, right) => right.favorites_count - left.favorites_count)[0]
+  const mostLiked = [...games].sort((left, right) => right.likes_count - left.likes_count)[0]
   const bestRated = [...games]
     .filter((game) => game.ratings_count > 0)
     .sort((left, right) => {
@@ -155,7 +156,7 @@ export async function getHomepageHighlights() {
 
       return right.ratings_count - left.ratings_count
     })[0] ?? mostViewed
-  const teamPickPool = games.filter((game) => ![mostViewed.id, mostFavorited.id, bestRated.id].includes(game.id))
+  const teamPickPool = games.filter((game) => ![mostViewed.id, mostFavorited.id, mostLiked.id, bestRated.id].includes(game.id))
   const teamPick =
     teamPickPool[Math.floor(Math.random() * Math.max(teamPickPool.length, 1))] ?? mostViewed
 
@@ -169,6 +170,11 @@ export async function getHomepageHighlights() {
       label: 'Le plus en favori',
       description: `${mostFavorited.favorites_count} favoris`,
       game: mostFavorited,
+    },
+    {
+      label: 'Le plus like',
+      description: `${mostLiked.likes_count} likes`,
+      game: mostLiked,
     },
     {
       label: 'Meilleure note',

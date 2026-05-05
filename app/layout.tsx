@@ -1,8 +1,18 @@
 import './globals.css'
+import type { Metadata } from 'next'
 import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import XpHeartbeat from '@/components/XpHeartbeat'
+
+export const metadata: Metadata = {
+  title: 'ChibaskoGames',
+  icons: {
+    icon: '/logo-chibaskogames-rond.ico',
+    shortcut: '/logo-chibaskogames-rond.ico',
+    apple: '/logo-chibaskogames-rond.ico',
+  },
+}
 
 export default function RootLayout({
   children,

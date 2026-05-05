@@ -18,12 +18,7 @@ export default function PlayersDirectory({
       return profiles
     }
 
-    return profiles.filter((profile) =>
-      [profile.username, profile.bio || '']
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery)
-    )
+    return profiles.filter((profile) => profile.username.toLowerCase().includes(normalizedQuery))
   }, [profiles, query])
 
   return (
@@ -31,7 +26,7 @@ export default function PlayersDirectory({
       <input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Rechercher un joueur par pseudo ou bio"
+        placeholder="Rechercher un joueur par pseudo"
         className="w-full rounded-2xl border border-zinc-800 bg-black/50 p-4 text-white outline-none focus:border-cyan-500"
       />
 
