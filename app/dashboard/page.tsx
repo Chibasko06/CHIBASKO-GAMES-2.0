@@ -36,6 +36,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
   const requestIdRef = useRef(0)
+  const xpPoints = profile?.xp_points ?? 0
+  const level = Math.floor(xpPoints / 100) + 1
+  const xpProgress = xpPoints % 100
 
   useEffect(() => {
     let mounted = true
@@ -213,32 +216,96 @@ export default function DashboardPage() {
 
   return (
     <main className="space-y-8">
-      <section className="rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(10,15,23,0.98),rgba(10,10,12,0.98))] p-6 md:p-8">
-        <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/75">Espace joueur</p>
-        <h1 className="mt-3 text-3xl font-black uppercase text-white md:text-4xl">Tableau de bord</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-          Gere ton compte, ton profil public et ton activite de joueur depuis un seul espace.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <div className="rounded-full border border-cyan-900 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
-            {profile?.xp_points ?? 0} XP
+      <section className="relative overflow-hidden rounded-[32px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(7,12,19,0.98),rgba(13,22,38,0.94),rgba(7,9,13,0.98))] px-6 py-8 md:px-8 md:py-10">
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_55%)]" />
+        <div className="absolute -right-10 top-10 h-44 w-44 rounded-full border border-cyan-500/10 bg-cyan-400/5 blur-2xl" />
+        <div className="relative grid gap-8 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <p className="text-[11px] uppercase tracking-[0.45em] text-cyan-300/75">Hub joueur</p>
+              <h1 className="text-4xl font-black uppercase leading-none text-white md:text-5xl">
+                Ton espace
+                <span className="block text-cyan-400">Chibasko Games</span>
+              </h1>
+              <p className="max-w-2xl text-sm leading-7 text-zinc-300">
+                Retrouve ton profil public, ta progression et tes raccourcis principaux dans un tableau de bord plus net et plus rapide a lire.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/games"
+                className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-black"
+              >
+                Rejouer maintenant
+              </Link>
+              <Link
+                href={profile?.username ? `/players/${profile.username}` : '/players'}
+                className="rounded-full border border-cyan-800 bg-black/25 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-cyan-200"
+              >
+                Voir mon profil public
+              </Link>
+            </div>
           </div>
-          <div className="rounded-full border border-zinc-800 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-300">
-            {favoriteCount} favoris
-          </div>
-          <div className="rounded-full border border-zinc-800 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-300">
-            {commentCount} commentaires
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="rounded-[24px] border border-cyan-900/70 bg-black/30 p-4">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Niveau</p>
+              <p className="mt-3 text-3xl font-black text-white">{level}</p>
+              <p className="mt-2 text-xs text-zinc-400">{xpProgress}/100 XP avant le prochain palier</p>
+            </div>
+            <div className="rounded-[24px] border border-zinc-800 bg-black/30 p-4">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Favoris actifs</p>
+              <p className="mt-3 text-3xl font-black text-white">{favoriteCount}</p>
+              <p className="mt-2 text-xs text-zinc-400">Ta selection perso prete a relancer.</p>
+            </div>
+            <div className="rounded-[24px] border border-zinc-800 bg-black/30 p-4">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Commentaires</p>
+              <p className="mt-3 text-3xl font-black text-white">{commentCount}</p>
+              <p className="mt-2 text-xs text-zinc-400">Ton empreinte dans la communaute.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
-        <ProfileCard profile={profile} stats={{ favoriteCount, commentCount }} />
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[0.82fr_1.18fr]">
+        <div className="space-y-6">
+          <ProfileCard profile={profile} stats={{ favoriteCount, commentCount }} />
+
+          <section className="rounded-[30px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(14,18,28,0.96),rgba(9,9,11,0.98))] p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Securite</p>
+                <h2 className="mt-2 text-2xl font-black uppercase text-white">Compte protege</h2>
+              </div>
+              <span className="rounded-full border border-cyan-900 bg-black/25 px-3 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
+                code email
+              </span>
+            </div>
+
+            <div className="mt-5 rounded-[24px] border border-zinc-800 bg-black/35 p-5">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Email du compte</p>
+              <p className="mt-3 text-base font-bold text-white">{user?.email || 'Email indisponible'}</p>
+              <p className="mt-3 text-sm leading-6 text-zinc-400">
+                Si tu oublies ton mot de passe, tu peux maintenant demander un code de confirmation puis definir un nouveau mot de passe directement sur le site.
+              </p>
+              <Link
+                href={user?.email ? `/reset-password?email=${encodeURIComponent(user.email)}` : '/reset-password'}
+                className="mt-5 inline-flex rounded-full border border-cyan-700 bg-cyan-950/20 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-cyan-200"
+              >
+                Ouvrir le reset
+              </Link>
+            </div>
+          </section>
+        </div>
 
         <div className="space-y-6">
-          <section className="rounded-[24px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(17,24,39,0.92),rgba(9,9,11,0.95))] p-6">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Mon profil</h2>
+          <section className="rounded-[30px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(17,24,39,0.92),rgba(9,9,11,0.95))] p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Profil public</p>
+                <h2 className="mt-2 text-2xl font-black uppercase text-white">Identite joueur</h2>
+              </div>
               {!isEditingProfile && profile ? (
                 <button
                   type="button"
@@ -250,56 +317,66 @@ export default function DashboardPage() {
                     setProfileMessage(null)
                     setIsEditingProfile(true)
                   }}
-                  className="rounded-full border border-cyan-800 px-3 py-2 text-xs font-black text-cyan-300"
+                  className="rounded-full border border-cyan-800 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-cyan-300"
                   title="Editer mon profil"
                 >
-                  ✎
+                  Editer
                 </button>
               ) : null}
             </div>
+
             {profile ? (
               isEditingProfile ? (
-                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-[22px] border border-cyan-950/60 bg-black/30 p-5 md:col-span-2">
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-[26px] border border-cyan-950/60 bg-black/30 p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-cyan-400/70 bg-zinc-900">
+                      <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[24px] border border-cyan-400/60 bg-zinc-900">
                         {profile.avatar_url ? (
                           <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-2xl font-black text-cyan-300">{(draftProfile.username || profile.username || 'J')[0]?.toUpperCase()}</span>
+                          <span className="text-3xl font-black text-cyan-300">
+                            {(draftProfile.username || profile.username || 'J')[0]?.toUpperCase()}
+                          </span>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Apercu public</p>
-                        <p className="mt-2 text-lg font-black text-white">{draftProfile.username || 'Pseudo joueur'}</p>
-                        <p className="mt-2 text-sm leading-6 text-zinc-400 line-clamp-2">
+                        <p className="mt-2 truncate text-xl font-black uppercase text-white">
+                          {draftProfile.username || 'Pseudo joueur'}
+                        </p>
+                        <p className="mt-3 text-sm leading-6 text-zinc-400">
                           {draftProfile.bio || 'Ta bio apparaitra ici une fois enregistree.'}
                         </p>
                       </div>
                     </div>
                   </div>
-                  <input
-                    value={draftProfile.username}
-                    onChange={(event) => setDraftProfile((current) => ({ ...current, username: event.target.value }))}
-                    placeholder="Pseudo"
-                    className="rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
-                  />
-                  <label className="flex min-h-[60px] cursor-pointer items-center justify-between rounded-2xl border border-zinc-800 bg-black/60 px-4 text-sm text-zinc-300 transition hover:border-cyan-700">
-                    <span>{uploadingAvatar ? 'Envoi de l avatar...' : 'Choisir un avatar rond'}</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-                    <span className="rounded-full border border-cyan-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
-                      Importer
-                    </span>
-                  </label>
+
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_0.8fr]">
+                    <input
+                      value={draftProfile.username}
+                      onChange={(event) => setDraftProfile((current) => ({ ...current, username: event.target.value }))}
+                      placeholder="Pseudo"
+                      className="rounded-[22px] border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
+                    />
+                    <label className="flex min-h-[60px] cursor-pointer items-center justify-between rounded-[22px] border border-zinc-800 bg-black/60 px-4 text-sm text-zinc-300 transition hover:border-cyan-700">
+                      <span>{uploadingAvatar ? 'Envoi de l avatar...' : 'Importer un avatar'}</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                      <span className="rounded-full border border-cyan-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
+                        Choisir
+                      </span>
+                    </label>
+                  </div>
+
                   <textarea
                     value={draftProfile.bio}
                     onChange={(event) => setDraftProfile((current) => ({ ...current, bio: event.target.value }))}
                     placeholder="Bio"
-                    className="min-h-32 rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500 md:col-span-2"
+                    className="min-h-36 rounded-[22px] border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
                   />
-                  <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                     <div className="text-zinc-400">
-                      {savingProfile ? 'Sauvegarde du profil...' : profileMessage || 'Modifie puis enregistre si tout te va.'}
+                      {savingProfile ? 'Sauvegarde du profil...' : profileMessage || 'Ajuste ton profil puis valide quand le rendu te plait.'}
                     </div>
                     <div className="flex gap-3">
                       <button
@@ -320,43 +397,44 @@ export default function DashboardPage() {
                         type="button"
                         onClick={() => void handleProfileSave()}
                         disabled={savingProfile || !draftProfile.username.trim()}
-                        className="rounded-full bg-cyan-400 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full bg-cyan-400 px-5 py-2 text-xs font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Save
+                        Sauvegarder
                       </button>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)]">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo</p>
-                    <p className="mt-2 text-lg font-black text-white">{profile.username}</p>
+                <div className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+                  <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo public</p>
+                    <p className="mt-3 text-2xl font-black uppercase text-white">{profile.username}</p>
+                    <p className="mt-4 text-sm leading-6 text-zinc-400">
+                      C est ce pseudo qui apparait dans la communaute et sur tes commentaires.
+                    </p>
                   </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)]">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Avatar</p>
-                    <div className="mt-3 flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-cyan-700 bg-zinc-900">
+                  <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Avatar actuel</p>
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[18px] border border-cyan-700 bg-zinc-900">
                         {profile.avatar_url ? (
                           <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-sm font-black text-cyan-300">{profile.username[0]?.toUpperCase()}</span>
+                          <span className="text-lg font-black text-cyan-300">{profile.username[0]?.toUpperCase()}</span>
                         )}
                       </div>
-                      <p className="text-sm text-zinc-300">
-                        {profile.avatar_url ? 'Avatar personnalise actif' : 'Aucun avatar personnalise'}
+                      <p className="text-sm leading-6 text-zinc-300">
+                        {profile.avatar_url ? 'Avatar personalise actif sur ton compte.' : 'Aucun avatar personnalise pour le moment.'}
                       </p>
                     </div>
                   </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5 shadow-[0_10px_35px_rgba(0,0,0,0.2)] md:col-span-2">
+                  <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5 lg:col-span-2">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Bio</p>
-                    <p className="mt-2 text-sm leading-6 text-zinc-300">
-                      {profile.bio || 'Aucune bio pour le moment.'}
+                    <p className="mt-3 text-sm leading-7 text-zinc-300">
+                      {profile.bio || 'Aucune bio pour le moment. Donne une petite couleur a ton profil pour le rendre plus vivant.'}
                     </p>
                   </div>
-                  {profileMessage ? (
-                    <div className="md:col-span-2 text-sm text-cyan-300">{profileMessage}</div>
-                  ) : null}
+                  {profileMessage ? <div className="lg:col-span-2 text-sm text-cyan-300">{profileMessage}</div> : null}
                 </div>
               )
             ) : (
@@ -364,100 +442,98 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <section className="rounded-[24px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(16,21,32,0.94),rgba(9,9,11,0.98))] p-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Securite du compte</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-                  Recois un lien securise par email pour choisir un nouveau mot de passe sans rester bloque dans le dashboard.
-                </p>
-              </div>
-              <div className="rounded-full border border-cyan-900 bg-black/30 px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
-                reset par email
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">Email du compte</p>
-                <p className="mt-3 text-base font-bold text-white">{user?.email || 'Email indisponible'}</p>
-                <p className="mt-3 text-sm leading-6 text-zinc-400">
-                  Clique sur le bouton pour recevoir un lien de reinitialisation. Le mail ouvrira ensuite la page securisee du site pour choisir ton nouveau mot de passe.
-                </p>
-              </div>
-              <div className="rounded-[22px] border border-cyan-900/70 bg-cyan-950/20 p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">Action rapide</p>
-                <p className="mt-3 text-sm leading-6 text-zinc-300">
-                  Pratique si tu as oublie ton mot de passe ou si tu veux simplement le redefinir avec un code de confirmation.
-                </p>
-                <Link
-                  href={user?.email ? `/reset-password?email=${encodeURIComponent(user.email)}` : '/reset-password'}
-                  className="mt-5 block w-full rounded-full border border-cyan-700 bg-black/20 py-4 text-center font-black uppercase tracking-[0.2em] text-cyan-200"
-                >
-                  Ouvrir la page de reset
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-[30px] border border-zinc-800 bg-zinc-950 p-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Collection</p>
+                  <h2 className="mt-2 text-2xl font-black uppercase text-white">Favoris recents</h2>
+                </div>
+                <Link href="/favorites" className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400 hover:text-cyan-400">
+                  Voir tout
                 </Link>
               </div>
+
+              {recentFavorites.length > 0 ? (
+                <div className="space-y-3">
+                  {recentFavorites.map((entry) => (
+                    <Link
+                      key={entry.favoriteId}
+                      href={`/games/${entry.game.slug}`}
+                      className="grid grid-cols-[88px_1fr] gap-4 rounded-[22px] border border-zinc-800 bg-black/30 p-3 transition hover:border-cyan-800"
+                    >
+                      {entry.game.thumbnail_url ? (
+                        <img
+                          src={entry.game.thumbnail_url}
+                          alt={entry.game.title}
+                          className="h-20 w-24 rounded-[16px] object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-20 w-24 items-center justify-center rounded-[16px] bg-zinc-900 text-cyan-300">
+                          {entry.game.title[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-black text-white">{entry.game.title}</p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-cyan-300">Selection perso</p>
+                        <p className="mt-2 text-sm text-zinc-400 line-clamp-2">
+                          {entry.game.description || 'Pret a relancer depuis tes favoris.'}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500">Aucun favori enregistre pour le moment.</p>
+              )}
+            </div>
+
+            <div className="rounded-[30px] border border-zinc-800 bg-zinc-950 p-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Activite</p>
+                  <h2 className="mt-2 text-2xl font-black uppercase text-white">Derniers jeux vus</h2>
+                </div>
+                <Link href="/games" className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400 hover:text-cyan-400">
+                  Explorer
+                </Link>
+              </div>
+
+              {recentHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {recentHistory.map((entry) => (
+                    <Link
+                      key={entry.historyId}
+                      href={`/games/${entry.game.slug}`}
+                      className="grid grid-cols-[88px_1fr] gap-4 rounded-[22px] border border-zinc-800 bg-black/30 p-3 transition hover:border-cyan-800"
+                    >
+                      {entry.game.thumbnail_url ? (
+                        <img
+                          src={entry.game.thumbnail_url}
+                          alt={entry.game.title}
+                          className="h-20 w-24 rounded-[16px] object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-20 w-24 items-center justify-center rounded-[16px] bg-zinc-900 text-cyan-300">
+                          {entry.game.title[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-black text-white">{entry.game.title}</p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-cyan-300">Vu recemment</p>
+                        <p className="mt-2 text-sm text-zinc-400">
+                          {entry.played_at ? new Date(entry.played_at).toLocaleString('fr-FR') : 'Vue enregistree'}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500">Aucune visite enregistree pour le moment.</p>
+              )}
             </div>
           </section>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Favoris recents</h2>
-            <Link href="/favorites" className="text-xs text-zinc-400 hover:text-cyan-400">
-              Voir tout
-            </Link>
-          </div>
-
-          {recentFavorites.length > 0 ? (
-            <div className="space-y-3">
-              {recentFavorites.map((entry) => (
-                <Link
-                  key={entry.favoriteId}
-                  href={`/games/${entry.game.slug}`}
-                  className="block rounded-2xl border border-zinc-800 bg-black/30 p-4 hover:border-cyan-800 transition-colors"
-                >
-                  <p className="font-bold text-white">{entry.game.title}</p>
-                  <p className="mt-1 text-xs text-zinc-500">Ajoute a ta selection perso</p>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-500">Aucun favori enregistre pour le moment.</p>
-          )}
-        </section>
-
-        <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">Derniers jeux vus</h2>
-            <Link href="/games" className="text-xs text-zinc-400 hover:text-cyan-400">
-              Explorer
-            </Link>
-          </div>
-
-          {recentHistory.length > 0 ? (
-            <div className="space-y-3">
-              {recentHistory.map((entry) => (
-                <Link
-                  key={entry.historyId}
-                  href={`/games/${entry.game.slug}`}
-                  className="block rounded-2xl border border-zinc-800 bg-black/30 p-4 hover:border-cyan-800 transition-colors"
-                >
-                  <p className="font-bold text-white">{entry.game.title}</p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {entry.played_at
-                      ? new Date(entry.played_at).toLocaleString('fr-FR')
-                      : 'Vue enregistree'}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-500">Aucune visite enregistree pour le moment.</p>
-          )}
-        </section>
       </div>
     </main>
   )
