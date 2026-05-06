@@ -13,6 +13,38 @@ type Props = {
   initialCategorySlug?: string
 }
 
+function normalizeCompatibility(value: string | null | undefined) {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function getCompatibilityBucket(value: string | null | undefined): DeviceFilter | 'unknown' {
+  const normalized = normalizeCompatibility(value)
+
+  if (!normalized) {
+    return 'unknown'
+  }
+
+  const mobilePatterns = ['yes', 'oui', 'true', 'mobile', 'smartphone', 'touch', 'tactile', 'compatible']
+  const desktopPatterns = ['no', 'non', 'false', 'pc', 'desktop', 'ordinateur', 'clavier', 'souris']
+
+  const mobileScore = mobilePatterns.filter((pattern) => normalized.includes(pattern)).length
+  const desktopScore = desktopPatterns.filter((pattern) => normalized.includes(pattern)).length
+
+  if (desktopScore > mobileScore) {
+    return 'desktop'
+  }
+
+  if (mobileScore > desktopScore) {
+    return 'mobile'
+  }
+
+  return 'unknown'
+}
+
 export default function GamesCatalog({
   games,
   categories,
@@ -28,7 +60,7 @@ export default function GamesCatalog({
 
   const visibleGames = games
     .filter((game) => {
-      const compatibility = (game.mobile_compatible || '').toLowerCase()
+      const compatibilityBucket = getCompatibilityBucket(game.mobile_compatible)
       const matchesCategory =
         selectedCategory === 'all' ||
         game.categories.some((category) => category.slug === selectedCategory)
@@ -39,8 +71,7 @@ export default function GamesCatalog({
 
       const matchesDeviceFilter =
         deviceFilter === 'all' ||
-        (deviceFilter === 'mobile' && compatibility === 'yes') ||
-        (deviceFilter === 'desktop' && compatibility === 'no')
+        compatibilityBucket === deviceFilter
 
       if (!matchesDeviceFilter) {
         return false
