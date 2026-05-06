@@ -36,9 +36,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
   const requestIdRef = useRef(0)
-  const xpPoints = profile?.xp_points ?? 0
-  const level = Math.floor(xpPoints / 100) + 1
-  const xpProgress = xpPoints % 100
 
   useEffect(() => {
     let mounted = true

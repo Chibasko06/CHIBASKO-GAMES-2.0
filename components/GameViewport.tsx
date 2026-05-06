@@ -21,6 +21,7 @@ export default function GameViewport({
   initialDislikes,
 }: Props) {
   const { session, user } = useAuth()
+  const frameContainerRef = useRef<HTMLDivElement | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const [likes, setLikes] = useState(initialLikes)
   const [dislikes, setDislikes] = useState(initialDislikes)
@@ -151,23 +152,42 @@ export default function GameViewport({
   }
 
   const openFullscreen = async () => {
-    if (!iframeRef.current) {
+    const container = frameContainerRef.current
+
+    if (!container) {
       return
     }
 
-    if (iframeRef.current.requestFullscreen) {
-      await iframeRef.current.requestFullscreen()
+    const fullscreenTarget = container as HTMLDivElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void
     }
+
+    try {
+      if (fullscreenTarget.requestFullscreen) {
+        await fullscreenTarget.requestFullscreen()
+        return
+      }
+
+      if (fullscreenTarget.webkitRequestFullscreen) {
+        await fullscreenTarget.webkitRequestFullscreen()
+        return
+      }
+    } catch {
+      // Fallback below opens the game in its own tab when the browser blocks fullscreen.
+    }
+
+    window.open(gameUrl, '_blank', 'noopener,noreferrer')
   }
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-cyan-900/50 bg-black">
-      <div className="aspect-video">
+      <div ref={frameContainerRef} className="aspect-video bg-black">
         <iframe
           ref={iframeRef}
           src={gameUrl}
           className="h-full w-full"
           allowFullScreen
+          allow="fullscreen; autoplay; clipboard-write; gamepad"
         />
       </div>
       <div className="flex items-center justify-between gap-4 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3">
