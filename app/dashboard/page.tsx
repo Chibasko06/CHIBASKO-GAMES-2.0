@@ -216,58 +216,6 @@ export default function DashboardPage() {
 
   return (
     <main className="space-y-8">
-      <section className="relative overflow-hidden rounded-[32px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(7,12,19,0.98),rgba(13,22,38,0.94),rgba(7,9,13,0.98))] px-6 py-8 md:px-8 md:py-10">
-        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_55%)]" />
-        <div className="absolute -right-10 top-10 h-44 w-44 rounded-full border border-cyan-500/10 bg-cyan-400/5 blur-2xl" />
-        <div className="relative grid gap-8 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <p className="text-[11px] uppercase tracking-[0.45em] text-cyan-300/75">Hub joueur</p>
-              <h1 className="text-4xl font-black uppercase leading-none text-white md:text-5xl">
-                Ton espace
-                <span className="block text-cyan-400">Chibasko Games</span>
-              </h1>
-              <p className="max-w-2xl text-sm leading-7 text-zinc-300">
-                Retrouve ton profil public, ta progression et tes raccourcis principaux dans un tableau de bord plus net et plus rapide a lire.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/games"
-                className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-black"
-              >
-                Rejouer maintenant
-              </Link>
-              <Link
-                href={profile?.username ? `/players/${profile.username}` : '/players'}
-                className="rounded-full border border-cyan-800 bg-black/25 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-cyan-200"
-              >
-                Voir mon profil public
-              </Link>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-[24px] border border-cyan-900/70 bg-black/30 p-4">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Niveau</p>
-              <p className="mt-3 text-3xl font-black text-white">{level}</p>
-              <p className="mt-2 text-xs text-zinc-400">{xpProgress}/100 XP avant le prochain palier</p>
-            </div>
-            <div className="rounded-[24px] border border-zinc-800 bg-black/30 p-4">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Favoris actifs</p>
-              <p className="mt-3 text-3xl font-black text-white">{favoriteCount}</p>
-              <p className="mt-2 text-xs text-zinc-400">Ta selection perso prete a relancer.</p>
-            </div>
-            <div className="rounded-[24px] border border-zinc-800 bg-black/30 p-4">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Commentaires</p>
-              <p className="mt-3 text-3xl font-black text-white">{commentCount}</p>
-              <p className="mt-2 text-xs text-zinc-400">Ton empreinte dans la communaute.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="space-y-6">
           <ProfileCard profile={profile} stats={{ favoriteCount, commentCount }} />
