@@ -2,15 +2,13 @@
 
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 type ResetStep = 'request' | 'verify' | 'confirm' | 'success'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const initialEmail = searchParams.get('email')?.trim() ?? ''
-  const [email, setEmail] = useState(initialEmail)
+  const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [nextPassword, setNextPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
