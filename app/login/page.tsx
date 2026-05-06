@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
-import { getResetPasswordRedirectUrl } from '@/lib/authRedirect'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -11,9 +10,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [resettingPassword, setResettingPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const { loading: authLoading, user } = useAuth()
+  const resetPasswordHref = useMemo(() => {
+    const normalizedEmail = email.trim()
+    return normalizedEmail ? `/reset-password?email=${encodeURIComponent(normalizedEmail)}` : '/reset-password'
+  }, [email])
 
   const handleLogin = async () => {
     setMessage(null)
@@ -29,30 +31,6 @@ export default function LoginPage() {
 
     await ensureProfile(data.session)
     window.location.href = '/'
-  }
-
-  const handleForgotPassword = async () => {
-    setMessage(null)
-
-    if (!email.trim()) {
-      setMessage('Renseigne ton email pour recevoir le lien de reinitialisation.')
-      return
-    }
-
-    setResettingPassword(true)
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: getResetPasswordRedirectUrl(),
-    })
-
-    if (error) {
-      setMessage(error.message)
-      setResettingPassword(false)
-      return
-    }
-
-    setMessage('Un email de reinitialisation vient d etre envoye si ce compte existe.')
-    setResettingPassword(false)
   }
 
   if (!authLoading && user) {
@@ -98,19 +76,17 @@ export default function LoginPage() {
         />
 
         <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={handleForgotPassword}
-            disabled={resettingPassword}
-            className="text-sm text-cyan-300 transition hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          <Link
+            href={resetPasswordHref}
+            className="text-sm text-cyan-300 transition hover:text-cyan-200"
           >
-            {resettingPassword ? 'Envoi du lien...' : 'Mot de passe oublie ?'}
-          </button>
+            Mot de passe oublie ?
+          </Link>
         </div>
 
         <button
           onClick={handleLogin}
-          disabled={loading || resettingPassword}
+          disabled={loading}
           className="w-full rounded-full bg-cyan-400 py-4 text-sm font-black uppercase tracking-[0.2em] text-black disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? 'Connexion...' : 'Connexion'}

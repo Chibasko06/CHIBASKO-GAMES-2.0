@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import ProfileCard from '@/components/ProfileCard'
-import { getResetPasswordRedirectUrl } from '@/lib/authRedirect'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
 import { uploadOwnAvatar } from '@/lib/avatarUpload'
@@ -28,10 +27,8 @@ export default function DashboardPage() {
   })
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
-  const [savingPassword, setSavingPassword] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
-  const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
   const [favoriteCount, setFavoriteCount] = useState(0)
   const [commentCount, setCommentCount] = useState(0)
   const [recentFavorites, setRecentFavorites] = useState<FavoriteEntry[]>([])
@@ -194,30 +191,6 @@ export default function DashboardPage() {
       setUploadingAvatar(false)
       event.target.value = ''
     }
-  }
-
-  const handlePasswordResetEmail = async () => {
-    setPasswordMessage(null)
-
-    if (!user?.email) {
-      setPasswordMessage('Impossible de retrouver l email de ton compte.')
-      return
-    }
-
-    setSavingPassword(true)
-
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: getResetPasswordRedirectUrl(),
-    })
-
-    if (error) {
-      setPasswordMessage(error.message)
-      setSavingPassword(false)
-      return
-    }
-
-    setPasswordMessage(`Un lien de reinitialisation a ete envoye a ${user.email}.`)
-    setSavingPassword(false)
   }
 
   if (!loading && needsAuth) {
@@ -415,22 +388,16 @@ export default function DashboardPage() {
               <div className="rounded-[22px] border border-cyan-900/70 bg-cyan-950/20 p-5">
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">Action rapide</p>
                 <p className="mt-3 text-sm leading-6 text-zinc-300">
-                  Pratique si tu as oublie ton mot de passe ou si la session courante devient capricieuse.
+                  Pratique si tu as oublie ton mot de passe ou si tu veux simplement le redefinir avec un code de confirmation.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => void handlePasswordResetEmail()}
-                  disabled={savingPassword}
-                  className="mt-5 w-full rounded-full border border-cyan-700 bg-black/20 py-4 font-black uppercase tracking-[0.2em] text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                <Link
+                  href={user?.email ? `/reset-password?email=${encodeURIComponent(user.email)}` : '/reset-password'}
+                  className="mt-5 block w-full rounded-full border border-cyan-700 bg-black/20 py-4 text-center font-black uppercase tracking-[0.2em] text-cyan-200"
                 >
-                  {savingPassword ? 'Envoi du lien...' : 'Recevoir un lien de reset'}
-                </button>
+                  Ouvrir la page de reset
+                </Link>
               </div>
             </div>
-
-            {passwordMessage ? (
-              <p className="mt-4 text-sm text-cyan-300">{passwordMessage}</p>
-            ) : null}
           </section>
         </div>
       </div>
