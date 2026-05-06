@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import ProfileCard from '@/components/ProfileCard'
+import { getResetPasswordRedirectUrl } from '@/lib/authRedirect'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
 import { uploadOwnAvatar } from '@/lib/avatarUpload'
@@ -205,11 +206,8 @@ export default function DashboardPage() {
 
     setSavingPassword(true)
 
-    const redirectTo =
-      typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined
-
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo,
+      redirectTo: getResetPasswordRedirectUrl(),
     })
 
     if (error) {
@@ -429,6 +427,10 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
+
+            {passwordMessage ? (
+              <p className="mt-4 text-sm text-cyan-300">{passwordMessage}</p>
+            ) : null}
           </section>
         </div>
       </div>

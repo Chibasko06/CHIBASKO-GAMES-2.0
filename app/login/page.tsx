@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
+import { getResetPasswordRedirectUrl } from '@/lib/authRedirect'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -40,11 +41,8 @@ export default function LoginPage() {
 
     setResettingPassword(true)
 
-    const redirectTo =
-      typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined
-
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo,
+      redirectTo: getResetPasswordRedirectUrl(),
     })
 
     if (error) {
