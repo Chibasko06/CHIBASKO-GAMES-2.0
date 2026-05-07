@@ -10,6 +10,7 @@ type Game = Tables<'games'> & {
 }
 type AdminUser = Tables<'profiles'> & { email: string | null }
 type Category = Tables<'categories'> & { games_count?: number; game_categories?: { game_id: string }[] }
+type FaqEntry = Tables<'faq_entries'>
 
 type GameFormState = {
   title: string
@@ -39,9 +40,11 @@ type CategoryFormState = {
   slug: string
 }
 
-type ImportState = {
-  dataFilePath: string
-  imagesDirectoryPath: string
+type FaqFormState = {
+  question: string
+  answer: string
+  sort_order: number
+  is_published: boolean
 }
 
 const emptyGameForm: GameFormState = {
@@ -72,11 +75,11 @@ const emptyCategoryForm: CategoryFormState = {
   slug: '',
 }
 
-const defaultImportState: ImportState = {
-  dataFilePath:
-    'C:\\Users\\chiba\\OneDrive - UniversitÃ© Paris-Saclay\\Documents\\Projet_perso\\CHIBASKO-GAMES\\JavaScript\\game-data.js',
-  imagesDirectoryPath:
-    'C:\\Users\\chiba\\OneDrive - UniversitÃ© Paris-Saclay\\Documents\\Projet_perso\\CHIBASKO-GAMES\\images',
+const emptyFaqForm: FaqFormState = {
+  question: '',
+  answer: '',
+  sort_order: 0,
+  is_published: true,
 }
 
 function slugifyCategory(value: string) {
@@ -122,28 +125,39 @@ function toCategoryFormState(category: Category): CategoryFormState {
   }
 }
 
+function toFaqFormState(entry: FaqEntry): FaqFormState {
+  return {
+    question: entry.question,
+    answer: entry.answer,
+    sort_order: entry.sort_order,
+    is_published: entry.is_published,
+  }
+}
+
 export default function AdminPage() {
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [games, setGames] = useState<Game[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [faqEntries, setFaqEntries] = useState<FaqEntry[]>([])
   const [gameForm, setGameForm] = useState<GameFormState>(emptyGameForm)
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm)
+  const [faqForm, setFaqForm] = useState<FaqFormState>(emptyFaqForm)
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [editingFaqId, setEditingFaqId] = useState<string | null>(null)
   const [loadingGames, setLoadingGames] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingCategories, setLoadingCategories] = useState(true)
+  const [loadingFaq, setLoadingFaq] = useState(true)
   const [savingGame, setSavingGame] = useState(false)
   const [savingUser, setSavingUser] = useState(false)
   const [savingCategory, setSavingCategory] = useState(false)
+  const [savingFaq, setSavingFaq] = useState(false)
   const [uploadingUserAvatar, setUploadingUserAvatar] = useState(false)
-  const [importing, setImporting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [importMessage, setImportMessage] = useState<string | null>(null)
-  const [importState, setImportState] = useState<ImportState>(defaultImportState)
 
   const authorizedFetch = useCallback(async (input: string, init?: RequestInit) => {
     if (!sessionToken) {
@@ -161,15 +175,12 @@ export default function AdminPage() {
 
   const loadGames = useCallback(async () => {
     setLoadingGames(true)
-
     try {
       const response = await authorizedFetch('/api/admin/games')
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
-
       setGames(payload.games || [])
       setErrorMessage(null)
     } catch (error) {
@@ -182,15 +193,12 @@ export default function AdminPage() {
 
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true)
-
     try {
       const response = await authorizedFetch('/api/admin/users')
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
-
       setUsers(payload.users || [])
       setErrorMessage(null)
     } catch (error) {
@@ -203,15 +211,12 @@ export default function AdminPage() {
 
   const loadCategories = useCallback(async () => {
     setLoadingCategories(true)
-
     try {
       const response = await authorizedFetch('/api/admin/categories')
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
-
       setCategories(payload.categories || [])
       setErrorMessage(null)
     } catch (error) {
@@ -219,6 +224,24 @@ export default function AdminPage() {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur categories.')
     } finally {
       setLoadingCategories(false)
+    }
+  }, [authorizedFetch])
+
+  const loadFaq = useCallback(async () => {
+    setLoadingFaq(true)
+    try {
+      const response = await authorizedFetch('/api/admin/faq')
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Acces FAQ refuse.')
+      }
+      setFaqEntries(payload.faqEntries || [])
+      setErrorMessage(null)
+    } catch (error) {
+      setFaqEntries([])
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur FAQ.')
+    } finally {
+      setLoadingFaq(false)
     }
   }, [authorizedFetch])
 
@@ -235,6 +258,7 @@ export default function AdminPage() {
         setLoadingGames(false)
         setLoadingUsers(false)
         setLoadingCategories(false)
+        setLoadingFaq(false)
         setErrorMessage('Connecte-toi avec un compte admin pour acceder a cet espace.')
       }
     }
@@ -260,24 +284,18 @@ export default function AdminPage() {
     }
 
     const refreshAdminPanels = async () => {
-      await Promise.all([loadGames(), loadUsers(), loadCategories()])
+      await Promise.all([loadGames(), loadUsers(), loadCategories(), loadFaq()])
     }
 
     void refreshAdminPanels()
-  }, [sessionToken, loadGames, loadUsers, loadCategories])
+  }, [sessionToken, loadGames, loadUsers, loadCategories, loadFaq])
 
   const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
-    setGameForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
+    setGameForm((current) => ({ ...current, [field]: value }))
   }
 
   const handleUserChange = (field: keyof UserFormState, value: string | number) => {
-    setUserForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
+    setUserForm((current) => ({ ...current, [field]: value }))
   }
 
   const handleCategoryToggle = (categoryId: string) => {
@@ -304,28 +322,26 @@ export default function AdminPage() {
     setEditingCategoryId(null)
   }
 
+  const resetFaqForm = () => {
+    setFaqForm(emptyFaqForm)
+    setEditingFaqId(null)
+  }
+
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSavingGame(true)
-
     try {
       const endpoint = editingGameId ? `/api/admin/games/${editingGameId}` : '/api/admin/games'
       const method = editingGameId ? 'PATCH' : 'POST'
-
       const response = await authorizedFetch(endpoint, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(gameForm),
       })
-
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la sauvegarde du jeu.')
       }
-
       resetGameForm()
       await Promise.all([loadGames(), loadCategories()])
       setErrorMessage(null)
@@ -338,29 +354,21 @@ export default function AdminPage() {
 
   const handleUserSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
     if (!editingUserId) {
       setErrorMessage('Selectionne un utilisateur a modifier.')
       return
     }
-
     setSavingUser(true)
-
     try {
       const response = await authorizedFetch(`/api/admin/users/${editingUserId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userForm),
       })
-
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la mise a jour de l utilisateur.')
       }
-
       await loadUsers()
       setErrorMessage(null)
     } catch (error) {
@@ -373,27 +381,21 @@ export default function AdminPage() {
   const handleCategorySubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSavingCategory(true)
-
     try {
       const endpoint = editingCategoryId ? `/api/admin/categories/${editingCategoryId}` : '/api/admin/categories'
       const method = editingCategoryId ? 'PATCH' : 'POST'
       const response = await authorizedFetch(endpoint, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: categoryForm.name,
           slug: categoryForm.slug || slugifyCategory(categoryForm.name),
         }),
       })
-
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur categorie.')
       }
-
       resetCategoryForm()
       await loadCategories()
       setErrorMessage(null)
@@ -401,6 +403,31 @@ export default function AdminPage() {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur categorie.')
     } finally {
       setSavingCategory(false)
+    }
+  }
+
+  const handleFaqSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSavingFaq(true)
+    try {
+      const endpoint = editingFaqId ? `/api/admin/faq/${editingFaqId}` : '/api/admin/faq'
+      const method = editingFaqId ? 'PATCH' : 'POST'
+      const response = await authorizedFetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(faqForm),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erreur FAQ.')
+      }
+      resetFaqForm()
+      await loadFaq()
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur FAQ.')
+    } finally {
+      setSavingFaq(false)
     }
   }
 
@@ -422,24 +449,23 @@ export default function AdminPage() {
     setErrorMessage(null)
   }
 
+  const startEditFaq = (entry: FaqEntry) => {
+    setEditingFaqId(entry.id)
+    setFaqForm(toFaqFormState(entry))
+    setErrorMessage(null)
+  }
+
   const handleDeleteGame = async (id: string) => {
     setSavingGame(true)
-
     try {
-      const response = await authorizedFetch(`/api/admin/games/${id}`, {
-        method: 'DELETE',
-      })
-
+      const response = await authorizedFetch(`/api/admin/games/${id}`, { method: 'DELETE' })
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la suppression du jeu.')
       }
-
       if (editingGameId === id) {
         resetGameForm()
       }
-
       await Promise.all([loadGames(), loadCategories()])
       setErrorMessage(null)
     } catch (error) {
@@ -451,22 +477,15 @@ export default function AdminPage() {
 
   const handleDeleteUser = async (id: string) => {
     setSavingUser(true)
-
     try {
-      const response = await authorizedFetch(`/api/admin/users/${id}`, {
-        method: 'DELETE',
-      })
-
+      const response = await authorizedFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la suppression de l utilisateur.')
       }
-
       if (editingUserId === id) {
         resetUserForm()
       }
-
       await loadUsers()
       setErrorMessage(null)
     } catch (error) {
@@ -478,22 +497,15 @@ export default function AdminPage() {
 
   const handleDeleteCategory = async (id: string) => {
     setSavingCategory(true)
-
     try {
-      const response = await authorizedFetch(`/api/admin/categories/${id}`, {
-        method: 'DELETE',
-      })
-
+      const response = await authorizedFetch(`/api/admin/categories/${id}`, { method: 'DELETE' })
       const payload = await response.json()
-
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la suppression de la categorie.')
       }
-
       if (editingCategoryId === id) {
         resetCategoryForm()
       }
-
       setGameForm((current) => ({
         ...current,
         category_ids: current.category_ids.filter((categoryId) => categoryId !== id),
@@ -507,15 +519,33 @@ export default function AdminPage() {
     }
   }
 
+  const handleDeleteFaq = async (id: string) => {
+    setSavingFaq(true)
+    try {
+      const response = await authorizedFetch(`/api/admin/faq/${id}`, { method: 'DELETE' })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erreur suppression FAQ.')
+      }
+      if (editingFaqId === id) {
+        resetFaqForm()
+      }
+      await loadFaq()
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur suppression FAQ.')
+    } finally {
+      setSavingFaq(false)
+    }
+  }
+
   const handleUserAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-
     if (!file || !editingUserId) {
       return
     }
 
     setUploadingUserAvatar(true)
-
     try {
       const avatarUrl = await uploadAdminAvatar(editingUserId, file)
       setUserForm((current) => ({
@@ -535,12 +565,10 @@ export default function AdminPage() {
   const exportCsv = async (entity: 'games' | 'users') => {
     try {
       const response = await authorizedFetch(`/api/admin/export/${entity}`)
-
       if (!response.ok) {
         const payload = await response.json()
         throw new Error(payload.error || 'Erreur export CSV.')
       }
-
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -553,48 +581,6 @@ export default function AdminPage() {
     }
   }
 
-  const handleImportChange = (field: keyof ImportState, value: string) => {
-    setImportState((current) => ({
-      ...current,
-      [field]: value,
-    }))
-  }
-
-  const handleImportV1 = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setImporting(true)
-    setImportMessage(null)
-
-    try {
-      const response = await authorizedFetch('/api/admin/import/v1', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(importState),
-      })
-
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.error || 'Erreur pendant l import v1.')
-      }
-
-      await loadGames()
-      setImportMessage(
-        `${payload.importedCount} jeux importes, ${payload.copiedImagesCount} images copiees.` +
-          (payload.missingImages?.length
-            ? ` Images manquantes: ${payload.missingImages.slice(0, 5).join(', ')}`
-            : '')
-      )
-      setErrorMessage(null)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur pendant l import v1.')
-    } finally {
-      setImporting(false)
-    }
-  }
-
   return (
     <main className="space-y-8">
       <section className="border border-zinc-800 bg-zinc-950 p-6">
@@ -602,7 +588,7 @@ export default function AdminPage() {
           <div>
             <h1 className="mb-2 text-2xl font-black uppercase text-cyan-500">Admin Chibasko Games</h1>
             <p className="text-zinc-400">
-              Gere le catalogue, les categories, les profils joueurs et les imports.
+              Gere le catalogue, les categories, la FAQ et les profils joueurs.
             </p>
           </div>
           <div className="flex gap-3">
@@ -623,38 +609,6 @@ export default function AdminPage() {
           </div>
         </div>
         {errorMessage ? <p className="mt-4 text-sm text-red-400">{errorMessage}</p> : null}
-        {importMessage ? <p className="mt-2 text-sm text-cyan-300">{importMessage}</p> : null}
-      </section>
-
-      <section className="border border-zinc-800 bg-zinc-950 p-6">
-        <div className="mb-6">
-          <h2 className="text-lg font-black uppercase text-white">Import v1</h2>
-          <p className="mt-2 text-zinc-400">
-            Lit ton ancien `game-data.js`, copie les miniatures dans `public/games` et reinjecte les jeux dans la v2.
-          </p>
-        </div>
-
-        <form onSubmit={handleImportV1} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <input
-            value={importState.dataFilePath}
-            onChange={(e) => handleImportChange('dataFilePath', e.target.value)}
-            placeholder="Chemin vers game-data.js"
-            className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2"
-          />
-          <input
-            value={importState.imagesDirectoryPath}
-            onChange={(e) => handleImportChange('imagesDirectoryPath', e.target.value)}
-            placeholder="Chemin vers le dossier images"
-            className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2"
-          />
-          <button
-            type="submit"
-            disabled={importing}
-            className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2"
-          >
-            {importing ? 'IMPORT EN COURS...' : 'IMPORTER LES JEUX V1'}
-          </button>
-        </form>
       </section>
 
       <section className="grid grid-cols-1 gap-8 xl:grid-cols-[1.15fr_0.85fr]">
@@ -664,11 +618,7 @@ export default function AdminPage() {
               {editingGameId ? 'Modifier un jeu' : 'Ajouter un jeu'}
             </h2>
             {editingGameId ? (
-              <button
-                type="button"
-                onClick={resetGameForm}
-                className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300"
-              >
+              <button type="button" onClick={resetGameForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
                 Annuler
               </button>
             ) : null}
@@ -702,11 +652,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {categories.map((category) => (
                     <label key={category.id} className="flex items-center gap-3 border border-zinc-800 px-3 py-2 text-sm text-zinc-300">
-                      <input
-                        type="checkbox"
-                        checked={gameForm.category_ids.includes(category.id)}
-                        onChange={() => handleCategoryToggle(category.id)}
-                      />
+                      <input type="checkbox" checked={gameForm.category_ids.includes(category.id)} onChange={() => handleCategoryToggle(category.id)} />
                       <span>{category.name}</span>
                     </label>
                   ))}
@@ -753,10 +699,7 @@ export default function AdminPage() {
                     <div className="space-y-1 text-xs text-zinc-400">
                       <p>{game.developer_name || 'Developpeur non renseigne'}</p>
                       <p>{game.technology || 'Technologie non renseignee'}</p>
-                      <p>
-                        Categories:{' '}
-                        {(game.game_categories ?? []).length > 0 ? `${(game.game_categories ?? []).length} liees` : 'Aucune'}
-                      </p>
+                      <p>Categories: {(game.game_categories ?? []).length > 0 ? `${(game.game_categories ?? []).length} liees` : 'Aucune'}</p>
                     </div>
                     <div className="flex gap-3">
                       <button type="button" onClick={() => startEditGame(game)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
@@ -778,11 +721,7 @@ export default function AdminPage() {
                 {editingCategoryId ? 'Modifier une categorie' : 'Ajouter une categorie'}
               </h2>
               {editingCategoryId ? (
-                <button
-                  type="button"
-                  onClick={resetCategoryForm}
-                  className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300"
-                >
+                <button type="button" onClick={resetCategoryForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
                   Annuler
                 </button>
               ) : null}
@@ -810,11 +749,7 @@ export default function AdminPage() {
                 className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
                 required
               />
-              <button
-                type="submit"
-                disabled={savingCategory}
-                className="w-full bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              <button type="submit" disabled={savingCategory} className="w-full bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
                 {savingCategory ? 'SAUVEGARDE...' : editingCategoryId ? 'METTRE A JOUR LA CATEGORIE' : 'AJOUTER LA CATEGORIE'}
               </button>
             </form>
@@ -856,14 +791,80 @@ export default function AdminPage() {
         <div className="border border-zinc-800 bg-zinc-950 p-6">
           <div className="mb-6 flex items-center justify-between gap-4">
             <h2 className="text-lg font-black uppercase text-white">
+              {editingFaqId ? 'Modifier une entree FAQ' : 'Ajouter une entree FAQ'}
+            </h2>
+            {editingFaqId ? (
+              <button type="button" onClick={resetFaqForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
+                Annuler
+              </button>
+            ) : null}
+          </div>
+
+          <form onSubmit={handleFaqSubmit} className="grid grid-cols-1 gap-4">
+            <input value={faqForm.question} onChange={(event) => setFaqForm((current) => ({ ...current, question: event.target.value }))} placeholder="Question" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            <textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} placeholder="Reponse" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            <input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Ordre d affichage" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <label className="flex items-center gap-3 text-sm text-zinc-300">
+              <input type="checkbox" checked={faqForm.is_published} onChange={(event) => setFaqForm((current) => ({ ...current, is_published: event.target.checked }))} />
+              Entree publiee sur la page FAQ
+            </label>
+            <button type="submit" disabled={savingFaq} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
+              {savingFaq ? 'SAUVEGARDE...' : editingFaqId ? 'METTRE A JOUR LA FAQ' : 'AJOUTER LA FAQ'}
+            </button>
+          </form>
+        </div>
+
+        <div className="border border-zinc-800 bg-zinc-950 p-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 className="text-lg font-black uppercase text-white">FAQ publique</h2>
+            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{faqEntries.length} entrees</span>
+          </div>
+
+          {loadingFaq ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="h-24 animate-pulse border border-zinc-800 bg-zinc-900" />
+              ))}
+            </div>
+          ) : faqEntries.length === 0 ? (
+            <p className="text-sm text-zinc-500">Aucune entree FAQ pour le moment.</p>
+          ) : (
+            <div className="max-h-[760px] space-y-3 overflow-y-auto pr-1">
+              {faqEntries.map((entry) => (
+                <article key={entry.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-white">{entry.question}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">Ordre {entry.sort_order}</p>
+                    </div>
+                    <span className={`text-[10px] uppercase tracking-[0.3em] ${entry.is_published ? 'text-cyan-400' : 'text-zinc-500'}`}>
+                      {entry.is_published ? 'Publiee' : 'Masquee'}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-6 text-zinc-400">{entry.answer}</p>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => startEditFaq(entry)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
+                      Editer
+                    </button>
+                    <button type="button" onClick={() => void handleDeleteFaq(entry.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
+                      Supprimer
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="border border-zinc-800 bg-zinc-950 p-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 className="text-lg font-black uppercase text-white">
               {editingUserId ? 'Modifier un joueur' : 'Selectionne un joueur'}
             </h2>
             {editingUserId ? (
-              <button
-                type="button"
-                onClick={resetUserForm}
-                className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300"
-              >
+              <button type="button" onClick={resetUserForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
                 Annuler
               </button>
             ) : null}
