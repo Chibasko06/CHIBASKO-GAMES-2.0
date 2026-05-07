@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react'
-import { uploadAdminAvatar } from '@/lib/avatarUpload'
+import { uploadAdminAvatar, uploadAdminGameThumbnail } from '@/lib/avatarUpload'
 import { supabase } from '@/lib/supabaseClient'
 import { Tables } from '@/types/database'
 
@@ -156,6 +156,7 @@ export default function AdminPage() {
   const [savingUser, setSavingUser] = useState(false)
   const [savingCategory, setSavingCategory] = useState(false)
   const [savingFaq, setSavingFaq] = useState(false)
+  const [uploadingGameThumbnail, setUploadingGameThumbnail] = useState(false)
   const [uploadingUserAvatar, setUploadingUserAvatar] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -562,6 +563,30 @@ export default function AdminPage() {
     }
   }
 
+  const handleGameThumbnailUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    setUploadingGameThumbnail(true)
+
+    try {
+      const thumbnailUrl = await uploadAdminGameThumbnail(file, gameForm.slug || gameForm.title)
+      setGameForm((current) => ({
+        ...current,
+        thumbnail_url: thumbnailUrl,
+      }))
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur upload miniature jeu.')
+    } finally {
+      setUploadingGameThumbnail(false)
+      event.target.value = ''
+    }
+  }
+
   const exportCsv = async (entity: 'games' | 'users') => {
     try {
       const response = await authorizedFetch(`/api/admin/export/${entity}`)
@@ -629,6 +654,11 @@ export default function AdminPage() {
             <input value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             <input value={gameForm.game_url} onChange={(e) => handleGameChange('game_url', e.target.value)} placeholder="URL du jeu" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" required />
             <input value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
+            <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300 md:col-span-2">
+              <span>{uploadingGameThumbnail ? 'Upload miniature...' : 'Importer une image de jeu'}</span>
+              <input type="file" accept="image/*,.ico" className="hidden" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
+              <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
+            </label>
             <input value={gameForm.developer_name} onChange={(e) => handleGameChange('developer_name', e.target.value)} placeholder="Developpeur" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.release_date_text} onChange={(e) => handleGameChange('release_date_text', e.target.value)} placeholder="Date de sortie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.mobile_compatible} onChange={(e) => handleGameChange('mobile_compatible', e.target.value)} placeholder="Compatibilite mobile" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
