@@ -4,7 +4,7 @@ import ChibaskoLogo from '@/components/ChibaskoLogo'
 export default function Footer() {
   return (
     <footer className="mt-20 border-t border-cyan-950/70 bg-black/90">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-[1.2fr_0.8fr_0.8fr]">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
         <div className="space-y-4">
           <ChibaskoLogo compact />
           <p className="max-w-md text-sm leading-6 text-zinc-400">
@@ -22,11 +22,17 @@ export default function Footer() {
         </div>
 
         <div>
-          <h2 className="mb-4 text-sm font-black uppercase tracking-[0.3em] text-cyan-300">Infos</h2>
+          <h2 className="mb-4 text-sm font-black uppercase tracking-[0.3em] text-cyan-300">Nous connaitre</h2>
           <div className="space-y-3 text-sm text-zinc-400">
             <Link href="/a-propos" className="block hover:text-white">A propos</Link>
-            <Link href="/faq" className="block hover:text-white">FAQ</Link>
             <Link href="/contact" className="block hover:text-white">Contact</Link>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="mb-4 text-sm font-black uppercase tracking-[0.3em] text-cyan-300">Infos</h2>
+          <div className="space-y-3 text-sm text-zinc-400">
+            <Link href="/faq" className="block hover:text-white">FAQ</Link>
             <Link href="/mentions-legales" className="block hover:text-white">Mentions legales</Link>
           </div>
         </div>
