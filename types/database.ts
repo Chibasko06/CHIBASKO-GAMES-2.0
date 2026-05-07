@@ -69,6 +69,33 @@ export type Database = {
           },
         ]
       }
+      faq_entries: {
+        Row: {
+          answer: string
+          created_at: string
+          id: string
+          is_published: boolean
+          question: string
+          sort_order: number
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          question: string
+          sort_order?: number
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          question?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       game_categories: {
         Row: {
           category_id: string
