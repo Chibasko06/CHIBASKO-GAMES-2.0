@@ -62,9 +62,6 @@ export default function Footer() {
               ) : (
                 <div key={social.key} className="flex items-center justify-between gap-3 text-zinc-500">
                   <span>{social.label}</span>
-                  <span className="rounded-full border border-zinc-800 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-zinc-600">
-                    a configurer
-                  </span>
                 </div>
               )
             )}
