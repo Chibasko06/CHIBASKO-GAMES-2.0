@@ -11,6 +11,7 @@ type Game = Tables<'games'> & {
 type AdminUser = Tables<'profiles'> & { email: string | null }
 type Category = Tables<'categories'> & { games_count?: number; game_categories?: { game_id: string }[] }
 type FaqEntry = Tables<'faq_entries'>
+type GameSubmission = Tables<'game_submissions'>
 
 type GameFormState = {
   title: string
@@ -140,6 +141,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [faqEntries, setFaqEntries] = useState<FaqEntry[]>([])
+  const [submissions, setSubmissions] = useState<GameSubmission[]>([])
   const [gameForm, setGameForm] = useState<GameFormState>(emptyGameForm)
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm)
@@ -152,10 +154,12 @@ export default function AdminPage() {
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [loadingFaq, setLoadingFaq] = useState(true)
+  const [loadingSubmissions, setLoadingSubmissions] = useState(true)
   const [savingGame, setSavingGame] = useState(false)
   const [savingUser, setSavingUser] = useState(false)
   const [savingCategory, setSavingCategory] = useState(false)
   const [savingFaq, setSavingFaq] = useState(false)
+  const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null)
   const [uploadingGameThumbnail, setUploadingGameThumbnail] = useState(false)
   const [uploadingUserAvatar, setUploadingUserAvatar] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -246,6 +250,24 @@ export default function AdminPage() {
     }
   }, [authorizedFetch])
 
+  const loadSubmissions = useCallback(async () => {
+    setLoadingSubmissions(true)
+    try {
+      const response = await authorizedFetch('/api/admin/game-submissions')
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Acces propositions refuse.')
+      }
+      setSubmissions(payload.submissions || [])
+      setErrorMessage(null)
+    } catch (error) {
+      setSubmissions([])
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur propositions developpeurs.')
+    } finally {
+      setLoadingSubmissions(false)
+    }
+  }, [authorizedFetch])
+
   useEffect(() => {
     const bootstrap = async () => {
       const {
@@ -260,6 +282,7 @@ export default function AdminPage() {
         setLoadingUsers(false)
         setLoadingCategories(false)
         setLoadingFaq(false)
+        setLoadingSubmissions(false)
         setErrorMessage('Connecte-toi avec un compte admin pour acceder a cet espace.')
       }
     }
@@ -285,11 +308,11 @@ export default function AdminPage() {
     }
 
     const refreshAdminPanels = async () => {
-      await Promise.all([loadGames(), loadUsers(), loadCategories(), loadFaq()])
+      await Promise.all([loadGames(), loadUsers(), loadCategories(), loadFaq(), loadSubmissions()])
     }
 
     void refreshAdminPanels()
-  }, [sessionToken, loadGames, loadUsers, loadCategories, loadFaq])
+  }, [sessionToken, loadGames, loadUsers, loadCategories, loadFaq, loadSubmissions])
 
   const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
     setGameForm((current) => ({ ...current, [field]: value }))
@@ -537,6 +560,44 @@ export default function AdminPage() {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur suppression FAQ.')
     } finally {
       setSavingFaq(false)
+    }
+  }
+
+  const handleSubmissionStatus = async (id: string, status: GameSubmission['status']) => {
+    setSavingSubmissionId(id)
+    try {
+      const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, admin_notes: '' }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erreur mise a jour proposition.')
+      }
+      await loadSubmissions()
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur mise a jour proposition.')
+    } finally {
+      setSavingSubmissionId(null)
+    }
+  }
+
+  const handleDeleteSubmission = async (id: string) => {
+    setSavingSubmissionId(id)
+    try {
+      const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, { method: 'DELETE' })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erreur suppression proposition.')
+      }
+      await loadSubmissions()
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur suppression proposition.')
+    } finally {
+      setSavingSubmissionId(null)
     }
   }
 
@@ -815,6 +876,147 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="border border-zinc-800 bg-zinc-950 p-6">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-black uppercase text-white">Propositions developpeurs</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Demandes recues depuis la page publique Publier un jeu. Tu peux les examiner puis integrer manuellement les jeux retenus dans ton formulaire catalogue.
+            </p>
+          </div>
+          <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{submissions.length} demandes</span>
+        </div>
+
+        {loadingSubmissions ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-32 animate-pulse border border-zinc-800 bg-zinc-900" />
+            ))}
+          </div>
+        ) : submissions.length === 0 ? (
+          <p className="text-sm text-zinc-500">Aucune proposition developpeur pour le moment.</p>
+        ) : (
+          <div className="space-y-4">
+            {submissions.map((submission) => (
+              <article key={submission.id} className="space-y-4 border border-zinc-800 bg-black/30 p-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-lg font-black text-white">{submission.game_title}</p>
+                    <p className="mt-1 text-sm text-zinc-400">{submission.name_or_studio} • {submission.email}</p>
+                  </div>
+                  <span className={`text-[10px] uppercase tracking-[0.3em] ${
+                    submission.status === 'accepted'
+                      ? 'text-cyan-400'
+                      : submission.status === 'rejected'
+                        ? 'text-red-400'
+                        : submission.status === 'reviewed'
+                          ? 'text-amber-300'
+                          : 'text-zinc-500'
+                  }`}>
+                    {submission.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Type</p>
+                    <p className="mt-2 text-sm text-white">{submission.game_type}</p>
+                  </div>
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Demo</p>
+                    <a href={submission.demo_url} target="_blank" rel="noreferrer" className="mt-2 block text-sm text-cyan-300 hover:text-cyan-200">
+                      Ouvrir le lien
+                    </a>
+                  </div>
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pubs</p>
+                    <p className="mt-2 text-sm text-white">
+                      {submission.has_ads === true ? 'Oui' : submission.has_ads === false ? 'Non' : 'Non renseigne'}
+                    </p>
+                  </div>
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Date</p>
+                    <p className="mt-2 text-sm text-white">{new Date(submission.created_at).toLocaleString('fr-FR')}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Categories proposees</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {submission.category_names.length > 0 ? submission.category_names.map((categoryName) => (
+                        <span key={categoryName} className="border border-cyan-900 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-300">
+                          {categoryName}
+                        </span>
+                      )) : <span className="text-sm text-zinc-500">Aucune categorie</span>}
+                    </div>
+                  </div>
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Publication ailleurs</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300">{submission.published_elsewhere || 'Non renseignee'}</p>
+                  </div>
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Description</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.description}</p>
+                  </div>
+                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Attentes / conditions</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.expectations || 'Aucune condition precise.'}</p>
+                  </div>
+                  <div className="border border-zinc-800 bg-zinc-950 p-4 xl:col-span-2">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Message</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.message || 'Aucun message complementaire.'}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmissionStatus(submission.id, 'reviewed')}
+                    disabled={savingSubmissionId === submission.id}
+                    className="border border-amber-800 px-3 py-2 text-xs font-bold text-amber-300 disabled:opacity-60"
+                  >
+                    Marquer revisee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmissionStatus(submission.id, 'accepted')}
+                    disabled={savingSubmissionId === submission.id}
+                    className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300 disabled:opacity-60"
+                  >
+                    Accepter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmissionStatus(submission.id, 'rejected')}
+                    disabled={savingSubmissionId === submission.id}
+                    className="border border-red-900 px-3 py-2 text-xs font-bold text-red-400 disabled:opacity-60"
+                  >
+                    Refuser
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmissionStatus(submission.id, 'archived')}
+                    disabled={savingSubmissionId === submission.id}
+                    className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-60"
+                  >
+                    Archiver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteSubmission(submission.id)}
+                    disabled={savingSubmissionId === submission.id}
+                    className="border border-red-950 px-3 py-2 text-xs font-bold text-red-500 disabled:opacity-60"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">

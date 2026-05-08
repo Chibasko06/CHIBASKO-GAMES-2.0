@@ -34,6 +34,7 @@ export default function Footer() {
           <div className="space-y-3 text-sm text-zinc-400">
             <Link href="/a-propos" className="block hover:text-white">A propos</Link>
             <Link href="/contact" className="block hover:text-white">Contact</Link>
+            <Link href="/publier-un-jeu" className="block hover:text-white">Publier un jeu</Link>
           </div>
         </div>
 

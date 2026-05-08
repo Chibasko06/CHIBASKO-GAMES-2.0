@@ -41,6 +41,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     },
     {
+      url: absoluteUrl('/publier-un-jeu'),
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
       url: absoluteUrl('/mentions-legales'),
       changeFrequency: 'yearly',
       priority: 0.3,

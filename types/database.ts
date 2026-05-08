@@ -219,6 +219,63 @@ export type Database = {
           },
         ]
       }
+      game_submissions: {
+        Row: {
+          admin_notes: string | null
+          category_names: string[]
+          created_at: string
+          demo_url: string
+          description: string
+          email: string
+          expectations: string | null
+          game_title: string
+          game_type: string
+          has_ads: boolean | null
+          id: string
+          message: string | null
+          name_or_studio: string
+          published_elsewhere: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          category_names?: string[]
+          created_at?: string
+          demo_url: string
+          description: string
+          email: string
+          expectations?: string | null
+          game_title: string
+          game_type: string
+          has_ads?: boolean | null
+          id?: string
+          message?: string | null
+          name_or_studio: string
+          published_elsewhere?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          category_names?: string[]
+          created_at?: string
+          demo_url?: string
+          description?: string
+          email?: string
+          expectations?: string | null
+          game_title?: string
+          game_type?: string
+          has_ads?: boolean | null
+          id?: string
+          message?: string | null
+          name_or_studio?: string
+          published_elsewhere?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       games: {
         Row: {
           created_at: string
