@@ -7,6 +7,12 @@ export const siteConfig = {
   description:
     'Chibasko Games est une plateforme de jeux gratuits en ligne avec catalogue, profils joueurs, favoris, commentaires et futurs projets de creation de jeux.',
   ogImage: '/logo-chibaskogames-rond.ico',
+  socials: {
+    discord: '',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
+  },
 }
 
 export function absoluteUrl(path = '/') {

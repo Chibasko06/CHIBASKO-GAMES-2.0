@@ -69,6 +69,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const socialLinks = Object.values(siteConfig.socials).filter(Boolean)
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -77,6 +78,7 @@ export default function RootLayout({
         name: siteConfig.name,
         url: siteConfig.url,
         logo: `${siteConfig.url}${siteConfig.ogImage}`,
+        sameAs: socialLinks.length ? socialLinks : undefined,
       },
       {
         '@type': 'WebSite',
