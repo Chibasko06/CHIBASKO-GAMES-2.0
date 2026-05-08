@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
   title: 'Chibasko Games - Un univers de jeux sans précédent !',
   description:
-    'Découvre Chibasko Games, une plateforme de jeux gratuits sur navigateur pensée pour les vrais joueurs : profils, XP, favoris, avis, tendances et nouveaux jeux chaque semaine. Rejoins la communauté et partage ton expérience avec d’autres joueurs.',
+    'Découvre Chibasko Games, une plateforme de jeux gratuits sur navigateur : profils, XP, favoris, avis, tendances et nouveaux jeux chaque semaine. Rejoins la communauté !',
   path: '/',
 })
 
