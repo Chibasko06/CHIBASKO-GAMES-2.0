@@ -7,9 +7,9 @@ import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Accueil',
+  title: 'Jeux gratuits en ligne et navigateur',
   description:
-    'Decouvre Chibasko Games, une plateforme de jeux gratuits en ligne avec catalogue, favoris, profils joueurs et selection de jeux populaires.',
+    'Decouvre Chibasko Games, une plateforme de jeux gratuits en ligne sur navigateur avec favoris, profils joueurs, commentaires et selections populaires.',
   path: '/',
 })
 

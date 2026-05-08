@@ -1,5 +1,5 @@
 import './globals.css'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -55,6 +55,13 @@ export const metadata: Metadata = {
     shortcut: '/logo-chibaskogames-rond.ico',
     apple: '/logo-chibaskogames-rond.ico',
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#09090b',
 }
 
 export default function RootLayout({
