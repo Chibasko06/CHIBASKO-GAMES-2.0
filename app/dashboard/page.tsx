@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import ProfileCard from '@/components/ProfileCard'
@@ -277,7 +278,14 @@ export default function DashboardPage() {
                     <div className="flex flex-col gap-4 md:flex-row md:items-center">
                       <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[24px] border border-cyan-400/60 bg-zinc-900">
                         {profile.avatar_url ? (
-                          <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
+                          <Image
+                            src={profile.avatar_url}
+                            alt={profile.username}
+                            width={96}
+                            height={96}
+                            unoptimized
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           <span className="text-3xl font-black text-cyan-300">
                             {(draftProfile.username || profile.username || 'J')[0]?.toUpperCase()}
@@ -363,7 +371,14 @@ export default function DashboardPage() {
                     <div className="mt-4 flex items-center gap-4">
                       <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[18px] border border-cyan-700 bg-zinc-900">
                         {profile.avatar_url ? (
-                          <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
+                          <Image
+                            src={profile.avatar_url}
+                            alt={profile.username}
+                            width={64}
+                            height={64}
+                            unoptimized
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           <span className="text-lg font-black text-cyan-300">{profile.username[0]?.toUpperCase()}</span>
                         )}
@@ -408,9 +423,12 @@ export default function DashboardPage() {
                       className="grid grid-cols-[88px_1fr] gap-4 rounded-[22px] border border-zinc-800 bg-black/30 p-3 transition hover:border-cyan-800"
                     >
                       {entry.game.thumbnail_url ? (
-                        <img
+                        <Image
                           src={entry.game.thumbnail_url}
                           alt={entry.game.title}
+                          width={96}
+                          height={80}
+                          unoptimized
                           className="h-20 w-24 rounded-[16px] object-cover"
                         />
                       ) : (
@@ -453,9 +471,12 @@ export default function DashboardPage() {
                       className="grid grid-cols-[88px_1fr] gap-4 rounded-[22px] border border-zinc-800 bg-black/30 p-3 transition hover:border-cyan-800"
                     >
                       {entry.game.thumbnail_url ? (
-                        <img
+                        <Image
                           src={entry.game.thumbnail_url}
                           alt={entry.game.title}
+                          width={96}
+                          height={80}
+                          unoptimized
                           className="h-20 w-24 rounded-[16px] object-cover"
                         />
                       ) : (

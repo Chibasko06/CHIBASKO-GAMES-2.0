@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 type Props = {
   game: {
@@ -21,11 +22,16 @@ export function GameCard({ game }: Props) {
     <Link href={`/games/${game.slug}`} className="block">
       <article className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-cyan-700 hover:scale-[1.02] transition cursor-pointer">
         {game.thumbnail_url ? (
-          <img
-            src={game.thumbnail_url}
-            alt={game.title}
-            className="w-full h-40 object-cover"
-          />
+          <div className="relative h-40 w-full">
+            <Image
+              src={game.thumbnail_url}
+              alt={game.title}
+              fill
+              unoptimized
+              className="object-cover"
+              sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw"
+            />
+          </div>
         ) : (
           <div className="w-full h-40 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black flex items-center justify-center text-3xl">
             <span aria-hidden="true">🎮</span>

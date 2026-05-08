@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image'
 import { useState } from 'react'
 import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
@@ -29,7 +30,14 @@ export default function UserDropdown({
       >
         <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-cyan-700 bg-cyan-600 text-[10px] font-black text-black">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="Avatar compte" className="h-full w-full object-cover" />
+            <Image
+              src={avatarUrl}
+              alt="Avatar compte"
+              width={32}
+              height={32}
+              unoptimized
+              className="h-full w-full object-cover"
+            />
           ) : (
             user.email?.[0]?.toUpperCase() ?? 'J'
           )}

@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 type Profile = {
   username: string
   avatar_url?: string | null
@@ -36,7 +38,14 @@ export default function ProfileCard({
         <div className="mt-5 flex items-center gap-4">
           <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[26px] border border-cyan-400/60 bg-zinc-900 shadow-[0_0_30px_rgba(34,211,238,0.18)]">
             {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt={identity} className="h-full w-full object-cover" />
+              <Image
+                src={profile.avatar_url}
+                alt={identity}
+                width={96}
+                height={96}
+                unoptimized
+                className="h-full w-full object-cover"
+              />
             ) : (
               <span className="text-4xl font-black text-cyan-300">
                 {identity[0]?.toUpperCase()}

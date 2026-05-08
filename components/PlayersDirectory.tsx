@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { PublicProfile } from '@/lib/queries/profiles'
@@ -40,7 +41,14 @@ export default function PlayersDirectory({
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-cyan-700 bg-zinc-900">
                 {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
+                  <Image
+                    src={profile.avatar_url}
+                    alt={profile.username}
+                    width={56}
+                    height={56}
+                    unoptimized
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <span className="text-lg font-black text-cyan-300">{profile.username[0]?.toUpperCase()}</span>
                 )}

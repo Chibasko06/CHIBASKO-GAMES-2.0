@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 type Props = {
   compact?: boolean
@@ -7,9 +8,11 @@ type Props = {
 export default function ChibaskoLogo({ compact = false }: Props) {
   return (
     <Link href="/" className="inline-flex items-center gap-3 group">
-      <img
+      <Image
         src="/logo-chibaskogames-rond.ico"
         alt="Logo ChibaskoGames"
+        width={48}
+        height={48}
         className="h-12 w-12 rounded-full border border-cyan-400/60 bg-black object-cover shadow-[0_0_24px_rgba(34,211,238,0.18)]"
       />
       <div className={compact ? 'hidden sm:block' : 'block'}>

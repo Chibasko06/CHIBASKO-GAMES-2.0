@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { GameCard } from '@/components/GameCard'
 import HomeHeroActions from '@/components/HomeHeroActions'
 import { getFeaturedGames, getGamesByCategory, getHomepageHighlights } from '@/lib/queries/games'
@@ -66,13 +67,16 @@ export default async function Home() {
                 }`}
               >
                 {highlight.game.thumbnail_url ? (
-                  <img
-                    src={highlight.game.thumbnail_url}
-                    alt={highlight.game.title}
-                    className={`w-full object-cover transition duration-300 group-hover:scale-105 ${
-                      index === 0 ? 'h-56' : 'h-40'
-                    }`}
-                  />
+                  <div className={`relative overflow-hidden ${index === 0 ? 'h-56' : 'h-40'}`}>
+                    <Image
+                      src={highlight.game.thumbnail_url}
+                      alt={highlight.game.title}
+                      fill
+                      unoptimized
+                      className="object-cover transition duration-300 group-hover:scale-105"
+                      sizes={index === 0 ? '(min-width: 640px) 50vw, 100vw' : '(min-width: 640px) 25vw, 100vw'}
+                    />
+                  </div>
                 ) : (
                   <div className={`flex w-full items-center justify-center bg-zinc-900 text-4xl ${
                     index === 0 ? 'h-56' : 'h-40'

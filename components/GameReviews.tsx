@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
@@ -232,7 +233,14 @@ export default function GameReviews({ gameId }: Props) {
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-cyan-700 bg-zinc-900">
                   {review.avatar_url ? (
-                    <img src={review.avatar_url} alt={review.username} className="h-full w-full object-cover" />
+                    <Image
+                      src={review.avatar_url}
+                      alt={review.username}
+                      width={44}
+                      height={44}
+                      unoptimized
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <span className="font-black text-cyan-300">{review.username[0]?.toUpperCase()}</span>
                   )}
