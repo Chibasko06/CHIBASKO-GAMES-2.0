@@ -1,12 +1,58 @@
+import type { Metadata } from 'next'
 import FavoriteButton from '@/components/FavoriteButton'
 import GameReviews from '@/components/GameReviews'
 import GameViewport from '@/components/GameViewport'
 import PlaySessionTracker from '@/components/PlaySessionTracker'
 import { getGameBySlug } from '@/lib/queries/games'
+import { absoluteUrl } from '@/lib/seo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const game = await getGameBySlug(slug)
+
+  if (!game) {
+    return {
+      title: 'Jeu introuvable',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    }
+  }
+
+  const description =
+    game.description ||
+    `Joue a ${game.title} sur Chibasko Games, gratuitement depuis ton navigateur.`
+
+  return {
+    title: game.title,
+    description,
+    alternates: {
+      canonical: `https://chibaskogames.fr/games/${game.slug}`,
+    },
+    openGraph: {
+      title: game.title,
+      description,
+      url: `https://chibaskogames.fr/games/${game.slug}`,
+      type: 'article',
+      images: game.thumbnail_url ? [{ url: game.thumbnail_url }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: game.title,
+      description,
+      images: game.thumbnail_url ? [game.thumbnail_url] : undefined,
+    },
+  }
+}
 
 export default async function GamePage({
   params,
@@ -20,8 +66,42 @@ export default async function GamePage({
     notFound()
   }
 
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'VideoGame',
+    name: game.title,
+    description: game.description || `Joue a ${game.title} sur Chibasko Games.`,
+    url: absoluteUrl(`/games/${game.slug}`),
+    image: game.thumbnail_url || absoluteUrl('/logo-chibaskogames-rond.ico'),
+    genre: game.categories?.map((category) => category.name),
+    author: game.developer_name
+      ? {
+          '@type': 'Organization',
+          name: game.developer_name,
+        }
+      : undefined,
+    publisher: {
+      '@type': 'Organization',
+      name: 'Chibasko Games',
+      url: absoluteUrl('/'),
+    },
+    aggregateRating: game.ratings_count > 0
+      ? {
+          '@type': 'AggregateRating',
+          ratingValue: Number(game.average_rating.toFixed(1)),
+          ratingCount: game.ratings_count,
+          bestRating: 5,
+          worstRating: 1,
+        }
+      : undefined,
+  }
+
   return (
     <div className="space-y-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <PlaySessionTracker gameId={game.id} />
 
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

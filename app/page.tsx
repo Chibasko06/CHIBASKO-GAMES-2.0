@@ -1,9 +1,17 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { GameCard } from '@/components/GameCard'
 import HomeHeroActions from '@/components/HomeHeroActions'
 import { getFeaturedGames, getGamesByCategory, getHomepageHighlights } from '@/lib/queries/games'
+import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Accueil',
+  description:
+    'Decouvre Chibasko Games, une plateforme de jeux gratuits en ligne avec catalogue, favoris, profils joueurs et selection de jeux populaires.',
+  path: '/',
+})
 
 export default async function Home() {
   const [featuredGames, categorySections, homepageHighlights] = await Promise.all([

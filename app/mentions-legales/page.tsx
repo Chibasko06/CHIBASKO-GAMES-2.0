@@ -1,3 +1,13 @@
+import type { Metadata } from 'next'
+import { buildPageMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Mentions legales',
+  description:
+    'Consulte les mentions legales de Chibasko Games concernant le site, les donnees personnelles, les cookies et la legislation applicable.',
+  path: '/mentions-legales',
+})
+
 export default function MentionsLegalesPage() {
   return (
     <div className="mx-auto max-w-5xl rounded-[32px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 md:p-10">

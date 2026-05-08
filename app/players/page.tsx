@@ -1,7 +1,15 @@
+import type { Metadata } from 'next'
 import PlayersDirectory from '@/components/PlayersDirectory'
 import { getPublicProfiles } from '@/lib/queries/profiles'
+import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Communaute',
+  description:
+    'Explore les profils publics des joueurs de Chibasko Games, leurs bios, leur XP et leur activite visible.',
+  path: '/players',
+})
 
 export default async function PlayersPage() {
   const profiles = await getPublicProfiles()

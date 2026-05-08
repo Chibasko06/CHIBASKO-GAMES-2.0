@@ -1,3 +1,13 @@
+import type { Metadata } from 'next'
+import { buildPageMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = buildPageMetadata({
+  title: 'A propos',
+  description:
+    'Decouvre l histoire de Chibasko Games, la vision de l equipe Chibasko et l ambition de devenir aussi un hub de creation de jeux.',
+  path: '/a-propos',
+})
+
 export default function AProposPage() {
   return (
     <div className="mx-auto max-w-5xl rounded-[32px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 md:p-10">

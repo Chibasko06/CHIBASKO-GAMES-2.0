@@ -1,9 +1,54 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
 import { getPublicProfileByUsername, getPublicProfileSummary } from '@/lib/queries/profiles'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}): Promise<Metadata> {
+  const { username } = await params
+  const profile = await getPublicProfileByUsername(username)
+
+  if (!profile) {
+    return {
+      title: 'Profil introuvable',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    }
+  }
+
+  const description =
+    profile.bio ||
+    `Consulte le profil public de ${profile.username} sur Chibasko Games.`
+
+  return {
+    title: `${profile.username} - Profil joueur`,
+    description,
+    alternates: {
+      canonical: `https://chibaskogames.fr/players/${profile.username}`,
+    },
+    openGraph: {
+      title: `${profile.username} - Profil joueur`,
+      description,
+      url: `https://chibaskogames.fr/players/${profile.username}`,
+      type: 'profile',
+      images: profile.avatar_url ? [{ url: profile.avatar_url }] : undefined,
+    },
+    twitter: {
+      card: 'summary',
+      title: `${profile.username} - Profil joueur`,
+      description,
+      images: profile.avatar_url ? [profile.avatar_url] : undefined,
+    },
+  }
+}
 
 export default async function PublicPlayerPage({
   params,
