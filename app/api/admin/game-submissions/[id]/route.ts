@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '../../_utils'
 
-const allowedStatuses = new Set(['pending', 'reviewed', 'accepted', 'rejected', 'archived'])
+const allowedStatuses = new Set(['pending', 'reviewing', 'accepted', 'rejected', 'archived'])
 
 export async function PATCH(
   request: NextRequest,

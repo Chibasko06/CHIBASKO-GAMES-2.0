@@ -226,15 +226,21 @@ export type Database = {
           created_at: string
           demo_url: string
           description: string
+          developer_website: string | null
           email: string
           expectations: string | null
           game_title: string
           game_type: string
           has_ads: boolean | null
           id: string
+          long_description: string
           message: string | null
+          mobile_compatibility: string
           name_or_studio: string
+          ownership_confirmed: boolean
           published_elsewhere: string | null
+          sensitive_content: string
+          short_description: string
           status: string
           updated_at: string
         }
@@ -244,15 +250,21 @@ export type Database = {
           created_at?: string
           demo_url: string
           description: string
+          developer_website?: string | null
           email: string
           expectations?: string | null
           game_title: string
           game_type: string
           has_ads?: boolean | null
           id?: string
+          long_description?: string
           message?: string | null
+          mobile_compatibility?: string
           name_or_studio: string
+          ownership_confirmed?: boolean
           published_elsewhere?: string | null
+          sensitive_content?: string
+          short_description?: string
           status?: string
           updated_at?: string
         }
@@ -262,15 +274,21 @@ export type Database = {
           created_at?: string
           demo_url?: string
           description?: string
+          developer_website?: string | null
           email?: string
           expectations?: string | null
           game_title?: string
           game_type?: string
           has_ads?: boolean | null
           id?: string
+          long_description?: string
           message?: string | null
+          mobile_compatibility?: string
           name_or_studio?: string
+          ownership_confirmed?: boolean
           published_elsewhere?: string | null
+          sensitive_content?: string
+          short_description?: string
           status?: string
           updated_at?: string
         }

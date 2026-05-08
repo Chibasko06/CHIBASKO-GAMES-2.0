@@ -13,6 +13,22 @@ type Category = Tables<'categories'> & { games_count?: number; game_categories?:
 type FaqEntry = Tables<'faq_entries'>
 type GameSubmission = Tables<'game_submissions'>
 
+const submissionStatusLabels: Record<string, string> = {
+  pending: 'En attente',
+  reviewing: 'En cours de revue',
+  accepted: 'Acceptee',
+  rejected: 'Refusee',
+  archived: 'Archivee',
+}
+
+const submissionActionHelp: Record<string, string> = {
+  pending: 'Laisser la demande en file d attente sans action immediate.',
+  reviewing: 'Marquer la proposition comme en cours d analyse.',
+  accepted: 'Valider la proposition pour une integration manuelle ulterieure.',
+  rejected: 'Refuser la proposition si elle ne convient pas au catalogue.',
+  archived: 'Ranger la demande hors du flux principal sans la supprimer.',
+}
+
 type GameFormState = {
   title: string
   slug: string
@@ -142,6 +158,7 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [faqEntries, setFaqEntries] = useState<FaqEntry[]>([])
   const [submissions, setSubmissions] = useState<GameSubmission[]>([])
+  const [submissionNotes, setSubmissionNotes] = useState<Record<string, string>>({})
   const [gameForm, setGameForm] = useState<GameFormState>(emptyGameForm)
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm)
@@ -258,7 +275,13 @@ export default function AdminPage() {
       if (!response.ok) {
         throw new Error(payload.error || 'Acces propositions refuse.')
       }
-      setSubmissions(payload.submissions || [])
+      const nextSubmissions = payload.submissions || []
+      setSubmissions(nextSubmissions)
+      setSubmissionNotes(
+        Object.fromEntries(
+          nextSubmissions.map((submission: GameSubmission) => [submission.id, submission.admin_notes || ''])
+        )
+      )
       setErrorMessage(null)
     } catch (error) {
       setSubmissions([])
@@ -569,7 +592,7 @@ export default function AdminPage() {
       const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, admin_notes: '' }),
+        body: JSON.stringify({ status, admin_notes: submissionNotes[id] || '' }),
       })
       const payload = await response.json()
       if (!response.ok) {
@@ -582,6 +605,48 @@ export default function AdminPage() {
     } finally {
       setSavingSubmissionId(null)
     }
+  }
+
+  const handleSubmissionNotesSave = async (id: string, currentStatus: GameSubmission['status']) => {
+    setSavingSubmissionId(id)
+    try {
+      const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: currentStatus, admin_notes: submissionNotes[id] || '' }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erreur sauvegarde notes admin.')
+      }
+      await loadSubmissions()
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erreur sauvegarde notes admin.')
+    } finally {
+      setSavingSubmissionId(null)
+    }
+  }
+
+  const handleCopySubmissionLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setErrorMessage(null)
+    } catch {
+      setErrorMessage('Impossible de copier le lien automatiquement.')
+    }
+  }
+
+  const handleOpenExternalLink = (url: string) => {
+    const confirmed = window.confirm(
+      `Tu vas ouvrir un lien externe soumis par un developpeur.\n\n${url}\n\nVerifie toujours la source avant de poursuivre.`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleDeleteSubmission = async (id: string) => {
@@ -883,7 +948,7 @@ export default function AdminPage() {
           <div>
             <h2 className="text-lg font-black uppercase text-white">Propositions developpeurs</h2>
             <p className="mt-2 text-sm text-zinc-400">
-              Demandes recues depuis la page publique Publier un jeu. Tu peux les examiner puis integrer manuellement les jeux retenus dans ton formulaire catalogue.
+              Demandes recues depuis la page publique Publier un jeu. Tu peux les examiner, noter leur statut, sauvegarder tes notes puis integrer manuellement les jeux retenus dans ton formulaire catalogue.
             </p>
           </div>
           <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{submissions.length} demandes</span>
@@ -900,50 +965,95 @@ export default function AdminPage() {
         ) : (
           <div className="space-y-4">
             {submissions.map((submission) => (
-              <article key={submission.id} className="space-y-4 border border-zinc-800 bg-black/30 p-5">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <article key={submission.id} className="space-y-5 rounded-[28px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(20,24,33,0.82),rgba(9,9,11,0.94))] p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="text-lg font-black text-white">{submission.game_title}</p>
                     <p className="mt-1 text-sm text-zinc-400">{submission.name_or_studio} • {submission.email}</p>
+                    <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-300">
+                      {submission.short_description || submission.description}
+                    </p>
                   </div>
-                  <span className={`text-[10px] uppercase tracking-[0.3em] ${
+                  <span className={`rounded-full border px-3 py-2 text-[10px] uppercase tracking-[0.3em] ${
                     submission.status === 'accepted'
-                      ? 'text-cyan-400'
+                      ? 'border-cyan-900 text-cyan-400'
                       : submission.status === 'rejected'
-                        ? 'text-red-400'
-                        : submission.status === 'reviewed'
-                          ? 'text-amber-300'
-                          : 'text-zinc-500'
+                        ? 'border-red-950 text-red-400'
+                        : submission.status === 'reviewing'
+                          ? 'border-amber-900 text-amber-300'
+                          : submission.status === 'archived'
+                            ? 'border-zinc-800 text-zinc-500'
+                            : 'border-zinc-800 text-zinc-400'
                   }`}>
-                    {submission.status}
+                    {submissionStatusLabels[submission.status] || submission.status}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Type</p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Type de jeu</p>
                     <p className="mt-2 text-sm text-white">{submission.game_type}</p>
                   </div>
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Demo</p>
-                    <a href={submission.demo_url} target="_blank" rel="noreferrer" className="mt-2 block text-sm text-cyan-300 hover:text-cyan-200">
-                      Ouvrir le lien
-                    </a>
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Compatibilite mobile</p>
+                    <p className="mt-2 text-sm text-white">{submission.mobile_compatibility || 'Non renseignee'}</p>
                   </div>
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Contenu sensible</p>
+                    <p className="mt-2 text-sm text-white">{submission.sensitive_content || 'Non renseigne'}</p>
+                  </div>
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pubs</p>
                     <p className="mt-2 text-sm text-white">
                       {submission.has_ads === true ? 'Oui' : submission.has_ads === false ? 'Non' : 'Non renseigne'}
                     </p>
                   </div>
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Date</p>
                     <p className="mt-2 text-sm text-white">{new Date(submission.created_at).toLocaleString('fr-FR')}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Lien de demo complet</p>
+                    <p className="mt-3 break-all text-sm leading-6 text-cyan-300">{submission.demo_url}</p>
+                    <p className="mt-3 text-xs leading-5 text-zinc-500">
+                      Attention : lien externe soumis par un developpeur. Verifie toujours la source avant ouverture.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handleCopySubmissionLink(submission.demo_url)}
+                        className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-200"
+                      >
+                        Copier le lien
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenExternalLink(submission.demo_url)}
+                        className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300"
+                      >
+                        Ouvrir dans un nouvel onglet
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Site / portfolio</p>
+                    <p className="mt-3 break-all text-sm leading-6 text-zinc-300">
+                      {submission.developer_website || 'Non renseigne'}
+                    </p>
+                    {submission.developer_website ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenExternalLink(submission.developer_website!)}
+                        className="mt-4 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300"
+                      >
+                        Ouvrir le site
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Categories proposees</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {submission.category_names.length > 0 ? submission.category_names.map((categoryName) => (
@@ -953,65 +1063,93 @@ export default function AdminPage() {
                       )) : <span className="text-sm text-zinc-500">Aucune categorie</span>}
                     </div>
                   </div>
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Publication ailleurs</p>
                     <p className="mt-3 text-sm leading-6 text-zinc-300">{submission.published_elsewhere || 'Non renseignee'}</p>
                   </div>
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Description</p>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.description}</p>
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Confirmation de droits</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300">
+                      {submission.ownership_confirmed ? 'Le developpeur affirme etre proprietaire ou autorise a proposer ce jeu.' : 'Confirmation absente.'}
+                    </p>
                   </div>
-                  <div className="border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Description longue</p>
+                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.long_description || submission.description}</p>
+                  </div>
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Attentes / conditions</p>
                     <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.expectations || 'Aucune condition precise.'}</p>
                   </div>
-                  <div className="border border-zinc-800 bg-zinc-950 p-4 xl:col-span-2">
+                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4 xl:col-span-2">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Message</p>
                     <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.message || 'Aucun message complementaire.'}</p>
                   </div>
                 </div>
 
+                <div className="rounded-[24px] border border-cyan-950/60 bg-cyan-950/10 p-4">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Notes admin</p>
+                  <textarea
+                    value={submissionNotes[submission.id] || ''}
+                    onChange={(event) =>
+                      setSubmissionNotes((current) => ({
+                        ...current,
+                        [submission.id]: event.target.value,
+                      }))
+                    }
+                    placeholder="Observations, points a verifier, decision interne..."
+                    className="mt-3 min-h-28 w-full rounded-2xl border border-zinc-800 bg-black/50 p-4 text-white outline-none focus:border-cyan-500"
+                  />
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleSubmissionNotesSave(submission.id, submission.status)}
+                      disabled={savingSubmissionId === submission.id}
+                      className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300 disabled:opacity-60"
+                    >
+                      Sauvegarder les notes
+                    </button>
+                    <span className="text-xs leading-5 text-zinc-500">
+                      Ces notes servent a documenter ton analyse avant la decision finale.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  {(['pending', 'reviewing', 'accepted', 'rejected', 'archived'] as const).map((statusKey) => (
+                    <button
+                      key={statusKey}
+                      type="button"
+                      onClick={() => void handleSubmissionStatus(submission.id, statusKey)}
+                      disabled={savingSubmissionId === submission.id}
+                      className={`rounded-[20px] border px-4 py-4 text-left disabled:opacity-60 ${
+                        submission.status === statusKey
+                          ? 'border-cyan-700 bg-cyan-950/20'
+                          : 'border-zinc-800 bg-black/25'
+                      }`}
+                    >
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-white">
+                        {submissionStatusLabels[statusKey]}
+                      </p>
+                      <p className="mt-2 text-xs leading-5 text-zinc-400">
+                        {submissionActionHelp[statusKey]}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleSubmissionStatus(submission.id, 'reviewed')}
-                    disabled={savingSubmissionId === submission.id}
-                    className="border border-amber-800 px-3 py-2 text-xs font-bold text-amber-300 disabled:opacity-60"
-                  >
-                    Marquer revisee
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSubmissionStatus(submission.id, 'accepted')}
-                    disabled={savingSubmissionId === submission.id}
-                    className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300 disabled:opacity-60"
-                  >
-                    Accepter
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSubmissionStatus(submission.id, 'rejected')}
-                    disabled={savingSubmissionId === submission.id}
-                    className="border border-red-900 px-3 py-2 text-xs font-bold text-red-400 disabled:opacity-60"
-                  >
-                    Refuser
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSubmissionStatus(submission.id, 'archived')}
-                    disabled={savingSubmissionId === submission.id}
-                    className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-60"
-                  >
-                    Archiver
-                  </button>
                   <button
                     type="button"
                     onClick={() => void handleDeleteSubmission(submission.id)}
                     disabled={savingSubmissionId === submission.id}
                     className="border border-red-950 px-3 py-2 text-xs font-bold text-red-500 disabled:opacity-60"
                   >
-                    Supprimer
+                    Supprimer definitivement
                   </button>
+                  <span className="text-xs leading-5 text-zinc-500">
+                    Suppression reservee aux doublons ou demandes inutilisables.
+                  </span>
                 </div>
               </article>
             ))}
