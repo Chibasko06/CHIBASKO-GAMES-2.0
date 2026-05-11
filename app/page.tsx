@@ -8,9 +8,9 @@ import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Chibasko Games - Un univers de jeux sans précédent !',
+  title: 'Chibasko Games - Un univers de jeux sans precedent',
   description:
-    'Découvre Chibasko Games, une plateforme de jeux gratuits sur navigateur : profils, XP, favoris, avis, tendances et nouveaux jeux chaque semaine. Rejoins la communauté !',
+    'Decouvre Chibasko Games, une plateforme de jeux gratuits sur navigateur avec profils, XP, favoris, avis, tendances et nouveaux jeux chaque semaine.',
   path: '/',
 })
 
@@ -22,20 +22,20 @@ export default async function Home() {
   ])
 
   return (
-    <div className="space-y-14">
+    <div className="space-y-12 xl:space-y-14">
       <section className="overflow-hidden rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(8,12,18,0.98),rgba(15,23,42,0.92))]">
-        <div className="grid gap-8 px-6 py-8 md:px-10 md:py-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+        <div className="grid gap-8 px-5 py-7 sm:px-6 md:px-8 md:py-9 lg:grid-cols-[1.08fr_0.92fr] lg:px-10 lg:py-10 xl:gap-10 2xl:grid-cols-[1.02fr_0.98fr] 2xl:px-12">
           <div className="space-y-6">
-            <p className="text-[11px] uppercase tracking-[0.45em] text-cyan-300/75">
+            <p className="text-[10px] uppercase tracking-[0.32em] text-cyan-300/75 sm:text-[11px] sm:tracking-[0.45em]">
               Chibasko Games Version 2.0
             </p>
             <div className="space-y-4">
-              <h1 className="max-w-2xl text-4xl font-black uppercase leading-none text-white md:text-6xl">
+              <h1 className="max-w-4xl text-4xl font-black uppercase leading-none text-white sm:text-5xl md:text-6xl 2xl:max-w-5xl 2xl:text-[5.2rem]">
                 Votre navigateur devient
                 <span className="block text-cyan-400"> votre console</span>
               </h1>
-              <p className="max-w-xl text-base leading-7 text-zinc-300">
-                Accédez à des centaines de jeux gratuits sans aucune installation. Créez votre profil, gagnez de l&apos;XP et grimpez dans le classement.
+              <p className="max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
+                Accedez a des centaines de jeux gratuits sans aucune installation. Creez votre profil, gagnez de l XP et grimpez dans le classement.
               </p>
             </div>
 
@@ -44,11 +44,11 @@ export default async function Home() {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
                 <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Sans attente</p>
-                <p className="mt-2 text-sm text-zinc-300">Cliquez, jouez. Aucun téléchargement ni installation requis.</p>
+                <p className="mt-2 text-sm text-zinc-300">Cliquez, jouez. Aucun telechargement ni installation requis.</p>
               </div>
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
                 <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">100% gratuit</p>
-                <p className="mt-2 text-sm text-zinc-300">Tous nos jeux sont accessibles librement, sans frais cachés.</p>
+                <p className="mt-2 text-sm text-zinc-300">Tous nos jeux sont accessibles librement, sans frais caches.</p>
               </div>
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
                 <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Compte joueur</p>
@@ -57,7 +57,7 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 2xl:gap-5">
             {homepageHighlights.map((highlight, index) => (
               <Link
                 key={`${highlight.label}-${highlight.game.id}`}
@@ -106,7 +106,7 @@ export default async function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
           {featuredGames.map((game) => (
             <GameCard key={game.id} game={game} />
           ))}
@@ -128,7 +128,7 @@ export default async function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
             {section.games.map((game) => (
               <GameCard key={game.id} game={game} />
             ))}

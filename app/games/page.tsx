@@ -23,10 +23,10 @@ export default async function GamesPage({
   ])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 2xl:space-y-8">
       <div>
-        <h1 className="text-2xl font-bold mb-2">Tous les jeux</h1>
-        <p className="text-zinc-500 mb-6">
+        <h1 className="mb-2 text-2xl font-bold sm:text-3xl">Tous les jeux</h1>
+        <p className="mb-6 max-w-3xl text-zinc-500">
           Bibliotheque complete des jeux publies actuellement sur Chibasko Games, avec recherche, filtres et tri.
         </p>
       </div>

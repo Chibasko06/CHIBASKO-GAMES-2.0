@@ -48,7 +48,7 @@ export default function UserDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-56 bg-zinc-950 border border-cyan-900 shadow-[0_10px_20px_rgba(0,0,0,0.5)] z-50">
+        <div className="absolute right-0 z-50 mt-2 w-[min(14rem,calc(100vw-1.5rem))] overflow-hidden rounded-[20px] border border-cyan-900 bg-zinc-950 shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
           <Link
             href="/dashboard"
             className="block px-4 py-2 text-xs font-bold text-zinc-400 hover:text-cyan-400 hover:bg-zinc-900 border-b border-zinc-900"

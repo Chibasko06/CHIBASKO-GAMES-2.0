@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import ScrollToTopButton from '@/components/ScrollToTopButton'
 import XpHeartbeat from '@/components/XpHeartbeat'
 import { siteConfig } from '@/lib/seo'
 
@@ -100,9 +101,10 @@ export default function RootLayout({
         <AuthProvider>
           <XpHeartbeat />
           <Navbar />
-          <main className="mx-auto max-w-7xl px-4 py-8">
+          <main className="mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">
             {children}
           </main>
+          <ScrollToTopButton />
           <Footer />
         </AuthProvider>
       </body>

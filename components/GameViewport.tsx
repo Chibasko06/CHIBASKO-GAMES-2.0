@@ -190,13 +190,13 @@ export default function GameViewport({
           allow="fullscreen; autoplay; clipboard-write; gamepad"
         />
       </div>
-      <div className="flex items-center justify-between gap-4 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={pending}
             onClick={() => void applyReaction('like')}
-            className={`rounded-full border px-3 py-2 text-sm font-bold transition ${
+            className={`rounded-full border px-3 py-2 text-sm font-bold transition sm:px-4 ${
               reaction === 'like'
                 ? 'border-cyan-400 bg-cyan-400 text-black'
                 : 'border-zinc-700 text-zinc-200 hover:border-cyan-700'
@@ -208,7 +208,7 @@ export default function GameViewport({
             type="button"
             disabled={pending}
             onClick={() => void applyReaction('dislike')}
-            className={`rounded-full border px-3 py-2 text-sm font-bold transition ${
+            className={`rounded-full border px-3 py-2 text-sm font-bold transition sm:px-4 ${
               reaction === 'dislike'
                 ? 'border-red-400 bg-red-400 text-black'
                 : 'border-zinc-700 text-zinc-200 hover:border-red-700'
@@ -221,7 +221,7 @@ export default function GameViewport({
         <button
           type="button"
           onClick={() => void openFullscreen()}
-          className="rounded-full border border-cyan-700 px-4 py-2 text-sm font-bold text-cyan-200 hover:bg-zinc-900 transition-colors"
+          className="w-full rounded-full border border-cyan-700 px-4 py-2 text-sm font-bold text-cyan-200 transition-colors hover:bg-zinc-900 sm:w-auto"
         >
           Plein ecran
         </button>

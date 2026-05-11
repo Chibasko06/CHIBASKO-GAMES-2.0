@@ -12,7 +12,7 @@ const socialLinks = [
 export default function Footer() {
   return (
     <footer className="mt-20 border-t border-cyan-950/70 bg-black/90">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-2 xl:grid-cols-[1.15fr_0.8fr_0.8fr_0.8fr_0.95fr]">
+      <div className="mx-auto grid w-full max-w-[2200px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:px-8 xl:grid-cols-[1.1fr_0.8fr_0.8fr_0.8fr_0.95fr] xl:px-10 2xl:px-12">
         <div className="space-y-4">
           <ChibaskoLogo compact />
           <p className="max-w-md text-sm leading-6 text-zinc-400">

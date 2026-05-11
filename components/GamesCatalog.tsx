@@ -116,8 +116,8 @@ export default function GamesCatalog({
 
   return (
     <div className="space-y-6">
-      <section className="space-y-5 border border-zinc-800 bg-zinc-950 p-4 md:p-6">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_220px_220px]">
+      <section className="space-y-5 border border-zinc-800 bg-zinc-950 p-4 md:p-6 xl:p-7">
+        <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.4fr)_240px_240px]">
           <label className="block">
             <span className="mb-2 block text-[10px] uppercase tracking-[0.35em] text-zinc-500">
               Recherche
@@ -163,7 +163,7 @@ export default function GamesCatalog({
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">
               Categories
             </p>
@@ -185,7 +185,7 @@ export default function GamesCatalog({
             <button
               type="button"
               onClick={() => setSelectedCategory('all')}
-              className={`border px-3 py-2 text-xs uppercase tracking-[0.2em] transition-colors ${
+              className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors sm:tracking-[0.2em] ${
                 selectedCategory === 'all'
                   ? 'border-cyan-500 bg-cyan-500 text-black'
                   : 'border-zinc-800 text-zinc-300 hover:border-cyan-700'
@@ -198,7 +198,7 @@ export default function GamesCatalog({
                 key={category.id}
                 type="button"
                 onClick={() => setSelectedCategory(category.slug)}
-                className={`border px-3 py-2 text-xs uppercase tracking-[0.2em] transition-colors ${
+                className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors sm:tracking-[0.2em] ${
                   selectedCategory === category.slug
                     ? 'border-cyan-500 bg-cyan-500 text-black'
                     : 'border-zinc-800 text-zinc-300 hover:border-cyan-700'
@@ -237,7 +237,7 @@ export default function GamesCatalog({
           Aucun jeu ne correspond aux filtres actuels.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {visibleGames.map((game) => (
             <GameCard key={game.id} game={game} />
           ))}

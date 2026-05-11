@@ -35,7 +35,7 @@ export default function ProfileCard({
     <aside className="overflow-hidden rounded-[30px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(8,14,24,0.98),rgba(6,8,12,0.98))]">
       <div className="border-b border-cyan-950/60 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.18),transparent_55%)] p-6">
         <p className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-300/80">Carte joueur</p>
-        <div className="mt-5 flex items-center gap-4">
+        <div className="mt-5 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[26px] border border-cyan-400/60 bg-zinc-900 shadow-[0_0_30px_rgba(34,211,238,0.18)]">
             {profile.avatar_url ? (
               <Image
@@ -78,7 +78,7 @@ export default function ProfileCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
             <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Total XP</p>
             <p className="mt-2 text-2xl font-black text-white">{profile.xp_points}</p>
@@ -87,7 +87,7 @@ export default function ProfileCard({
             <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Favoris</p>
             <p className="mt-2 text-2xl font-black text-white">{stats.favoriteCount}</p>
           </div>
-          <div className="col-span-2 rounded-[22px] border border-zinc-800 bg-black/35 p-4">
+          <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4 sm:col-span-2">
             <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Commentaires publies</p>
             <p className="mt-2 text-2xl font-black text-white">{stats.commentCount}</p>
           </div>

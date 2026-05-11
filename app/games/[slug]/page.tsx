@@ -97,16 +97,16 @@ export default async function GamePage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 xl:space-y-8">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
       <PlaySessionTracker gameId={game.id} />
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-3">
-          <h1 className="text-3xl font-black uppercase text-cyan-400">{game.title}</h1>
+          <h1 className="text-3xl font-black uppercase text-cyan-400 sm:text-4xl">{game.title}</h1>
           <div className="flex flex-wrap gap-2">
             {game.categories?.map((category) => (
               <Link
@@ -123,7 +123,7 @@ export default async function GamePage({
         <FavoriteButton gameId={game.id} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Vues</p>
           <p className="mt-2 text-2xl font-black text-white">{game.views_count}</p>
@@ -153,7 +153,7 @@ export default async function GamePage({
         {game.description ?? 'Aucune description disponible.'}
       </p>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
         <div className="bg-zinc-900 border border-zinc-800 p-4">
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">Developpeur</p>
           <p className="text-base font-bold text-white">{game.developer_name || 'Non renseigne'}</p>
