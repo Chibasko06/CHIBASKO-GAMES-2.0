@@ -149,7 +149,7 @@ export function Navbar() {
                     Favoris
                   </Link>
                   <Link href="/dashboard" onClick={handleCloseMobileMenu} className="rounded-2xl border border-zinc-800 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em]">
-                    Dashboard
+                    Profil
                   </Link>
                   {isAdmin ? (
                     <Link href="/admin" onClick={handleCloseMobileMenu} className="rounded-2xl border border-cyan-800 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] text-cyan-300">
