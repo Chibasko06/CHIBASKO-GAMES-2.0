@@ -59,7 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   const profileRoutes: MetadataRoute.Sitemap = profiles.map((profile) => ({
-    url: absoluteUrl(`/players/@${profile.public_handle}`),
+    url: absoluteUrl(`/players/${profile.username}`),
     changeFrequency: 'weekly',
     priority: 0.5,
   }))

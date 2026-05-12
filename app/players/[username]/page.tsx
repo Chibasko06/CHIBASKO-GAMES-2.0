@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
-import { normalizePublicHandle } from '@/lib/profileHandle'
-import { getPublicProfileByHandle, getPublicProfileSummary } from '@/lib/queries/profiles'
+import { getPublicProfileByUsername, getPublicProfileSummary } from '@/lib/queries/profiles'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +12,7 @@ export async function generateMetadata({
   params: Promise<{ username: string }>
 }): Promise<Metadata> {
   const { username } = await params
-  const profile = await getPublicProfileByHandle(normalizePublicHandle(username))
+  const profile = await getPublicProfileByUsername(username)
 
   if (!profile) {
     return {
@@ -33,12 +32,12 @@ export async function generateMetadata({
     title: `${profile.username} - Profil joueur`,
     description,
     alternates: {
-      canonical: `https://chibaskogames.fr/players/@${profile.public_handle}`,
+      canonical: `https://chibaskogames.fr/players/${profile.username}`,
     },
     openGraph: {
       title: `${profile.username} - Profil joueur`,
       description,
-      url: `https://chibaskogames.fr/players/@${profile.public_handle}`,
+      url: `https://chibaskogames.fr/players/${profile.username}`,
       type: 'profile',
       images: profile.avatar_url ? [{ url: profile.avatar_url }] : undefined,
     },
@@ -57,13 +56,7 @@ export default async function PublicPlayerPage({
   params: Promise<{ username: string }>
 }) {
   const { username } = await params
-  const normalizedHandle = normalizePublicHandle(username)
-
-  if (username !== `@${normalizedHandle}`) {
-    redirect(`/players/@${normalizedHandle}`)
-  }
-
-  const profile = await getPublicProfileByHandle(normalizedHandle)
+  const profile = await getPublicProfileByUsername(username)
 
   if (!profile) {
     notFound()
@@ -76,7 +69,6 @@ export default async function PublicPlayerPage({
       <section className="rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(10,15,23,0.98),rgba(10,10,12,0.98))] p-6 md:p-8">
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/75">Profil public</p>
         <h1 className="mt-3 text-3xl font-black uppercase text-white md:text-4xl">{profile.username}</h1>
-        <p className="mt-2 text-sm font-bold uppercase tracking-[0.18em] text-cyan-300">@{profile.public_handle}</p>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
           Voici la fiche publique de ce joueur: pseudo, avatar, bio, XP et activite communautaire visible.
         </p>
@@ -96,10 +88,6 @@ export default async function PublicPlayerPage({
             <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
               <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo</p>
               <p className="mt-2 text-lg font-black text-white">{profile.username}</p>
-            </div>
-            <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Handle public</p>
-              <p className="mt-2 text-lg font-black text-cyan-300">@{profile.public_handle}</p>
             </div>
             <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
               <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">XP public</p>

@@ -1,43 +1,32 @@
 import { Tables } from '@/types/database'
-import { normalizePublicHandle } from '@/lib/profileHandle'
 import { supabase } from '@/lib/supabaseClient'
 
 type Profile = Tables<'profiles'>
 
 export type PublicProfile = Pick<
   Profile,
-  'id' | 'username' | 'public_handle' | 'avatar_url' | 'bio' | 'xp_points' | 'created_at'
+  'id' | 'username' | 'avatar_url' | 'bio' | 'xp_points' | 'created_at'
 >
 
 export async function getPublicProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
+    .select('id, username, avatar_url, bio, xp_points, created_at')
     .order('xp_points', { ascending: false })
     .order('username', { ascending: true })
 
   if (error) {
-    const { data: legacyProfiles } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, bio, xp_points, created_at')
-      .order('xp_points', { ascending: false })
-      .order('username', { ascending: true })
-
-    return ((legacyProfiles as Array<Omit<PublicProfile, 'public_handle'>> | null) ?? []).map((profile) => ({
-      ...profile,
-      public_handle: profile.username,
-    }))
+    return []
   }
 
   return (data as PublicProfile[] | null) ?? []
 }
 
-export async function getPublicProfileByHandle(handle: string) {
-  const normalizedHandle = normalizePublicHandle(handle)
+export async function getPublicProfileByUsername(username: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
-    .eq('public_handle', normalizedHandle)
+    .select('id, username, avatar_url, bio, xp_points, created_at')
+    .eq('username', username)
     .maybeSingle()
 
   if (error) {

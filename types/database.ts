@@ -422,7 +422,6 @@ export type Database = {
           display_name: string | null
           id: string
           last_xp_tick_at: string | null
-          public_handle: string
           username: string
           xp_points: number
         }
@@ -433,7 +432,6 @@ export type Database = {
           display_name?: string | null
           id: string
           last_xp_tick_at?: string | null
-          public_handle: string
           username: string
           xp_points?: number
         }
@@ -444,7 +442,6 @@ export type Database = {
           display_name?: string | null
           id?: string
           last_xp_tick_at?: string | null
-          public_handle?: string
           username?: string
           xp_points?: number
         }

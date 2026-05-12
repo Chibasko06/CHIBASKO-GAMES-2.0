@@ -47,7 +47,6 @@ type GameFormState = {
 
 type UserFormState = {
   username: string
-  public_handle: string
   avatar_url: string
   bio: string
   xp_points: number
@@ -83,7 +82,6 @@ const emptyGameForm: GameFormState = {
 
 const emptyUserForm: UserFormState = {
   username: '',
-  public_handle: '',
   avatar_url: '',
   bio: '',
   xp_points: 0,
@@ -131,7 +129,6 @@ function toGameFormState(game: Game): GameFormState {
 function toUserFormState(user: AdminUser): UserFormState {
   return {
     username: user.username,
-    public_handle: user.public_handle || '',
     avatar_url: user.avatar_url || '',
     bio: user.bio || '',
     xp_points: user.xp_points,
@@ -1245,7 +1242,6 @@ export default function AdminPage() {
 
           <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4">
             <input value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <input value={userForm.public_handle} onChange={(e) => handleUserChange('public_handle', e.target.value)} placeholder="@handle public" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             <input value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="Avatar public URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300">
               <span>{uploadingUserAvatar ? 'Upload avatar...' : 'Importer une image avatar'}</span>
@@ -1278,12 +1274,10 @@ export default function AdminPage() {
                 <article key={user.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
                   <div>
                     <p className="font-bold text-white">{user.username}</p>
-                    <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-cyan-300">@{user.public_handle}</p>
                     <p className="mt-1 text-xs text-zinc-500">{user.email || 'Email non disponible'}</p>
                   </div>
                   <div className="space-y-1 text-xs text-zinc-400">
                     <p>Pseudo: {user.username}</p>
-                    <p>Handle: @{user.public_handle}</p>
                     <p>XP: {user.xp_points}</p>
                     <p>Bio: {user.bio || 'Aucune bio'}</p>
                   </div>

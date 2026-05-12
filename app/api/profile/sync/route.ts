@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
-import { buildUniqueProfileHandle } from '@/lib/profileHandle'
 
 function sanitizeUsername(value: string | null | undefined) {
   const normalized = (value || '')
@@ -75,7 +74,6 @@ export async function POST(request: NextRequest) {
     const patch: {
       display_name?: string
       username?: string
-      public_handle?: string
     } = {}
 
     if (!existingProfile.display_name) {
@@ -84,14 +82,6 @@ export async function POST(request: NextRequest) {
 
     if (!existingProfile.username?.trim()) {
       patch.username = await buildUniqueUsername(supabaseAdmin, requestedUsername, user.id)
-    }
-
-    if (!existingProfile.public_handle?.trim()) {
-      patch.public_handle = await buildUniqueProfileHandle(
-        supabaseAdmin,
-        existingProfile.username || requestedUsername,
-        user.id
-      )
     }
 
     if (Object.keys(patch).length > 0) {
@@ -113,14 +103,12 @@ export async function POST(request: NextRequest) {
   }
 
   const username = await buildUniqueUsername(supabaseAdmin, requestedUsername, user.id)
-  const publicHandle = await buildUniqueProfileHandle(supabaseAdmin, requestedUsername, user.id)
 
   const { data: createdProfile, error: insertError } = await supabaseAdmin
     .from('profiles')
     .insert({
       id: user.id,
       username,
-      public_handle: publicHandle,
       display_name: username,
       avatar_url: null,
       bio: null,

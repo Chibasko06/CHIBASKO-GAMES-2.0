@@ -367,7 +367,6 @@ export default function DashboardPage() {
                   <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo public</p>
                     <p className="mt-3 text-2xl font-black uppercase text-white">{profile.username}</p>
-                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-cyan-300">@{profile.public_handle}</p>
                     <p className="mt-4 text-sm leading-6 text-zinc-400">
                       C est ce pseudo qui apparait dans la communaute et sur tes commentaires.
                     </p>

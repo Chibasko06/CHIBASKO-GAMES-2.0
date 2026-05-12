@@ -20,7 +20,7 @@ export default async function PlayersPage() {
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Communaute</p>
         <h1 className="mt-3 text-4xl font-black uppercase text-white">Joueurs publics</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-          Recherche un joueur, consulte son pseudo, son @handle, son avatar, sa bio et son XP public.
+          Recherche un joueur, consulte son pseudo, son avatar, sa bio et son XP public.
         </p>
       </div>
       <PlayersDirectory profiles={profiles} />

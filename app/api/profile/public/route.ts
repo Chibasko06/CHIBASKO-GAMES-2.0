@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
-import { buildUniqueProfileHandle } from '@/lib/profileHandle'
 
 export async function PATCH(request: NextRequest) {
   const authorization = request.headers.get('authorization')
@@ -30,14 +29,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Pseudo obligatoire.' }, { status: 400 })
   }
 
-  const publicHandle = await buildUniqueProfileHandle(supabaseAdmin, username, user.id)
-
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update({
       username,
       display_name: username,
-      public_handle: publicHandle,
       bio: bio || null,
     })
     .eq('id', user.id)
