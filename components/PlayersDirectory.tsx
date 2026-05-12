@@ -35,7 +35,7 @@ export default function PlayersDirectory({
         {visibleProfiles.map((profile) => (
           <Link
             key={profile.id}
-            href={`/players/${profile.username}`}
+            href={`/players/${profile.id}`}
             className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5 transition hover:border-cyan-800"
           >
             <div className="flex items-center gap-4">

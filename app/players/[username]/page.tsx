@@ -1,8 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
-import { getPublicProfileByUsername, getPublicProfileSummary } from '@/lib/queries/profiles'
+import {
+  getPublicProfileById,
+  getPublicProfileByUsername,
+  getPublicProfileSummary,
+} from '@/lib/queries/profiles'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +16,9 @@ export async function generateMetadata({
   params: Promise<{ username: string }>
 }): Promise<Metadata> {
   const { username } = await params
-  const profile = await getPublicProfileByUsername(username)
+  const profile =
+    (await getPublicProfileById(username)) ??
+    (await getPublicProfileByUsername(username))
 
   if (!profile) {
     return {
@@ -32,12 +38,12 @@ export async function generateMetadata({
     title: `${profile.username} - Profil joueur`,
     description,
     alternates: {
-      canonical: `https://chibaskogames.fr/players/${profile.username}`,
+      canonical: `https://chibaskogames.fr/players/${profile.id}`,
     },
     openGraph: {
       title: `${profile.username} - Profil joueur`,
       description,
-      url: `https://chibaskogames.fr/players/${profile.username}`,
+      url: `https://chibaskogames.fr/players/${profile.id}`,
       type: 'profile',
       images: profile.avatar_url ? [{ url: profile.avatar_url }] : undefined,
     },
@@ -56,10 +62,16 @@ export default async function PublicPlayerPage({
   params: Promise<{ username: string }>
 }) {
   const { username } = await params
-  const profile = await getPublicProfileByUsername(username)
+  const profile =
+    (await getPublicProfileById(username)) ??
+    (await getPublicProfileByUsername(username))
 
   if (!profile) {
     notFound()
+  }
+
+  if (username !== profile.id) {
+    redirect(`/players/${profile.id}`)
   }
 
   const stats = await getPublicProfileSummary(profile.id)
