@@ -109,7 +109,7 @@ export default function DashboardPage() {
   }, [authLoading, pathname, session, user])
 
   const handleProfileSave = async () => {
-    if (!user || !profile) {
+    if (!user || !profile || !session?.access_token) {
       return
     }
 
@@ -117,22 +117,27 @@ export default function DashboardPage() {
     setProfileMessage(null)
     const normalizedUsername = draftProfile.username.trim()
 
-    const { error, data } = await supabase
-      .from('profiles')
-      .update({
+    const response = await fetch('/api/profile/public', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
         username: normalizedUsername,
-        display_name: normalizedUsername,
-        bio: draftProfile.bio.trim() || null,
-      })
-      .eq('id', user.id)
-      .select('*')
-      .single()
+        bio: draftProfile.bio.trim(),
+      }),
+    })
 
-    if (error) {
-      setProfileMessage(error.message)
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok || !payload?.profile) {
+      setProfileMessage(payload?.error || 'Impossible de mettre a jour ton profil.')
       setSavingProfile(false)
       return
     }
+
+    const data = payload.profile as Profile
 
     setProfile(data)
     setSavedProfile(data)
@@ -362,6 +367,7 @@ export default function DashboardPage() {
                   <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5">
                     <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo public</p>
                     <p className="mt-3 text-2xl font-black uppercase text-white">{profile.username}</p>
+                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-cyan-300">@{profile.public_handle}</p>
                     <p className="mt-4 text-sm leading-6 text-zinc-400">
                       C est ce pseudo qui apparait dans la communaute et sur tes commentaires.
                     </p>

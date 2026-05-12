@@ -35,7 +35,7 @@ export default function PlayersDirectory({
         {visibleProfiles.map((profile) => (
           <Link
             key={profile.id}
-            href={`/players/${profile.username}`}
+            href={`/players/@${profile.public_handle}`}
             className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5 transition hover:border-cyan-800"
           >
             <div className="flex items-center gap-4">
@@ -55,6 +55,7 @@ export default function PlayersDirectory({
               </div>
               <div>
                 <p className="font-black uppercase text-white">{profile.username}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-cyan-300">@{profile.public_handle}</p>
                 <p className="text-sm text-cyan-300">{profile.xp_points} XP</p>
               </div>
             </div>

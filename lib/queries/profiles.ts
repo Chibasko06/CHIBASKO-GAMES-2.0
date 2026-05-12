@@ -5,24 +5,25 @@ type Profile = Tables<'profiles'>
 
 export type PublicProfile = Pick<
   Profile,
-  'id' | 'username' | 'avatar_url' | 'bio' | 'xp_points' | 'created_at'
+  'id' | 'username' | 'public_handle' | 'avatar_url' | 'bio' | 'xp_points' | 'created_at'
 >
 
 export async function getPublicProfiles() {
   const { data } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, bio, xp_points, created_at')
+    .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
     .order('xp_points', { ascending: false })
     .order('username', { ascending: true })
 
   return (data as PublicProfile[] | null) ?? []
 }
 
-export async function getPublicProfileByUsername(username: string) {
+export async function getPublicProfileByHandle(handle: string) {
+  const normalizedHandle = handle.replace(/^@+/, '')
   const { data } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, bio, xp_points, created_at')
-    .eq('username', username)
+    .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
+    .eq('public_handle', normalizedHandle)
     .maybeSingle()
 
   return (data as PublicProfile | null) ?? null
