@@ -1,4 +1,5 @@
 import { Tables } from '@/types/database'
+import { normalizePublicHandle } from '@/lib/profileHandle'
 import { supabase } from '@/lib/supabaseClient'
 
 type Profile = Tables<'profiles'>
@@ -32,7 +33,7 @@ export async function getPublicProfiles() {
 }
 
 export async function getPublicProfileByHandle(handle: string) {
-  const normalizedHandle = handle.replace(/^@+/, '')
+  const normalizedHandle = normalizePublicHandle(handle)
   const { data, error } = await supabase
     .from('profiles')
     .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
+import { normalizePublicHandle } from '@/lib/profileHandle'
 import { getPublicProfileByHandle, getPublicProfileSummary } from '@/lib/queries/profiles'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,7 @@ export async function generateMetadata({
   params: Promise<{ username: string }>
 }): Promise<Metadata> {
   const { username } = await params
-  const profile = await getPublicProfileByHandle(username)
+  const profile = await getPublicProfileByHandle(normalizePublicHandle(username))
 
   if (!profile) {
     return {
@@ -56,9 +57,9 @@ export default async function PublicPlayerPage({
   params: Promise<{ username: string }>
 }) {
   const { username } = await params
-  const normalizedHandle = username.replace(/^@+/, '')
+  const normalizedHandle = normalizePublicHandle(username)
 
-  if (!username.startsWith('@')) {
+  if (username !== `@${normalizedHandle}`) {
     redirect(`/players/@${normalizedHandle}`)
   }
 

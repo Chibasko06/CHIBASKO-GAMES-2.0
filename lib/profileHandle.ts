@@ -1,5 +1,25 @@
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
 
+function decodeHandleValue(value: string) {
+  let current = value
+
+  for (let index = 0; index < 3; index += 1) {
+    try {
+      const decoded = decodeURIComponent(current)
+
+      if (decoded === current) {
+        break
+      }
+
+      current = decoded
+    } catch {
+      break
+    }
+  }
+
+  return current
+}
+
 export function sanitizeProfileHandle(value: string | null | undefined) {
   const normalized = (value || '')
     .normalize('NFD')
@@ -13,7 +33,7 @@ export function sanitizeProfileHandle(value: string | null | undefined) {
 }
 
 export function normalizePublicHandle(value: string | null | undefined) {
-  return sanitizeProfileHandle((value || '').replace(/^@+/, ''))
+  return sanitizeProfileHandle(decodeHandleValue(value || '').replace(/^@+/, ''))
 }
 
 export async function buildUniqueProfileHandle(
