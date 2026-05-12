@@ -79,16 +79,16 @@ export default function RegisterPage() {
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Inscription joueur</p>
         <h1 className="mt-3 text-3xl font-black uppercase text-white sm:text-4xl">Creer ton compte</h1>
         <p className="mt-3 max-w-lg text-sm leading-6 text-zinc-400">
-          Va a l essentiel: pseudo, email et mot de passe. Tu peux aussi rejoindre rapidement ChibaskoGames avec Google ou Discord.
+          Va a l essentiel: pseudo, email et mot de passe. Tu peux aussi rejoindre rapidement ChibaskoGames avec Google.
         </p>
       </div>
 
       <form onSubmit={handleSignUp} className="space-y-5">
         <div className="rounded-[26px] border border-zinc-800 bg-black/25 p-5 sm:p-6">
           <p className="text-[10px] uppercase tracking-[0.28em] text-cyan-300">Connexion rapide</p>
-          <h2 className="mt-2 text-xl font-black uppercase text-white">Google ou Discord</h2>
+          <h2 className="mt-2 text-xl font-black uppercase text-white">Connexion Google</h2>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
-            Si tu preferes, ton compte peut aussi etre cree via un fournisseur deja connu.
+            Si tu preferes, ton compte peut aussi etre cree via Google.
           </p>
           <div className="mt-5">
             <SocialAuthButtons

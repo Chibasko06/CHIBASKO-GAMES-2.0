@@ -59,7 +59,7 @@ export default function LoginPage() {
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Connexion joueur</p>
         <h1 className="text-3xl font-black uppercase text-white">Acces compte</h1>
         <p className="text-sm leading-6 text-zinc-400">
-          Connecte-toi avec ton compte ChibaskoGames ou passe directement par Google et Discord.
+          Connecte-toi avec ton compte ChibaskoGames ou passe directement par Google.
         </p>
       </div>
 
