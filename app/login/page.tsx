@@ -7,21 +7,10 @@ import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
-  const initialSearchParams =
-    typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(
-    initialSearchParams?.get('registered') === '1'
-      ? 'Compte cree. Connecte-toi puis termine ton profil et ton avatar.'
-      : null
-  )
-  const [nextHref] = useState(
-    initialSearchParams?.get('next')?.startsWith('/')
-      ? initialSearchParams.get('next')!
-      : '/'
-  )
+  const [message, setMessage] = useState<string | null>(null)
   const { loading: authLoading, user } = useAuth()
   const resetPasswordHref = useMemo(() => {
     const normalizedEmail = email.trim()
@@ -41,7 +30,7 @@ export default function LoginPage() {
     }
 
     await ensureProfile(data.session)
-    window.location.href = nextHref
+    window.location.href = '/'
   }
 
   if (!authLoading && user) {
