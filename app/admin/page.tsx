@@ -502,7 +502,15 @@ export default function AdminPage() {
     setErrorMessage(null)
   }
 
+  const confirmDeletion = (label: string) => {
+    return window.confirm(`Confirmer la suppression de ${label} ?\n\nCette action est irreversible.`)
+  }
+
   const handleDeleteGame = async (id: string) => {
+    if (!confirmDeletion('ce jeu')) {
+      return
+    }
+
     setSavingGame(true)
     try {
       const response = await authorizedFetch(`/api/admin/games/${id}`, { method: 'DELETE' })
@@ -523,6 +531,10 @@ export default function AdminPage() {
   }
 
   const handleDeleteUser = async (id: string) => {
+    if (!confirmDeletion('cet utilisateur')) {
+      return
+    }
+
     setSavingUser(true)
     try {
       const response = await authorizedFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
@@ -543,6 +555,10 @@ export default function AdminPage() {
   }
 
   const handleDeleteCategory = async (id: string) => {
+    if (!confirmDeletion('cette categorie')) {
+      return
+    }
+
     setSavingCategory(true)
     try {
       const response = await authorizedFetch(`/api/admin/categories/${id}`, { method: 'DELETE' })
@@ -567,6 +583,10 @@ export default function AdminPage() {
   }
 
   const handleDeleteFaq = async (id: string) => {
+    if (!confirmDeletion('cette entree FAQ')) {
+      return
+    }
+
     setSavingFaq(true)
     try {
       const response = await authorizedFetch(`/api/admin/faq/${id}`, { method: 'DELETE' })
@@ -650,6 +670,10 @@ export default function AdminPage() {
   }
 
   const handleDeleteSubmission = async (id: string) => {
+    if (!confirmDeletion('cette proposition developpeur')) {
+      return
+    }
+
     setSavingSubmissionId(id)
     try {
       const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, { method: 'DELETE' })
@@ -943,6 +967,75 @@ export default function AdminPage() {
         </div>
       </section>
 
+      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="border border-zinc-800 bg-zinc-950 p-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 className="text-lg font-black uppercase text-white">
+              {editingUserId ? 'Modifier un joueur' : 'Selectionne un joueur'}
+            </h2>
+            {editingUserId ? (
+              <button type="button" onClick={resetUserForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
+                Annuler
+              </button>
+            ) : null}
+          </div>
+
+          <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4">
+            <input value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            <input value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="Avatar public URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300">
+              <span>{uploadingUserAvatar ? 'Upload avatar...' : 'Importer une image avatar'}</span>
+              <input type="file" accept="image/*,.ico" className="hidden" onChange={handleUserAvatarUpload} disabled={!editingUserId || uploadingUserAvatar} />
+              <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
+            </label>
+            <input value={userForm.xp_points} onChange={(e) => handleUserChange('xp_points', Number(e.target.value) || 0)} placeholder="XP" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
+              {savingUser ? 'MISE A JOUR...' : 'METTRE A JOUR LE JOUEUR'}
+            </button>
+          </form>
+        </div>
+
+        <div className="border border-zinc-800 bg-zinc-950 p-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 className="text-lg font-black uppercase text-white">Utilisateurs</h2>
+            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{users.length} comptes</span>
+          </div>
+
+          {loadingUsers ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-24 animate-pulse border border-zinc-800 bg-zinc-900" />
+              ))}
+            </div>
+          ) : (
+            <div className="max-h-[900px] space-y-3 overflow-y-auto pr-1">
+              {users.map((user) => (
+                <article key={user.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
+                  <div>
+                    <p className="font-bold text-white">{user.username}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{user.email || 'Email non disponible'}</p>
+                  </div>
+                  <div className="space-y-1 text-xs text-zinc-400">
+                    <p>Pseudo: {user.username}</p>
+                    <p>XP: {user.xp_points}</p>
+                    <p>Bio: {user.bio || 'Aucune bio'}</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => startEditUser(user)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
+                      Gerer
+                    </button>
+                    <button type="button" onClick={() => void handleDeleteUser(user.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
+                      Supprimer
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="border border-zinc-800 bg-zinc-950 p-6">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
@@ -1227,74 +1320,6 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">
-              {editingUserId ? 'Modifier un joueur' : 'Selectionne un joueur'}
-            </h2>
-            {editingUserId ? (
-              <button type="button" onClick={resetUserForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
-                Annuler
-              </button>
-            ) : null}
-          </div>
-
-          <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4">
-            <input value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <input value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="Avatar public URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300">
-              <span>{uploadingUserAvatar ? 'Upload avatar...' : 'Importer une image avatar'}</span>
-              <input type="file" accept="image/*,.ico" className="hidden" onChange={handleUserAvatarUpload} disabled={!editingUserId || uploadingUserAvatar} />
-              <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
-            </label>
-            <input value={userForm.xp_points} onChange={(e) => handleUserChange('xp_points', Number(e.target.value) || 0)} placeholder="XP" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
-              {savingUser ? 'MISE A JOUR...' : 'METTRE A JOUR LE JOUEUR'}
-            </button>
-          </form>
-        </div>
-
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">Utilisateurs</h2>
-            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{users.length} comptes</span>
-          </div>
-
-          {loadingUsers ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="h-24 animate-pulse border border-zinc-800 bg-zinc-900" />
-              ))}
-            </div>
-          ) : (
-            <div className="max-h-[900px] space-y-3 overflow-y-auto pr-1">
-              {users.map((user) => (
-                <article key={user.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
-                  <div>
-                    <p className="font-bold text-white">{user.username}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{user.email || 'Email non disponible'}</p>
-                  </div>
-                  <div className="space-y-1 text-xs text-zinc-400">
-                    <p>Pseudo: {user.username}</p>
-                    <p>XP: {user.xp_points}</p>
-                    <p>Bio: {user.bio || 'Aucune bio'}</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={() => startEditUser(user)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
-                      Gerer
-                    </button>
-                    <button type="button" onClick={() => void handleDeleteUser(user.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
-                      Supprimer
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
     </main>
   )
 }

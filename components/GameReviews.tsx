@@ -144,6 +144,14 @@ export default function GameReviews({ gameId }: Props) {
       return
     }
 
+    const confirmed = window.confirm(
+      'Confirmer la suppression de ton commentaire ?\n\nCette action est irreversible.'
+    )
+
+    if (!confirmed) {
+      return
+    }
+
     setSubmitting(true)
     setMessage(null)
 
