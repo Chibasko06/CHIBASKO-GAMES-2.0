@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
 import { getPublicProfileByHandle, getPublicProfileSummary } from '@/lib/queries/profiles'
 
@@ -56,7 +56,13 @@ export default async function PublicPlayerPage({
   params: Promise<{ username: string }>
 }) {
   const { username } = await params
-  const profile = await getPublicProfileByHandle(username)
+  const normalizedHandle = username.replace(/^@+/, '')
+
+  if (!username.startsWith('@')) {
+    redirect(`/players/@${normalizedHandle}`)
+  }
+
+  const profile = await getPublicProfileByHandle(normalizedHandle)
 
   if (!profile) {
     notFound()
