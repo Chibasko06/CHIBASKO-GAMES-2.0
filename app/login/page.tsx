@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
+import SocialAuthButtons from '@/components/SocialAuthButtons'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -57,9 +58,22 @@ export default function LoginPage() {
       <div className="mb-6 space-y-3">
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Connexion joueur</p>
         <h1 className="text-3xl font-black uppercase text-white">Acces compte</h1>
+        <p className="text-sm leading-6 text-zinc-400">
+          Connecte-toi avec ton compte ChibaskoGames ou passe directement par Google et Discord.
+        </p>
       </div>
 
       <div className="space-y-4">
+        <SocialAuthButtons
+          onError={(nextMessage) => setMessage(nextMessage || null)}
+        />
+
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-zinc-800" />
+          <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">ou</span>
+          <div className="h-px flex-1 bg-zinc-800" />
+        </div>
+
         <input
           type="email"
           value={email}

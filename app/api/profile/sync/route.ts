@@ -58,6 +58,11 @@ export async function POST(request: NextRequest) {
   const requestedUsername =
     metadata.user_name ||
     metadata.username ||
+    metadata.preferred_username ||
+    metadata.nickname ||
+    metadata.full_name ||
+    metadata.name ||
+    metadata.global_name ||
     (typeof user.email === 'string' ? user.email.split('@')[0] : null)
   const requestedBio =
     typeof metadata.bio === 'string'
