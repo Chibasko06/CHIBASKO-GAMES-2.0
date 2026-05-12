@@ -59,6 +59,12 @@ export async function POST(request: NextRequest) {
     metadata.user_name ||
     metadata.username ||
     (typeof user.email === 'string' ? user.email.split('@')[0] : null)
+  const requestedBio =
+    typeof metadata.bio === 'string'
+      ? metadata.bio.trim()
+      : typeof metadata.onboarding_bio === 'string'
+        ? metadata.onboarding_bio.trim()
+        : ''
 
   const { data: existingProfile, error: profileLookupError } = await supabaseAdmin
     .from('profiles')
@@ -74,6 +80,7 @@ export async function POST(request: NextRequest) {
     const patch: {
       display_name?: string
       username?: string
+      bio?: string | null
     } = {}
 
     if (!existingProfile.display_name) {
@@ -82,6 +89,10 @@ export async function POST(request: NextRequest) {
 
     if (!existingProfile.username?.trim()) {
       patch.username = await buildUniqueUsername(supabaseAdmin, requestedUsername, user.id)
+    }
+
+    if (!existingProfile.bio?.trim() && requestedBio) {
+      patch.bio = requestedBio
     }
 
     if (Object.keys(patch).length > 0) {
@@ -111,7 +122,7 @@ export async function POST(request: NextRequest) {
       username,
       display_name: username,
       avatar_url: null,
-      bio: null,
+      bio: requestedBio || null,
       xp_points: 0,
       last_xp_tick_at: new Date().toISOString(),
     })

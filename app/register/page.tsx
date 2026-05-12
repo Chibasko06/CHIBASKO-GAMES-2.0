@@ -10,36 +10,46 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
+  const [bio, setBio] = useState('')
   const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
   const { loading: authLoading, user } = useAuth()
 
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault()
     setLoading(true)
+    setMessage(null)
+
+    const trimmedUsername = username.trim()
+    const trimmedBio = bio.trim()
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          user_name: username,
-          username,
+          user_name: trimmedUsername,
+          username: trimmedUsername,
+          bio: trimmedBio,
+          onboarding_bio: trimmedBio,
         },
       },
     })
 
     if (error) {
-      alert(error.message)
+      setMessage(error.message)
       setLoading(false)
       return
     }
 
     if (data.session) {
       await ensureProfile(data.session)
+      window.location.href = '/dashboard?welcome=1&edit=1'
+      return
     }
 
-    alert('Inscription reussie !')
-    window.location.href = '/login'
+    setMessage('Compte cree. Connecte-toi pour finaliser ton profil et ajouter ton avatar.')
+    window.location.href = '/login?registered=1&next=%2Fdashboard%3Fwelcome%3D1%26edit%3D1'
   }
 
   if (!authLoading && user) {
@@ -67,7 +77,7 @@ export default function RegisterPage() {
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Inscription joueur</p>
         <h1 className="text-3xl font-black uppercase text-white">Creer ton profil</h1>
         <p className="text-sm leading-6 text-zinc-400">
-          Un seul pseudo, ton email, ton mot de passe et ton profil ChibaskoGames est pret.
+          Ton identifiant technique unique est cree automatiquement par Supabase. Ici tu choisis surtout ton pseudo public.
         </p>
       </div>
 
@@ -96,12 +106,25 @@ export default function RegisterPage() {
           className="w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-sm text-white outline-none focus:border-cyan-500"
           onChange={(event) => setPassword(event.target.value)}
         />
+        <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-4">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Infos recommandees</p>
+          <p className="mt-2 text-sm leading-6 text-zinc-400">
+            Tu peux deja remplir une bio ici. L avatar se complete juste apres sur ton profil.
+          </p>
+          <textarea
+            value={bio}
+            placeholder="Bio optionnelle"
+            className="mt-4 min-h-28 w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-sm text-white outline-none focus:border-cyan-500"
+            onChange={(event) => setBio(event.target.value)}
+          />
+        </div>
         <button
           disabled={loading}
           className="w-full rounded-full bg-cyan-400 py-4 text-sm font-black uppercase tracking-[0.2em] text-black disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? 'Inscription...' : "S'inscrire"}
         </button>
+        {message ? <p className="text-sm text-cyan-300">{message}</p> : null}
       </form>
     </div>
   )

@@ -18,6 +18,16 @@ type FavoriteEntry = Awaited<ReturnType<typeof getFavoriteGames>>[number]
 type HistoryEntry = Awaited<ReturnType<typeof getRecentPlayHistory>>[number]
 
 export default function DashboardPage() {
+  const initialOnboardingParams =
+    typeof window !== 'undefined'
+      ? (() => {
+          const params = new URLSearchParams(window.location.search)
+          return {
+            welcome: params.get('welcome') === '1',
+            edit: params.get('edit') === '1',
+          }
+        })()
+      : { welcome: false, edit: false }
   const pathname = usePathname()
   const { loading: authLoading, session, user } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -36,6 +46,7 @@ export default function DashboardPage() {
   const [recentHistory, setRecentHistory] = useState<HistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
+  const [onboardingParams, setOnboardingParams] = useState<{ welcome: boolean; edit: boolean }>(initialOnboardingParams)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -85,6 +96,21 @@ export default function DashboardPage() {
         setCommentCount(reviewsTotal ?? 0)
         setRecentFavorites(favoriteEntries.slice(0, 4))
         setRecentHistory(historyEntries)
+        if (profileData && onboardingParams.edit) {
+          setIsEditingProfile(true)
+          setProfileMessage(
+            onboardingParams.welcome
+              ? 'Bienvenue. Termine ton profil avec une bio et un avatar pour le rendre complet.'
+              : 'Tu peux completer ton profil ici.'
+          )
+          if (typeof window !== 'undefined') {
+            const cleanUrl = new URL(window.location.href)
+            cleanUrl.searchParams.delete('welcome')
+            cleanUrl.searchParams.delete('edit')
+            window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search)
+          }
+          setOnboardingParams({ welcome: false, edit: false })
+        }
         setLoading(false)
       }
     }
@@ -106,7 +132,7 @@ export default function DashboardPage() {
       window.removeEventListener('favorites-updated', handleFavoritesUpdate)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [authLoading, pathname, session, user])
+  }, [authLoading, onboardingParams, pathname, session, user])
 
   const handleProfileSave = async () => {
     if (!user || !profile || !session?.access_token) {
