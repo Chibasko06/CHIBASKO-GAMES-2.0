@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '../../_utils'
-import { buildUniqueProfileHandle } from '@/lib/profileHandle'
+import { buildUniqueProfileHandle, normalizePublicHandle } from '@/lib/profileHandle'
 
 export async function PATCH(
   request: NextRequest,
@@ -16,7 +16,12 @@ export async function PATCH(
   const { supabaseAdmin } = adminCheck
   const body = await request.json()
   const username = typeof body.username === 'string' ? body.username.trim() : ''
-  const publicHandle = await buildUniqueProfileHandle(supabaseAdmin, username, id)
+  const requestedHandle = typeof body.public_handle === 'string' ? normalizePublicHandle(body.public_handle) : ''
+  const publicHandle = await buildUniqueProfileHandle(
+    supabaseAdmin,
+    requestedHandle || username,
+    id
+  )
 
   const payload = {
     username,

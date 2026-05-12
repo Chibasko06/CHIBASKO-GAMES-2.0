@@ -26,7 +26,17 @@ export async function getPublicProfileByHandle(handle: string) {
     .eq('public_handle', normalizedHandle)
     .maybeSingle()
 
-  return (data as PublicProfile | null) ?? null
+  if (data) {
+    return data as PublicProfile
+  }
+
+  const { data: legacyProfile } = await supabase
+    .from('profiles')
+    .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
+    .eq('username', handle)
+    .maybeSingle()
+
+  return (legacyProfile as PublicProfile | null) ?? null
 }
 
 export async function getPublicProfileSummary(userId: string) {
