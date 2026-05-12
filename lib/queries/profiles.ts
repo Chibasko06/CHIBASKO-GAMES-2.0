@@ -9,34 +9,56 @@ export type PublicProfile = Pick<
 >
 
 export async function getPublicProfiles() {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
     .order('xp_points', { ascending: false })
     .order('username', { ascending: true })
+
+  if (error) {
+    const { data: legacyProfiles } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, bio, xp_points, created_at')
+      .order('xp_points', { ascending: false })
+      .order('username', { ascending: true })
+
+    return ((legacyProfiles as Array<Omit<PublicProfile, 'public_handle'>> | null) ?? []).map((profile) => ({
+      ...profile,
+      public_handle: profile.username,
+    }))
+  }
 
   return (data as PublicProfile[] | null) ?? []
 }
 
 export async function getPublicProfileByHandle(handle: string) {
   const normalizedHandle = handle.replace(/^@+/, '')
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
     .eq('public_handle', normalizedHandle)
     .maybeSingle()
 
-  if (data) {
+  if (data && !error) {
     return data as PublicProfile
   }
 
   const { data: legacyProfile } = await supabase
     .from('profiles')
-    .select('id, username, public_handle, avatar_url, bio, xp_points, created_at')
-    .eq('username', handle)
+    .select('id, username, avatar_url, bio, xp_points, created_at')
+    .eq('username', normalizedHandle)
     .maybeSingle()
 
-  return (legacyProfile as PublicProfile | null) ?? null
+  if (!legacyProfile) {
+    return null
+  }
+
+  const legacy = legacyProfile as Omit<PublicProfile, 'public_handle'>
+
+  return {
+    ...legacy,
+    public_handle: legacy.username,
+  }
 }
 
 export async function getPublicProfileSummary(userId: string) {
