@@ -5,8 +5,10 @@ export const siteConfig = {
   shortName: 'Chibasko',
   url: 'https://chibaskogames.fr',
   description:
-    'Chibasko Games est une plateforme de jeux gratuits en ligne avec catalogue, profils joueurs, favoris, commentaires et futurs projets de creation de jeux.',
-  ogImage: '/logo-chibaskogames-rond.ico',
+    'Joue gratuitement a des jeux en ligne sur Chibasko Games : catalogue navigateur, profils joueurs, favoris, avis et futurs projets de creation.',
+  logoPath: '/chibaskogames-logo.png',
+  ogImage: '/chibaskogames-logo.png',
+  faviconPath: '/chibaskogames-logo.png',
   socials: {
     discord: '',
     instagram: '',
@@ -50,6 +52,7 @@ export function buildPageMetadata({
       images: [
         {
           url: imageUrl,
+          alt: `${siteConfig.name} logo`,
         },
       ],
     },

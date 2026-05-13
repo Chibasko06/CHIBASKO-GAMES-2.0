@@ -38,6 +38,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: siteConfig.ogImage,
+        alt: `${siteConfig.name} logo`,
       },
     ],
   },
@@ -52,9 +53,12 @@ export const metadata: Metadata = {
     follow: true,
   },
   icons: {
-    icon: '/logo-chibaskogames-rond.ico',
-    shortcut: '/logo-chibaskogames-rond.ico',
-    apple: '/logo-chibaskogames-rond.ico',
+    icon: [
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
+      { url: '/logo-chibaskogames-rond.ico', type: 'image/x-icon' },
+    ],
+    shortcut: ['/icon.png'],
+    apple: [{ url: '/apple-icon.png', sizes: '512x512', type: 'image/png' }],
   },
 }
 
@@ -78,7 +82,7 @@ export default function RootLayout({
         '@type': 'Organization',
         name: siteConfig.name,
         url: siteConfig.url,
-        logo: `${siteConfig.url}${siteConfig.ogImage}`,
+        logo: `${siteConfig.url}${siteConfig.logoPath}`,
         sameAs: socialLinks.length ? socialLinks : undefined,
       },
       {
@@ -87,6 +91,11 @@ export default function RootLayout({
         url: siteConfig.url,
         inLanguage: 'fr-FR',
         description: siteConfig.description,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${siteConfig.url}/games?search={search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
       },
     ],
   }

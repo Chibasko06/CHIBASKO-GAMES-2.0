@@ -4,9 +4,9 @@ import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
-  title: 'FAQ',
+  title: 'FAQ Chibasko Games',
   description:
-    'Retrouve les reponses aux questions frequentes sur Chibasko Games, les comptes joueurs, les jeux et la plateforme.',
+    'Retrouve les reponses aux questions frequentes sur Chibasko Games : compte joueur, jeux en ligne, profils, favoris et fonctionnement de la plateforme.',
   path: '/faq',
 })
 

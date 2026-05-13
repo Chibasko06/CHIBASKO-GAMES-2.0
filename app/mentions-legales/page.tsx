@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import { buildPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Mentions legales',
+  title: 'Mentions legales de Chibasko Games',
   description:
-    'Consulte les mentions legales de Chibasko Games concernant le site, les donnees personnelles, les cookies et la legislation applicable.',
+    'Consulte les mentions legales de Chibasko Games : objet du site, propriete intellectuelle, responsabilite, donnees personnelles, cookies et loi applicable.',
   path: '/mentions-legales',
 })
 

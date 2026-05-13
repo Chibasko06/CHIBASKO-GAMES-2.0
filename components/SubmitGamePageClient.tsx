@@ -132,7 +132,7 @@ export default function SubmitGamePageClient({
         <p className="text-[11px] uppercase tracking-[0.45em] text-cyan-300/80">Espace developpeur</p>
         <h1 className="mt-4 text-4xl font-black uppercase text-white md:text-5xl">Publier un jeu</h1>
         <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-300">
-          Tu developpes un jeu HTML5, WebGL ou jouable directement dans le navigateur ? Tu peux proposer ton projet a Chibasko Games pour etude. Nous ne traitons pas les executables .exe : seuls les jeux navigateur, embed HTML5, WebGL ou iframe sont acceptes.
+          Tu developpes un jeu HTML5, WebGL ou jouable directement dans le navigateur ? Propose ton projet a Chibasko Games pour etude manuelle. Nous n acceptons pas les fichiers .exe : seuls les jeux navigateur, embeds HTML5, WebGL ou iframe sont analyses pour une publication potentielle.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           <div className="rounded-[22px] border border-zinc-800 bg-black/30 p-4">
@@ -155,7 +155,7 @@ export default function SubmitGamePageClient({
           <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Proposition manuelle</p>
           <h2 className="mt-3 text-2xl font-black uppercase text-white">Envoyer un projet</h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-400">
-            Le formulaire suit volontairement une logique proche de ta fiche jeu admin : identite du developpeur, lien de demo, categorie, compatibilite, contenu et contexte de publication. Ca aide a verifier rapidement si le projet peut etre repris proprement dans ton catalogue.
+            Ce formulaire reprend les informations utiles a une vraie etude editoriale : identite du developpeur, lien de demo, categories, compatibilite mobile, contenu sensible et contexte de publication. Cela permet a l equipe Chibasko Games de verifier rapidement si le jeu peut entrer dans le catalogue.
           </p>
         </div>
 

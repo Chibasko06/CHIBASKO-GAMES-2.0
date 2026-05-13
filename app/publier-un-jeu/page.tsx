@@ -5,9 +5,9 @@ import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Publier un jeu',
+  title: 'Publier un jeu navigateur sur Chibasko Games',
   description:
-    'Propose ton jeu navigateur a Chibasko Games et envoie une fiche developpeur complete pour etude manuelle par l equipe.',
+    'Developpeur HTML5, WebGL ou iframe : propose ton jeu navigateur a Chibasko Games pour etude, visibilite et eventuelles collaborations.',
   path: '/publier-un-jeu',
 })
 
