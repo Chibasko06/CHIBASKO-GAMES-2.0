@@ -1,11 +1,14 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import ScrollToTopButton from '@/components/ScrollToTopButton'
 import XpHeartbeat from '@/components/XpHeartbeat'
 import { siteConfig } from '@/lib/seo'
+
+const GOOGLE_ANALYTICS_ID = 'G-H10SZPPWWX'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -103,6 +106,18 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="bg-zinc-950 text-white">
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GOOGLE_ANALYTICS_ID}');
+          `}
+        </Script>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
