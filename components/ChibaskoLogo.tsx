@@ -9,10 +9,11 @@ export default function ChibaskoLogo({ compact = false }: Props) {
   return (
     <Link href="/" className="inline-flex items-center gap-3 group">
       <Image
-        src="/logo-chibaskogames-rond.ico"
+        src="/chibaskogames-logo.png"
         alt="Logo ChibaskoGames"
         width={48}
         height={48}
+        sizes="48px"
         className="h-12 w-12 rounded-full border border-cyan-400/60 bg-black object-cover shadow-[0_0_24px_rgba(34,211,238,0.18)]"
       />
       <div className={compact ? 'hidden sm:block' : 'block'}>

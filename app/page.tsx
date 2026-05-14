@@ -72,7 +72,7 @@ export default async function Home() {
                       src={highlight.game.thumbnail_url}
                       alt={highlight.game.title}
                       fill
-                      unoptimized
+                      priority={index === 0}
                       className="object-cover transition duration-300 group-hover:scale-105"
                       sizes={index === 0 ? '(min-width: 640px) 50vw, 100vw' : '(min-width: 640px) 25vw, 100vw'}
                     />

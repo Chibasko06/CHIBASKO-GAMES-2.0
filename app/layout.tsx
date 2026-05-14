@@ -1,14 +1,15 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
+import dynamic from 'next/dynamic'
 import Script from 'next/script'
 import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import Footer from '@/components/Footer'
-import ScrollToTopButton from '@/components/ScrollToTopButton'
-import XpHeartbeat from '@/components/XpHeartbeat'
 import { siteConfig } from '@/lib/seo'
 
 const GOOGLE_ANALYTICS_ID = 'G-H10SZPPWWX'
+const ScrollToTopButton = dynamic(() => import('@/components/ScrollToTopButton'), { ssr: false })
+const XpHeartbeat = dynamic(() => import('@/components/XpHeartbeat'), { ssr: false })
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),

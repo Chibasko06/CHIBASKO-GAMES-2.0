@@ -27,7 +27,6 @@ export function GameCard({ game }: Props) {
               src={game.thumbnail_url}
               alt={game.title}
               fill
-              unoptimized
               className="object-cover"
               sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw"
             />
