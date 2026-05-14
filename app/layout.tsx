@@ -7,7 +7,7 @@ import ClientEnhancements from '@/components/ClientEnhancements'
 import Footer from '@/components/Footer'
 import { siteConfig } from '@/lib/seo'
 
-const GOOGLE_TAG_MANAGER_ID = 'GTM-MXCNJF89'
+const GOOGLE_ANALYTICS_ID = 'G-H10SZPPWWX'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -105,24 +105,18 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="bg-zinc-950 text-white">
-        <Script id="google-tag-manager" strategy="beforeInteractive">
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
-            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-            })(window,document,'script','dataLayer','${GOOGLE_TAG_MANAGER_ID}');
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GOOGLE_ANALYTICS_ID}');
           `}
         </Script>
-        <noscript>
-          <iframe
-            src={`https://www.googletagmanager.com/ns.html?id=${GOOGLE_TAG_MANAGER_ID}`}
-            height="0"
-            width="0"
-            style={{ display: 'none', visibility: 'hidden' }}
-          />
-        </noscript>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
