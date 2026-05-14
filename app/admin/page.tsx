@@ -805,8 +805,8 @@ export default function AdminPage() {
             <input value={gameForm.game_url} onChange={(e) => handleGameChange('game_url', e.target.value)} placeholder="URL du jeu" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" required />
             <input value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
             <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300 md:col-span-2">
-              <span>{uploadingGameThumbnail ? 'Upload miniature...' : 'Importer une image de jeu'}</span>
-              <input type="file" accept="image/*,.ico" className="hidden" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
+              <span>{uploadingGameThumbnail ? 'Upload miniature...' : 'Importer une image de jeu (optimisee auto)'}</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" className="hidden" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
               <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
             </label>
             <input value={gameForm.developer_name} onChange={(e) => handleGameChange('developer_name', e.target.value)} placeholder="Developpeur" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
