@@ -41,43 +41,64 @@ export default function AProposPage() {
         </section>
 
         <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">Suivre le projet</h2>
+          <h2 className="text-lg font-black uppercase text-white">Mes liens</h2>
           <p className="mt-3 text-sm leading-7 text-zinc-400">
-            Si tu veux suivre l evolution de Chibasko Games, jeter un oeil au code ou simplement voir mes autres projets, mon GitHub reste le meilleur point d entree.
+            Si tu veux suivre l evolution de Chibasko Games, voir mon code ou soutenir directement mon travail personnel, tu peux passer par ces liens.
           </p>
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-5 grid gap-3">
             <Link
               href="https://github.com/Chibasko06"
               target="_blank"
               rel="noreferrer"
-              className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-cyan-300"
+              className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
             >
-              Voir mon GitHub
-            </Link>
-          </div>
-        </section>
-
-        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">Soutenir et s engager</h2>
-          <p className="mt-3 text-sm leading-7 text-zinc-400">
-            En dehors de Chibasko Games, je suis aussi membre du bureau d Ummanitary. C est une association porte par des benevoles engages, avec des actions solidaires locales et internationales. Si tu veux donner un coup de pouce, parler du projet ou soutenir une cause utile, notre page HelloAsso est un bon point de depart.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              href="https://www.helloasso.com/associations/ummanitary"
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-full border border-cyan-700/70 px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-cyan-200 transition hover:bg-zinc-900"
-            >
-              Decouvrir Ummanitary
+              <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
+                <path d="M12 2C6.477 2 2 6.596 2 12.267c0 4.537 2.865 8.387 6.839 9.746.5.095.682-.223.682-.495 0-.244-.009-.89-.014-1.748-2.782.62-3.369-1.384-3.369-1.384-.455-1.187-1.11-1.503-1.11-1.503-.908-.637.069-.624.069-.624 1.004.072 1.532 1.058 1.532 1.058.892 1.565 2.341 1.113 2.91.851.091-.667.35-1.113.636-1.369-2.22-.261-4.555-1.14-4.555-5.073 0-1.12.389-2.036 1.029-2.754-.103-.261-.446-1.312.098-2.736 0 0 .84-.277 2.75 1.052A9.36 9.36 0 0 1 12 6.844a9.36 9.36 0 0 1 2.504.347c1.909-1.329 2.748-1.052 2.748-1.052.546 1.424.203 2.475.1 2.736.64.718 1.028 1.634 1.028 2.754 0 3.943-2.338 4.809-4.566 5.065.359.319.678.947.678 1.909 0 1.379-.012 2.49-.012 2.829 0 .274.18.594.688.493C19.138 20.65 22 16.802 22 12.267 22 6.596 17.523 2 12 2Z" />
+              </svg>
+              <span>Voir mon GitHub</span>
             </Link>
             <Link
               href="https://paypal.me/chibasko06"
               target="_blank"
               rel="noreferrer"
-              className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-cyan-300"
+              className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
             >
-              Soutenir via PayPal
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                <path fill="#003087" d="M7.2 19.6H3.9c-.2 0-.4-.2-.3-.4l2.4-15.4c0-.2.2-.3.4-.3h6c2.1 0 3.7.5 4.6 1.5.8.8 1.1 1.8.9 3.1-.4 3.2-2.8 4.9-6.8 4.9H9.5c-.3 0-.5.2-.5.5l-.6 3.9c0 .1-.1.2-.2.2Z" />
+                <path fill="#009cde" d="M9.2 20.5h-3c-.3 0-.4-.2-.4-.4l1.8-11.7c0-.2.2-.3.4-.3h2.5c3 0 5.2.7 5.9 2.6.3.8.3 1.8.1 3.1-.5 3.9-3.1 6.7-7.3 6.7Z" />
+              </svg>
+              <span>Soutenir via PayPal</span>
+            </Link>
+          </div>
+        </section>
+
+        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
+          <h2 className="text-lg font-black uppercase text-white">Ummanitary</h2>
+          <p className="mt-3 text-sm leading-7 text-zinc-400">
+            En dehors de Chibasko Games, je suis aussi membre du bureau d Ummanitary. C est une association porte par des benevoles engages, avec des actions solidaires locales et internationales. Si tu veux nous soutenir ou simplement decouvrir ce que l on fait, voici les liens utiles.
+          </p>
+          <div className="mt-5 grid gap-3">
+            <Link
+              href="https://www.helloasso.com/associations/ummanitary"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
+            >
+              <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                HA
+              </span>
+              <span>Voir HelloAsso</span>
+            </Link>
+            <Link
+              href="https://ummanitary.com"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
+            >
+              <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-cyan-500 px-2 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                WEB
+              </span>
+              <span>Aller sur notre site</span>
             </Link>
           </div>
         </section>
