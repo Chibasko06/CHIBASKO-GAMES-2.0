@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { buildPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = buildPageMetadata({
@@ -37,6 +38,48 @@ export default function AProposPage() {
           <p className="mt-3 text-sm leading-7 text-zinc-400">
             Chibasko Games est et sera bientot aussi un hub de creation de jeux. Certains projets sont deja en cours de developpement, avec l idee de proposer a terme non seulement une plateforme pour jouer, mais aussi un espace ou de nouvelles creations pourront voir le jour et grandir.
           </p>
+        </section>
+
+        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
+          <h2 className="text-lg font-black uppercase text-white">Suivre le projet</h2>
+          <p className="mt-3 text-sm leading-7 text-zinc-400">
+            Si tu veux suivre l evolution de Chibasko Games, jeter un oeil au code ou simplement voir mes autres projets, mon GitHub reste le meilleur point d entree.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href="https://github.com/Chibasko06"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-cyan-300"
+            >
+              Voir mon GitHub
+            </Link>
+          </div>
+        </section>
+
+        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
+          <h2 className="text-lg font-black uppercase text-white">Soutenir et s engager</h2>
+          <p className="mt-3 text-sm leading-7 text-zinc-400">
+            En dehors de Chibasko Games, je suis aussi membre du bureau d Ummanitary. C est une association porte par des benevoles engages, avec des actions solidaires locales et internationales. Si tu veux donner un coup de pouce, parler du projet ou soutenir une cause utile, notre page HelloAsso est un bon point de depart.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href="https://www.helloasso.com/associations/ummanitary"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-cyan-700/70 px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-cyan-200 transition hover:bg-zinc-900"
+            >
+              Decouvrir Ummanitary
+            </Link>
+            <Link
+              href="https://paypal.me/chibasko06"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-black transition hover:bg-cyan-300"
+            >
+              Soutenir via PayPal
+            </Link>
+          </div>
         </section>
       </div>
     </div>
