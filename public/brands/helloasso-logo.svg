@@ -1,0 +1,13 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="48" fill="white"/>
+  <path d="M128 32C180.438 32 223 74.5629 223 127C223 178.145 184.252 217.495 129.723 223.808C76.0812 217.249 33 178.008 33 127C33 74.5629 75.5629 32 128 32Z" fill="url(#helloassoGradient)"/>
+  <path d="M127.999 57.1777C89.376 57.1777 58.0615 88.4922 58.0615 127.115C58.0615 160.636 81.7361 189.335 128.114 207.352C174.109 189.301 197.938 160.589 197.938 127.115C197.938 88.4922 166.623 57.1777 127.999 57.1777Z" fill="white"/>
+  <path d="M128.001 72.3633C97.7649 72.3633 73.249 96.8792 73.249 127.115C73.249 151.796 91.1256 173.906 128.092 188.949C164.71 173.868 182.751 151.753 182.751 127.115C182.751 96.8792 158.236 72.3633 128.001 72.3633Z" fill="url(#helloassoGradient)"/>
+  <defs>
+    <linearGradient id="helloassoGradient" x1="43" y1="63" x2="214" y2="195" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFAB0F"/>
+      <stop offset="0.42" stop-color="#72C490"/>
+      <stop offset="1" stop-color="#CC3AA8"/>
+    </linearGradient>
+  </defs>
+</svg>
