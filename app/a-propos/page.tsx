@@ -63,9 +63,9 @@ export default function AProposPage() {
               rel="noreferrer"
               className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                <path fill="#003087" d="M7.2 19.6H3.9c-.2 0-.4-.2-.3-.4l2.4-15.4c0-.2.2-.3.4-.3h6c2.1 0 3.7.5 4.6 1.5.8.8 1.1 1.8.9 3.1-.4 3.2-2.8 4.9-6.8 4.9H9.5c-.3 0-.5.2-.5.5l-.6 3.9c0 .1-.1.2-.2.2Z" />
-                <path fill="#009cde" d="M9.2 20.5h-3c-.3 0-.4-.2-.4-.4l1.8-11.7c0-.2.2-.3.4-.3h2.5c3 0 5.2.7 5.9 2.6.3.8.3 1.8.1 3.1-.5 3.9-3.1 6.7-7.3 6.7Z" />
+              <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+                <path fill="#003087" d="M8.6 3.4h5.1c1.8 0 3.2.4 4 1.3.6.6.9 1.5.7 2.6-.3 2.7-2.3 4.1-5.8 4.1H11c-.2 0-.4.1-.4.3l-.7 4.6c0 .1-.1.2-.2.2H6.3c-.2 0-.3-.2-.3-.4L8.2 3.7c0-.2.2-.3.4-.3Z" />
+                <path fill="#009CDE" d="M10.8 18.7H7.9c-.2 0-.4-.2-.3-.4l1.5-9.7c0-.2.2-.3.4-.3h2.2c2.6 0 4.5.6 5.1 2.2.3.7.3 1.5.1 2.6-.4 3.3-2.6 5.6-6.1 5.6Z" />
               </svg>
               <span>Soutenir via PayPal</span>
             </Link>
@@ -84,9 +84,19 @@ export default function AProposPage() {
               rel="noreferrer"
               className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
             >
-              <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 text-[10px] font-black uppercase tracking-[0.16em] text-white">
-                HA
-              </span>
+              <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+                <defs>
+                  <linearGradient id="helloassoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#F7A600" />
+                    <stop offset="45%" stopColor="#6CC18A" />
+                    <stop offset="100%" stopColor="#C13FA3" />
+                  </linearGradient>
+                </defs>
+                <path
+                  fill="url(#helloassoGradient)"
+                  d="M12 2.8c4.8 0 8.6 3.8 8.6 8.5 0 4.6-3.5 8.1-8.5 9.9-4.9-1.8-8.7-5.2-8.7-9.9 0-4.7 3.8-8.5 8.6-8.5Zm0 3.1c-3 0-5.4 2.4-5.4 5.4 0 2.6 1.8 4.8 5.4 6.4 3.5-1.6 5.3-3.8 5.3-6.4 0-3-2.4-5.4-5.3-5.4Z"
+                />
+              </svg>
               <span>Voir HelloAsso</span>
             </Link>
             <Link
@@ -95,9 +105,20 @@ export default function AProposPage() {
               rel="noreferrer"
               className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
             >
-              <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-cyan-500 px-2 text-[10px] font-black uppercase tracking-[0.16em] text-white">
-                WEB
-              </span>
+              <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+                <path
+                  fill="#0B6E5A"
+                  d="M12 2.5c2.6 3.8 5.9 5.8 5.9 9.8 0 3.3-2.5 6.5-5.9 9.2-3.4-2.7-5.9-5.9-5.9-9.2 0-4 3.3-6 5.9-9.8Z"
+                />
+                <path
+                  fill="#D3B17A"
+                  d="M12 8.1c1.5 2 3.4 3.2 3.4 5.2 0 1.7-1.4 3.4-3.4 4.9-2-1.5-3.4-3.2-3.4-4.9 0-2 1.9-3.2 3.4-5.2Z"
+                />
+                <path
+                  fill="#ffffff"
+                  d="M12 6.7c-1.7 2.1-4.1 3.8-4.1 6.7 0 2.1 1.3 4 4.1 6.2 2.7-2.2 4.1-4.1 4.1-6.2 0-2.9-2.4-4.6-4.1-6.7Zm0 2.3c1.3 1.5 2.3 2.6 2.3 4.1 0 1.2-.8 2.4-2.3 3.7-1.5-1.3-2.3-2.5-2.3-3.7 0-1.5 1-2.6 2.3-4.1Z"
+                />
+              </svg>
               <span>Aller sur notre site</span>
             </Link>
           </div>
