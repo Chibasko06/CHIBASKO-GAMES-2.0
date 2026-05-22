@@ -104,6 +104,13 @@ export default function RootLayout({
 
   return (
     <html lang="fr">
+      <head>
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9977547315559489"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="bg-zinc-950 text-white">
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
