@@ -51,7 +51,7 @@ export default function AProposPage() {
               href="https://github.com/Chibasko06"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
+              className="flex items-center justify-center gap-3 rounded-[22px] border border-white/80 bg-white px-5 py-3 text-sm font-bold text-zinc-950 shadow-[0_12px_30px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:bg-zinc-100"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
                 <path d="M12 2C6.477 2 2 6.596 2 12.267c0 4.537 2.865 8.387 6.839 9.746.5.095.682-.223.682-.495 0-.244-.009-.89-.014-1.748-2.782.62-3.369-1.384-3.369-1.384-.455-1.187-1.11-1.503-1.11-1.503-.908-.637.069-.624.069-.624 1.004.072 1.532 1.058 1.532 1.058.892 1.565 2.341 1.113 2.91.851.091-.667.35-1.113.636-1.369-2.22-.261-4.555-1.14-4.555-5.073 0-1.12.389-2.036 1.029-2.754-.103-.261-.446-1.312.098-2.736 0 0 .84-.277 2.75 1.052A9.36 9.36 0 0 1 12 6.844a9.36 9.36 0 0 1 2.504.347c1.909-1.329 2.748-1.052 2.748-1.052.546 1.424.203 2.475.1 2.736.64.718 1.028 1.634 1.028 2.754 0 3.943-2.338 4.809-4.566 5.065.359.319.678.947.678 1.909 0 1.379-.012 2.49-.012 2.829 0 .274.18.594.688.493C19.138 20.65 22 16.802 22 12.267 22 6.596 17.523 2 12 2Z" />
@@ -62,9 +62,11 @@ export default function AProposPage() {
               href="https://paypal.me/chibasko06"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
+              className="flex items-center justify-center gap-3 rounded-[22px] border border-white/80 bg-white px-5 py-3 text-sm font-bold text-zinc-950 shadow-[0_12px_30px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:bg-zinc-100"
             >
-              <Image src="/brands/paypal-logo.svg" alt="PayPal" width={24} height={24} className="h-6 w-6" />
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white">
+                <Image src="/brands/logoPayPal.jpg" alt="PayPal" width={28} height={28} className="h-7 w-7 object-contain" />
+              </span>
               <span>Soutenir via PayPal</span>
             </Link>
           </div>
@@ -80,18 +82,22 @@ export default function AProposPage() {
               href="https://www.helloasso.com/associations/ummanitary"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold text-zinc-950 transition hover:bg-zinc-100"
+              className="flex items-center justify-center gap-3 rounded-[22px] border border-white/80 bg-white px-5 py-3 text-sm font-bold text-zinc-950 shadow-[0_12px_30px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:bg-zinc-100"
             >
-              <Image src="/brands/helloasso-logo.svg" alt="HelloAsso" width={24} height={24} className="h-6 w-6" />
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white">
+                <Image src="/brands/logoHelloAsso.jpg" alt="HelloAsso" width={28} height={28} className="h-7 w-7 object-contain" />
+              </span>
               <span>Voir HelloAsso</span>
             </Link>
             <Link
               href="https://ummanitary.com"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-3 rounded-full bg-[#DDF3EB] px-5 py-3 text-sm font-bold text-[#0B6D57] transition hover:bg-[#CFEBDD]"
+              className="flex items-center justify-center gap-3 rounded-[22px] border border-[#A3D6C4] bg-[#D9F1E8] px-5 py-3 text-sm font-bold text-[#0B6D57] shadow-[0_12px_30px_rgba(13,109,87,0.18)] transition hover:-translate-y-0.5 hover:bg-[#CDEBDF]"
             >
-              <Image src="/brands/ummanitary-logo.svg" alt="Ummanitary" width={96} height={48} className="h-8 w-auto" />
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90">
+                <Image src="/brands/logoUmmanitary.png" alt="Ummanitary" width={28} height={28} className="h-7 w-7 object-contain" />
+              </span>
               <span>Aller sur notre site</span>
             </Link>
           </div>
