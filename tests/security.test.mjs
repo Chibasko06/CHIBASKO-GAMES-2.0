@@ -9,6 +9,69 @@ import { POST as confirmReset } from '../app/api/auth/password-reset/confirm/rou
 import { POST as submitGame } from '../app/api/game-submissions/route.ts'
 import { isAdminEmail } from '../lib/adminAuth.ts'
 import { logAdminAuthorization } from '../lib/server/adminDiagnostics.ts'
+import { logSupabaseAuthValidation } from '../lib/server/supabaseAuthDiagnostics.ts'
+import { createClient } from '@supabase/supabase-js'
+
+test('Supabase JWT diagnostics expose only safe labels and handle malformed tokens', () => {
+  const warn = console.warn
+  const logs = []
+  console.warn = (...args) => logs.push(args)
+  const jwt = payload => `e30.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`
+  try {
+    logSupabaseAuthValidation(jwt({ exp: 1, email: 'private@example.test' }), 'sb_publishable_private',
+      'https://project.supabase.co', { name: 'AuthApiError', status: 401, code: 'bad_jwt' })
+    const expired = logs.at(-1)[1]
+    assert.equal(expired.token_expired, true)
+    assert.equal(expired.token_has_exp, true)
+    assert.equal(expired.anon_key_kind, 'publishable')
+    assert.equal(expired.auth_error_code, 'bad_jwt')
+    logSupabaseAuthValidation(jwt({ exp: Date.now() / 1000 + 3600 }), jwt({ role: 'anon' }),
+      'https://project.supabase.co', null)
+    assert.equal(logs.at(-1)[1].token_expired, false)
+    assert.equal(logs.at(-1)[1].anon_key_kind, 'legacy_anon')
+    for (const token of ['private', 'a.b.c', jwt({ exp: 'invalid' }), jwt({})]) {
+      logSupabaseAuthValidation(token, 'private', 'invalid', {
+        name: 'private', status: NaN, code: 'private',
+      })
+      const fields = logs.at(-1)[1]
+      assert.equal(fields.token_has_exp, false)
+      assert.equal('token_expired' in fields, false)
+      assert.equal(fields.auth_error_name, 'unknown')
+      assert.equal(fields.auth_error_code, 'unknown')
+      assert.equal(fields.auth_error_status, null)
+    }
+    assert.ok(!JSON.stringify(logs).includes('private'))
+    assert.ok(!JSON.stringify(logs).includes('@'))
+  } finally { console.warn = warn }
+})
+
+test('installed Supabase SDK sends the supplied JWT with publishable and legacy keys in both getUser forms', async () => {
+  const token = 'e30.eyJleHAiOjQxMDI0NDQ4MDB9.signature'
+  const legacyKey = `e30.${Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64url')}.signature`
+  for (const key of ['sb_publishable_test', legacyKey]) {
+    for (const explicitJwt of [false, true]) {
+      let calls = 0
+      const client = createClient('https://project.supabase.co', key, {
+        auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+        global: {
+          headers: { Authorization: `Bearer ${token}` },
+          fetch: async (url, options) => {
+            calls++
+            assert.equal(String(url), 'https://project.supabase.co/auth/v1/user')
+            const headers = new Headers(options.headers)
+            assert.equal(headers.get('authorization'), `Bearer ${token}`)
+            assert.equal(headers.get('apikey'), key)
+            return Response.json({ id: 'test-user', aud: 'authenticated' })
+          },
+        },
+      })
+      const result = explicitJwt ? await client.auth.getUser(token) : await client.auth.getUser()
+      assert.equal(result.error, null)
+      assert.equal(result.data.user.id, 'test-user')
+      assert.equal(calls, 1)
+    }
+  }
+})
 
 test('admin runtime diagnostics distinguish secret and session states without disclosing values', () => {
   const previous = process.env.ADMIN_EMAILS

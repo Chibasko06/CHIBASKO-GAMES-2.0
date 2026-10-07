@@ -4,6 +4,7 @@ import { Database } from '@/types/database'
 import { isAdminEmail } from '@/lib/adminAuth'
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
 import { logAdminAuthorization } from '@/lib/server/adminDiagnostics'
+import { logSupabaseAuthValidation } from '@/lib/server/supabaseAuthDiagnostics'
 
 export async function requireAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -43,6 +44,7 @@ export async function requireAdmin(request: NextRequest) {
     error: authError,
   } = await authClient.auth.getUser()
 
+  logSupabaseAuthValidation(token, anonKey, supabaseUrl, authError)
   logAdminAuthorization(request, true, user, Boolean(authError))
 
   if (!user || !isAdminEmail(user.email)) {
