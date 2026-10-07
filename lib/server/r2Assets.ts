@@ -14,36 +14,14 @@ export type AssetsBucket = {
 }
 
 export function getR2AssetsBucket(): AssetsBucket {
-  // Temporary server-only diagnostics: never include binding/env values or errors.
-  const diagnostic = {
-    context_error: false,
-    binding_access_error: false,
-    context_available: false,
-    env_available: false,
-    r2_binding_available: false,
-    put_type: 'undefined',
-    head_type: 'undefined',
-    delete_type: 'undefined',
-  }
-  let contextRetrieved = false
   try {
     const context = getCloudflareContext()
-    contextRetrieved = true
-    diagnostic.context_available = context != null
     const env = context?.env
-    diagnostic.env_available = env != null
     const bucket = (env as { CHIBASKO_ASSETS?: AssetsBucket } | undefined)?.CHIBASKO_ASSETS
-    diagnostic.r2_binding_available = bucket != null
-    diagnostic.put_type = typeof bucket?.put
-    diagnostic.head_type = typeof bucket?.head
-    diagnostic.delete_type = typeof bucket?.delete
     if (bucket && typeof bucket.put === 'function' && typeof bucket.head === 'function'
       && typeof bucket.delete === 'function') return bucket
   } catch {
-    diagnostic.context_error = !contextRetrieved
-    diagnostic.binding_access_error = contextRetrieved
-  } finally {
-    console.warn('[R2_DIAGNOSTIC]', diagnostic)
+    // A runtime without a usable binding receives the same public error below.
   }
   throw new Error('Stockage R2 indisponible : binding CHIBASKO_ASSETS requis sur Cloudflare.')
 }
