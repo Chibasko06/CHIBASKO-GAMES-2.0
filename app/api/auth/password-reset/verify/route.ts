@@ -1,30 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getValidPasswordResetCode, normalizeEmail } from '@/lib/server/passwordReset'
+import { InputError, readJsonObject, resetCode, resetEmail } from '@/lib/server/inputValidation'
+import { checkPasswordReset } from '@/lib/server/passwordReset'
 
 export async function POST(request: NextRequest) {
+  const headers = { 'Cache-Control': 'no-store' }
   try {
-    const body = await request.json()
-    const email = typeof body?.email === 'string' ? normalizeEmail(body.email) : ''
-    const code = typeof body?.code === 'string' ? body.code.trim() : ''
-
-    if (!email || !code) {
-      return NextResponse.json({ error: 'Email et code requis.' }, { status: 400 })
-    }
-
-    const resetCode = await getValidPasswordResetCode(email, code)
-
-    if (!resetCode) {
-      return NextResponse.json({ error: 'Code invalide ou expire.' }, { status: 400 })
-    }
-
-    return NextResponse.json({
-      ok: true,
-      message: 'Code confirme. Tu peux maintenant choisir un nouveau mot de passe.',
-    })
+    const body = await readJsonObject(request)
+    const userId = await checkPasswordReset(resetEmail(body), resetCode(body), false)
+    if (!userId) return NextResponse.json({ error: 'Code invalide ou expire.' }, { status: 400, headers })
+    return NextResponse.json({ ok: true, message: 'Code confirme. Tu peux choisir un nouveau mot de passe.' }, { headers })
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Verification impossible.' },
-      { status: 500 }
-    )
+    if (error instanceof InputError) return NextResponse.json({ error: error.message }, { status: error.status, headers })
+    console.error('Password reset verification failed')
+    return NextResponse.json({ error: 'Verification indisponible. Reessaie plus tard.' }, { status: 503, headers })
   }
 }

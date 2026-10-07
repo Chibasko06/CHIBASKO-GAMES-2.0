@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   const { data: existingProfile, error: profileLookupError } = await supabaseAdmin
     .from('profiles')
-    .select('*')
+    .select('id, username, display_name, avatar_url, bio, created_at')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         .from('profiles')
         .update(patch)
         .eq('id', user.id)
-        .select('*')
+        .select('id, username, display_name, avatar_url, bio, created_at')
         .single()
 
       if (updateError) {
@@ -128,10 +128,8 @@ export async function POST(request: NextRequest) {
       display_name: username,
       avatar_url: null,
       bio: requestedBio || null,
-      xp_points: 0,
-      last_xp_tick_at: new Date().toISOString(),
     })
-    .select('*')
+    .select('id, username, display_name, avatar_url, bio, created_at')
     .single()
 
   if (insertError) {

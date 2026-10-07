@@ -5,14 +5,13 @@ type Profile = Tables<'profiles'>
 
 export type PublicProfile = Pick<
   Profile,
-  'id' | 'username' | 'avatar_url' | 'bio' | 'xp_points' | 'created_at'
+  'id' | 'username' | 'avatar_url' | 'bio' | 'created_at'
 >
 
 export async function getPublicProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, bio, xp_points, created_at')
-    .order('xp_points', { ascending: false })
+    .select('id, username, avatar_url, bio, created_at')
     .order('username', { ascending: true })
 
   if (error) {
@@ -25,7 +24,7 @@ export async function getPublicProfiles() {
 export async function getPublicProfileByUsername(username: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, bio, xp_points, created_at')
+    .select('id, username, avatar_url, bio, created_at')
     .eq('username', username)
     .maybeSingle()
 
@@ -39,7 +38,7 @@ export async function getPublicProfileByUsername(username: string) {
 export async function getPublicProfileById(id: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, bio, xp_points, created_at')
+    .select('id, username, avatar_url, bio, created_at')
     .eq('id', id)
     .maybeSingle()
 

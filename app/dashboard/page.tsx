@@ -57,7 +57,6 @@ export default function DashboardPage() {
       }
 
       await ensureProfile(session)
-      await supabase.rpc('sync_profile_xp')
 
       const [
         { data: profileData },
@@ -66,7 +65,7 @@ export default function DashboardPage() {
         { count: favoritesTotal },
         { count: reviewsTotal },
       ] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('profiles').select('id, username, display_name, avatar_url, bio, created_at').eq('id', user.id).single(),
         getFavoriteGames(user.id),
         getRecentPlayHistory(user.id, 6),
         supabase.from('favorites').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
@@ -176,7 +175,7 @@ export default function DashboardPage() {
         .from('profiles')
         .update({ avatar_url: avatarUrl })
         .eq('id', user.id)
-        .select('*')
+        .select('id, username, display_name, avatar_url, bio, created_at')
         .single()
 
       if (error) {
@@ -205,7 +204,7 @@ export default function DashboardPage() {
         <div className="max-w-2xl rounded-[28px] border border-zinc-800 bg-zinc-950 p-6 space-y-4">
           <h1 className="text-2xl font-black uppercase text-white">Dashboard joueur</h1>
           <p className="text-zinc-400">
-            Le dashboard et l&apos;XP sont reserves aux membres connectes sur leur compte ChibaskoGames.
+            Le dashboard est reserve aux membres connectes sur leur compte ChibaskoGames.
           </p>
           <div className="flex gap-4">
             <Link href="/login" className="rounded-full bg-cyan-400 px-5 py-3 font-bold text-black">

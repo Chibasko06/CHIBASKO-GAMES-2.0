@@ -21,14 +21,13 @@ export async function PATCH(
     display_name: username || null,
     avatar_url: body.avatar_url || null,
     bio: body.bio || null,
-    xp_points: Number(body.xp_points) || 0,
   }
 
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update(payload)
     .eq('id', id)
-    .select('*')
+    .select('id, username, display_name, avatar_url, bio, created_at')
     .single()
 
   if (error) {

@@ -37,7 +37,7 @@ export async function PATCH(request: NextRequest) {
       bio: bio || null,
     })
     .eq('id', user.id)
-    .select('*')
+    .select('id, username, display_name, avatar_url, bio, created_at')
     .single()
 
   if (error) {

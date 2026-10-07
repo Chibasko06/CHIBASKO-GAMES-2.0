@@ -55,7 +55,6 @@ export default function PlayersDirectory({
               </div>
               <div>
                 <p className="font-black uppercase text-white">{profile.username}</p>
-                <p className="text-sm text-cyan-300">{profile.xp_points} XP</p>
               </div>
             </div>
             <p className="mt-4 line-clamp-3 text-sm leading-6 text-zinc-400">

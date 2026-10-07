@@ -1,37 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server'
-import {
-  createPasswordResetCode,
-  findAuthUserByEmail,
-  invalidateActivePasswordResetCodes,
-  normalizeEmail,
-  sendPasswordResetCodeEmail,
-} from '@/lib/server/passwordReset'
+import { after, NextRequest, NextResponse } from 'next/server'
+import { InputError, readJsonObject, resetEmail } from '@/lib/server/inputValidation'
+import { deliverPasswordReset, generatePasswordResetCode, passwordResetClientHash, reservePasswordReset } from '@/lib/server/passwordReset'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const email = typeof body?.email === 'string' ? normalizeEmail(body.email) : ''
-
-    if (!email) {
-      return NextResponse.json({ error: 'Email requis.' }, { status: 400 })
+    const email = resetEmail(await readJsonObject(request))
+    const code = generatePasswordResetCode()
+    const reservation = await reservePasswordReset(email, code, passwordResetClientHash(request))
+    // Sending after the response avoids an account-dependent Resend timing signal.
+    if (reservation?.auth_user_id) {
+      after(() => deliverPasswordReset(reservation.request_id, email, code))
     }
-
-    const authUser = await findAuthUserByEmail(email)
-
-    if (authUser) {
-      await invalidateActivePasswordResetCodes(email)
-      const code = await createPasswordResetCode(email)
-      await sendPasswordResetCodeEmail(email, code)
-    }
-
-    return NextResponse.json({
-      ok: true,
-      message: 'Si ce compte existe, un code de confirmation a ete envoye par email.',
-    })
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Impossible d envoyer le code.' },
-      { status: 500 }
-    )
+    if (error instanceof InputError) {
+      return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'no-store' } })
+    }
+    console.error('Password reset request could not be processed')
+    // Same public result for absent accounts, quotas and infrastructure failures.
   }
+  return NextResponse.json({
+    ok: true,
+    message: 'Si ce compte existe et que la limite de demandes le permet, un code sera envoye par email.',
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }

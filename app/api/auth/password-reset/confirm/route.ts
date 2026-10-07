@@ -1,50 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  findAuthUserByEmail,
-  getValidPasswordResetCode,
-  markPasswordResetCodeUsed,
-  normalizeEmail,
-  updateAuthUserPassword,
-} from '@/lib/server/passwordReset'
+import { InputError, readJsonObject, resetCode, resetEmail, resetPassword } from '@/lib/server/inputValidation'
+import { checkPasswordReset, updateAuthUserPassword } from '@/lib/server/passwordReset'
 
 export async function POST(request: NextRequest) {
+  const headers = { 'Cache-Control': 'no-store' }
   try {
-    const body = await request.json()
-    const email = typeof body?.email === 'string' ? normalizeEmail(body.email) : ''
-    const code = typeof body?.code === 'string' ? body.code.trim() : ''
-    const password = typeof body?.password === 'string' ? body.password : ''
-
-    if (!email || !code || !password) {
-      return NextResponse.json({ error: 'Email, code et mot de passe requis.' }, { status: 400 })
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'Le mot de passe doit faire au moins 8 caracteres.' }, { status: 400 })
-    }
-
-    const resetCode = await getValidPasswordResetCode(email, code)
-
-    if (!resetCode) {
-      return NextResponse.json({ error: 'Code invalide ou expire.' }, { status: 400 })
-    }
-
-    const authUser = await findAuthUserByEmail(email)
-
-    if (!authUser) {
-      return NextResponse.json({ error: 'Compte introuvable.' }, { status: 404 })
-    }
-
-    await updateAuthUserPassword(authUser, password)
-    await markPasswordResetCodeUsed(resetCode.id)
-
-    return NextResponse.json({
-      ok: true,
-      message: 'Mot de passe mis a jour. Tu peux maintenant te reconnecter.',
-    })
+    const body = await readJsonObject(request)
+    const email = resetEmail(body)
+    const code = resetCode(body)
+    const password = resetPassword(body)
+    // Consume atomically BEFORE Auth: concurrent confirmations cannot reuse it.
+    const userId = await checkPasswordReset(email, code, true)
+    if (!userId) return NextResponse.json({ error: 'Code invalide ou expire.' }, { status: 400, headers })
+    await updateAuthUserPassword(userId, password)
+    return NextResponse.json({ ok: true, message: 'Mot de passe mis a jour. Tu peux te reconnecter.' }, { headers })
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Impossible de changer le mot de passe.' },
-      { status: 500 }
-    )
+    if (error instanceof InputError) return NextResponse.json({ error: error.message }, { status: error.status, headers })
+    console.error('Password reset confirmation failed')
+    // A consumed code is never reactivated after an uncertain Auth outcome.
+    return NextResponse.json({ error: 'Impossible de changer le mot de passe. Demande un nouveau code.' }, { status: 503, headers })
   }
 }

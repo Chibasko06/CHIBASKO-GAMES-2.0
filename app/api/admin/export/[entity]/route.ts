@@ -49,7 +49,7 @@ export async function GET(
   if (entity === 'users') {
     const [{ data: profiles, error: profilesError }, { data: authUsers, error: authError }] =
       await Promise.all([
-        supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabaseAdmin.from('profiles').select('id, username, display_name, avatar_url, bio, created_at').order('created_at', { ascending: false }),
         supabaseAdmin.auth.admin.listUsers(),
       ])
 

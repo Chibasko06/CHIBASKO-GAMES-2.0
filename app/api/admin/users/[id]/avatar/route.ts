@@ -27,7 +27,7 @@ export async function POST(
       .from('profiles')
       .update({ avatar_url: avatarUrl })
       .eq('id', id)
-      .select('*')
+      .select('id, username, display_name, avatar_url, bio, created_at')
       .single()
 
     if (error) {

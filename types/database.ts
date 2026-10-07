@@ -353,29 +353,41 @@ export type Database = {
       }
       password_reset_codes: {
         Row: {
+          attempts: number
           code_hash: string
           created_at: string
           email: string
           expires_at: string
           id: string
           used_at: string | null
+          user_id: string | null
         }
         Insert: {
+          attempts?: number
           code_hash: string
           created_at?: string
           email: string
           expires_at: string
           id?: string
           used_at?: string | null
+          user_id?: string | null
         }
         Update: {
+          attempts?: number
           code_hash?: string
           created_at?: string
           email?: string
           expires_at?: string
           id?: string
           used_at?: string | null
+          user_id?: string | null
         }
+        Relationships: []
+      }
+      password_reset_rate_limits: {
+        Row: { client_hash: string; window_started_at: string; requests: number }
+        Insert: { client_hash: string; window_started_at?: string; requests?: number }
+        Update: { client_hash?: string; window_started_at?: string; requests?: number }
         Relationships: []
       }
       play_history: {
@@ -414,6 +426,7 @@ export type Database = {
           },
         ]
       }
+      // Application projection: legacy progression columns remain only in PostgreSQL.
       profiles: {
         Row: {
           avatar_url: string | null
@@ -421,9 +434,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
-          last_xp_tick_at: string | null
           username: string
-          xp_points: number
         }
         Insert: {
           avatar_url?: string | null
@@ -431,9 +442,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id: string
-          last_xp_tick_at?: string | null
           username: string
-          xp_points?: number
         }
         Update: {
           avatar_url?: string | null
@@ -441,9 +450,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
-          last_xp_tick_at?: string | null
           username?: string
-          xp_points?: number
         }
         Relationships: []
       }
@@ -485,9 +492,17 @@ export type Database = {
         }
         Returns: number
       }
-      sync_profile_xp: {
+      cleanup_password_reset_requests: {
         Args: Record<PropertyKey, never>
-        Returns: Database['public']['Tables']['profiles']['Row'][]
+        Returns: undefined
+      }
+      reserve_password_reset: {
+        Args: { p_email: string; p_code_hash: string; p_client_hash: string }
+        Returns: { request_id: string; auth_user_id: string | null }[]
+      }
+      check_password_reset: {
+        Args: { p_email: string; p_code_hash: string; p_consume: boolean }
+        Returns: { auth_user_id: string }[]
       }
     }
     Enums: {

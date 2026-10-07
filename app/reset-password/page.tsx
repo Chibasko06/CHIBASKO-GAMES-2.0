@@ -6,6 +6,23 @@ import { useRouter } from 'next/navigation'
 
 type ResetStep = 'request' | 'verify' | 'confirm' | 'success'
 
+async function submitReset(step: 'request' | 'verify' | 'confirm', body: Record<string, string>) {
+  try {
+    const response = await fetch(`/api/auth/password-reset/${step}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || !payload?.ok) {
+      return { ok: false, message: String(payload?.error || 'Requete impossible. Reessaie plus tard.') }
+    }
+    return { ok: true, message: String(payload.message || '') }
+  } catch {
+    return { ok: false, message: 'Connexion interrompue. Reessaie plus tard.' }
+  }
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -27,22 +44,15 @@ export default function ResetPasswordPage() {
 
     setSubmitting(true)
 
-    const response = await fetch('/api/auth/password-reset/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    })
-
-    const payload = await response.json()
-
-    if (!response.ok) {
-      setMessage(payload.error || 'Impossible d envoyer le code.')
+    const result = await submitReset('request', { email })
+    if (!result.ok) {
+      setMessage(result.message)
       setSubmitting(false)
       return
     }
 
     setStep('verify')
-    setMessage(payload.message || 'Si ce compte existe, un code a ete envoye par email.')
+    setMessage(result.message)
     setSubmitting(false)
   }
 
@@ -57,22 +67,15 @@ export default function ResetPasswordPage() {
 
     setSubmitting(true)
 
-    const response = await fetch('/api/auth/password-reset/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, code }),
-    })
-
-    const payload = await response.json()
-
-    if (!response.ok) {
-      setMessage(payload.error || 'Code invalide ou expire.')
+    const result = await submitReset('verify', { email, code })
+    if (!result.ok) {
+      setMessage(result.message)
       setSubmitting(false)
       return
     }
 
     setStep('confirm')
-    setMessage(payload.message || 'Code valide. Tu peux choisir un nouveau mot de passe.')
+    setMessage(result.message)
     setSubmitting(false)
   }
 
@@ -80,8 +83,8 @@ export default function ResetPasswordPage() {
     event.preventDefault()
     setMessage(null)
 
-    if (nextPassword.length < 8) {
-      setMessage('Le nouveau mot de passe doit faire au moins 8 caracteres.')
+    if (nextPassword.length < 8 || nextPassword.length > 128) {
+      setMessage('Le nouveau mot de passe doit faire entre 8 et 128 caracteres.')
       return
     }
 
@@ -97,26 +100,15 @@ export default function ResetPasswordPage() {
 
     setSubmitting(true)
 
-    const response = await fetch('/api/auth/password-reset/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        code,
-        password: nextPassword,
-      }),
-    })
-
-    const payload = await response.json()
-
-    if (!response.ok) {
-      setMessage(payload.error || 'Impossible de changer le mot de passe.')
+    const result = await submitReset('confirm', { email, code, password: nextPassword })
+    if (!result.ok) {
+      setMessage(result.message)
       setSubmitting(false)
       return
     }
 
     setStep('success')
-    setMessage(payload.message || 'Mot de passe modifie. Tu peux maintenant te reconnecter.')
+    setMessage(result.message)
     setNextPassword('')
     setConfirmPassword('')
     setSubmitting(false)
@@ -201,6 +193,8 @@ export default function ResetPasswordPage() {
           <input
             type="password"
             value={nextPassword}
+            maxLength={128}
+            autoComplete="new-password"
             placeholder="Nouveau mot de passe"
             className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
             onChange={(event) => setNextPassword(event.target.value)}
@@ -209,6 +203,8 @@ export default function ResetPasswordPage() {
           <input
             type="password"
             value={confirmPassword}
+            maxLength={128}
+            autoComplete="new-password"
             placeholder="Confirmer le nouveau mot de passe"
             className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
             onChange={(event) => setConfirmPassword(event.target.value)}
@@ -221,6 +217,20 @@ export default function ResetPasswordPage() {
             className="w-full rounded-full bg-cyan-400 py-4 text-sm font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? 'Mise a jour...' : 'Valider le nouveau mot de passe'}
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => {
+              setCode('')
+              setNextPassword('')
+              setConfirmPassword('')
+              setMessage(null)
+              setStep('request')
+            }}
+            className="w-full rounded-full border border-zinc-700 py-3 text-sm font-bold text-zinc-200 disabled:opacity-60"
+          >
+            Demander un nouveau code
           </button>
           {message ? <p className="text-sm text-cyan-300">{message}</p> : null}
         </form>

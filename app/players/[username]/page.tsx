@@ -82,7 +82,7 @@ export default async function PublicPlayerPage({
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/75">Profil public</p>
         <h1 className="mt-3 text-3xl font-black uppercase text-white md:text-4xl">{profile.username}</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-          Voici la fiche publique de ce joueur: pseudo, avatar, bio, XP et activite communautaire visible.
+          Voici la fiche publique de ce joueur: pseudo, avatar, bio et activite communautaire visible.
         </p>
         <div className="mt-5">
           <Link href="/players" className="rounded-full border border-cyan-700 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-cyan-200">
@@ -100,10 +100,6 @@ export default async function PublicPlayerPage({
             <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
               <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo</p>
               <p className="mt-2 text-lg font-black text-white">{profile.username}</p>
-            </div>
-            <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">XP public</p>
-              <p className="mt-2 text-lg font-black text-white">{profile.xp_points}</p>
             </div>
             <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4 sm:col-span-2">
               <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Bio</p>

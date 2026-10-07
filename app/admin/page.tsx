@@ -49,7 +49,6 @@ type UserFormState = {
   username: string
   avatar_url: string
   bio: string
-  xp_points: number
 }
 
 type CategoryFormState = {
@@ -84,7 +83,6 @@ const emptyUserForm: UserFormState = {
   username: '',
   avatar_url: '',
   bio: '',
-  xp_points: 0,
 }
 
 const emptyCategoryForm: CategoryFormState = {
@@ -131,7 +129,6 @@ function toUserFormState(user: AdminUser): UserFormState {
     username: user.username,
     avatar_url: user.avatar_url || '',
     bio: user.bio || '',
-    xp_points: user.xp_points,
   }
 }
 
@@ -988,7 +985,6 @@ export default function AdminPage() {
               <input type="file" accept="image/*,.ico" className="hidden" onChange={handleUserAvatarUpload} disabled={!editingUserId || uploadingUserAvatar} />
               <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
             </label>
-            <input value={userForm.xp_points} onChange={(e) => handleUserChange('xp_points', Number(e.target.value) || 0)} placeholder="XP" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
               {savingUser ? 'MISE A JOUR...' : 'METTRE A JOUR LE JOUEUR'}
@@ -1018,7 +1014,6 @@ export default function AdminPage() {
                   </div>
                   <div className="space-y-1 text-xs text-zinc-400">
                     <p>Pseudo: {user.username}</p>
-                    <p>XP: {user.xp_points}</p>
                     <p>Bio: {user.bio || 'Aucune bio'}</p>
                   </div>
                   <div className="flex gap-3">

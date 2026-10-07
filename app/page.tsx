@@ -35,7 +35,7 @@ export default async function Home() {
                 <span className="block text-cyan-400"> votre console</span>
               </h1>
               <p className="max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
-                Accedez a des centaines de jeux gratuits sans aucune installation. Creez votre profil, gagnez de l XP et grimpez dans le classement.
+                Accedez a des centaines de jeux gratuits sans aucune installation. Creez votre profil et retrouvez vos jeux preferes.
               </p>
             </div>
 
@@ -52,7 +52,7 @@ export default async function Home() {
               </div>
               <div className="rounded-2xl border border-zinc-800 bg-black/35 p-4">
                 <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Compte joueur</p>
-                <p className="mt-2 text-sm text-zinc-300">Sauvegardez vos scores, vos favoris et votre XP sur votre compte.</p>
+                <p className="mt-2 text-sm text-zinc-300">Retrouvez vos favoris et votre historique sur votre compte.</p>
               </div>
             </div>
           </div>

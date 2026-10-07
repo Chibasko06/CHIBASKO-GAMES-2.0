@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     await Promise.all([
       supabaseAdmin
         .from('profiles')
-        .select('*')
+        .select('id, username, display_name, avatar_url, bio, created_at')
         .order('created_at', { ascending: false }),
       supabaseAdmin.auth.admin.listUsers(),
     ])
