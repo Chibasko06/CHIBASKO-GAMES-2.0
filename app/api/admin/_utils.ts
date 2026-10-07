@@ -5,6 +5,7 @@ import { isAdminEmail } from '@/lib/adminAuth'
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
 import { logAdminAuthorization } from '@/lib/server/adminDiagnostics'
 import { logSupabaseAuthValidation } from '@/lib/server/supabaseAuthDiagnostics'
+import { createSupabaseAuthProbe } from '@/lib/server/supabaseAuthProbe'
 
 export async function requireAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -27,12 +28,14 @@ export async function requireAdmin(request: NextRequest) {
     }
   }
 
+  const authProbe = createSupabaseAuthProbe(supabaseUrl)
   const authClient = createClient<Database>(supabaseUrl, anonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
     global: {
+      fetch: authProbe.fetch,
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -42,8 +45,12 @@ export async function requireAdmin(request: NextRequest) {
   const {
     data: { user },
     error: authError,
-  } = await authClient.auth.getUser()
+  } = await authClient.auth.getUser().catch(error => {
+    authProbe.logResult(error, false, true)
+    throw error
+  })
 
+  authProbe.logResult(authError, Boolean(user))
   logSupabaseAuthValidation(token, anonKey, supabaseUrl, authError)
   logAdminAuthorization(request, true, user, Boolean(authError))
 

@@ -11,6 +11,62 @@ import { isAdminEmail } from '../lib/adminAuth.ts'
 import { logAdminAuthorization } from '../lib/server/adminDiagnostics.ts'
 import { logSupabaseAuthValidation } from '../lib/server/supabaseAuthDiagnostics.ts'
 import { createClient } from '@supabase/supabase-js'
+import { createSupabaseAuthProbe, inspectAuthError } from '../lib/server/supabaseAuthProbe.ts'
+
+test('auth error inspection distinguishes null, plain objects and SDK errors without reading values', () => {
+  assert.equal(inspectAuthError(null).auth_error_is_null, true)
+  assert.equal(inspectAuthError(undefined).auth_error_type, 'undefined')
+  const error = new Error('private-token@example.test', { cause: 'private-key' })
+  error.status = 401
+  error.__isAuthError = true
+  const fields = inspectAuthError(error)
+  assert.equal(fields.auth_error_instanceof_error, true)
+  assert.equal(fields.auth_error_has_message, true)
+  assert.equal(fields.auth_error_has_cause, true)
+  assert.equal(fields.auth_error_has_is_auth_error, true)
+  assert.ok(fields.auth_error_own_property_names.includes('message'))
+  assert.equal(fields.auth_error_keys.includes('message'), false)
+  const object = { 'private-token@example.test': 'private', get message() { throw new Error('private') } }
+  assert.equal(inspectAuthError(object).auth_error_has_message, true)
+  assert.equal(inspectAuthError(object).auth_error_inspection_failed, false)
+  assert.ok(!JSON.stringify([fields, inspectAuthError(object)]).includes('private'))
+  const proxy = new Proxy({}, { ownKeys() { throw new Error('private') } })
+  assert.equal(inspectAuthError(proxy).auth_error_inspection_failed, true)
+})
+
+test('auth fetch probe preserves request, response body and rejection; logs are correlated and contain no values', async () => {
+  const warn = console.warn
+  const logs = []
+  console.warn = (...args) => logs.push(args)
+  try {
+    const response = Response.json({ private: 'private' }, { status: 401 })
+    const request = new Request('https://project.supabase.co/auth/v1/user', {
+      headers: { Authorization: 'Bearer private', apikey: 'private' },
+    })
+    const probe = createSupabaseAuthProbe('https://project.supabase.co', async input => {
+      if (typeof input !== 'string') assert.equal(input, request)
+      return response
+    })
+    assert.equal(await probe.fetch(request), response)
+    assert.equal(response.bodyUsed, false)
+    probe.logResult({ status: 401, message: 'private' }, false)
+    assert.equal(logs[0][1].diagnostic_id, logs[1][1].diagnostic_id)
+    assert.equal(logs[0][1].http_status, 401)
+    assert.equal(logs[0][1].response_received, true)
+    assert.equal(logs[0][1].network_exception, false)
+    const failure = new TypeError('private')
+    const failing = createSupabaseAuthProbe('https://project.supabase.co', async () => { throw failure })
+    await assert.rejects(failing.fetch('https://project.supabase.co/auth/v1/user'), error => error === failure)
+    assert.equal(logs.at(-1)[1].network_exception, true)
+    assert.equal(logs.at(-1)[1].response_received, false)
+    assert.equal(logs.at(-1)[1].http_status, null)
+    const count = logs.length
+    await probe.fetch('https://project.supabase.co/rest/v1/games')
+    assert.equal(logs.length, count)
+    assert.ok(!JSON.stringify(logs).includes('private'))
+    assert.ok(!JSON.stringify(logs).includes('@'))
+  } finally { console.warn = warn }
+})
 
 test('Supabase JWT diagnostics expose only safe labels and handle malformed tokens', () => {
   const warn = console.warn
