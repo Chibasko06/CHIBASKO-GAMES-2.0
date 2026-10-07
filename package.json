@@ -7,13 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs tests/cloudflare.test.mjs tests/r2-thumbnails.test.mjs tests/r2-avatars.test.mjs tests/media-migration.test.mjs tests/local-thumbnails.test.mjs",
+    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs tests/cloudflare.test.mjs tests/r2-thumbnails.test.mjs tests/r2-avatars.test.mjs",
     "test:db": "node tests/database-security.mjs",
     "build:cloudflare": "node scripts/cloudflare.mjs build",
     "preview:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs preview",
-    "deploy:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs deploy",
-    "migrate:media": "node scripts/migrate-media.mjs",
-    "migrate:local-thumbnails": "node scripts/migrate-local-thumbnails.mjs"
+    "deploy:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",
@@ -25,7 +23,6 @@
     "resend": "^6.12.2"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "3.984.0",
     "@opennextjs/cloudflare": "1.20.9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
