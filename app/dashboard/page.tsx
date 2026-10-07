@@ -8,7 +8,7 @@ import { useAuth } from '@/components/AuthProvider'
 import ProfileCard from '@/components/ProfileCard'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
-import { uploadOwnAvatar } from '@/lib/avatarUpload'
+import { removeOwnAvatar, uploadOwnAvatar } from '@/lib/avatarUpload'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 import { Tables } from '@/types/database'
@@ -170,17 +170,7 @@ export default function DashboardPage() {
     setProfileMessage(null)
 
     try {
-      const avatarUrl = await uploadOwnAvatar(file)
-      const { data: updatedProfile, error } = await supabase
-        .from('profiles')
-        .update({ avatar_url: avatarUrl })
-        .eq('id', user.id)
-        .select('id, username, display_name, avatar_url, bio, created_at')
-        .single()
-
-      if (error) {
-        throw error
-      }
+      const updatedProfile = await uploadOwnAvatar(file)
 
       setProfile(updatedProfile)
       setSavedProfile(updatedProfile)
@@ -195,6 +185,22 @@ export default function DashboardPage() {
     } finally {
       setUploadingAvatar(false)
       event.target.value = ''
+    }
+  }
+
+  const handleAvatarDelete = async () => {
+    if (!user || !profile || uploadingAvatar) return
+    setUploadingAvatar(true)
+    setProfileMessage(null)
+    try {
+      const updatedProfile = await removeOwnAvatar()
+      setProfile(updatedProfile)
+      setSavedProfile(updatedProfile)
+      setProfileMessage('Avatar supprime.')
+    } catch (error) {
+      setProfileMessage(error instanceof Error ? error.message : 'Impossible de supprimer l avatar.')
+    } finally {
+      setUploadingAvatar(false)
     }
   }
 
@@ -317,11 +323,17 @@ export default function DashboardPage() {
                     />
                     <label className="flex min-h-[60px] cursor-pointer items-center justify-between rounded-[22px] border border-zinc-800 bg-black/60 px-4 text-sm text-zinc-300 transition hover:border-cyan-700">
                       <span>{uploadingAvatar ? 'Envoi de l avatar...' : 'Importer un avatar'}</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon" disabled={uploadingAvatar} className="hidden" onChange={handleAvatarUpload} />
                       <span className="rounded-full border border-cyan-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
                         Choisir
                       </span>
                     </label>
+                    {profile.avatar_url ? (
+                      <button type="button" disabled={uploadingAvatar} onClick={handleAvatarDelete}
+                        className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 disabled:opacity-50">
+                        Supprimer l avatar
+                      </button>
+                    ) : null}
                   </div>
 
                   <textarea

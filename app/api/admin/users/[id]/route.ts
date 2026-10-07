@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '../../_utils'
+import { AvatarUpdateError, updateAvatarForUser } from '@/lib/server/avatarStorage'
 
 export async function PATCH(
   request: NextRequest,
@@ -23,18 +24,14 @@ export async function PATCH(
     bio: body.bio || null,
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .update(payload)
-    .eq('id', id)
-    .select('id, username, display_name, avatar_url, bio, created_at')
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const { avatar_url, ...fields } = payload
+    const data = await updateAvatarForUser(id, avatar_url, supabaseAdmin, fields)
+    return NextResponse.json({ user: data })
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Sauvegarde impossible.' },
+      { status: error instanceof AvatarUpdateError ? error.status : 500 })
   }
-
-  return NextResponse.json({ user: data })
 }
 
 export async function DELETE(

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '../../../_utils'
-import { uploadAvatarForUser } from '@/lib/server/avatarStorage'
+import { AvatarUpdateError, replaceAvatarForUser } from '@/lib/server/avatarStorage'
 
 export async function POST(
   request: NextRequest,
@@ -21,24 +21,13 @@ export async function POST(
   }
 
   try {
-    const avatarUrl = await uploadAvatarForUser(id, file)
     const { supabaseAdmin } = adminCheck
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .update({ avatar_url: avatarUrl })
-      .eq('id', id)
-      .select('id, username, display_name, avatar_url, bio, created_at')
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ avatarUrl, user: data })
+    const data = await replaceAvatarForUser(id, file, supabaseAdmin)
+    return NextResponse.json({ avatarUrl: data.avatar_url, user: data })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Upload avatar impossible.' },
-      { status: 500 }
+      { status: error instanceof AvatarUpdateError ? error.status : 500 }
     )
   }
 }

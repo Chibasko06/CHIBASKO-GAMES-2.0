@@ -111,7 +111,8 @@ Les fichiers originaux peuvent donc être plus lourds. Préparer des miniatures 
 avant upload. Le CSS existant garde son rôle pour l'affichage.
 Les nouveaux uploads de miniatures utilisent le binding `CHIBASKO_ASSETS` et sont
 publics sur `https://assets.chibaskogames.fr/game-thumbnails/<UUID>.<extension>`.
-Supabase Storage conserve les anciennes miniatures et tous les avatars.
+Supabase Storage conserve les anciennes miniatures et les anciens avatars.
+Les nouveaux avatars utilisent R2 ; voir [le fonctionnement des avatars](r2-avatars.md).
 Voir [le fonctionnement et les limites R2](r2-game-thumbnails.md).
 
 `sharp` n'était pas une dépendance directe : c'était une dépendance transitive Next.js

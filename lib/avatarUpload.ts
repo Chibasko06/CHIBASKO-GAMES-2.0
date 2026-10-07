@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
+import type { Tables } from '@/types/database'
 
 async function uploadAvatarViaRoute(endpoint: string, file: File) {
   const {
@@ -26,15 +27,28 @@ async function uploadAvatarViaRoute(endpoint: string, file: File) {
     throw new Error(payload?.error || 'Echec de l upload avatar.')
   }
 
-  return payload.avatarUrl as string
+  return payload as { avatarUrl: string; profile?: Tables<'profiles'> }
 }
 
 export async function uploadOwnAvatar(file: File) {
-  return uploadAvatarViaRoute('/api/profile/avatar', file)
+  const payload = await uploadAvatarViaRoute('/api/profile/avatar', file)
+  if (!payload.profile) throw new Error('Profil introuvable apres l upload.')
+  return payload.profile
 }
 
 export async function uploadAdminAvatar(userId: string, file: File) {
-  return uploadAvatarViaRoute(`/api/admin/users/${userId}/avatar`, file)
+  return (await uploadAvatarViaRoute(`/api/admin/users/${userId}/avatar`, file)).avatarUrl
+}
+
+export async function removeOwnAvatar() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Session introuvable pour supprimer l avatar.')
+  const response = await fetch('/api/profile/avatar', {
+    method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}` },
+  })
+  const payload = await response.json().catch(() => null)
+  if (!response.ok || !payload?.profile) throw new Error(payload?.error || 'Suppression avatar impossible.')
+  return payload.profile as Tables<'profiles'>
 }
 
 export async function uploadAdminGameThumbnail(file: File, slug?: string) {

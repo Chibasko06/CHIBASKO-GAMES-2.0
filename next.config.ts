@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'assets.chibaskogames.fr',
+        pathname: '/avatars/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'assets.chibaskogames.fr',
         pathname: '/game-thumbnails/**',
       },
       {

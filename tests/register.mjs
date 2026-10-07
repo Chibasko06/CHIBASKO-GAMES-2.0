@@ -13,7 +13,8 @@ registerHooks({
       resend: 'resend',
       '@opennextjs/cloudflare': 'cloudflare',
     }
-    if (specifier.endsWith('_utils') && context.parentURL?.includes('/app/api/admin/games/')) {
+    if (specifier.endsWith('_utils') && (context.parentURL?.includes('/app/api/admin/games/')
+      || context.parentURL?.includes('/app/api/admin/users/'))) {
       return { url: 'phase0:admin-check', shortCircuit: true }
     }
     if (stubs[specifier]) return { url: `phase0:${stubs[specifier]}`, shortCircuit: true }
