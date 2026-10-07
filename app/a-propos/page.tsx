@@ -75,7 +75,7 @@ export default function AProposPage() {
         <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
           <h2 className="text-lg font-black uppercase text-white">Ummanitary</h2>
           <p className="mt-3 text-sm leading-7 text-zinc-400">
-            En dehors de Chibasko Games, je suis aussi membre du bureau d Ummanitary. C est une association porte par des benevoles engages, avec des actions solidaires locales et internationales. Si tu veux nous soutenir ou simplement decouvrir ce que l on fait, voici les liens utiles.
+            En dehors de Chibasko Games, je suis aussi membre du bureau d Ummanitary ainsi que le responsable du pôle sportif. C est une association porte par des benevoles engages, avec des actions solidaires locales et internationales. Si tu veux nous soutenir ou simplement decouvrir ce que l on fait, voici les liens utiles.
           </p>
           <div className="mt-5 grid gap-3">
             <Link
