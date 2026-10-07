@@ -1,9 +1,7 @@
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
-import sharp from 'sharp'
+import { validateGameThumbnail } from './gameThumbnailValidation'
 
 const GAME_THUMBNAILS_BUCKET = 'game-thumbnails'
-const GAME_THUMBNAIL_MAX_WIDTH = 1280
-const GAME_THUMBNAIL_MAX_HEIGHT = 720
 const GAME_THUMBNAIL_CACHE_SECONDS = 60 * 60 * 24 * 365
 const SUPPORTED_GAME_THUMBNAIL_TYPES = new Set([
   'image/jpeg',
@@ -52,52 +50,18 @@ export async function ensureGameThumbnailsBucket() {
   return supabaseAdmin
 }
 
-function isSupportedGameThumbnailType(file: File) {
-  return SUPPORTED_GAME_THUMBNAIL_TYPES.has(file.type)
-}
-
-async function optimizeGameThumbnail(file: File) {
-  if (!isSupportedGameThumbnailType(file)) {
-    throw new Error('Format miniature non pris en charge. Utilise JPG, PNG, WEBP, GIF, AVIF ou SVG.')
-  }
-
-  try {
-    const inputBuffer = Buffer.from(await file.arrayBuffer())
-    const optimizedBuffer = await sharp(inputBuffer, { animated: false })
-      .rotate()
-      .resize({
-        width: GAME_THUMBNAIL_MAX_WIDTH,
-        height: GAME_THUMBNAIL_MAX_HEIGHT,
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .webp({
-        quality: 82,
-        effort: 4,
-      })
-      .toBuffer()
-
-    return {
-      buffer: optimizedBuffer,
-      contentType: 'image/webp',
-      extension: 'webp',
-    }
-  } catch {
-    throw new Error('Impossible d optimiser cette miniature. Essaie plutot un JPG, PNG ou WEBP classique.')
-  }
-}
-
 export async function uploadGameThumbnail(file: File, slug?: string) {
+  // Validate before performing any Storage operation; retain the original bytes.
+  const thumbnail = await validateGameThumbnail(file)
   const supabaseAdmin = await ensureGameThumbnailsBucket()
   const baseName = slugifyFileBase(slug || file.name.replace(/\.[^.]+$/, '') || 'game')
-  const optimizedThumbnail = await optimizeGameThumbnail(file)
-  const filePath = `${baseName}-${Date.now()}.${optimizedThumbnail.extension}`
+  const filePath = `${baseName}-${crypto.randomUUID()}.${thumbnail.extension}`
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(GAME_THUMBNAILS_BUCKET)
-    .upload(filePath, optimizedThumbnail.buffer, {
-      upsert: true,
-      contentType: optimizedThumbnail.contentType,
+    .upload(filePath, thumbnail.buffer, {
+      upsert: false,
+      contentType: thumbnail.contentType,
       cacheControl: String(GAME_THUMBNAIL_CACHE_SECONDS),
     })
 

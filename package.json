@@ -7,24 +7,31 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs",
-    "test:db": "node tests/database-security.mjs"
+    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs tests/cloudflare.test.mjs",
+    "test:db": "node tests/database-security.mjs",
+    "build:cloudflare": "node scripts/cloudflare.mjs build",
+    "preview:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs preview",
+    "deploy:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",
-    "next": "16.2.4",
+    "@xmldom/xmldom": "0.9.12",
+    "image-size": "2.0.4",
+    "next": "16.3.8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.2"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "4.148.0"
   }
 }

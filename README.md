@@ -115,6 +115,16 @@ npm run test:db
 
 Le script prepare le schema minimal, simule d'anciens droits permissifs, applique deux fois les trois migrations et verifie : compte/profil preserve, avatar modifiable, progression bloquee, RLS/droits/RPC, CRUD backend, expiration, cinq essais, quotas, ancien code invalide et nettoyage. Il lance aussi 12 connexions concurrentes pour tester reservation, consommation unique et plafond de tentatives. Repartir d'un cluster jetable neuf pour un nouvel execution complete.
 
-## Points restant avant Cloudflare
+## Preview Cloudflare (Phase 1)
 
-La version Next.js et ses correctifs de securite, l'adaptateur Workers, la conversion native des miniatures (`sharp`), l'optimisation `next/image`, la strategie du sitemap, les erreurs Supabase masquees et les requetes de catalogue globales restent a traiter dans des changements distincts. L'historique SQL initial reste a regulariser sans reecriture silencieuse.
+Voir [le guide de preview](docs/cloudflare-preview.md) pour OpenNext, les commandes
+`build:cloudflare`, `preview:cloudflare`, `deploy:cloudflare`, les variables runtime,
+Supabase Auth et la protection contre l'indexation. Vercel reste la production ;
+aucun DNS, domaine ou asset existant n'est migre.
+
+## Points restant avant bascule du domaine
+
+Valider les parcours complets sur l'URL Cloudflare distante et ses limites de runtime.
+L'audit des dependances transitives, la strategie de rafraichissement du sitemap,
+les erreurs Supabase masquees et les requetes de catalogue globales restent des
+points distincts. L'historique SQL initial reste a regulariser sans reecriture silencieuse.

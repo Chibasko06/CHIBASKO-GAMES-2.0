@@ -18,9 +18,11 @@ export function hashPasswordResetCode(email: string, code: string) {
 }
 
 export function passwordResetClientHash(request: Request) {
-  // Only trust the IP header when the request is handled by Vercel's ingress.
+  // Trust provider headers only on their configured ingress, never arbitrary XFF.
   // Local/unknown hosts share a conservative quota; arbitrary XFF is ignored.
-  const forwarded = process.env.VERCEL === '1' ? request.headers.get('x-vercel-forwarded-for') : null
+  const forwarded = process.env.CHIBASKO_CLOUDFLARE === '1'
+    ? request.headers.get('cf-connecting-ip')
+    : process.env.VERCEL === '1' ? request.headers.get('x-vercel-forwarded-for') : null
   const candidate = forwarded?.split(',')[0].trim() || ''
   const client = isIP(candidate) ? candidate : 'shared-untrusted-ingress'
   return createHmac('sha256', secret()).update(`client:${client}`).digest('hex')
