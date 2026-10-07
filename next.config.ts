@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'assets.chibaskogames.fr',
+        pathname: '/game-thumbnails/**',
+      },
+      {
+        protocol: 'https',
         hostname: '**.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },

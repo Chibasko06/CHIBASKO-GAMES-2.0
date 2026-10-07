@@ -10,7 +10,8 @@ existant, nous conservons le compilateur Next.js et ses scripts habituels.
 - Next.js et eslint-config-next : 16.2.4 → 16.3.8 (correctifs sécurité, même majeure).
 - Adaptateur : @opennextjs/cloudflare 1.20.9 ; Wrangler : 4.148.0.
 - Worker séparé : `chibasko-games-preview`, uniquement workers.dev, aucune route DNS.
-- Pas de R2, KV, Docker, VPS ou serveur multijoueur.
+- R2 est utilisé uniquement pour les nouveaux uploads de miniatures ; pas de cache R2,
+  KV, Docker, VPS ou serveur multijoueur.
 - Cache incrémental OpenNext désactivé par défaut (`dummy`). Le catalogue est
   dynamique ; aucun ISR persistant n'est requis par le code actuel.
 - Windows a passé le build local, mais n'est pas pleinement garanti par OpenNext.
@@ -108,7 +109,10 @@ chaque image raster comme sharp. Aucun traitement natif ni accès filesystem.
 Pas de conversion WebP, redimensionnement à 1280×720 ou normalisation EXIF serveur.
 Les fichiers originaux peuvent donc être plus lourds. Préparer des miniatures adaptées
 avant upload. Le CSS existant garde son rôle pour l'affichage.
-Supabase Storage (`game-thumbnails` et `avatars`) reste utilisé.
+Les nouveaux uploads de miniatures utilisent le binding `CHIBASKO_ASSETS` et sont
+publics sur `https://assets.chibaskogames.fr/game-thumbnails/<UUID>.<extension>`.
+Supabase Storage conserve les anciennes miniatures et tous les avatars.
+Voir [le fonctionnement et les limites R2](r2-game-thumbnails.md).
 
 `sharp` n'était pas une dépendance directe : c'était une dépendance transitive Next.js
 importée par le code métier. Cet import est supprimé. Il peut rester installé pour le

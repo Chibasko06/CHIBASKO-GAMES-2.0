@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '../../_utils'
+import { cleanupReplacedGameThumbnail } from '@/lib/server/gameMediaStorage'
 
 export async function PATCH(
   request: NextRequest,
@@ -33,15 +34,26 @@ export async function PATCH(
     is_published: Boolean(body.is_published),
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data: previousGame, error: previousError } = await supabaseAdmin
+    .from('games').select('thumbnail_url').eq('id', id).single()
+  if (previousError) {
+    return NextResponse.json({ error: previousError.message }, { status: 500 })
+  }
+
+  let update = supabaseAdmin
     .from('games')
     .update(payload)
     .eq('id', id)
+  // A concurrent thumbnail change must not be overwritten by this request.
+  update = previousGame.thumbnail_url === null
+    ? update.is('thumbnail_url', null)
+    : update.eq('thumbnail_url', previousGame.thumbnail_url)
+  const { data, error } = await update
     .select('*')
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: error.code === 'PGRST116' ? 409 : 500 })
   }
 
   const { error: deleteRelationsError } = await supabaseAdmin
@@ -63,6 +75,7 @@ export async function PATCH(
     }
   }
 
+  await cleanupReplacedGameThumbnail(previousGame.thumbnail_url, data.thumbnail_url, supabaseAdmin)
   return NextResponse.json({ game: data })
 }
 

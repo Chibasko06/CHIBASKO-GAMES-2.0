@@ -11,14 +11,13 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData()
   const file = formData.get('file')
-  const slug = typeof formData.get('slug') === 'string' ? String(formData.get('slug')) : ''
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'Fichier miniature manquant.' }, { status: 400 })
   }
 
   try {
-    const thumbnailUrl = await uploadGameThumbnail(file, slug)
+    const thumbnailUrl = await uploadGameThumbnail(file)
     return NextResponse.json({ thumbnailUrl })
   } catch (error) {
     return NextResponse.json(

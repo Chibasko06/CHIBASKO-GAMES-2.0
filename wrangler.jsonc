@@ -6,6 +6,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "routes": [],
+  "r2_buckets": [
+    {
+      "binding": "CHIBASKO_ASSETS",
+      "bucket_name": "chibasko-assets"
+    }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",
