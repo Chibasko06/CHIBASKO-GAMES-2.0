@@ -7,6 +7,53 @@ import { POST as requestReset } from '../app/api/auth/password-reset/request/rou
 import { POST as verifyReset } from '../app/api/auth/password-reset/verify/route.ts'
 import { POST as confirmReset } from '../app/api/auth/password-reset/confirm/route.ts'
 import { POST as submitGame } from '../app/api/game-submissions/route.ts'
+import { isAdminEmail } from '../lib/adminAuth.ts'
+import { logAdminAuthorization } from '../lib/server/adminDiagnostics.ts'
+
+test('admin runtime diagnostics distinguish secret and session states without disclosing values', () => {
+  const previous = process.env.ADMIN_EMAILS
+  const warn = console.warn
+  const logs = []
+  console.warn = (...args) => logs.push(args)
+  const request = new Request('https://chibaskogames.fr/api/admin/status')
+  const inspect = (user = null, token = false, error = false) => {
+    logAdminAuthorization(request, token, user, error)
+    return logs.at(-1)[1]
+  }
+  try {
+    globalThis.__adminContext = () => ({ env: {} })
+    delete process.env.ADMIN_EMAILS
+    assert.equal(inspect().secret_present, false)
+    assert.equal(inspect().token_present, false)
+    assert.equal(isAdminEmail('admin-sensitive@example.test'), false)
+    process.env.ADMIN_EMAILS = '   '
+    assert.equal(inspect().secret_empty, true)
+    process.env.ADMIN_EMAILS = ' ADMIN-SENSITIVE@example.test, other@example.test '
+    globalThis.__adminContext = () => ({ env: { ADMIN_EMAILS: process.env.ADMIN_EMAILS } })
+    assert.equal(inspect({}, true).user_present, true)
+    assert.equal(inspect({}, true).user_email_present, false)
+    assert.equal(inspect({ email: 'ordinary@example.test' }, true).email_matches_admin, false)
+    const authorized = inspect({ email: 'admin-sensitive@example.test' }, true)
+    assert.equal(authorized.email_matches_admin, true)
+    assert.equal(authorized.context_secret_matches_process, true)
+    globalThis.__adminContext = () => ({ env: { ADMIN_EMAILS: 'different-sensitive@example.test' } })
+    assert.equal(inspect().context_secret_matches_process, false)
+    globalThis.__adminContext = () => { throw new Error('sensitive-context-error') }
+    assert.equal(inspect(null, true, true).context_error, true)
+    assert.equal(inspect(null, true, true).auth_error, true)
+    for (const [prefix, fields] of logs) {
+      assert.equal(prefix, '[ADMIN_DIAGNOSTIC]')
+      assert.ok(Object.values(fields).every(value => typeof value === 'boolean'))
+    }
+    assert.ok(!JSON.stringify(logs).includes('@'))
+    assert.ok(!JSON.stringify(logs).includes('sensitive'))
+  } finally {
+    console.warn = warn
+    delete globalThis.__adminContext
+    if (previous === undefined) delete process.env.ADMIN_EMAILS
+    else process.env.ADMIN_EMAILS = previous
+  }
+})
 
 const validSubmission = {
   name_or_studio: 'Studio', email: ' DEV@example.com ', game_title: 'Puzzle',
