@@ -49,10 +49,51 @@ export async function checkPasswordReset(email: string, code: string, consume: b
 }
 
 export async function deliverPasswordReset(requestId: string, email: string, code: string) {
+  let apiKey: string | undefined
+  let from: string | undefined
+  let stage = 'resend_exception'
+  let failure: unknown
+  // Temporary diagnostics: never serialize provider objects or request contents.
+  const diagnostic = (error?: unknown, sendingIdPresent = false) => {
+    const clean = (value: unknown) => {
+      if (typeof value !== 'string') return undefined
+      let text = value
+      for (const sensitive of [apiKey, from, email, code, requestId]) {
+        if (sensitive) text = text.split(sensitive).join('[REDACTED]')
+      }
+      return text
+        .replace(/authorization\s*[:=]?\s*[^\r\n]*/gi, '[REDACTED]')
+        .replace(/bearer\s+\S+/gi, '[REDACTED]')
+        .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, '[URL REDACTED]')
+        .replace(/[^\s<>"']+@[^\s<>"']+/g, '[EMAIL REDACTED]')
+        .replace(/\b\d{6}\b/g, '[CODE REDACTED]')
+        .replace(/[A-Za-z0-9_+\/.=-]{20,}/g, '[TOKEN REDACTED]')
+        .replace(/[\r\n\t\x00-\x1f\x7f]/g, ' ')
+        .slice(0, 240)
+    }
+    const field = (key: string): unknown => {
+      try { return error && typeof error === 'object' ? Reflect.get(error, key) : undefined }
+      catch { return undefined }
+    }
+    const statusCode = field('statusCode')
+    console.warn('[PASSWORD_RESET_EMAIL_DIAGNOSTIC]', {
+      resendApiKeyPresent: !!apiKey,
+      resendFromEmailPresent: !!from,
+      stage,
+      errorName: clean(field('name')),
+      errorStatusCode: typeof statusCode === 'number' && Number.isFinite(statusCode) ? statusCode : undefined,
+      errorCode: clean(field('code')),
+      errorMessage: clean(typeof error === 'string' ? error : field('message')),
+      sendingIdPresent,
+    })
+  }
   try {
-    const apiKey = process.env.RESEND_API_KEY?.trim()
-    const from = process.env.RESEND_FROM_EMAIL?.trim()
-    if (!apiKey || !from) throw new Error('Email configuration missing')
+    apiKey = process.env.RESEND_API_KEY?.trim()
+    from = process.env.RESEND_FROM_EMAIL?.trim()
+    if (!apiKey || !from) {
+      stage = 'config_missing'
+      throw new Error('Email configuration missing')
+    }
     const { data, error } = await new Resend(apiKey).emails.send({
       from,
       to: email,
@@ -60,8 +101,15 @@ export async function deliverPasswordReset(requestId: string, email: string, cod
       text: `Ton code Chibasko Games : ${code}. Il expire dans 10 minutes. Si tu n as pas demande ce code, ignore cet email.`,
       html: `<div style="font-family:Arial,sans-serif;padding:24px"><h1>Chibasko Games</h1><p>Ton code de reinitialisation :</p><p style="font-size:32px;letter-spacing:8px">${code}</p><p>Il expire dans 10 minutes. Si tu n as pas demande ce code, ignore cet email.</p></div>`,
     }, { idempotencyKey: `password-reset/${requestId}` })
-    if (error || !data?.id) throw new Error('Email delivery rejected')
-  } catch {
+    if (error || !data?.id) {
+      stage = error ? 'resend_returned_error' : 'resend_missing_id'
+      failure = error
+      throw new Error('Email delivery rejected')
+    }
+    stage = 'success'
+    diagnostic(undefined, true)
+  } catch (error) {
+    diagnostic(failure ?? error)
     // No email, code, hash or provider payload is written to logs or returned.
     console.error('Password reset email delivery failed')
     try {
