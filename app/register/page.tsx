@@ -6,8 +6,13 @@ import { useAuth } from '@/components/AuthProvider'
 import SocialAuthButtons from '@/components/SocialAuthButtons'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
+import { useRouter } from 'next/navigation'
+import { useAuthNext } from '@/lib/useAuthNext'
+import { getOAuthRedirectUrl } from '@/lib/authRedirect'
 
 export default function RegisterPage() {
+  const next = useAuthNext()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
@@ -29,6 +34,7 @@ export default function RegisterPage() {
       email,
       password,
       options: {
+        emailRedirectTo: getOAuthRedirectUrl(next),
         data: {
           user_name: trimmedUsername,
           username: trimmedUsername,
@@ -46,7 +52,7 @@ export default function RegisterPage() {
 
     if (data.session) {
       await ensureProfile(data.session)
-      window.location.href = '/'
+      router.replace(next)
       return
     }
 
@@ -79,7 +85,7 @@ export default function RegisterPage() {
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Inscription joueur</p>
         <h1 className="mt-3 text-3xl font-black uppercase text-white sm:text-4xl">Creer ton compte</h1>
         <p className="mt-3 max-w-lg text-sm leading-6 text-zinc-400">
-          Va a l essentiel: pseudo, email et mot de passe. Tu peux aussi rejoindre rapidement ChibaskoGames avec Google.
+          Va a l essentiel: pseudo, email et mot de passe. Tu peux aussi rejoindre rapidement Chibasko Games avec Google.
         </p>
       </div>
 
@@ -92,6 +98,7 @@ export default function RegisterPage() {
           </p>
           <div className="mt-5">
             <SocialAuthButtons
+              nextPath={next}
               onError={(nextMessage) => setMessage(nextMessage || null)}
             />
           </div>

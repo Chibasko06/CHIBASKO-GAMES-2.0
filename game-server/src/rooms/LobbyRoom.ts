@@ -1,4 +1,4 @@
-import { Room, ServerError, type Client, type AuthContext } from '@colyseus/core'
+import { Room, ServerError, matchMaker, type Client, type AuthContext } from '@colyseus/core'
 import type { Authenticate, AuthenticatedPlayer } from '../auth/supabaseAuth.js'
 import { scheduleSessionExpiry } from '../auth/sessionExpiry.js'
 import { allocateLobbyCode } from '../lobby/lobbyCode.js'
@@ -19,12 +19,19 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
       const path = context.req instanceof Request ? new URL(context.req.url).pathname : ''
       const creating = path === '/matchmake/create/lobby'
       if (!creating && !/^\/matchmake\/joinById\/[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(path)) throw new ServerError(400, 'INVALID_ACTION')
+      let identity: AuthenticatedPlayer
+      try { identity = await authenticate(token) } catch { throw new ServerError(401, 'AUTH_REQUIRED') }
       if (creating) {
         if (Object.keys(options).length !== 1 || !('gameId' in options)) throw new ServerError(400, 'INVALID_PAYLOAD')
         try { resolveGame(options.gameId, config.registry ?? gameRegistry) } catch { throw new ServerError(400, 'UNKNOWN_GAME') }
-      } else if (Object.keys(options).length) throw new ServerError(400, 'INVALID_PAYLOAD')
-      let identity: AuthenticatedPlayer
-      try { identity = await authenticate(token) } catch { throw new ServerError(401, 'AUTH_REQUIRED') }
+      } else {
+        if (Object.keys(options).length !== 1 || !('expectedGameId' in options) || typeof options.expectedGameId !== 'string') throw new ServerError(400, 'INVALID_PAYLOAD')
+        const code = path.split('/').pop()!
+        const lobby = matchMaker.getLocalRoomById(code)
+        if (!lobby || lobby.roomName !== 'lobby') throw new ServerError(404, 'LOBBY_NOT_FOUND')
+        const gameId = await matchMaker.remoteRoomCall(code, 'getPublicGameId')
+        if (gameId !== options.expectedGameId) throw new ServerError(409, 'WRONG_GAME')
+      }
       // This field is injected only AFTER strict input validation and verified Auth.
       // Colyseus passes these creation options to onCreate; the browser cannot set it.
       if (creating) Object.assign(options, { _creatorUserId: identity.userId })
@@ -38,6 +45,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
     private countdown: ReturnType<typeof setTimeout> | undefined
     private definition!: GameDefinition
     private transitionId: string | undefined
+    getPublicGameId() { return this.state.gameId }
 
     async onCreate(options: { _creatorUserId?: unknown; gameId?: unknown }) {
       if (typeof options._creatorUserId !== 'string' || !options._creatorUserId) throw new ServerError(401, 'AUTH_REQUIRED')

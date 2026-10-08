@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const siteConfig = {
   name: 'Chibasko Games',
-  shortName: 'Chibasko',
+  shortName: 'Chibasko Games',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://chibaskogames.fr',
   description:
     'Joue gratuitement a des jeux en ligne sur Chibasko Games : catalogue navigateur, profils joueurs, favoris, avis et futurs projets de creation.',

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
+import { safeAuthNext } from '@/lib/authRedirect'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -16,7 +17,7 @@ export default function AuthCallbackPage() {
       typeof window !== 'undefined'
         ? (() => {
       const next = new URLSearchParams(window.location.search).get('next') || '/'
-      return next.startsWith('/') ? next : '/'
+      return safeAuthNext(next)
         })()
         : '/'
 

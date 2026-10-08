@@ -12,7 +12,7 @@ export function normalizeLobbyCode(input: string) {
 }
 export async function connectLobby(token: string, code?: string, endpoint?: string, gameId = 'chibasko-pong') {
   const creating = code === undefined
-  const room = await connectGameRoom<LobbyClientState>(token, creating ? 'create' : 'joinById', creating ? 'lobby' : normalizeLobbyCode(code), endpoint, creating ? { gameId } : {})
+  const room = await connectGameRoom<LobbyClientState>(token, creating ? 'create' : 'joinById', creating ? 'lobby' : normalizeLobbyCode(code), endpoint, creating ? { gameId } : { expectedGameId: gameId })
   try {
     await new Promise<void>((resolve, reject) => {
       const cleanup = () => { clearTimeout(timer); room.onStateChange.remove(check); room.onLeave.remove(failed) }
@@ -20,7 +20,7 @@ export async function connectLobby(token: string, code?: string, endpoint?: stri
       const check = () => {
         const self = room.state?.players?.get(room.sessionId)
         if (!self) return
-        if (room.state.code !== room.roomId || (creating && room.state.hostUserId !== self.userId)) { failed(); return }
+        if (room.state.gameId !== gameId || room.state.code !== room.roomId || (creating && room.state.hostUserId !== self.userId)) { failed(); return }
         cleanup(); resolve()
       }
       const timer = setTimeout(failed, 5000)

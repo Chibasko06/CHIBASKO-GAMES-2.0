@@ -1,13 +1,13 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
-import Script from 'next/script'
+import SiteAnalytics from '@/components/SiteAnalytics'
 import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import ClientEnhancements from '@/components/ClientEnhancements'
 import Footer from '@/components/Footer'
+import { MultiplayerProvider } from '@/components/multiplayer/MultiplayerProvider'
 import { siteConfig } from '@/lib/seo'
 
-const GOOGLE_ANALYTICS_ID = 'G-H10SZPPWWX'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -112,29 +112,20 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-zinc-950 text-white">
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GOOGLE_ANALYTICS_ID}');
-          `}
-        </Script>
+        <SiteAnalytics />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         <AuthProvider>
-          <ClientEnhancements />
-          <Navbar />
-          <main className="mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">
-            {children}
-          </main>
-          <Footer />
+          <MultiplayerProvider>
+            <ClientEnhancements />
+            <Navbar />
+            <main className="mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">
+              {children}
+            </main>
+            <Footer />
+          </MultiplayerProvider>
         </AuthProvider>
       </body>
     </html>

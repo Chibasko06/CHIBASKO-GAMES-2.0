@@ -10,7 +10,22 @@ export async function connectGameRoom<State>(token: string, method: 'create' | '
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(options), credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(10000),
   })
-  if (!response.ok) throw new Error('Connection refused')
+  if (!response.ok) {
+    const data: unknown = await response.json().catch(() => null)
+    const message = data && typeof data === 'object' && 'error' in data ? data.error : null
+    const code = data && typeof data === 'object' && 'code' in data ? data.code : null
+    const allowed = ['AUTH_REQUIRED', 'WRONG_GAME', 'LOBBY_NOT_FOUND', 'LOBBY_FULL', 'LOBBY_STARTED', 'DUPLICATE_USER', 'CREATOR_PENDING']
+    // Colyseus rejects locked/full rooms before onAuth. Resolve only that failure
+    // with an authenticated minimal lookup, never by exposing its raw error text.
+    if (method === 'joinById' && code === 522) {
+      try {
+        const lookup = await fetch(new URL(`/lobbies/${encodeURIComponent(target)}`, base), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(10000) })
+        const result: unknown = await lookup.json()
+        if (result && typeof result === 'object' && 'error' in result && typeof result.error === 'string' && allowed.includes(result.error)) throw new Error(result.error)
+      } catch (error) { if (error instanceof Error && allowed.includes(error.message)) throw error }
+    }
+    throw new Error(typeof message === 'string' && allowed.includes(message) ? message : code === 522 ? 'LOBBY_NOT_FOUND' : code === 524 ? 'LOBBY_STARTED' : response.status === 401 ? 'AUTH_REQUIRED' : 'CONNECTION_REFUSED')
+  }
   const reservation = await response.json()
   return consumeGameReservation<State>(reservation, base.origin)
 }

@@ -16,7 +16,7 @@ export default function Footer() {
         <div className="space-y-4">
           <ChibaskoLogo compact />
           <p className="max-w-md text-sm leading-6 text-zinc-400">
-            ChibaskoGames rassemble des jeux 100% gratuits accessibles directement depuis votre navigateur, avec une navigation simplifiee, des favoris et un profil joueur pour une experience plus immersive.
+            Chibasko Games rassemble des jeux 100% gratuits accessibles directement depuis votre navigateur, avec une navigation simplifiee, des favoris et un profil joueur pour une experience plus immersive.
           </p>
         </div>
 
@@ -71,7 +71,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-zinc-900/80 px-4 py-4 text-center text-[11px] uppercase tracking-[0.3em] text-zinc-600">
-        © {new Date().getFullYear()} ChibaskoGames
+        © {new Date().getFullYear()} Chibasko Games
       </div>
     </footer>
   )

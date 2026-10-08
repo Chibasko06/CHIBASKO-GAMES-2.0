@@ -29,7 +29,7 @@ test('lobby authenticated lifecycle, creator guarantee, duplicates, security, re
     const wsUrls: string[] = []
     server.transport.server?.on('upgrade', request => { wsUrls.push(request.url ?? ''); assert.equal(request.headers.authorization, undefined) })
     const reserve = (method: string, target: string, token?: string, body: unknown = {}) => fetch(`${endpoint}/matchmake/${method}/${target}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(method === 'create' && Object.keys(body as object).length === 0 ? { gameId: 'chibasko-pong' } : body),
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(Object.keys(body as object).length === 0 ? (method === 'create' ? { gameId: 'chibasko-pong' } : { expectedGameId: 'chibasko-pong' }) : body),
     })
     const join = async (token: string, code?: string) => {
       const room = await connectLobby(token, code, endpoint)

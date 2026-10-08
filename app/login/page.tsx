@@ -6,8 +6,12 @@ import { useAuth } from '@/components/AuthProvider'
 import SocialAuthButtons from '@/components/SocialAuthButtons'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
+import { useRouter } from 'next/navigation'
+import { useAuthNext } from '@/lib/useAuthNext'
 
 export default function LoginPage() {
+  const next = useAuthNext()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -31,7 +35,7 @@ export default function LoginPage() {
     }
 
     await ensureProfile(data.session)
-    window.location.href = '/'
+    router.replace(next)
   }
 
   if (!authLoading && user) {
@@ -59,12 +63,13 @@ export default function LoginPage() {
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Connexion joueur</p>
         <h1 className="text-3xl font-black uppercase text-white">Acces compte</h1>
         <p className="text-sm leading-6 text-zinc-400">
-          Connecte-toi avec ton compte ChibaskoGames ou passe directement par Google.
+          Connecte-toi avec ton compte Chibasko Games ou passe directement par Google.
         </p>
       </div>
 
       <div className="space-y-4">
         <SocialAuthButtons
+          nextPath={next}
           onError={(nextMessage) => setMessage(nextMessage || null)}
         />
 
@@ -110,7 +115,7 @@ export default function LoginPage() {
 
         <p className="text-sm text-zinc-400">
           Pas encore de compte ?{' '}
-          <Link href="/register" className="text-cyan-300 hover:text-cyan-200">
+          <Link href={`/register?next=${encodeURIComponent(next)}`} className="text-cyan-300 hover:text-cyan-200">
             Cree ton profil joueur
           </Link>
         </p>

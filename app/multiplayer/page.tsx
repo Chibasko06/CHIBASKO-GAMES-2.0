@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getGamesCatalog } from '@/lib/queries/games'
 import { buildPageMetadata } from '@/lib/seo'
 import MultiplayerSection from '@/components/multiplayer/MultiplayerSection'
+import MultiplayerEntry from '@/components/multiplayer/MultiplayerEntry'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
@@ -20,7 +21,8 @@ export default async function MultiplayerPage() {
     <MultiplayerSection games={games} />
     <section className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5 sm:p-7" aria-labelledby="join-title">
       <h2 id="join-title" className="text-xl font-bold text-white">Rejoindre une partie</h2>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">Le partage de codes sera disponible à l’ouverture des parties. Pour le moment, découvre les jeux et leurs fiches.</p>
+      <p className="my-3 text-sm text-zinc-400">Tu as déjà un code de partie ?</p>
+      <MultiplayerEntry global />
     </section>
   </div>
 }

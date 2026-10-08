@@ -814,12 +814,12 @@ export default function AdminPage() {
                 if (type === 'classic' || type === 'multiplayer_chibasko') setGameForm(current => changeGameFormType(current, type, !!editingGameId))
               }} className="block w-full border border-zinc-800 bg-black p-3">
                 <option value="classic">Classique / HTML5</option>
-                <option value="multiplayer_chibasko">Multijoueur Chibasko</option>
+                <option value="multiplayer_chibasko">Multijoueur Chibasko Games</option>
               </select>
             </label>
             {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu, ses catégories et ses statistiques. Renseigne les champs du nouveau type avant de sauvegarder.</p>}
             {gameForm.game_type === 'multiplayer_chibasko' && <label className="space-y-2 md:col-span-2">
-              <span>Game Chibasko</span>
+              <span>Jeu Chibasko Games</span>
               <select required value={gameForm.multiplayer_game_id} onChange={event => handleGameChange('multiplayer_game_id', event.target.value)} className="block w-full border border-zinc-800 bg-black p-3">
                 <option value="">Choisir un jeu</option>
                 {multiplayerGames.map(game => <option key={game.gameId} value={game.gameId}>{game.label} — {game.gameId}</option>)}
@@ -909,7 +909,7 @@ export default function AdminPage() {
                     </div>
                     <div className="space-y-1 text-xs text-zinc-400">
                       <p>{game.developer_name || 'Developpeur non renseigne'}</p>
-                      <p>{game.game_type === 'multiplayer_chibasko' ? `Multijoueur Chibasko : ${game.multiplayer_game_id}` : (game.technology || 'Technologie non renseignee')}</p>
+                      <p>{game.game_type === 'multiplayer_chibasko' ? `Multijoueur Chibasko Games : ${game.multiplayer_game_id}` : (game.technology || 'Technologie non renseignee')}</p>
                       <p>Categories: {(game.game_categories ?? []).length > 0 ? `${(game.game_categories ?? []).length} liees` : 'Aucune'}</p>
                     </div>
                     <div className="flex gap-3">

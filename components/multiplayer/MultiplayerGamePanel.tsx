@@ -3,7 +3,7 @@ import { GameBadges, type GameBadgeData } from './GameBadges'
 import MultiplayerEntry from './MultiplayerEntry'
 import { getMultiplayerDefinition } from '@/lib/multiplayer/catalogue'
 
-export default function MultiplayerGamePanel({ game }: { game: GameBadgeData & { title: string; thumbnail_url: string | null } }) {
+export default function MultiplayerGamePanel({ game }: { game: GameBadgeData & { title: string; slug: string; thumbnail_url: string | null } }) {
   const available = !!game.multiplayer_game_id && !!getMultiplayerDefinition(game.multiplayer_game_id)
   return <section aria-label="Jouer en multijoueur" className="overflow-hidden rounded-[24px] border border-cyan-900/50 bg-zinc-950">
     <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -11,7 +11,7 @@ export default function MultiplayerGamePanel({ game }: { game: GameBadgeData & {
       <div className="space-y-5 p-5 sm:p-8">
         <GameBadges game={game} />
         <h2 className="text-2xl font-black text-white">Retrouve tes amis sur {game.title}</h2>
-        <MultiplayerEntry available={available} />
+        <MultiplayerEntry available={available} game={game.multiplayer_game_id ? { slug: game.slug, gameId: game.multiplayer_game_id } : undefined} />
       </div>
     </div>
   </section>

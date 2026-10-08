@@ -10,7 +10,7 @@ export default function ChibaskoLogo({ compact = false }: Props) {
     <Link href="/" className="inline-flex items-center gap-3 group">
       <Image
         src="/chibaskogames-logo.png"
-        alt="Logo ChibaskoGames"
+        alt="Logo Chibasko Games"
         width={48}
         height={48}
         sizes="48px"
@@ -19,7 +19,7 @@ export default function ChibaskoLogo({ compact = false }: Props) {
       <div className={compact ? 'hidden sm:block' : 'block'}>
         
         <p className="text-xl font-black uppercase tracking-tight text-white group-hover:text-cyan-300 transition-colors">
-          Chibasko<span className="text-cyan-400">Games</span>
+          Chibasko <span className="text-cyan-400">Games</span>
         </p>
         <p className="text-[10px] uppercase text-cyan-300/80">Un univers de jeux sans précédents !</p>
       </div>

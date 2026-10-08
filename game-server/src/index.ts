@@ -6,6 +6,7 @@ import { createSupabaseAuthenticator, type Authenticate } from './auth/supabaseA
 import { createLobbyRoom, type LobbyOptions } from './rooms/LobbyRoom.js'
 import { GameSessionCoordinator, type GameBackend } from './platform/multiplayer/GameSessionCoordinator.js'
 import { createPongRoom } from './games/chibasko-pong/PongRoom.js'
+import { lobbyResolutionRoutes } from './lobby/resolveLobby.js'
 
 export function createPlaygroundServer(authenticate: Authenticate = createSupabaseAuthenticator(
   process.env.SUPABASE_URL ?? '', process.env.SUPABASE_PUBLISHABLE_KEY ?? '',
@@ -15,6 +16,7 @@ export function createPlaygroundServer(authenticate: Authenticate = createSupaba
     transport: new WebSocketTransport(),
     greet: false,
     gracefullyShutdown: false,
+    express: lobbyResolutionRoutes(authenticate),
   })
   server.define('playground', createPlaygroundRoom(authenticate))
   server.define('lobby', createLobbyRoom(authenticate, coordinator, lobbyOptions))
