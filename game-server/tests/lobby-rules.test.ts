@@ -23,7 +23,7 @@ test('state machine only allows declared transitions', () => {
   assert.ok(canTransition('RESULTS', 'CLOSED'))
   for (const state of Object.values(LOBBY_STATUS)) assert.equal(canTransition('CLOSED', state), false)
   assert.equal(canTransition('WAITING', 'PLAYING'), false)
-  assert.equal(canTransition('PLAYING', 'WAITING'), false)
+  assert.equal(canTransition('PLAYING', 'WAITING'), true) // Coordinator recovery only.
 })
 test('ready is strict and roster must have 2–4 ready unexpired players', () => {
   assert.equal(readReady({ ready: true }), true)

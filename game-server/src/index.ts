@@ -4,17 +4,21 @@ import { pathToFileURL } from 'node:url'
 import { createPlaygroundRoom } from './rooms/PlaygroundRoom.js'
 import { createSupabaseAuthenticator, type Authenticate } from './auth/supabaseAuth.js'
 import { createLobbyRoom, type LobbyOptions } from './rooms/LobbyRoom.js'
+import { GameSessionCoordinator, type GameBackend } from './platform/multiplayer/GameSessionCoordinator.js'
+import { createPongRoom } from './games/chibasko-pong/PongRoom.js'
 
 export function createPlaygroundServer(authenticate: Authenticate = createSupabaseAuthenticator(
   process.env.SUPABASE_URL ?? '', process.env.SUPABASE_PUBLISHABLE_KEY ?? '',
-), lobbyOptions: LobbyOptions = {}) {
+), lobbyOptions: LobbyOptions = {}, sessionOptions: { timeoutMs?: number; backend?: Partial<GameBackend> } = {}) {
+  const coordinator = new GameSessionCoordinator(sessionOptions.timeoutMs, sessionOptions.backend)
   const server = new Server({
     transport: new WebSocketTransport(),
     greet: false,
     gracefullyShutdown: false,
   })
   server.define('playground', createPlaygroundRoom(authenticate))
-  server.define('lobby', createLobbyRoom(authenticate, lobbyOptions))
+  server.define('lobby', createLobbyRoom(authenticate, coordinator, lobbyOptions))
+  server.define('pong', createPongRoom(coordinator)).on('join', (room, client) => room.admitted(client))
   return server
 }
 

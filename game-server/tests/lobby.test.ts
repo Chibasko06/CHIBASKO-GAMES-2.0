@@ -6,6 +6,7 @@ import { matchMaker } from '@colyseus/core'
 import { createPlaygroundServer } from '../src/index.js'
 import { connectLobby } from '../../lib/lobbyConnection.js'
 import type { LobbyState } from '../src/schema/LobbyState.js'
+import { consumeGameReservation } from '../../lib/gameConnection.js'
 
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 4000
@@ -13,7 +14,7 @@ async function until(predicate: () => boolean) {
 }
 test('lobby authenticated lifecycle, creator guarantee, duplicates, security, ready, launch, host and expiry', { timeout: 20000 }, async () => {
   const expirations = new Map<string, number>()
-  const lobbyConfig = { startDelayMs: 300 }
+  const lobbyConfig = { startDelayMs: 300, registry: new Map([['chibasko-pong', { id: 'chibasko-pong', roomType: 'pong', minPlayers: 2, maxPlayers: 4 }]]) }
   const server = createPlaygroundServer(async token => {
     if (!token || !['A', 'B', 'C', 'D', 'E'].includes(token)) throw new Error('Denied')
     return { userId: `user-${token}`, username: `Name ${token}`, avatarUrl: null, expiresAt: expirations.get(token) ?? Date.now() + 60000 }
@@ -28,11 +29,16 @@ test('lobby authenticated lifecycle, creator guarantee, duplicates, security, re
     const wsUrls: string[] = []
     server.transport.server?.on('upgrade', request => { wsUrls.push(request.url ?? ''); assert.equal(request.headers.authorization, undefined) })
     const reserve = (method: string, target: string, token?: string, body: unknown = {}) => fetch(`${endpoint}/matchmake/${method}/${target}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body),
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(method === 'create' && Object.keys(body as object).length === 0 ? { gameId: 'chibasko-pong' } : body),
     })
     const join = async (token: string, code?: string) => {
       const room = await connectLobby(token, code, endpoint)
       room.onMessage('lobby_error', () => {})
+      room.onMessage('game_cancelled', () => {})
+      room.onMessage('game_reservation', async (message: { reservation: unknown }) => {
+        const game = await consumeGameReservation(message.reservation, endpoint)
+        rooms.push(game)
+      })
       rooms.push(room)
       return room
     }
@@ -103,7 +109,7 @@ test('lobby authenticated lifecycle, creator guarantee, duplicates, security, re
     const local = matchMaker.getLocalRoomById(closedId)!
     await a.leave()
     await until(() => b.state.hostUserId === 'user-B' && count(b) === 1)
-    assert.equal(b.state.status, 'PLAYING')
+    await until(() => b.state.status === 'WAITING')
     await b.leave()
     await until(() => !matchMaker.getLocalRoomById(closedId))
     assert.equal(local.state.status, 'CLOSED')

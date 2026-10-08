@@ -5,17 +5,24 @@ import { allocateLobbyCode } from '../lobby/lobbyCode.js'
 import { canTransition, MAX_PLAYERS, readReady, rosterCanStart, type LobbyStatus } from '../lobby/lobbyRules.js'
 import { LobbyState } from '../schema/LobbyState.js'
 import { LobbyPlayerState } from '../schema/LobbyPlayerState.js'
+import { resolveGame, gameRegistry } from '../games/registry.js'
+import type { GameDefinition, GameRegistry } from '../games/types.js'
+import type { GameSessionCoordinator } from '../platform/multiplayer/GameSessionCoordinator.js'
 
 type LobbyClient = Client<{ auth: AuthenticatedPlayer }>
-export type LobbyOptions = { allocateCode?: () => string; startDelayMs?: number }
+export type LobbyOptions = { allocateCode?: () => string; startDelayMs?: number; registry?: GameRegistry }
 
-export function createLobbyRoom(authenticate: Authenticate, config: LobbyOptions = {}) {
+export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSessionCoordinator, config: LobbyOptions = {}) {
   return class LobbyRoom extends Room<{ state: LobbyState; client: LobbyClient }> {
     static async onAuth(token: string | undefined, options: unknown, context: AuthContext) {
-      if (!options || typeof options !== 'object' || Array.isArray(options) || Object.keys(options).length) throw new ServerError(400, 'INVALID_PAYLOAD')
+      if (!options || typeof options !== 'object' || Array.isArray(options)) throw new ServerError(400, 'INVALID_PAYLOAD')
       const path = context.req instanceof Request ? new URL(context.req.url).pathname : ''
       const creating = path === '/matchmake/create/lobby'
       if (!creating && !/^\/matchmake\/joinById\/[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(path)) throw new ServerError(400, 'INVALID_ACTION')
+      if (creating) {
+        if (Object.keys(options).length !== 1 || !('gameId' in options)) throw new ServerError(400, 'INVALID_PAYLOAD')
+        try { resolveGame(options.gameId, config.registry ?? gameRegistry) } catch { throw new ServerError(400, 'UNKNOWN_GAME') }
+      } else if (Object.keys(options).length) throw new ServerError(400, 'INVALID_PAYLOAD')
       let identity: AuthenticatedPlayer
       try { identity = await authenticate(token) } catch { throw new ServerError(401, 'AUTH_REQUIRED') }
       // This field is injected only AFTER strict input validation and verified Auth.
@@ -29,10 +36,17 @@ export function createLobbyRoom(authenticate: Authenticate, config: LobbyOptions
     private creatorAdmitted = false
     private participants = new Map<string, { identity: AuthenticatedPlayer; cancelExpiry: () => void }>()
     private countdown: ReturnType<typeof setTimeout> | undefined
+    private definition!: GameDefinition
+    private transitionId: string | undefined
 
-    async onCreate(options: { _creatorUserId?: unknown }) {
+    async onCreate(options: { _creatorUserId?: unknown; gameId?: unknown }) {
       if (typeof options._creatorUserId !== 'string' || !options._creatorUserId) throw new ServerError(401, 'AUTH_REQUIRED')
       this.creatorUserId = options._creatorUserId
+      this.definition = resolveGame(options.gameId, config.registry ?? gameRegistry)
+      this.maxClients = this.definition.maxPlayers
+      this.state.gameId = this.definition.id
+      this.state.minPlayers = this.definition.minPlayers
+      this.state.maxPlayers = this.definition.maxPlayers
       this.roomId = (config.allocateCode ?? allocateLobbyCode)()
       this.state.code = this.roomId
       this.seatReservationTimeout = 10
@@ -51,22 +65,40 @@ export function createLobbyRoom(authenticate: Authenticate, config: LobbyOptions
         if (this.state.status !== 'WAITING') return this.reject(client, 'INVALID_STATE')
         if (!this.canStart()) return this.reject(client, 'NOT_READY')
         this.transition('STARTING')
+        const snapshot = [...this.participants].map(([lobbySessionId, participant]) => ({ lobbySessionId, identity: participant.identity }))
+        const transitionId = coordinator.begin(this.roomId, this.definition, snapshot, {
+          valid: () => this.transitionId === transitionId && ['STARTING', 'PLAYING'].includes(this.state.status)
+            && snapshot.length === this.participants.size && snapshot.every(p => this.participants.get(p.lobbySessionId)?.identity === p.identity),
+          reservation: (sessionId, message) => {
+            const member = this.clients.getById(sessionId)
+            if (!member) throw new Error('PARTICIPANT_LEFT')
+            member.send('game_reservation', message)
+          },
+          ready: () => { if (this.transitionId === transitionId && this.state.status === 'STARTING') this.transition('PLAYING') },
+          failed: () => {
+            if (this.transitionId !== transitionId) return
+            this.transitionId = undefined
+            if (this.state.status === 'STARTING' || this.state.status === 'PLAYING') this.cancelStart()
+            this.broadcast('game_cancelled', { transitionId })
+          },
+        })
+        this.transitionId = transitionId
         void this.lock().then(() => {
-          if (this.state.status !== 'STARTING') return
+          if (this.state.status !== 'STARTING' || this.transitionId !== transitionId) return
           this.countdown = setTimeout(() => {
             this.countdown = undefined
-            if (this.state.status !== 'STARTING') return
-            if (this.canStart()) this.transition('PLAYING')
-            else this.cancelStart()
+            if (this.state.status !== 'STARTING' || this.transitionId !== transitionId) return
+            if (this.canStart()) void coordinator.prepare(transitionId)
+            else coordinator.cancel(transitionId)
           }, config.startDelayMs ?? 3000)
-        }).catch(() => this.closeLobby())
+        }).catch(() => { if (this.transitionId === transitionId) coordinator.cancel(transitionId) })
       })
     }
     async onJoin(client: LobbyClient) {
       if (!client.auth || client.auth.expiresAt <= Date.now()) throw new ServerError(401, 'AUTH_REQUIRED')
       if (this.state.status !== 'WAITING') throw new ServerError(409, 'LOBBY_STARTED')
       if (!this.creatorAdmitted && client.auth.userId !== this.creatorUserId) throw new ServerError(409, 'CREATOR_PENDING')
-      if (this.state.players.size >= MAX_PLAYERS) throw new ServerError(409, 'LOBBY_FULL')
+      if (this.state.players.size >= this.definition.maxPlayers) throw new ServerError(409, 'LOBBY_FULL')
       for (const player of this.state.players.values()) {
         if (player.userId === client.auth.userId) throw new ServerError(409, 'DUPLICATE_USER')
       }
@@ -93,9 +125,10 @@ export function createLobbyRoom(authenticate: Authenticate, config: LobbyOptions
         // Map insertion order is private server admission order.
         this.state.hostUserId = this.participants.values().next().value!.identity.userId
       }
-      if (this.state.status === 'STARTING') this.cancelStart()
+      if (this.transitionId) coordinator.participantLeft(this.transitionId)
     }
     onDispose() {
+      if (this.transitionId) coordinator.cancel(this.transitionId, false)
       clearTimeout(this.countdown)
       for (const participant of this.participants.values()) participant.cancelExpiry()
       this.participants.clear()
@@ -105,7 +138,7 @@ export function createLobbyRoom(authenticate: Authenticate, config: LobbyOptions
       return this.state.players.has(client.sessionId) && this.participants.has(client.sessionId)
     }
     private canStart() {
-      return rosterCanStart([...this.state.players].map(([id, player]) => ({ ready: player.ready, expiresAt: this.participants.get(id)?.identity.expiresAt ?? 0 })), Date.now())
+      return rosterCanStart([...this.state.players].map(([id, player]) => ({ ready: player.ready, expiresAt: this.participants.get(id)?.identity.expiresAt ?? 0 })), Date.now(), this.definition)
     }
     private transition(next: LobbyStatus) {
       if (!canTransition(this.state.status as LobbyStatus, next)) throw new Error('Invalid lobby transition')
@@ -121,6 +154,8 @@ export function createLobbyRoom(authenticate: Authenticate, config: LobbyOptions
     private closeLobby() {
       if (this.state.status === 'CLOSED') return
       this.transition('CLOSED')
+      if (this.transitionId) coordinator.cancel(this.transitionId, false)
+      this.transitionId = undefined
       clearTimeout(this.countdown)
       void this.disconnect().catch(() => {})
     }

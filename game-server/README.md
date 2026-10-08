@@ -115,3 +115,41 @@ Expiration/signOut/changement de compte/démontage : fermeture comme pour le pla
 
 Tests lobby : codes, règles pures et vrais clients réseau avec identités injectées,
 sans Supabase production. Les commandes de validation ci-dessus couvrent les deux rooms.
+# Phase 6A — Lobby → GameRoom (local)
+
+Le registre serveur associe `chibasko-pong` à `pong`, avec exactement deux joueurs.
+Créer un lobby demande uniquement `{ gameId: "chibasko-pong" }` ; rejoindre par code
+ne prend aucune option. Les capacités et le type de room ne viennent jamais du client.
+
+`LobbyRoom` conserve ses connexions et délègue à `GameSessionCoordinator` :
+countdown de 3 secondes, création de `PongRoom`, réservation individuelle puis
+attente des admissions réellement confirmées par les événements Colyseus serveur.
+Le lobby reste STARTING tant qu'un joueur manque. Quand tous sont admis, PongRoom
+est READY et le lobby passe PLAYING. Aucun gameplay Pong n'est implémenté.
+
+Le budget global après countdown est de 10 secondes. Création/réservation en échec,
+départ, expiration, destruction ou timeout annulent la session. Les joueurs restants
+retournent WAITING, ready false. La politique de départ pendant PLAYING appartient
+au coordinateur ; un futur jeu pourra définir une autre politique.
+
+Les identités privées vérifiées sont attachées côté serveur aux réservations.
+`game_reservation` est envoyé à un seul client lobby et n'entre jamais dans le Schema.
+La réservation est un ticket temporaire : ne jamais la journaliser, partager, persister
+ou activer des logs SDK/proxy enregistrant les paramètres WebSocket. Aucun JWT ni
+`_authToken` ne doit apparaître dans le WebSocket. Le transport refuse une origine
+de réservation arbitraire et garde la reconnexion automatique désactivée.
+
+L'annulation révoque immédiatement l'admission et ferme les connexions de jeu.
+Colyseus peut différer la destruction finale d'une room avec des places non consommées
+jusqu'à l'expiration de leurs timers ; ceux-ci sont bornés par le budget de transition.
+Le coordinateur ne conserve pas la session annulée et nettoie toute création tardive.
+
+Test manuel : lancer le site et le serveur séparément comme indiqué plus haut,
+ouvrir `/lobby-playground` en développement avec deux comptes distincts, créer/rejoindre,
+ready puis Start. Vérifier lobby PLAYING, GameRoom connecté et 2/2. Quitter doit
+fermer le jeu et remettre le lobby restant WAITING. Les tests réseau automatisés
+reproduisent aussi le cas où un seul participant consomme sa réservation.
+
+`GameBackend` isole l'accès Colyseus du coordinateur. Son état reste en mémoire,
+sans persistance ni récupération après crash du processus. La frontière future
+`completed(result)` reste réservée au serveur, sans score ni message client de résultat.

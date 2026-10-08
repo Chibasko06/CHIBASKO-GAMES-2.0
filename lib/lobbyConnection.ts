@@ -2,7 +2,7 @@ import { connectGameRoom } from './gameConnection'
 
 export type LobbyPlayer = { userId: string; username: string; avatarUrl: string; ready: boolean }
 export type LobbyClientState = {
-  code: string; status: string; hostUserId: string
+  code: string; status: string; hostUserId: string; gameId: string; minPlayers: number; maxPlayers: number
   players: { forEach(callback: (player: LobbyPlayer, id: string) => void): void; get(id: string): LobbyPlayer | undefined }
 }
 export function normalizeLobbyCode(input: string) {
@@ -10,9 +10,9 @@ export function normalizeLobbyCode(input: string) {
   if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(code)) throw new Error('Code invalide')
   return code
 }
-export async function connectLobby(token: string, code?: string, endpoint?: string) {
+export async function connectLobby(token: string, code?: string, endpoint?: string, gameId = 'chibasko-pong') {
   const creating = code === undefined
-  const room = await connectGameRoom<LobbyClientState>(token, creating ? 'create' : 'joinById', creating ? 'lobby' : normalizeLobbyCode(code), endpoint)
+  const room = await connectGameRoom<LobbyClientState>(token, creating ? 'create' : 'joinById', creating ? 'lobby' : normalizeLobbyCode(code), endpoint, creating ? { gameId } : {})
   try {
     await new Promise<void>((resolve, reject) => {
       const cleanup = () => { clearTimeout(timer); room.onStateChange.remove(check); room.onLeave.remove(failed) }
