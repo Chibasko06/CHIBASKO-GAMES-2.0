@@ -49,67 +49,46 @@ export async function checkPasswordReset(email: string, code: string, consume: b
 }
 
 export async function deliverPasswordReset(requestId: string, email: string, code: string) {
-  let apiKey: string | undefined
-  let from: string | undefined
-  let stage = 'resend_exception'
-  let failure: unknown
-  // Temporary diagnostics: never serialize provider objects or request contents.
-  const diagnostic = (error?: unknown, sendingIdPresent = false) => {
-    const clean = (value: unknown) => {
-      if (typeof value !== 'string') return undefined
-      let text = value
-      for (const sensitive of [apiKey, from, email, code, requestId]) {
-        if (sensitive) text = text.split(sensitive).join('[REDACTED]')
-      }
-      return text
-        .replace(/authorization\s*[:=]?\s*[^\r\n]*/gi, '[REDACTED]')
-        .replace(/bearer\s+\S+/gi, '[REDACTED]')
-        .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, '[URL REDACTED]')
-        .replace(/[^\s<>"']+@[^\s<>"']+/g, '[EMAIL REDACTED]')
-        .replace(/\b\d{6}\b/g, '[CODE REDACTED]')
-        .replace(/[A-Za-z0-9_+\/.=-]{20,}/g, '[TOKEN REDACTED]')
-        .replace(/[\r\n\t\x00-\x1f\x7f]/g, ' ')
-        .slice(0, 240)
-    }
-    const field = (key: string): unknown => {
-      try { return error && typeof error === 'object' ? Reflect.get(error, key) : undefined }
-      catch { return undefined }
-    }
-    const statusCode = field('statusCode')
-    console.warn('[PASSWORD_RESET_EMAIL_DIAGNOSTIC]', {
-      resendApiKeyPresent: !!apiKey,
-      resendFromEmailPresent: !!from,
-      stage,
-      errorName: clean(field('name')),
-      errorStatusCode: typeof statusCode === 'number' && Number.isFinite(statusCode) ? statusCode : undefined,
-      errorCode: clean(field('code')),
-      errorMessage: clean(typeof error === 'string' ? error : field('message')),
-      sendingIdPresent,
-    })
-  }
   try {
-    apiKey = process.env.RESEND_API_KEY?.trim()
-    from = process.env.RESEND_FROM_EMAIL?.trim()
-    if (!apiKey || !from) {
-      stage = 'config_missing'
-      throw new Error('Email configuration missing')
-    }
+    const apiKey = process.env.RESEND_API_KEY?.trim()
+    const from = process.env.RESEND_FROM_EMAIL?.trim()
+    if (!apiKey || !from) throw new Error('Email configuration missing')
     const { data, error } = await new Resend(apiKey).emails.send({
-      from,
+      from: `Chibasko Games <${from.replace(/^.*<([^<>]+)>$/, '$1')}>`,
       to: email,
-      subject: 'Code de reinitialisation Chibasko Games',
-      text: `Ton code Chibasko Games : ${code}. Il expire dans 10 minutes. Si tu n as pas demande ce code, ignore cet email.`,
-      html: `<div style="font-family:Arial,sans-serif;padding:24px"><h1>Chibasko Games</h1><p>Ton code de reinitialisation :</p><p style="font-size:32px;letter-spacing:8px">${code}</p><p>Il expire dans 10 minutes. Si tu n as pas demande ce code, ignore cet email.</p></div>`,
+      subject: 'Ton code de réinitialisation Chibasko Games',
+      text: `Chibasko Games\n\nRéinitialisation de ton mot de passe\n\nUne demande de réinitialisation a été faite pour ton compte Chibasko Games. Saisis ce code sur la page de réinitialisation pour choisir un nouveau mot de passe :\n\n${code}\n\nCe code expire après 10 minutes. Ne le partage avec personne.\n\nSi tu n’es pas à l’origine de cette demande, ignore cet email. Ton mot de passe reste inchangé.\n\nChibasko Games`,
+      html: `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Réinitialisation de ton mot de passe</title></head>
+<body style="margin:0;padding:0;background-color:#f1f3f7;color:#202838;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f3f7;">
+    <tr><td align="center" style="padding:32px 12px;">
+      <!--[if mso]><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e1e5ed;border-radius:16px;">
+        <tr><td style="padding:28px 24px;background-color:#111827;border-radius:16px 16px 0 0;">
+          <p style="margin:0;color:#ffffff;font-size:22px;font-weight:bold;line-height:30px;">Chibasko <span style="color:#67e8f9;">Games</span></p>
+        </td></tr>
+        <tr><td style="padding:28px 24px;">
+          <h1 style="margin:0 0 20px;font-size:24px;line-height:32px;color:#111827;">Réinitialisation de ton mot de passe</h1>
+          <p style="margin:0 0 12px;font-size:16px;line-height:25px;">Une demande de réinitialisation a été faite pour ton compte Chibasko Games.</p>
+          <p style="margin:0 0 24px;font-size:16px;line-height:25px;">Saisis ce code sur la page de réinitialisation pour choisir un nouveau mot de passe :</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:22px 8px;background-color:#ecfeff;border:1px solid #a5f3fc;border-radius:12px;">
+            <p style="margin:0;font-family:'Courier New',monospace;font-size:32px;font-weight:bold;letter-spacing:5px;line-height:44px;color:#155e75;white-space:nowrap;">${code}</p>
+          </td></tr></table>
+          <p style="margin:20px 0 0;font-size:14px;line-height:22px;color:#475569;">Ce code expire après <strong>10 minutes</strong>. Ne le partage avec personne.</p>
+          <p style="margin:24px 0 0;padding-top:20px;border-top:1px solid #e1e5ed;font-size:14px;line-height:22px;color:#475569;">Si tu n’es pas à l’origine de cette demande, ignore cet email. Ton mot de passe reste inchangé.</p>
+        </td></tr>
+      </table>
+      <!--[if mso]></td></tr></table><![endif]-->
+      <p style="margin:20px 0 0;font-size:12px;line-height:20px;color:#64748b;">Chibasko Games</p>
+    </td></tr>
+  </table>
+</body>
+</html>`,
     }, { idempotencyKey: `password-reset/${requestId}` })
-    if (error || !data?.id) {
-      stage = error ? 'resend_returned_error' : 'resend_missing_id'
-      failure = error
-      throw new Error('Email delivery rejected')
-    }
-    stage = 'success'
-    diagnostic(undefined, true)
-  } catch (error) {
-    diagnostic(failure ?? error)
+    if (error || !data?.id) throw new Error('Email delivery rejected')
+  } catch {
     // No email, code, hash or provider payload is written to logs or returned.
     console.error('Password reset email delivery failed')
     try {

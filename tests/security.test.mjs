@@ -137,6 +137,29 @@ test('invalid confirmation never changes Auth, and provider errors stay private'
   assert.equal((await failed.text()).includes('private auth detail'), false)
 })
 
+test('reset email has branded sender, matching plain text and accessible inline HTML', async () => {
+  let payload
+  globalThis.__phase0.send = async (message) => {
+    payload = message
+    return { error: null, data: { id: 'email-id' } }
+  }
+  process.env.RESEND_FROM_EMAIL = 'noreply@chibaskogames.fr'
+  await deliverPasswordReset('request-id', 'test@example.com', '000123')
+  assert.equal(payload.from, 'Chibasko Games <noreply@chibaskogames.fr>')
+  assert.equal(payload.subject, 'Ton code de réinitialisation Chibasko Games')
+  for (const content of [payload.text, payload.html]) {
+    assert.ok(content.includes('000123'))
+    assert.ok(content.includes('10 minutes'))
+    assert.ok(content.includes('Ton mot de passe reste inchangé.'))
+    assert.equal(content.includes('test@example.com'), false)
+  }
+  assert.match(payload.html, /<html lang="fr">/)
+  assert.match(payload.html, /role="presentation"/)
+  assert.match(payload.html, /max-width:560px/)
+  assert.doesNotMatch(payload.html, /<script|<img|<a\s|https?:\/\//i)
+  assert.equal(globalThis.__phase0.calls.length, 0)
+})
+
 test('Resend errors, thrown errors and missing delivery id invalidate the reserved code', async () => {
   for (const send of [
     async () => ({ error: { message: 'private provider detail' }, data: null }),

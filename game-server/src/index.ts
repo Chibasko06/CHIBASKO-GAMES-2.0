@@ -3,16 +3,18 @@ import { WebSocketTransport } from '@colyseus/ws-transport'
 import { pathToFileURL } from 'node:url'
 import { createPlaygroundRoom } from './rooms/PlaygroundRoom.js'
 import { createSupabaseAuthenticator, type Authenticate } from './auth/supabaseAuth.js'
+import { createLobbyRoom, type LobbyOptions } from './rooms/LobbyRoom.js'
 
 export function createPlaygroundServer(authenticate: Authenticate = createSupabaseAuthenticator(
   process.env.SUPABASE_URL ?? '', process.env.SUPABASE_PUBLISHABLE_KEY ?? '',
-)) {
+), lobbyOptions: LobbyOptions = {}) {
   const server = new Server({
     transport: new WebSocketTransport(),
     greet: false,
     gracefullyShutdown: false,
   })
   server.define('playground', createPlaygroundRoom(authenticate))
+  server.define('lobby', createLobbyRoom(authenticate, lobbyOptions))
   return server
 }
 

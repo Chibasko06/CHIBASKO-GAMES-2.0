@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs tests/cloudflare.test.mjs tests/r2-thumbnails.test.mjs tests/r2-avatars.test.mjs tests/playground-connection.test.mjs",
+    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs tests/cloudflare.test.mjs tests/r2-thumbnails.test.mjs tests/r2-avatars.test.mjs tests/playground-connection.test.mjs tests/lobby-connection.test.mjs",
     "test:db": "node tests/database-security.mjs",
     "build:cloudflare": "node scripts/cloudflare.mjs build",
     "preview:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs preview",

@@ -3,6 +3,7 @@ import type { Authenticate, AuthenticatedPlayer } from '../auth/supabaseAuth.js'
 import { performance } from 'node:perf_hooks'
 import { PlayerState, PlaygroundState } from '../schema/PlaygroundState.js'
 import { validateMove } from '../validation/move.js'
+import { scheduleSessionExpiry } from '../auth/sessionExpiry.js'
 
 export function createPlaygroundRoom(authenticate: Authenticate) {
   return class PlaygroundRoom extends Room<{ state: PlaygroundState; client: Client<{ auth: AuthenticatedPlayer }> }> {
@@ -16,7 +17,7 @@ export function createPlaygroundRoom(authenticate: Authenticate) {
     state = new PlaygroundState()
     maxClients = 16
     private lastAccepted = new Map<string, number>()
-    private expiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
+    private expiryTimers = new Map<string, () => void>()
 
     onCreate() {
       this.seatReservationTimeout = 10
@@ -44,23 +45,17 @@ export function createPlaygroundRoom(authenticate: Authenticate) {
       player.username = client.auth.username
       player.avatarUrl = client.auth.avatarUrl ?? ''
       this.state.players.set(client.sessionId, player)
-      const expiresAt = client.auth.expiresAt
-      const expire = () => {
-        const remaining = expiresAt - Date.now()
-        if (remaining <= 0) { client.leave(4001); return }
-        this.expiryTimers.set(client.sessionId, setTimeout(expire, Math.min(remaining, 2147483647)))
-      }
-      expire()
+      this.expiryTimers.set(client.sessionId, scheduleSessionExpiry(client.auth.expiresAt, () => client.leave(4001)))
     }
 
     onLeave(client: Client) {
       this.state.players.delete(client.sessionId)
       this.lastAccepted.delete(client.sessionId)
-      clearTimeout(this.expiryTimers.get(client.sessionId))
+      this.expiryTimers.get(client.sessionId)?.()
       this.expiryTimers.delete(client.sessionId)
     }
     onDispose() {
-      for (const timer of this.expiryTimers.values()) clearTimeout(timer)
+      for (const cancel of this.expiryTimers.values()) cancel()
       this.expiryTimers.clear()
     }
   }

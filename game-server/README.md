@@ -81,3 +81,37 @@ game.chibaskogames.fr. Ne pas exposer ce prototype tel quel : prévoir TLS,
 filtrage des origines, limitation des requêtes et masquage des tickets dans les
 logs du proxy. Conserver HTTP authentifié / WebSocket sans JWT. Aucun VPS,
 Redis, Docker ou système de tickets supplémentaire n'est installé ici.
+
+## Lobby Chibasko (Phase 5)
+
+Ouvrir http://localhost:3000/lobby-playground (développement uniquement).
+Utiliser deux comptes distincts dans deux profils de navigateur ou une fenêtre privée.
+A crée le lobby, partage son code de six caractères, B rejoint puis chacun active Ready.
+A lance : WAITING → STARTING pendant trois secondes → PLAYING, sans gameplay.
+Le host doit lui aussi être ready. Aucun start n'est accepté depuis un non-host.
+
+La création HTTP injecte côté serveur le userId vérifié dans les options internes de
+création. Le lobby reste verrouillé jusqu'à admission de ce créateur ; aucune identité
+envoyée par le navigateur n'est acceptée. Le client n'affiche le code qu'après réception
+de l'état confirmant sa présence et son rôle de host. Join utilise joinById, jamais
+joinOrCreate. Lobbies privés/non listés, 2 joueurs minimum pour start et 4 maximum.
+
+Les codes sont des roomId, générés avec crypto, sans I/O/0/1. Allocation atomique en
+mémoire, codes émis conservés jusqu'à la fin du processus. Après redémarrage, aucune
+garantie de non-réutilisation historique n'est possible sans persistance.
+Le code est public, pas une preuve d'authentification. Le JWT reste dans HTTP uniquement.
+
+État : code/status/hostUserId/players[sessionId] ; joueur : userId/username/avatarUrl/ready.
+Un userId maximum par lobby, mais plusieurs lobbies possibles par compte. Un doublon
+est refusé dans onJoin sans expulser l'original. Une réservation peut être délivrée avant
+ce refus et occuper temporairement une place (10 secondes maximum si non consommée).
+
+Messages : set_ready avec exactement {ready:boolean}, start_game sans payload,
+lobby_error avec un code public. Départ du host : transfert au plus ancien présent.
+Départ pendant STARTING : annulation du timer, WAITING, ready remis à false, déverrouillage.
+PLAYING reste actif tant qu'un joueur demeure. Lobby vide : CLOSED, timers nettoyés,
+disconnect même si des réservations étaient pendantes. RESULTS est préparé sans gameplay.
+Expiration/signOut/changement de compte/démontage : fermeture comme pour le playground.
+
+Tests lobby : codes, règles pures et vrais clients réseau avec identités injectées,
+sans Supabase production. Les commandes de validation ci-dessus couvrent les deux rooms.
