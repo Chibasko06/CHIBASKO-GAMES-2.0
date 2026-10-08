@@ -1,0 +1,30 @@
+[Unit]
+Description=Chibasko Games multiplayer server
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Create this dedicated unprivileged account; adapt paths to the installation.
+User=chibasko-games
+Group=chibasko-games
+WorkingDirectory=/opt/chibasko-games/current/game-server
+EnvironmentFile=/etc/chibasko-games/game-server.env
+# Adapt to the absolute path of the maintained Node 24 binary.
+ExecStart=/usr/bin/node /opt/chibasko-games/current/game-server/dist/index.js
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

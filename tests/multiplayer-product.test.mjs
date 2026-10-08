@@ -121,6 +121,21 @@ test('multiplayer route is included in sitemap source; game tracking does not ma
   assert.match(await readFile(new URL('../components/PlaySessionTracker.tsx',import.meta.url),'utf8'),/if \(!recordPlay \|\| !user/)
 })
 
+test('network outage disables create/join and offers an explicit retry',async()=>{
+  let retried=0
+  globalThis.__productAuth={user:{id:'A'},loading:false}
+  globalThis.__productMultiplayer={available:true,state:{busy:false,unavailable:true,error:'Le multijoueur de Chibasko Games est temporairement indisponible.'},controller:{retry(){retried++}}}
+  try {
+    await mounted(MultiplayerEntry,{game:{slug:'pong',gameId:'chibasko-pong'}},async()=>{
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Jouer en multijoueur'))
+      assert.ok([...document.querySelectorAll('button')].find(b=>b.textContent==='Créer une partie').disabled)
+      assert.ok([...document.querySelectorAll('button')].find(b=>b.textContent==='Rejoindre').disabled)
+      assert.match(document.querySelector('[role="alert"]').textContent,/temporairement indisponible/)
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Réessayer la connexion'));assert.equal(retried,1)
+    })
+  } finally {delete globalThis.__productMultiplayer}
+})
+
 test('lobby UI renders public players, host, ready, start rules and game readiness',async()=>{
   const state={busy:false,error:'',lobby:{slug:'pong',gameId:'chibasko-pong',code:'AB7KQ2',status:'WAITING',minPlayers:2,maxPlayers:2,players:[{username:'Alice',avatarUrl:'',ready:false,host:true,self:true}]},game:{connected:false,count:0,expected:2,status:''}}
   const actions=[]
@@ -136,6 +151,7 @@ test('lobby UI renders public players, host, ready, start rules and game readine
     assert.equal(button('Lancer la partie').disabled,false);await click(button('Annuler prêt'));assert.deepEqual(actions[1],['ready',false])
     await click(button('Lancer la partie'));assert.deepEqual(actions[2],['start'])
     await render({...state,lobby:{...state.lobby,players,status:'STARTING'}})
+    assert.equal(button('Lancer la partie').hasAttribute('aria-describedby'),false)
     assert.match(document.body.textContent,/La partie démarre|Connexion au serveur de jeu/)
     assert.equal(button('Annuler prêt').disabled,true)
     await render({...state,lobby:{...state.lobby,players,status:'PLAYING'},game:{connected:true,count:2,expected:2,status:'READY'}})

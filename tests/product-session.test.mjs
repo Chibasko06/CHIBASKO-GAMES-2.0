@@ -2,6 +2,23 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { safeAuthNext, getOAuthRedirectUrl } from '../lib/authRedirect.ts'
 import { createProductSession, gameServerOrigin, multiplayerError } from '../lib/multiplayer/productSession.ts'
+import { JSDOM } from 'jsdom'
+import { protectLobbyNavigation, analyticsId } from '../lib/multiplayer/analyticsPrivacy.ts'
+
+test('analytics is disabled before history listeners observe private lobby URLs and guards are removed',()=>{
+  const dom=new JSDOM('',{url:'https://chibaskogames.fr/multiplayer'})
+  const win=dom.window, observed=[]
+  const original=win.history.pushState
+  win.history.pushState=function(...args){observed.push(win[`ga-disable-${analyticsId}`]);return original.apply(this,args)}
+  const before=win.history.pushState
+  const cleanup=protectLobbyNavigation(win)
+  win.history.pushState(null,'','/games/pong/lobby/AB7KQ2')
+  assert.equal(observed[0],true)
+  win[`ga-disable-${analyticsId}`]=false
+  win.history.pushState(null,'','/games/pong')
+  assert.equal(observed[1],true,'outgoing private referrer is also suppressed')
+  cleanup();assert.equal(win.history.pushState,before);dom.window.close()
+})
 
 test('safe return destinations reject external, encoded, protocol and credential destinations', () => {
   for (const next of ['//evil.com','https://evil.com','javascript:alert(1)','/\\evil.com','/%2f%2fevil.com','/games?access_token=secret','/games#token','/\nevil.com']) assert.equal(safeAuthNext(next), '/')
@@ -39,8 +56,30 @@ test('active session survives route handoff and closes on other context, account
     c.navigate('/games/pong');assert.ok(await c.connect(game))
     c.navigate('/games/pong/lobby/AB7KQ2');assert.ok(c.getSnapshot().lobby);assert.equal(left,0)
     if(cleanup==='navigation')c.navigate('/games/other');else if(cleanup==='account')c.accountChanged('B');else c.disconnect()
+    await new Promise(resolve=>setImmediate(resolve))
     assert.equal(c.getSnapshot().lobby,null);assert.equal(left,1);assert.equal(removed,1)
   }
+})
+
+test('returning from the lobby to its game closes the connection, without dropping closing handlers',async()=>{
+  let finish, removed=false
+  const game={slug:'pong',gameId:'chibasko-pong'}
+  const room={sessionId:'seat',state:{code:'AB7KQ2',status:'WAITING',hostUserId:'A',minPlayers:2,maxPlayers:2,players:new Map()},onStateChange(){},onMessage(){},onError(){},onLeave(){},removeAllListeners(){removed=true},leave:()=>new Promise(resolve=>{finish=resolve})}
+  const controller=createProductSession({endpoint:'http://127.0.0.1:2567',getSession:async()=>({access_token:'test',user:{id:'A'}}),catalogue:async()=>game,connect:async()=>room})
+  controller.navigate('/games/pong');await controller.connect(game)
+  controller.navigate('/games/pong/lobby/AB7KQ2');assert.ok(controller.getSnapshot().lobby)
+  controller.navigate('/games/pong');assert.equal(controller.getSnapshot().lobby,null)
+  assert.equal(removed,false)
+  finish(1000);await new Promise(resolve=>setImmediate(resolve));assert.equal(removed,true)
+})
+
+test('stopped game server yields a safe unavailable message and permits a new attempt',async()=>{
+  const controller=createProductSession({endpoint:'http://127.0.0.1:2567',getSession:async()=>({access_token:'test',user:{id:'A'}}),catalogue:async()=>null,connect:async()=>{throw new TypeError('fetch failed')}})
+  assert.equal(await controller.connect({slug:'pong',gameId:'chibasko-pong'}),null)
+  assert.equal(controller.getSnapshot().busy,false)
+  assert.equal(controller.getSnapshot().unavailable,true)
+  assert.equal(controller.getSnapshot().error,'Le multijoueur de Chibasko Games est temporairement indisponible.')
+  controller.retry();assert.equal(controller.getSnapshot().unavailable,false)
 })
 
 test('connection timeout closes a late successful admission',async t=>{

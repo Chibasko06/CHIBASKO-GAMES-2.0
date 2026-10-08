@@ -1,0 +1,27 @@
+# EXAMPLE ONLY: validate with the installed Caddy before use.
+# DNS only: Caddy receives Internet traffic directly, without another proxy.
+{
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request delete
+                msg replace caddy_event
+                err_trace delete
+                error delete
+            }
+        }
+    }
+}
+
+game.chibaskogames.fr {
+    # No HTTP access logging; runtime logs above omit requests and free text.
+    header -Server
+    reverse_proxy 127.0.0.1:2567 {
+        # Canonical single IP, overwritten from the direct peer, never input headers.
+        header_up X-Real-IP {http.request.remote.host}
+        header_up -X-Forwarded-For
+        header_up -X-Client-IP
+        header_up -CF-Connecting-IP
+    }
+}

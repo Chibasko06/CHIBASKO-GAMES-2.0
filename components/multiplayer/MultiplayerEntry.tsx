@@ -36,16 +36,17 @@ export default function MultiplayerEntry({ available = true, game, directCode, g
       } catch (err) { setError(multiplayerError(err)) }
       return
     }
-    if (!serviceAvailable || !available) return
+    if (!serviceAvailable || !available || state.unavailable) return
     try {
       const normalized = create ? undefined : normalizeLobbyCode(code)
       const joined = await controller.connect(game ?? null, normalized)
       if (joined) { suppressLobbyAnalytics(); router.push(`/games/${joined.slug}/lobby/${joined.code}`) }
     } catch (err) { setError(multiplayerError(err)) }
   }
-  const disabled = loading || state.busy || !serviceAvailable || !available
+  const disabled = loading || state.busy || !serviceAvailable || !available || !!state.unavailable
   return <div className="space-y-4">
     {(!serviceAvailable || !available) && <p role="status" className="text-sm text-zinc-400">Le multijoueur de Chibasko Games est temporairement indisponible.</p>}
+    {state.unavailable && <button type="button" onClick={controller.retry} className={multiplayerButton}>Réessayer la connexion</button>}
     {!global && !directCode && <button type="button" disabled={!available} aria-expanded={open} aria-controls={`${id}-entry`} onClick={() => setOpen(v => !v)} className={multiplayerButton}>Jouer en multijoueur</button>}
     {open && <div id={`${id}-entry`} className="space-y-4 rounded-2xl border border-zinc-800 bg-black/30 p-4 sm:p-5">
       {game && !directCode && <button type="button" onClick={() => void action(true)} disabled={disabled} className={multiplayerButton}>Créer une partie</button>}

@@ -1,3 +1,4 @@
+import { safeLog } from '../../runtime/logging.js'
 import { randomUUID } from 'node:crypto'
 import { matchMaker } from '@colyseus/core'
 import type { AuthenticatedPlayer } from '../../auth/supabaseAuth.js'
@@ -33,11 +34,16 @@ type Session = {
 }
 // All Colyseus access is behind GameBackend. State is process-local in this phase.
 export class GameSessionCoordinator {
+  private operations = new Set<Promise<void>>()
+  private closing = false
+  private cleanups = new Set<Promise<unknown>>()
+  private cleanupFailed = false
   private sessions = new Map<string, Session>()
   private byLobby = new Map<string, string>()
   private backend: GameBackend
-  constructor(private timeoutMs = 10000, overrides: Partial<GameBackend> = {}) { this.backend = { ...backend, ...overrides } }
+  constructor(private timeoutMs = 10000, overrides: Partial<GameBackend> = {}, private available: () => boolean = () => true) { this.backend = { ...backend, ...overrides } }
   begin(lobbyId: string, definition: GameDefinition, participants: readonly Participant[], events: SessionEvents) {
+    if (this.closing || !this.available()) throw new Error('UNAVAILABLE')
     if (this.byLobby.has(lobbyId)) throw new Error('SESSION_EXISTS')
     const id = randomUUID()
     const snapshot = participants.map(p => Object.freeze({ lobbySessionId: p.lobbySessionId, identity: Object.freeze({ ...p.identity }) }))
@@ -49,11 +55,17 @@ export class GameSessionCoordinator {
     return id
   }
   private valid(session: Session) {
-    return this.sessions.get(session.id) === session && session.events.valid()
+    return !this.closing && this.available() && this.sessions.get(session.id) === session && session.events.valid()
       && session.participants.every(p => p.identity.expiresAt > Date.now())
       && (session.phase === 'playing' || !session.deadline || Date.now() < session.deadline)
   }
-  async prepare(id: string) {
+  prepare(id: string) {
+    const task = this.prepareSession(id)
+    this.operations.add(task)
+    void task.then(() => this.operations.delete(task), () => this.operations.delete(task))
+    return task
+  }
+  private async prepareSession(id: string) {
     const session = this.sessions.get(id)
     if (!session || session.phase !== 'countdown') return
     session.phase = 'preparing'
@@ -76,7 +88,7 @@ export class GameSessionCoordinator {
       for (const { participant, reservation } of reservations) {
         session.events.reservation(participant.lobbySessionId, { transitionId: id, gameId: session.definition.id, reservation })
       }
-    } catch { this.cancel(id) }
+    } catch (error) { if (!(error instanceof Error && error.message === 'SESSION_INVALID')) safeLog('coordinator_error'); this.cancel(id) }
   }
   definition(id: string) { return this.sessions.get(id)?.definition }
   expectedPlayers(id: string) { return this.sessions.get(id)?.participants.length ?? 0 }
@@ -99,12 +111,14 @@ export class GameSessionCoordinator {
     session.admitted.add(auth.identity.userId)
     if (session.admitted.size !== session.participants.length) return
     session.phase = 'activating'
-    void this.backend.activate(roomId, session.id).then(() => {
+    const activation = this.backend.activate(roomId, session.id).then(() => {
       if (!this.valid(session) || session.phase !== 'activating') { this.cancel(session.id); return }
       session.phase = 'playing'
       clearTimeout(session.timer)
       session.events.ready()
-    }).catch(() => this.cancel(session.id))
+    }).catch(() => { safeLog('coordinator_error'); this.cancel(session.id) })
+    this.operations.add(activation)
+    void activation.then(() => this.operations.delete(activation), () => this.operations.delete(activation))
   }
   canActivate(id: string, roomId: string) {
     const session = this.sessions.get(id)
@@ -121,8 +135,22 @@ export class GameSessionCoordinator {
     this.sessions.delete(id)
     this.byLobby.delete(session.lobbyId)
     clearTimeout(session.timer)
-    if (session.room) void this.backend.destroy(session.room.roomId).catch(() => {})
+    if (session.room) this.destroy(session.room.roomId)
     if (notify) session.events.failed()
+  }
+  private destroy(roomId: string) {
+    const task = (async () => {
+      try { await this.backend.destroy(roomId) }
+      catch { this.cleanupFailed = true; safeLog('cleanup_error') }
+    })()
+    this.cleanups.add(task)
+    void task.finally(() => this.cleanups.delete(task))
+  }
+  async shutdown() {
+    this.closing = true
+    for (const id of [...this.sessions.keys()]) this.cancel(id, false)
+    while (this.operations.size || this.cleanups.size) await Promise.all([...this.operations, ...this.cleanups])
+    if (this.cleanupFailed) throw new Error('CLEANUP_FAILED')
   }
   // Future completed(result) belongs here; no client-supplied results are accepted.
 }

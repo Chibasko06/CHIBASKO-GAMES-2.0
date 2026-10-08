@@ -17,6 +17,21 @@ function fixture(overrides: Partial<GameBackend> = {}, timeout = 1000) {
   const id = coordinator.begin('lobby', resolveGame('chibasko-pong'), people, events)
   return { coordinator, counts, id, people, events }
 }
+
+test('shutdown waits for late room creation, cleans it and forbids subsequent sessions', async () => {
+  let release!: (room: typeof fakeRoom) => void
+  const f = fixture({ create: () => new Promise(resolve => { release = resolve }) })
+  const preparation = f.coordinator.prepare(f.id)
+  let finished = false
+  const shutdown = f.coordinator.shutdown().then(() => { finished = true })
+  await Promise.resolve()
+  assert.equal(finished, false)
+  assert.throws(() => f.coordinator.begin('another', resolveGame('chibasko-pong'), f.people, f.events))
+  release(fakeRoom)
+  await preparation; await shutdown
+  assert.equal(f.counts.destroyed, 1)
+  assert.equal(f.counts.published, 0)
+})
 test('coordinator creates once, snapshots identities, validates seats and waits for real admissions', async () => {
   const f = fixture()
   await Promise.all([f.coordinator.prepare(f.id), f.coordinator.prepare(f.id)])

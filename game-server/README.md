@@ -1,155 +1,69 @@
-# Chibasko Playground local authentifié
+# Serveur multijoueur Chibasko Games
 
-Projet Node 24 autonome, TypeScript strict, hors build Cloudflare et sans workspace.
-Supabase Auth valide les admissions ; PostgreSQL fournit le profil public.
-Aucune clé service_role, aucun stockage R2, aucun déploiement du serveur de jeu.
+Projet Node 24 / TypeScript strict autonome, hors build Next.js/Cloudflare.
+Une instance Colyseus 0.18, sans workspace, Redis ou Docker.
 
-## Configuration et lancement
+## Développement
 
-Copier `.env.example` vers `.env.local` dans game-server et remplir uniquement
-SUPABASE_URL et SUPABASE_PUBLISHABLE_KEY avec la configuration publique du même
-projet Supabase que le site. Les clés secret/service_role sont refusées.
-`.env.local` reste ignoré par Git. Node le charge pour `dev`, sans dotenv.
-Le script start attend les variables dans l'environnement du processus.
+Copier `.env.example` vers `.env.local` (ignoré par Git) et compléter SUPABASE_URL
+et SUPABASE_PUBLISHABLE_KEY du même projet que le site. Aucune service_role.
+Conserver les origines locales explicites. Omettre ENABLED_GAME_IDS en dev pour
+activer les jeux connus ; une valeur vide les désactive.
 
-Depuis la racine :
+Depuis la racine, dans deux terminaux séparés :
 
-```powershell
-npm ci
+```sh
 npm --prefix game-server ci
-# Terminal 1
-npm run dev
-# Terminal 2
 npm --prefix game-server run dev
 ```
 
-Se connecter sur http://localhost:3000/login puis ouvrir
-http://localhost:3000/playground dans deux onglets du même navigateur.
-La session du domaine de production n'est pas partagée avec localhost.
-Cliquer Connexion dans chaque onglet : même userId/username/avatar, sessionId
-distincts. Déplacer les joueurs et vérifier la synchronisation. Se déconnecter
-de Chibasko doit fermer les connexions multijoueurs.
+```sh
+npm run dev
+```
 
-## Protocole et sécurité
+Le serveur écoute par défaut sur 127.0.0.1:2567. Le site utilise localhost:3000.
+Se connecter localement ; les sessions du domaine production ne sont pas partagées.
+/playground et /lobby-playground restent des outils DEV ONLY.
 
-Le JWT est envoyé uniquement dans Authorization de la requête HTTP POST
-`/matchmake/joinOrCreate/playground`, avec corps `{}`. Le hook static onAuth
-appelle getUser(token), puis lit profiles avec user.id. Profil absent/invalide,
-token absent/invalide/expiré ou panne Supabase : admission refusée.
-Client Supabase dédié à chaque admission ; aucun token global partagé.
-L'expiration est décodée seulement après validation Auth.
-
-Colyseus conserve l'identité privée dans une réservation de 10 secondes.
-Le SDK consomme cette réservation sans client.auth.token et avec une URL contrôlée :
-origine attendue, seul paramètre sessionId autorisé. Ticket à usage unique.
-Ne jamais logger Authorization, objets requête/auth, URL complète ou query strings.
-Le SDK peut afficher une erreur réseau générique sans réponse Supabase ni token.
-
-État public : players[sessionId] = { userId, username, avatarUrl, x, y }.
-Avatar SQL null devient une chaîne vide. Aucun email, JWT, expiresAt ou User.
-Deux connexions du même compte sont autorisées. Position initiale (50,50),
-16 joueurs maximum, patches toutes les 50 ms. Message move inchangé : exactement
-x/y, entiers finis 0–100, une case orthogonale, intervalle minimum 100 ms.
-
-Fermeture à l'expiration du JWT (code 4001), avec contrôle avant chaque move.
-Reconnexion manuelle avec la session navigateur actualisée ; aucun refresh custom.
-SignOut/changement de compte/démontage ferme la room, même si le join termine tard.
-Un logout sur un autre appareil ne révoque pas immédiatement un JWT déjà accepté.
-
-## Validation
-
-```powershell
-npm test
-npm run lint
-npm run build
-npm run build:cloudflare
+```sh
 npm --prefix game-server test
 npm --prefix game-server run test:auth
 npm --prefix game-server run build
-# Depuis game-server, démarrage compilé local
+```
+
+`npm start` lance dist/index.js et attend les variables dans le processus ;
+il ne charge pas .env.local. En local après compilation :
+
+```sh
+cd game-server
 node --env-file=.env.local dist/index.js
 ```
 
-Tests : Supabase simulé, horloge injectable et vrais clients HTTP/WebSocket locaux.
-Aucun test automatisé ne contacte Supabase production. /playground reste 404
-hors développement. Le serveur écoute uniquement 127.0.0.1:2567.
+## Architecture et sécurité
 
-## Futur hébergement
+Auth Supabase pendant HTTP matchmaking, JWT dans Authorization uniquement.
+Le WebSocket n'utilise pas de JWT ni _authToken. Identité issue de getUser,
+username/avatar issus de profiles sous RLS. Expiration serveur ; signOut client
+ferme les connexions. Aucun User complet/email/token synchronisé.
 
-Le helper accepte une origine explicite pour préparer HTTPS/WSS sur
-game.chibaskogames.fr. Ne pas exposer ce prototype tel quel : prévoir TLS,
-filtrage des origines, limitation des requêtes et masquage des tickets dans les
-logs du proxy. Conserver HTTP authentifié / WebSocket sans JWT. Aucun VPS,
-Redis, Docker ou système de tickets supplémentaire n'est installé ici.
+PlaygroundRoom : déplacement validé et état public, en dev/test seulement.
+LobbyRoom : code 6 caractères sans I/O/0/1, créateur hôte garanti après admission,
+ready strict, transfert au plus ancien, un userId par lobby. Même compte permis
+sur d'autres lobbies. Création `{ gameId }`, join `{ expectedGameId }` obligatoires.
+GameRegistry : chibasko-pong, 2 joueurs, aucune règle réseau choisie par navigateur.
+Le manifeste catalogue est généré depuis ce registre.
 
-## Lobby Chibasko (Phase 5)
+WAITING → STARTING (3 s) → GameSessionCoordinator crée PongRoom privée et ses
+réservations individuelles → admissions réelles → PLAYING.
+Échec/timeout (10 s après countdown) ou départ : nettoyage et retour WAITING,
+ready remis à false. Lobby connecté en parallèle. Lobby vide détruit.
+PongRoom est un squelette d'admission, sans balle, raquette, score ou gameplay.
+RESULTS est préparé dans les types seulement.
 
-Ouvrir http://localhost:3000/lobby-playground (développement uniquement).
-Utiliser deux comptes distincts dans deux profils de navigateur ou une fenêtre privée.
-A crée le lobby, partage son code de six caractères, B rejoint puis chacun active Ready.
-A lance : WAITING → STARTING pendant trois secondes → PLAYING, sans gameplay.
-Le host doit lui aussi être ready. Aucun start n'est accepté depuis un non-host.
+## Production et exploitation
 
-La création HTTP injecte côté serveur le userId vérifié dans les options internes de
-création. Le lobby reste verrouillé jusqu'à admission de ce créateur ; aucune identité
-envoyée par le navigateur n'est acceptée. Le client n'affiche le code qu'après réception
-de l'état confirmant sa présence et son rôle de host. Join utilise joinById, jamais
-joinOrCreate. Lobbies privés/non listés, 2 joueurs minimum pour start et 4 maximum.
-
-Les codes sont des roomId, générés avec crypto, sans I/O/0/1. Allocation atomique en
-mémoire, codes émis conservés jusqu'à la fin du processus. Après redémarrage, aucune
-garantie de non-réutilisation historique n'est possible sans persistance.
-Le code est public, pas une preuve d'authentification. Le JWT reste dans HTTP uniquement.
-
-État : code/status/hostUserId/players[sessionId] ; joueur : userId/username/avatarUrl/ready.
-Un userId maximum par lobby, mais plusieurs lobbies possibles par compte. Un doublon
-est refusé dans onJoin sans expulser l'original. Une réservation peut être délivrée avant
-ce refus et occuper temporairement une place (10 secondes maximum si non consommée).
-
-Messages : set_ready avec exactement {ready:boolean}, start_game sans payload,
-lobby_error avec un code public. Départ du host : transfert au plus ancien présent.
-Départ pendant STARTING : annulation du timer, WAITING, ready remis à false, déverrouillage.
-PLAYING reste actif tant qu'un joueur demeure. Lobby vide : CLOSED, timers nettoyés,
-disconnect même si des réservations étaient pendantes. RESULTS est préparé sans gameplay.
-Expiration/signOut/changement de compte/démontage : fermeture comme pour le playground.
-
-Tests lobby : codes, règles pures et vrais clients réseau avec identités injectées,
-sans Supabase production. Les commandes de validation ci-dessus couvrent les deux rooms.
-# Phase 6A — Lobby → GameRoom (local)
-
-Le registre serveur associe `chibasko-pong` à `pong`, avec exactement deux joueurs.
-Créer un lobby demande uniquement `{ gameId: "chibasko-pong" }` ; rejoindre par code
-ne prend aucune option. Les capacités et le type de room ne viennent jamais du client.
-
-`LobbyRoom` conserve ses connexions et délègue à `GameSessionCoordinator` :
-countdown de 3 secondes, création de `PongRoom`, réservation individuelle puis
-attente des admissions réellement confirmées par les événements Colyseus serveur.
-Le lobby reste STARTING tant qu'un joueur manque. Quand tous sont admis, PongRoom
-est READY et le lobby passe PLAYING. Aucun gameplay Pong n'est implémenté.
-
-Le budget global après countdown est de 10 secondes. Création/réservation en échec,
-départ, expiration, destruction ou timeout annulent la session. Les joueurs restants
-retournent WAITING, ready false. La politique de départ pendant PLAYING appartient
-au coordinateur ; un futur jeu pourra définir une autre politique.
-
-Les identités privées vérifiées sont attachées côté serveur aux réservations.
-`game_reservation` est envoyé à un seul client lobby et n'entre jamais dans le Schema.
-La réservation est un ticket temporaire : ne jamais la journaliser, partager, persister
-ou activer des logs SDK/proxy enregistrant les paramètres WebSocket. Aucun JWT ni
-`_authToken` ne doit apparaître dans le WebSocket. Le transport refuse une origine
-de réservation arbitraire et garde la reconnexion automatique désactivée.
-
-L'annulation révoque immédiatement l'admission et ferme les connexions de jeu.
-Colyseus peut différer la destruction finale d'une room avec des places non consommées
-jusqu'à l'expiration de leurs timers ; ceux-ci sont bornés par le budget de transition.
-Le coordinateur ne conserve pas la session annulée et nettoie toute création tardive.
-
-Test manuel : lancer le site et le serveur séparément comme indiqué plus haut,
-ouvrir `/lobby-playground` en développement avec deux comptes distincts, créer/rejoindre,
-ready puis Start. Vérifier lobby PLAYING, GameRoom connecté et 2/2. Quitter doit
-fermer le jeu et remettre le lobby restant WAITING. Les tests réseau automatisés
-reproduisent aussi le cas où un seul participant consomme sa réservation.
-
-`GameBackend` isole l'accès Colyseus du coordinateur. Son état reste en mémoire,
-sans persistance ni récupération après crash du processus. La frontière future
-`completed(result)` reste réservée au serveur, sans score ni message client de résultat.
+Voir [PRODUCTION.md](PRODUCTION.md) : configuration, origines HTTP/WS, IP proxy,
+limites, health, arrêt 20 s, logs sûrs, releases, rollback, systemd et Caddy.
+Les exemples sous deploy/ sont uniquement des modèles à adapter/valider.
+Aucun déploiement, DNS ou publication de Chibasko Pong automatique.
+Rooms et sessions en mémoire : redémarrer interrompt les parties sans récupération.

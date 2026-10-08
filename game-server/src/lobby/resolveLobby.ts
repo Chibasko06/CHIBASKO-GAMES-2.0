@@ -4,20 +4,9 @@ import type { Authenticate, AuthenticatedPlayer } from '../auth/supabaseAuth.js'
 
 // Single-process, authenticated lookup. No list endpoint, roster or reservations.
 export function lobbyResolutionRoutes(authenticate: Authenticate): NonNullable<ServerOptions['express']> {
-  const requests = new Map<string, { count: number; until: number }>()
   return app => {
-    app.options('/lobbies/:code', (_req, res) => {
-      res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization', 'Access-Control-Allow-Methods': 'POST' }).sendStatus(204)
-    })
     app.post('/lobbies/:code', async (req, res) => {
-      res.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' })
-      const now = Date.now()
-      for (const [ip, quota] of requests) if (quota.until <= now) requests.delete(ip)
-      const ip = req.socket.remoteAddress ?? 'unknown'
-      const quota = requests.get(ip) ?? { count: 0, until: now + 60000 }
-      if (requests.size >= 10000 && !requests.has(ip)) { res.status(429).json({ error: 'RATE_LIMIT' }); return }
-      requests.set(ip, quota)
-      if (++quota.count > 10) { res.status(429).json({ error: 'RATE_LIMIT' }); return }
+      res.set({ 'Cache-Control': 'no-store' })
       const code = req.params.code
       if (typeof code !== 'string' || !/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(code)) { res.status(400).json({ error: 'INVALID_CODE' }); return }
       let identity: AuthenticatedPlayer

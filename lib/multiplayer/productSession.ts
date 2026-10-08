@@ -14,6 +14,7 @@ export function gameServerOrigin(config = process.env.NEXT_PUBLIC_GAME_SERVER_UR
   } catch { return null }
 }
 export function multiplayerError(error: unknown): string {
+  if (error instanceof TypeError) return 'Le multijoueur de Chibasko Games est temporairement indisponible.'
   const key = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
   const messages: Record<string, string> = {
     'Code invalide': 'Le code de partie est invalide.', INVALID_CODE: 'Le code de partie est invalide.',
@@ -31,7 +32,7 @@ export function multiplayerError(error: unknown): string {
 export type ProductGame = { slug: string; gameId: string }
 export type PublicPlayer = Pick<LobbyPlayer, 'username' | 'avatarUrl' | 'ready'> & { host: boolean; self: boolean }
 export type ProductLobby = ProductGame & { code: string; status: string; minPlayers: number; maxPlayers: number; players: PublicPlayer[] }
-export type ProductSnapshot = { busy: boolean; error: string; lobby: ProductLobby | null; game: { connected: boolean; count: number; expected: number; status: string } }
+export type ProductSnapshot = { busy: boolean; error: string; unavailable?: boolean; lobby: ProductLobby | null; game: { connected: boolean; count: number; expected: number; status: string } }
 export function isProductGameReady(state: ProductSnapshot) { return state.lobby?.status === 'PLAYING' && state.game.connected && state.game.status === 'READY' && state.game.count === state.game.expected }
 type Session = { access_token: string; user: { id: string } }
 export function createProductSession(options: {
@@ -51,8 +52,9 @@ export function createProductSession(options: {
     generation++; context = null
     bridge?.dispose(); bridge = null
     const previous = room; room = null
-    if (previous) { previous.removeAllListeners(); void previous.leave().catch(() => {}) }
-    update({ busy: false, error, lobby: null, game: { connected: false, count: 0, expected: 0, status: '' } })
+    // Keep handlers until the closing handshake completes: a cancellation can still arrive.
+    if (previous) void previous.leave().catch(() => {}).finally(() => previous.removeAllListeners())
+    update({ busy: false, error, unavailable: false, lobby: null, game: { connected: false, count: 0, expected: 0, status: '' } })
   }
   async function connect(game: ProductGame | null, input?: string) {
     if (state.busy) return null
@@ -93,7 +95,7 @@ export function createProductSession(options: {
       bridge = createLobbyGameSession((gameRoom, failed) => {
         if (room !== next) return
         let count = 0; gameRoom?.state?.players?.forEach(() => count++)
-        update({ game: { connected: !!gameRoom, count, expected: gameRoom?.state?.expectedPlayers ?? 0, status: gameRoom?.state?.status ?? '' }, ...(failed ? { error: 'La connexion à la partie a échoué. Tu peux réessayer depuis le lobby.' } : {}) })
+        update({ game: { connected: !!gameRoom, count, expected: gameRoom?.state?.expectedPlayers ?? 0, status: gameRoom?.state?.status ?? '' }, ...(failed ? { error: 'La connexion à la partie a échoué. Tu peux réessayer depuis la salle d’attente.' } : {}) })
       }, reservation => consumeGameReservation<BridgeGameState>(reservation, options.endpoint!))
       const refresh = () => {
         if (room !== next) return
@@ -110,7 +112,10 @@ export function createProductSession(options: {
       refresh(); update({ busy: false })
       return { ...target, code: next.state.code }
     } catch (error) {
-      if (attempt === generation) disconnect(multiplayerError(error instanceof Error && error.name === 'TimeoutError' ? 'TIMEOUT' : error))
+      if (attempt === generation) {
+        disconnect(multiplayerError(error instanceof Error && error.name === 'TimeoutError' ? 'TIMEOUT' : error))
+        if (error instanceof TypeError) update({ unavailable: true })
+      }
       return null
     }
   }
@@ -119,6 +124,7 @@ export function createProductSession(options: {
     getSnapshot: () => state,
     connect,
     disconnect,
+    retry() { if (!state.busy && state.unavailable) update({ unavailable: false, error: '' }) },
     accountChanged(id: string | null) { if (!id || (account && id !== account)) disconnect(); account = id },
     navigate(path: string) {
       const changed = lastPath && path !== lastPath
@@ -126,7 +132,8 @@ export function createProductSession(options: {
       if (changed && state.busy) { disconnect(); return }
       if (!context) return
       const base = `/games/${context.slug}`
-      if (path !== base && path !== `${base}/lobby/${state.lobby?.code}`) disconnect()
+      const lobbyPath = `${base}/lobby/${state.lobby?.code}`
+      if (path !== lobbyPath && (path !== base || changed)) disconnect()
     },
     ready(value: boolean) { update({ error: '' }); room?.send('set_ready', { ready: value }) },
     start() { update({ error: '' }); room?.send('start_game') },

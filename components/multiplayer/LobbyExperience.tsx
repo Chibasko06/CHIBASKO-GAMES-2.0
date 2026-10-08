@@ -48,7 +48,7 @@ export function LobbyView({ title, state, onReady, onStart, onLeave }: { title: 
     {state.error && <p role="alert" className="text-sm text-amber-200">{state.error}</p>}
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       <button type="button" disabled={!waiting || !self} onClick={() => onReady(!self?.ready)} className={multiplayerButton}>{self?.ready ? 'Annuler prêt' : 'Je suis prêt'}</button>
-      {self?.host && <button type="button" disabled={!waiting || !!reason} aria-describedby="start-reason" onClick={onStart} className={multiplayerButton}>Lancer la partie</button>}
+      {self?.host && <button type="button" disabled={!waiting || !!reason} aria-describedby={waiting ? 'start-reason' : undefined} onClick={onStart} className={multiplayerButton}>Lancer la partie</button>}
       <button type="button" onClick={onLeave} className={multiplayerButton}>Quitter la partie</button>
     </div>
     {waiting && <p id="start-reason" className="text-sm text-zinc-400">{reason || 'Tous les joueurs sont prêts. L’hôte peut lancer la partie.'}</p>}

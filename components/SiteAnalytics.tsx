@@ -2,18 +2,19 @@
 import Script from 'next/script'
 import { usePathname } from 'next/navigation'
 import { useLayoutEffect } from 'react'
+import { analyticsId as id, privateLobbyPath, protectLobbyNavigation } from '@/lib/multiplayer/analyticsPrivacy'
 
-const id = 'G-H10SZPPWWX'
-export function privateLobbyPath(path: string) { return /^\/games\/[^/]+\/lobby\//.test(path) }
+export { privateLobbyPath } from '@/lib/multiplayer/analyticsPrivacy'
 export function suppressLobbyAnalytics() {
   if (typeof window !== 'undefined') (window as unknown as Record<string, unknown>)[`ga-disable-${id}`] = true
 }
 export default function SiteAnalytics() {
   const pathname = usePathname()
   const privatePage = privateLobbyPath(pathname)
+  useLayoutEffect(() => protectLobbyNavigation(window), [])
   useLayoutEffect(() => {
     (window as unknown as Record<string, unknown>)[`ga-disable-${id}`] = privatePage
-  }, [privatePage])
+  }, [privatePage, pathname])
   if (privatePage) return null
   return <>
     <Script src={`https://www.googletagmanager.com/gtag/js?id=${id}`} strategy="afterInteractive" />

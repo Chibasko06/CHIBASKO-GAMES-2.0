@@ -1,3 +1,4 @@
+import { safeLog } from '../runtime/logging.js'
 import { Room, ServerError, matchMaker, type Client, type AuthContext } from '@colyseus/core'
 import type { Authenticate, AuthenticatedPlayer } from '../auth/supabaseAuth.js'
 import { scheduleSessionExpiry } from '../auth/sessionExpiry.js'
@@ -10,11 +11,12 @@ import type { GameDefinition, GameRegistry } from '../games/types.js'
 import type { GameSessionCoordinator } from '../platform/multiplayer/GameSessionCoordinator.js'
 
 type LobbyClient = Client<{ auth: AuthenticatedPlayer }>
-export type LobbyOptions = { allocateCode?: () => string; startDelayMs?: number; registry?: GameRegistry }
+export type LobbyOptions = { allocateCode?: () => string; startDelayMs?: number; registry?: GameRegistry; reserveCreation?: (userId: string) => (() => void) | undefined; available?: () => boolean }
 
 export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSessionCoordinator, config: LobbyOptions = {}) {
   return class LobbyRoom extends Room<{ state: LobbyState; client: LobbyClient }> {
     static async onAuth(token: string | undefined, options: unknown, context: AuthContext) {
+      if (config.available?.() === false) throw new ServerError(503, 'UNAVAILABLE')
       if (!options || typeof options !== 'object' || Array.isArray(options)) throw new ServerError(400, 'INVALID_PAYLOAD')
       const path = context.req instanceof Request ? new URL(context.req.url).pathname : ''
       const creating = path === '/matchmake/create/lobby'
@@ -39,6 +41,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
     }
     state = new LobbyState()
     maxClients = MAX_PLAYERS
+    private releaseCreation?: () => void
     private creatorUserId = ''
     private creatorAdmitted = false
     private participants = new Map<string, { identity: AuthenticatedPlayer; cancelExpiry: () => void }>()
@@ -60,13 +63,19 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
       this.seatReservationTimeout = 10
       this.setPatchRate(50)
       await this.setMatchmaking({ private: true, unlisted: true, locked: true })
+      if (config.reserveCreation) {
+        this.releaseCreation = config.reserveCreation(this.creatorUserId)
+        if (!this.releaseCreation) throw new ServerError(429, 'RATE_LIMIT')
+      }
       this.onMessage('set_ready', (client, payload: unknown) => {
+        if (config.available?.() === false) return this.reject(client, 'UNAVAILABLE')
         if (!this.isPresent(client)) return this.reject(client, 'NOT_PRESENT')
         if (this.state.status !== 'WAITING') return this.reject(client, 'INVALID_STATE')
         try { this.state.players.get(client.sessionId)!.ready = readReady(payload) }
         catch { this.reject(client, 'INVALID_PAYLOAD') }
       })
       this.onMessage('start_game', (client, payload: unknown) => {
+        if (config.available?.() === false) return this.reject(client, 'UNAVAILABLE')
         if (payload !== undefined) return this.reject(client, 'INVALID_PAYLOAD')
         if (!this.isPresent(client)) return this.reject(client, 'NOT_PRESENT')
         if (client.auth?.userId !== this.state.hostUserId) return this.reject(client, 'HOST_REQUIRED')
@@ -103,6 +112,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
       })
     }
     async onJoin(client: LobbyClient) {
+      if (config.available?.() === false) throw new ServerError(503, 'UNAVAILABLE')
       if (!client.auth || client.auth.expiresAt <= Date.now()) throw new ServerError(401, 'AUTH_REQUIRED')
       if (this.state.status !== 'WAITING') throw new ServerError(409, 'LOBBY_STARTED')
       if (!this.creatorAdmitted && client.auth.userId !== this.creatorUserId) throw new ServerError(409, 'CREATOR_PENDING')
@@ -136,11 +146,13 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
       if (this.transitionId) coordinator.participantLeft(this.transitionId)
     }
     onDispose() {
+      this.releaseCreation?.()
       if (this.transitionId) coordinator.cancel(this.transitionId, false)
       clearTimeout(this.countdown)
       for (const participant of this.participants.values()) participant.cancelExpiry()
       this.participants.clear()
     }
+    onUncaughtException(error: Error) { if (error.cause instanceof ServerError) return; safeLog('room_unexpected_error'); this.closeLobby() }
     private isPresent(client: LobbyClient) {
       if (client.auth && client.auth.expiresAt <= Date.now()) { client.leave(4001); return false }
       return this.state.players.has(client.sessionId) && this.participants.has(client.sessionId)
@@ -157,7 +169,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
       this.countdown = undefined
       this.transition('WAITING')
       for (const player of this.state.players.values()) player.ready = false
-      void this.unlock().catch(() => this.closeLobby())
+      void this.unlock().catch(() => { safeLog('cleanup_error'); this.closeLobby() })
     }
     private closeLobby() {
       if (this.state.status === 'CLOSED') return
@@ -165,7 +177,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
       if (this.transitionId) coordinator.cancel(this.transitionId, false)
       this.transitionId = undefined
       clearTimeout(this.countdown)
-      void this.disconnect().catch(() => {})
+      void this.disconnect().catch(() => safeLog('cleanup_error'))
     }
     private reject(client: LobbyClient, code: string) { client.send('lobby_error', { code }) }
   }

@@ -1,3 +1,4 @@
+import { safeLog } from '../../runtime/logging.js'
 import { Room, ServerError } from '@colyseus/core'
 import { GameAdmission, type GameClient } from '../../platform/multiplayer/GameAdmission.js'
 import type { GameSessionCoordinator } from '../../platform/multiplayer/GameSessionCoordinator.js'
@@ -39,6 +40,6 @@ export function createPongRoom(coordinator: GameSessionCoordinator) {
     }
     onLeave(client: GameClient) { this.state.players.delete(client.sessionId); this.admission?.leave(client) }
     onDispose() { this.admission?.dispose(); coordinator.disposed(this.transitionId, this.roomId) }
-    onUncaughtException() { coordinator.disposed(this.transitionId, this.roomId) }
+    onUncaughtException(error: Error) { if (error.cause instanceof ServerError) return; safeLog('room_unexpected_error'); coordinator.disposed(this.transitionId, this.roomId) }
   }
 }

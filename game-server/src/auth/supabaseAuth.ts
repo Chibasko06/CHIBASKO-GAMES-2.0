@@ -24,13 +24,14 @@ export function createSupabaseAuthenticator(
   return async token => {
     try {
       if (!token || token.length > 16384 || !/^[\w-]+\.[\w-]+\.[\w-]+$/.test(token)) throw new Error()
+      const signal = AbortSignal.timeout(7000)
       const client = createClient(url, key, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
         global: {
           headers: { Authorization: `Bearer ${token}` },
           fetch: async (input, init) => {
-            try { return await fetcher(input, { ...init, signal: AbortSignal.timeout(8000) }) }
-            catch { throw new Error('Authentication request unavailable') }
+            try { return await fetcher(input, { ...init, signal }) }
+            catch { return new Response(JSON.stringify({ message: 'Authentication unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } }) }
           },
         },
       })
