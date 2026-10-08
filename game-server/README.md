@@ -1,54 +1,83 @@
-# Chibasko Playground local
+# Chibasko Playground local authentifié
 
-Projet Node autonome, sans workspace. Node 24+, TypeScript strict. État en mémoire,
-aucun secret, Supabase, R2 ou stockage persistant. Le serveur écoute exclusivement
-sur `127.0.0.1:2567`. Il n'est ni installé ni démarré par le build Cloudflare du site.
+Projet Node 24 autonome, TypeScript strict, hors build Cloudflare et sans workspace.
+Supabase Auth valide les admissions ; PostgreSQL fournit le profil public.
+Aucune clé service_role, aucun stockage R2, aucun déploiement du serveur de jeu.
 
-Depuis la racine du dépôt :
+## Configuration et lancement
+
+Copier `.env.example` vers `.env.local` dans game-server et remplir uniquement
+SUPABASE_URL et SUPABASE_PUBLISHABLE_KEY avec la configuration publique du même
+projet Supabase que le site. Les clés secret/service_role sont refusées.
+`.env.local` reste ignoré par Git. Node le charge pour `dev`, sans dotenv.
+Le script start attend les variables dans l'environnement du processus.
+
+Depuis la racine :
 
 ```powershell
 npm ci
 npm --prefix game-server ci
-
-# Terminal 1 : site Next.js
+# Terminal 1
 npm run dev
-
-# Terminal 2 : serveur local, redémarrage sur modification
+# Terminal 2
 npm --prefix game-server run dev
 ```
 
-Ouvrir `http://localhost:3000/playground` dans deux onglets/navigateurs.
-Cliquer Connexion dans chacun, vérifier le même roomId et deux sessionId distincts.
-Déplacer chaque joueur avec les boutons et observer les coordonnées dans l'autre onglet.
-Déconnecter un joueur et vérifier sa disparition. Fermer/recharger la page quitte la
-connexion ; une nouvelle connexion reçoit une nouvelle identité temporaire.
-Le serveur vide dispose sa room automatiquement. Redémarrer le serveur efface son état.
+Se connecter sur http://localhost:3000/login puis ouvrir
+http://localhost:3000/playground dans deux onglets du même navigateur.
+La session du domaine de production n'est pas partagée avec localhost.
+Cliquer Connexion dans chaque onglet : même userId/username/avatar, sessionId
+distincts. Déplacer les joueurs et vérifier la synchronisation. Se déconnecter
+de Chibasko doit fermer les connexions multijoueurs.
 
-La page renvoie 404 hors `next dev`, notamment en production Cloudflare ; aucun lien
-de navigation ni sitemap. Le SDK navigateur contacte directement le serveur local,
-pas les routes API Next.js. Les boutons ne créent pas de connexion automatique au montage.
+## Protocole et sécurité
 
-État : `players: MapSchema<PlayerState>`, indexée par sessionId attribué par Colyseus.
-Chaque joueur possède sessionId, x et y, position initiale (50,50). Join crée le joueur ;
-leave supprime joueur et compteur. Maximum 16 joueurs par room ; `joinOrCreate`
-réutilise une room disponible (une nouvelle room est créée si toutes sont pleines).
-Cela reste le mécanisme de sélection intégré de Colyseus, sans matchmaking produit.
+Le JWT est envoyé uniquement dans Authorization de la requête HTTP POST
+`/matchmake/joinOrCreate/playground`, avec corps `{}`. Le hook static onAuth
+appelle getUser(token), puis lit profiles avec user.id. Profil absent/invalide,
+token absent/invalide/expiré ou panne Supabase : admission refusée.
+Client Supabase dédié à chaque admission ; aucun token global partagé.
+L'expiration est décodée seulement après validation Auth.
 
-Message `move: {x,y}` uniquement : objet strict, nombres finis entiers, coordonnées
-0–100, une seule case orthogonale, intervalle minimum de 100 ms entre mouvements acceptés.
-Le serveur déduit le joueur de la connexion, rejette les identifiants fournis par le client,
-modifie l'état puis Colyseus synchronise les patches (50 ms). Aucune prédiction cliente.
-Rejet : `move_rejected: {code}`. Identité de session uniquement, pas encore UUID Supabase.
-Pas de reconnexion de joueur implémentée, d'amis, party ou services distribués.
+Colyseus conserve l'identité privée dans une réservation de 10 secondes.
+Le SDK consomme cette réservation sans client.auth.token et avec une URL contrôlée :
+origine attendue, seul paramètre sessionId autorisé. Ticket à usage unique.
+Ne jamais logger Authorization, objets requête/auth, URL complète ou query strings.
+Le SDK peut afficher une erreur réseau générique sans réponse Supabase ni token.
+
+État public : players[sessionId] = { userId, username, avatarUrl, x, y }.
+Avatar SQL null devient une chaîne vide. Aucun email, JWT, expiresAt ou User.
+Deux connexions du même compte sont autorisées. Position initiale (50,50),
+16 joueurs maximum, patches toutes les 50 ms. Message move inchangé : exactement
+x/y, entiers finis 0–100, une case orthogonale, intervalle minimum 100 ms.
+
+Fermeture à l'expiration du JWT (code 4001), avec contrôle avant chaque move.
+Reconnexion manuelle avec la session navigateur actualisée ; aucun refresh custom.
+SignOut/changement de compte/démontage ferme la room, même si le join termine tard.
+Un logout sur un autre appareil ne révoque pas immédiatement un JWT déjà accepté.
+
+## Validation
 
 ```powershell
+npm test
+npm run lint
+npm run build
+npm run build:cloudflare
 npm --prefix game-server test
+npm --prefix game-server run test:auth
 npm --prefix game-server run build
-npm --prefix game-server start
+# Depuis game-server, démarrage compilé local
+node --env-file=.env.local dist/index.js
 ```
 
-Le test réseau démarre un serveur sur un port local éphémère, utilise deux vrais clients
-WebSocket, vérifie synchronisation/rejet/leave puis ferme toutes les connexions.
-Le package utilise core + ws-transport + schema, évitant les adaptateurs Redis et outils
-admin du package général `colyseus`. Le frontend et le serveur possèdent leurs lockfiles.
-Ne pas exposer ce prototype sur un VPS ou en production : aucune authentification joueur.
+Tests : Supabase simulé, horloge injectable et vrais clients HTTP/WebSocket locaux.
+Aucun test automatisé ne contacte Supabase production. /playground reste 404
+hors développement. Le serveur écoute uniquement 127.0.0.1:2567.
+
+## Futur hébergement
+
+Le helper accepte une origine explicite pour préparer HTTPS/WSS sur
+game.chibaskogames.fr. Ne pas exposer ce prototype tel quel : prévoir TLS,
+filtrage des origines, limitation des requêtes et masquage des tickets dans les
+logs du proxy. Conserver HTTP authentifié / WebSocket sans JWT. Aucun VPS,
+Redis, Docker ou système de tickets supplémentaire n'est installé ici.
