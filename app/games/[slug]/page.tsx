@@ -1,3 +1,4 @@
+import { isClassicGame } from '@/lib/multiplayer/catalogue'
 import type { Metadata } from 'next'
 import FavoriteButton from '@/components/FavoriteButton'
 import GameReviews from '@/components/GameReviews'
@@ -142,12 +143,14 @@ export default async function GamePage({
         </div>
       </div>
 
-      <GameViewport
-        gameId={game.id}
-        gameUrl={game.game_url}
-        initialLikes={game.likes_count}
-        initialDislikes={game.dislikes_count}
-      />
+      {isClassicGame(game) ? (
+        <GameViewport
+          gameId={game.id}
+          gameUrl={game.game_url}
+          initialLikes={game.likes_count}
+          initialDislikes={game.dislikes_count}
+        />
+      ) : <p className="rounded-2xl border border-cyan-900 p-6 text-zinc-300">Expérience multijoueur en préparation.</p>}
 
       <p className="text-zinc-400">
         {game.description ?? 'Aucune description disponible.'}

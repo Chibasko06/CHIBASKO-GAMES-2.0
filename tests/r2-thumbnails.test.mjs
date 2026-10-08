@@ -139,7 +139,7 @@ test('upload route preserves admin guard and returns the R2 URL without saving t
 
 const saveRequest = () => new Request('https://example.com/api/admin/games/game-id', {
   method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ title: 'Game', thumbnail_url: newUrl, category_ids: [] }),
+  body: JSON.stringify({ title: 'Game', slug: 'game', game_url: 'https://example.com/game', thumbnail_url: newUrl, category_ids: [] }),
 })
 const params = { params: Promise.resolve({ id: 'game-id' }) }
 

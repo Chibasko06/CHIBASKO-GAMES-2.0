@@ -1,3 +1,4 @@
+import { validateGameCatalogue, CatalogueValidationError } from '@/lib/server/gameCatalogueValidation'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '../../_utils'
 import { cleanupReplacedGameThumbnail } from '@/lib/server/gameMediaStorage'
@@ -14,25 +15,13 @@ export async function PATCH(
 
   const { id } = await params
   const { supabaseAdmin } = adminCheck
-  const body = await request.json()
-  const categoryIds = Array.isArray(body.category_ids)
-    ? body.category_ids.filter((value: unknown): value is string => typeof value === 'string')
-    : []
-
-  const payload = {
-    title: body.title,
-    slug: body.slug,
-    game_url: body.game_url,
-    thumbnail_url: body.thumbnail_url || null,
-    description: body.description || null,
-    developer_name: body.developer_name || null,
-    release_date_text: body.release_date_text || null,
-    mobile_compatible: body.mobile_compatible || null,
-    technology: body.technology || null,
-    provider_name: body.provider_name || null,
-    source_page_url: body.source_page_url || null,
-    is_published: Boolean(body.is_published),
+  let validated: ReturnType<typeof validateGameCatalogue>
+  try {
+    validated = validateGameCatalogue(await request.json())
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof CatalogueValidationError ? error.message : 'Formulaire invalide.' }, { status: 400 })
   }
+  const { payload, categoryIds } = validated
 
   const { data: previousGame, error: previousError } = await supabaseAdmin
     .from('games').select('thumbnail_url').eq('id', id).single()

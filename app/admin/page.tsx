@@ -1,4 +1,5 @@
 "use client";
+import { multiplayerGames, multiplayerCapacityLabel, changeGameFormType, gameFormPayload, type GameType } from '@/lib/multiplayer/catalogue'
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react'
 import { uploadAdminAvatar, uploadAdminGameThumbnail } from '@/lib/avatarUpload'
@@ -30,6 +31,9 @@ const submissionActionHelp: Record<string, string> = {
 }
 
 type GameFormState = {
+  game_type: GameType
+  multiplayer_game_id: string
+  is_beta: boolean
   title: string
   slug: string
   game_url: string
@@ -64,6 +68,9 @@ type FaqFormState = {
 }
 
 const emptyGameForm: GameFormState = {
+  game_type: 'classic',
+  multiplayer_game_id: '',
+  is_beta: false,
   title: '',
   slug: '',
   game_url: '',
@@ -110,7 +117,10 @@ function toGameFormState(game: Game): GameFormState {
   return {
     title: game.title,
     slug: game.slug,
-    game_url: game.game_url,
+    game_type: game.game_type ?? 'classic',
+    multiplayer_game_id: game.multiplayer_game_id ?? '',
+    is_beta: game.is_beta ?? false,
+    game_url: game.game_url ?? '',
     thumbnail_url: game.thumbnail_url || '',
     description: game.description || '',
     developer_name: game.developer_name || '',
@@ -380,7 +390,7 @@ export default function AdminPage() {
       const response = await authorizedFetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(gameForm),
+        body: JSON.stringify(gameFormPayload(gameForm)),
       })
       const payload = await response.json()
       if (!response.ok) {
@@ -797,9 +807,31 @@ export default function AdminPage() {
           </div>
 
           <form onSubmit={handleGameSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="space-y-2 md:col-span-2">
+              <span>Type de jeu</span>
+              <select value={gameForm.game_type} onChange={event => {
+                const type = event.target.value
+                if (type === 'classic' || type === 'multiplayer_chibasko') setGameForm(current => changeGameFormType(current, type, !!editingGameId))
+              }} className="block w-full border border-zinc-800 bg-black p-3">
+                <option value="classic">Classique / HTML5</option>
+                <option value="multiplayer_chibasko">Multijoueur Chibasko</option>
+              </select>
+            </label>
+            {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu, ses catégories et ses statistiques. Renseigne les champs du nouveau type avant de sauvegarder.</p>}
+            {gameForm.game_type === 'multiplayer_chibasko' && <label className="space-y-2 md:col-span-2">
+              <span>Game Chibasko</span>
+              <select required value={gameForm.multiplayer_game_id} onChange={event => handleGameChange('multiplayer_game_id', event.target.value)} className="block w-full border border-zinc-800 bg-black p-3">
+                <option value="">Choisir un jeu</option>
+                {multiplayerGames.map(game => <option key={game.gameId} value={game.gameId}>{game.label} — {game.gameId}</option>)}
+              </select>
+              <span className="block text-sm text-cyan-300">Capacité : {multiplayerCapacityLabel(gameForm.multiplayer_game_id)} (définie par le serveur)</span>
+            </label>}
+            <label className="flex items-center gap-3 md:col-span-2"><input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Bêta</label>
             <input value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             <input value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            {gameForm.game_type === 'classic' && <>
             <input value={gameForm.game_url} onChange={(e) => handleGameChange('game_url', e.target.value)} placeholder="URL du jeu" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" required />
+            </>}
             <input value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
             <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300 md:col-span-2">
               <span>{uploadingGameThumbnail ? 'Upload miniature...' : 'Importer une image de jeu (optimisee auto)'}</span>
@@ -810,8 +842,10 @@ export default function AdminPage() {
             <input value={gameForm.release_date_text} onChange={(e) => handleGameChange('release_date_text', e.target.value)} placeholder="Date de sortie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.mobile_compatible} onChange={(e) => handleGameChange('mobile_compatible', e.target.value)} placeholder="Compatibilite mobile" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.technology} onChange={(e) => handleGameChange('technology', e.target.value)} placeholder="Technologie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            {gameForm.game_type === 'classic' && <>
             <input value={gameForm.provider_name} onChange={(e) => handleGameChange('provider_name', e.target.value)} placeholder="Provider" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.source_page_url} onChange={(e) => handleGameChange('source_page_url', e.target.value)} placeholder="Source page URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            </>}
             <textarea value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
 
             <div className="border border-zinc-800 bg-black/40 p-4 md:col-span-2">
@@ -870,12 +904,12 @@ export default function AdminPage() {
                         <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">{game.slug}</p>
                       </div>
                       <span className={`text-[10px] uppercase tracking-[0.3em] ${game.is_published ? 'text-cyan-400' : 'text-zinc-500'}`}>
-                        {game.is_published ? 'Publie' : 'Brouillon'}
+                        {game.is_published ? (game.is_beta ? 'Bêta' : 'Publie') : 'Brouillon'}
                       </span>
                     </div>
                     <div className="space-y-1 text-xs text-zinc-400">
                       <p>{game.developer_name || 'Developpeur non renseigne'}</p>
-                      <p>{game.technology || 'Technologie non renseignee'}</p>
+                      <p>{game.game_type === 'multiplayer_chibasko' ? `Multijoueur Chibasko : ${game.multiplayer_game_id}` : (game.technology || 'Technologie non renseignee')}</p>
                       <p>Categories: {(game.game_categories ?? []).length > 0 ? `${(game.game_categories ?? []).length} liees` : 'Aucune'}</p>
                     </div>
                     <div className="flex gap-3">

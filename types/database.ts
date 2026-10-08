@@ -299,7 +299,10 @@ export type Database = {
           created_at: string
           description: string | null
           developer_name: string | null
-          game_url: string
+          game_url: string | null
+          game_type: 'classic' | 'multiplayer_chibasko'
+          multiplayer_game_id: string | null
+          is_beta: boolean
           id: string
           is_published: boolean
           mobile_compatible: string | null
@@ -317,7 +320,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           developer_name?: string | null
-          game_url: string
+          game_url?: string | null
+          game_type?: 'classic' | 'multiplayer_chibasko'
+          multiplayer_game_id?: string | null
+          is_beta?: boolean
           id?: string
           is_published?: boolean
           mobile_compatible?: string | null
@@ -335,7 +341,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           developer_name?: string | null
-          game_url?: string
+          game_url?: string | null
+          game_type?: 'classic' | 'multiplayer_chibasko'
+          multiplayer_game_id?: string | null
+          is_beta?: boolean
           id?: string
           is_published?: boolean
           mobile_compatible?: string | null

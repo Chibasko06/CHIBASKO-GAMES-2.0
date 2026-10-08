@@ -1,3 +1,4 @@
+export { isClassicGame, isChibaskoMultiplayerGame } from '@/lib/multiplayer/catalogue'
 import { Tables } from '@/types/database'
 import { supabase } from '../supabaseClient'
 
@@ -34,6 +35,9 @@ export type HomepageHighlight = {
 function withFallbackThumbnail(game: Game): Game {
   return {
     ...game,
+    game_type: game.game_type ?? 'classic',
+    multiplayer_game_id: game.multiplayer_game_id ?? null,
+    is_beta: game.is_beta ?? false,
     thumbnail_url: game.thumbnail_url || null,
   }
 }
