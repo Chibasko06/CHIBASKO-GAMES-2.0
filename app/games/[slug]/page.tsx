@@ -1,3 +1,5 @@
+import MultiplayerGamePanel from '@/components/multiplayer/MultiplayerGamePanel'
+import GameReactions from '@/components/GameReactions'
 import { isClassicGame } from '@/lib/multiplayer/catalogue'
 import type { Metadata } from 'next'
 import FavoriteButton from '@/components/FavoriteButton'
@@ -103,7 +105,7 @@ export default async function GamePage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <PlaySessionTracker gameId={game.id} />
+      <PlaySessionTracker gameId={game.id} recordPlay={isClassicGame(game)} />
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-3">
@@ -150,7 +152,10 @@ export default async function GamePage({
           initialLikes={game.likes_count}
           initialDislikes={game.dislikes_count}
         />
-      ) : <p className="rounded-2xl border border-cyan-900 p-6 text-zinc-300">Expérience multijoueur en préparation.</p>}
+      ) : <>
+        <MultiplayerGamePanel game={game} />
+        <GameReactions gameId={game.id} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
+      </>}
 
       <p className="text-zinc-400">
         {game.description ?? 'Aucune description disponible.'}

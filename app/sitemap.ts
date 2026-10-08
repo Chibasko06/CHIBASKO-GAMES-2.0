@@ -10,6 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ])
 
   const staticRoutes: MetadataRoute.Sitemap = [
+    { url: absoluteUrl('/multiplayer'), changeFrequency: 'weekly', priority: 0.9 },
     {
       url: absoluteUrl('/'),
       changeFrequency: 'daily',

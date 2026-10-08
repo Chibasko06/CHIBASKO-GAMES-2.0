@@ -1,122 +1,46 @@
 "use client";
 
-import { useDeferredValue, useState } from 'react'
+import { useDeferredValue } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { readCatalogueFilters, catalogueQueryString, filterCatalogue, type CatalogueFilters, type CatalogueType, type SortOption, type DeviceFilter } from '@/lib/catalogueFilters'
 import { GameCard } from '@/components/GameCard'
 import type { Category, GameWithCategoriesAndStats } from '@/lib/queries/games'
 
-type SortOption = 'popular' | 'recent' | 'title-asc' | 'title-desc'
-type DeviceFilter = 'all' | 'mobile' | 'desktop'
+
+
 
 type Props = {
   games: GameWithCategoriesAndStats[]
   categories: Category[]
-  initialCategorySlug?: string
-}
-
-function normalizeCompatibility(value: string | null | undefined) {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-
-function getCompatibilityBucket(value: string | null | undefined): DeviceFilter | 'unknown' {
-  const normalized = normalizeCompatibility(value)
-
-  if (!normalized) {
-    return 'unknown'
-  }
-
-  const mobilePatterns = ['yes', 'oui', 'true', 'mobile', 'smartphone', 'touch', 'tactile', 'compatible']
-  const desktopPatterns = ['no', 'non', 'false', 'pc', 'desktop', 'ordinateur', 'clavier', 'souris']
-
-  const mobileScore = mobilePatterns.filter((pattern) => normalized.includes(pattern)).length
-  const desktopScore = desktopPatterns.filter((pattern) => normalized.includes(pattern)).length
-
-  if (desktopScore > mobileScore) {
-    return 'desktop'
-  }
-
-  if (mobileScore > desktopScore) {
-    return 'mobile'
-  }
-
-  return 'unknown'
 }
 
 export default function GamesCatalog({
   games,
   categories,
-  initialCategorySlug,
 }: Props) {
-  const [search, setSearch] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState(initialCategorySlug || 'all')
-  const [sort, setSort] = useState<SortOption>('popular')
-  const [deviceFilter, setDeviceFilter] = useState<DeviceFilter>('all')
+  const params = useSearchParams()
+  const filters = readCatalogueFilters(params)
+  const { search, category: selectedCategory, sort, device: deviceFilter } = filters
   const deferredSearch = useDeferredValue(search)
-
-  const normalizedQuery = deferredSearch.trim().toLowerCase()
-
-  const visibleGames = games
-    .filter((game) => {
-      const compatibilityBucket = getCompatibilityBucket(game.mobile_compatible)
-      const matchesCategory =
-        selectedCategory === 'all' ||
-        game.categories.some((category) => category.slug === selectedCategory)
-
-      if (!matchesCategory) {
-        return false
-      }
-
-      const matchesDeviceFilter =
-        deviceFilter === 'all' ||
-        compatibilityBucket === deviceFilter
-
-      if (!matchesDeviceFilter) {
-        return false
-      }
-
-      if (!normalizedQuery) {
-        return true
-      }
-
-      const haystack = [
-        game.title,
-        game.description,
-        game.developer_name,
-        game.technology,
-        ...game.categories.map((category) => category.name),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      return haystack.includes(normalizedQuery)
-    })
-    .sort((left, right) => {
-      if (sort === 'recent') {
-        return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-      }
-
-      if (sort === 'title-asc') {
-        return left.title.localeCompare(right.title, 'fr', { sensitivity: 'base' })
-      }
-
-      if (sort === 'title-desc') {
-        return right.title.localeCompare(left.title, 'fr', { sensitivity: 'base' })
-      }
-
-      if ((right.views_count ?? 0) !== (left.views_count ?? 0)) {
-        return (right.views_count ?? 0) - (left.views_count ?? 0)
-      }
-
-      return (right.likes_count ?? 0) - (left.likes_count ?? 0)
-    })
+  const updateFilters = (patch: Partial<CatalogueFilters>) => {
+    const current = readCatalogueFilters(new URLSearchParams(window.location.search))
+    window.history.replaceState(null, '', catalogueQueryString({ ...current, ...patch }))
+  }
+  const setSearch = (search: string) => updateFilters({ search })
+  const setSelectedCategory = (category: string) => updateFilters({ category })
+  const setSort = (sort: SortOption) => updateFilters({ sort })
+  const setDeviceFilter = (device: DeviceFilter) => updateFilters({ device })
+  const visibleGames = filterCatalogue(games, { ...filters, search: deferredSearch })
 
   return (
     <div className="space-y-6">
       <section className="space-y-5 border border-zinc-800 bg-zinc-950 p-4 md:p-6 xl:p-7">
+        <fieldset>
+          <legend className="mb-3 text-xs font-semibold text-zinc-400">Type de jeu</legend>
+          <div className="flex flex-wrap gap-2">
+            {([['all', 'Tous'], ['classic', 'Classiques'], ['multiplayer', 'Multijoueur']] as const).map(([type, label]) => <button key={type} type="button" aria-pressed={filters.type === type} onClick={() => updateFilters({ type: type as CatalogueType })} className={`rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${filters.type === type ? 'border-cyan-400 bg-cyan-400 text-black' : 'border-zinc-700 text-zinc-300 hover:border-cyan-700'}`}>{label}</button>)}
+          </div>
+        </fieldset>
         <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.4fr)_240px_240px]">
           <label className="block">
             <span className="mb-2 block text-[10px] uppercase tracking-[0.35em] text-zinc-500">
@@ -170,10 +94,7 @@ export default function GamesCatalog({
             <button
               type="button"
               onClick={() => {
-                setSelectedCategory('all')
-                setSearch('')
-                setSort('popular')
-                setDeviceFilter('all')
+                updateFilters({ type: 'all', category: 'all', search: '', sort: 'popular', device: 'all' })
               }}
               className="text-xs text-zinc-400 transition-colors hover:text-cyan-400"
             >

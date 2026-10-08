@@ -11,12 +11,7 @@ export const metadata: Metadata = buildPageMetadata({
   path: '/games',
 })
 
-export default async function GamesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ category?: string }>
-}) {
-  const { category } = await searchParams
+export default async function GamesPage() {
   const [games, categories] = await Promise.all([
     getGamesCatalog(),
     getCategories(),
@@ -31,7 +26,7 @@ export default async function GamesPage({
         </p>
       </div>
 
-      <GamesCatalog games={games} categories={categories} initialCategorySlug={category} />
+      <GamesCatalog games={games} categories={categories} />
     </div>
   )
 }

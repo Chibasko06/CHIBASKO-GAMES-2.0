@@ -1,9 +1,11 @@
+import MultiplayerSection from '@/components/multiplayer/MultiplayerSection'
+import { GameBadges } from '@/components/multiplayer/GameBadges'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import { GameCard } from '@/components/GameCard'
 import HomeHeroActions from '@/components/HomeHeroActions'
-import { getFeaturedGames, getGamesByCategory, getHomepageHighlights } from '@/lib/queries/games'
+import { getFeaturedGames, getGamesByCategory, getHomepageHighlights, getGamesCatalog } from '@/lib/queries/games'
 import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
@@ -15,10 +17,11 @@ export const metadata: Metadata = buildPageMetadata({
 })
 
 export default async function Home() {
-  const [featuredGames, categorySections, homepageHighlights] = await Promise.all([
+  const [featuredGames, categorySections, homepageHighlights, multiplayerGames] = await Promise.all([
     getFeaturedGames(8),
     getGamesByCategory(4),
     getHomepageHighlights(),
+    getGamesCatalog('multiplayer_chibasko'),
   ])
 
   return (
@@ -87,6 +90,7 @@ export default async function Home() {
                 <div className="space-y-2 p-4">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300/80">{highlight.label}</p>
                   <h2 className="text-lg font-black text-white">{highlight.game.title}</h2>
+                  <GameBadges game={highlight.game} />
                   <p className="text-sm text-zinc-400">{highlight.description}</p>
                 </div>
               </Link>
@@ -112,6 +116,8 @@ export default async function Home() {
           ))}
         </div>
       </section>
+
+      <MultiplayerSection games={multiplayerGames.slice(0, 5)} home />
 
       {categorySections.map((section) => (
         <section key={section.category.id} className="space-y-5">

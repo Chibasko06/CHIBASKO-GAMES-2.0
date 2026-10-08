@@ -1,8 +1,9 @@
+import { GameBadges, type GameBadgeData } from './multiplayer/GameBadges'
 import Link from 'next/link'
 import Image from 'next/image'
 
 type Props = {
-  game: {
+  game: GameBadgeData & {
     id: string
     title: string
     slug: string
@@ -19,7 +20,7 @@ type Props = {
 
 export function GameCard({ game }: Props) {
   return (
-    <Link href={`/games/${game.slug}`} className="block">
+    <Link href={`/games/${game.slug}`} className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">
       <article className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-cyan-700 hover:scale-[1.02] transition cursor-pointer">
         {game.thumbnail_url ? (
           <div className="relative h-40 w-full">
@@ -39,6 +40,7 @@ export function GameCard({ game }: Props) {
 
         <div className="p-3 space-y-2">
           <h3 className="text-sm font-semibold line-clamp-1">{game.title}</h3>
+          <GameBadges game={game} />
           {game.categories?.length ? (
             <div className="flex flex-wrap gap-1">
               {game.categories.slice(0, 2).map((category) => (

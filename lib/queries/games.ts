@@ -1,3 +1,4 @@
+import type { GameType } from '@/lib/multiplayer/catalogue'
 export { isClassicGame, isChibaskoMultiplayerGame } from '@/lib/multiplayer/catalogue'
 import { Tables } from '@/types/database'
 import { supabase } from '../supabaseClient'
@@ -87,13 +88,11 @@ function mergeGamesWithStats(
   })
 }
 
-export async function getGamesCatalog() {
+export async function getGamesCatalog(type?: GameType) {
+  let query = supabase.from('games').select('*').eq('is_published', true)
+  if (type) query = query.eq('game_type', type)
   const [{ data: games }, { data: categoryLinks }, stats] = await Promise.all([
-    supabase
-      .from('games')
-      .select('*')
-      .eq('is_published', true)
-      .order('created_at', { ascending: false }),
+    query.order('created_at', { ascending: false }),
     supabase
       .from('game_categories')
       .select('game_id, categories(*)'),

@@ -7,9 +7,10 @@ import { supabase } from '@/lib/supabaseClient'
 
 type Props = {
   gameId: string
+  recordPlay?: boolean
 }
 
-export default function PlaySessionTracker({ gameId }: Props) {
+export default function PlaySessionTracker({ gameId, recordPlay = true }: Props) {
   const { session, user } = useAuth()
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export default function PlaySessionTracker({ gameId }: Props) {
         }
       }
 
-      if (!user || window.sessionStorage.getItem(historyStorageKey)) {
+      if (!recordPlay || !user || window.sessionStorage.getItem(historyStorageKey)) {
         return
       }
 
@@ -61,7 +62,7 @@ export default function PlaySessionTracker({ gameId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [gameId, session, user])
+  }, [gameId, session, user, recordPlay])
 
   return null
 }
