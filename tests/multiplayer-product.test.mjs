@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { createElement, act, useEffect } from 'react'
+import { createElement, act, useEffect, useState } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createRoot } from 'react-dom/client'
 import { JSDOM } from 'jsdom'
@@ -29,6 +29,48 @@ import { createPongPresentation } from '../games/chibasko-pong/client/pongPresen
 import { createPongControls } from '../games/chibasko-pong/client/pongControls.ts'
 import { drawPong } from '../games/chibasko-pong/client/pongRenderer.ts'
 import GameResults from '../components/multiplayer/GameResults.tsx'
+import GameTypeFields from '../components/admin/GameTypeFields.tsx'
+import { changeGameFormType, gameFormPayload } from '../lib/multiplayer/catalogue.ts'
+import { validateGameCatalogue } from '../lib/server/gameCatalogueValidation.ts'
+
+test('admin form modes show controlled fields, clear launch values, preserve beta/categories and restore edits',async()=>{
+  const saved=[]
+  function Form({initial,editing=false}){
+    const [form,setForm]=useState(initial)
+    return createElement('form',{onSubmit:e=>{e.preventDefault();saved.push(validateGameCatalogue(gameFormPayload(form))) }},
+      createElement(GameTypeFields,{type:form.game_type,gameUrl:form.game_url,gameId:form.multiplayer_game_id,onType:type=>setForm(f=>changeGameFormType(f,type,editing)),onUrl:game_url=>setForm(f=>({...f,game_url})),onGameId:multiplayer_game_id=>setForm(f=>({...f,multiplayer_game_id}))}),
+      createElement('button',{type:'submit'},'Sauver'))
+  }
+  const initial={title:'Fixture',slug:'fixture',game_type:'classic',game_url:'https://game.example',multiplayer_game_id:'',is_published:true,is_beta:true,category_ids:['11111111-1111-4111-8111-111111111111']}
+  await mounted(Form,{initial},async root=>{
+    assert.equal(document.querySelector('input[type=url]').required,true);assert.equal(document.querySelector('select'),null)
+    await click(document.querySelector('input[value=multiplayer_chibasko]'))
+    assert.equal(document.querySelector('input[type=url]'),null)
+    const select=document.querySelector('select');assert.equal(select.required,true)
+    assert.deepEqual([...select.options].map(o=>o.value),['','chibasko-pong'])
+    assert.match(document.body.textContent,/chargé directement par Chibasko Games/)
+    await act(async()=>{select.value='chibasko-pong';select.dispatchEvent(new window.Event('change',{bubbles:true}))})
+    assert.match(document.querySelector('output').textContent,/2 joueurs/);assert.equal(document.querySelector('input[type=number]'),null)
+    await act(async()=>document.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+    assert.equal(saved[0].payload.game_url,null);assert.equal(saved[0].payload.is_published,false);assert.equal(saved[0].payload.is_beta,true)
+    assert.deepEqual(saved[0].categoryIds,initial.category_ids)
+    await click(document.querySelector('input[value=classic]'))
+    assert.equal(document.querySelector('select'),null);assert.equal(document.querySelector('input[type=url]').value,'')
+    assert.equal(document.querySelector('input[type=url]').checkValidity(),false)
+    await act(async()=>root.render(createElement(Form,{key:'edit',editing:true,initial:{...initial,game_type:'multiplayer_chibasko',game_url:'',multiplayer_game_id:'chibasko-pong'}})))
+    assert.equal(document.querySelector('select').value,'chibasko-pong');assert.equal(document.querySelector('input[type=url]'),null)
+  })
+})
+
+test('admin link reflects only server approval and is absent for a normal account',async t=>{
+  globalThis.__productAuth={user:{id:'normal'},session:{access_token:'fixture'},loading:false}
+  t.mock.method(globalThis,'fetch',async()=>Response.json({isAdmin:false}))
+  await mounted(Navbar,{},async()=>{assert.equal(document.querySelector('a[href="/admin"]'),null)})
+  globalThis.__productAuth={user:{id:'admin'},session:{access_token:'fixture'},loading:false}
+  globalThis.fetch=async()=>Response.json({isAdmin:true})
+  await mounted(Navbar,{},async()=>{assert.ok(document.querySelector('a[href="/admin"]'))})
+})
+
 
 test('Pong touch controls send only directions and neutralize release, cancellation, focus, visibility and unmount',async()=>{
   const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:3000/lobby-playground'})

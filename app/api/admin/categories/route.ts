@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../_utils'
 
 function slugifyCategory(value: string) {
   return value
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     .order('name', { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
   const categories = (data ?? []).map((category) => ({
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     games_count: Array.isArray(category.game_categories) ? category.game_categories.length : 0,
   }))
 
-  return NextResponse.json({ categories })
+  return adminJson({ categories })
 }
 
 export async function POST(request: NextRequest) {
@@ -44,14 +44,16 @@ export async function POST(request: NextRequest) {
   }
 
   const { supabaseAdmin } = adminCheck
-  const body = await request.json()
+  let body: Record<string, unknown>
+  try { body = await readAdminJson(request) }
+  catch { return adminJson({ error: 'Formulaire invalide.' }, { status: 400 }) }
 
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   const slugSource = typeof body.slug === 'string' ? body.slug.trim() : ''
   const slug = slugifyCategory(slugSource || name)
 
   if (!name || !slug) {
-    return NextResponse.json({ error: 'Nom de categorie invalide.' }, { status: 400 })
+    return adminJson({ error: 'Nom de categorie invalide.' }, { status: 400 })
   }
 
   const { data, error } = await supabaseAdmin
@@ -61,8 +63,8 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ category: data })
+  return adminJson({ category: data })
 }

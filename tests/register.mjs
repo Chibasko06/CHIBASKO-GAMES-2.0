@@ -7,13 +7,17 @@ import ts from 'typescript'
 const root = new URL('../', import.meta.url)
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier === 'next/server' && process.env.TEST_REAL_ADMIN) return { url: new URL('tests/admin-next.mjs', root).href, shortCircuit: true }
     const stubs = {
       'next/server': 'next',
+      'server-only': 'server-only',
+      'next/headers': 'headers',
+      'next/navigation': 'navigation',
       '@/lib/supabaseAdmin': 'supabase',
       resend: 'resend',
       '@opennextjs/cloudflare': 'cloudflare',
     }
-    if (specifier.endsWith('_utils') && (context.parentURL?.includes('/app/api/admin/games/')
+    if (!process.env.TEST_REAL_ADMIN && specifier.endsWith('_utils') && (context.parentURL?.includes('/app/api/admin/games/')
       || context.parentURL?.includes('/app/api/admin/users/'))) {
       return { url: 'phase0:admin-check', shortCircuit: true }
     }
@@ -33,12 +37,15 @@ registerHooks({
       'phase0:supabase': 'export function getSupabaseAdminClient() { return globalThis.__phase0.admin }',
       'phase0:resend': 'export class Resend { emails = { send: (...args) => globalThis.__phase0.send(...args) } }',
       'phase0:cloudflare': 'export function getCloudflareContext() { return { env: { CHIBASKO_ASSETS: globalThis.__r2.bucket } } }',
-      'phase0:admin-check': 'export function requireAdmin(request) { return globalThis.__r2.adminCheck(request) }',
+      'phase0:admin-check': 'export function requireAdmin(request) { return globalThis.__r2.adminCheck(request) } export function adminJson(body,init){return Response.json(body,init)} export function adminErrorMessage(){return "Opération impossible."} export function readAdminJson(request){return request.json()}',
+      'phase0:server-only': 'export {}',
+      'phase0:headers': 'export async function cookies(){return globalThis.__adminCookies}',
+      'phase0:navigation': 'export function redirect(url){throw new Error("REDIRECT "+url)} export function notFound(){throw new Error("NOT_FOUND")}',
     }
     if (stubs[url]) return { format: 'module', source: stubs[url], shortCircuit: true }
-    if (url.startsWith(root.href) && url.endsWith('.ts')) {
+    if (url.startsWith(root.href) && /\.tsx?$/.test(url)) {
       const source = ts.transpileModule(readFileSync(fileURLToPath(url), 'utf8'), {
-        compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+        compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
       }).outputText
       return { format: 'module', source, shortCircuit: true }
     }

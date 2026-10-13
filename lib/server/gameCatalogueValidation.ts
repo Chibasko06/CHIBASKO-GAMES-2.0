@@ -23,13 +23,16 @@ export function validateGameCatalogue(input: unknown) {
   const gameUrl = optionalText(body.game_url)
   const multiplayerId = optionalText(body.multiplayer_game_id)
   if (gameType === 'classic') {
-    if (!gameUrl || multiplayerId !== null) fail('URL classique obligatoire ; identifiant multijoueur interdit.')
+    if (!gameUrl) fail('Une URL est requise pour un jeu classique.')
+    if (multiplayerId !== null) fail('Un jeu classique ne peut pas avoir d’identifiant multijoueur.')
     try {
       const url = new URL(gameUrl)
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) fail('URL du jeu invalide.')
     } catch { fail('URL du jeu invalide.') }
   } else {
-    if (gameUrl !== null || !multiplayerId || !getMultiplayerDefinition(multiplayerId)) fail('Jeu Chibasko inconnu ou URL classique interdite.')
+    if (gameUrl !== null) fail('Un jeu multijoueur Chibasko Games ne doit pas avoir d’URL classique.')
+    if (!multiplayerId) fail('Choisis un jeu multijoueur Chibasko Games.')
+    if (!getMultiplayerDefinition(multiplayerId)) fail('Ce Game ID n’est pas disponible.')
   }
   if (body.is_published !== undefined && typeof body.is_published !== 'boolean') fail('Publication invalide.')
   if (body.is_beta !== undefined && typeof body.is_beta !== 'boolean') fail('Bêta invalide.')

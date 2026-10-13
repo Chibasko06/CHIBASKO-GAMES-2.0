@@ -1,52 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { Database } from '@/types/database'
-import { isAdminEmail } from '@/lib/adminAuth'
+import type { NextRequest } from 'next/server'
+import { authorizeAdmin, createUserAuthClient, AdminAccessError } from '@/lib/server/adminAuthorization'
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
+import { adminJson } from '@/lib/server/adminResponses'
+import { adminOriginAllowed } from '@/lib/server/adminRequest'
+export { adminJson, adminErrorMessage } from '@/lib/server/adminResponses'
+export { readJsonObject as readAdminJson } from '@/lib/server/inputValidation'
 
 export async function requireAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
-
-  if (!token) {
-    return {
-      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    }
+  const header = request.headers.get('authorization')
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : null
+  if (!token) return { error: adminJson({ error: 'Connexion requise.' }, { status: 401 }) }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !adminOriginAllowed(request)) {
+    return { error: adminJson({ error: 'Origine refusée.' }, { status: 403 }) }
   }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !anonKey) {
-    return {
-      error: NextResponse.json({ error: 'Supabase env is missing' }, { status: 500 }),
-    }
-  }
-
-  const authClient = createClient<Database>(supabaseUrl, anonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  })
-
-  const {
-    data: { user },
-  } = await authClient.auth.getUser()
-
-  if (!user || !isAdminEmail(user.email)) {
-    return {
-      error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
-    }
-  }
-
-  return {
-    supabaseAdmin: getSupabaseAdminClient(),
-    user,
+  try {
+    const user = await authorizeAdmin(createUserAuthClient(token), token)
+    // Privileged client is created ONLY after user verification and DB membership.
+    return { supabaseAdmin: getSupabaseAdminClient(), user }
+  } catch (error) {
+    return { error: adminJson({ error: error instanceof AdminAccessError ? error.message : 'Administration temporairement indisponible.' },
+      { status: error instanceof AdminAccessError ? error.status : 503 }) }
   }
 }

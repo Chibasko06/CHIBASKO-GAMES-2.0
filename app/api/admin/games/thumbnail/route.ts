@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, adminJson, adminErrorMessage } from '../../_utils'
 import { uploadGameThumbnail } from '@/lib/server/gameMediaStorage'
 
 export async function POST(request: NextRequest) {
@@ -9,19 +9,21 @@ export async function POST(request: NextRequest) {
     return adminCheck.error
   }
 
-  const formData = await request.formData()
+  let formData: FormData
+  try { formData = await request.formData() }
+  catch { return adminJson({ error: 'Fichier invalide.' }, { status: 400 }) }
   const file = formData.get('file')
 
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'Fichier miniature manquant.' }, { status: 400 })
+    return adminJson({ error: 'Fichier miniature manquant.' }, { status: 400 })
   }
 
   try {
     const thumbnailUrl = await uploadGameThumbnail(file)
-    return NextResponse.json({ thumbnailUrl })
+    return adminJson({ thumbnailUrl })
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Upload miniature impossible.' },
+    return adminJson(
+      { error: adminErrorMessage(error) },
       { status: 500 }
     )
   }

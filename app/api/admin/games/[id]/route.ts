@@ -1,6 +1,6 @@
 import { validateGameCatalogue, CatalogueValidationError } from '@/lib/server/gameCatalogueValidation'
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../../_utils'
 import { cleanupReplacedGameThumbnail } from '@/lib/server/gameMediaStorage'
 
 export async function PATCH(
@@ -17,16 +17,16 @@ export async function PATCH(
   const { supabaseAdmin } = adminCheck
   let validated: ReturnType<typeof validateGameCatalogue>
   try {
-    validated = validateGameCatalogue(await request.json())
+    validated = validateGameCatalogue(await readAdminJson(request))
   } catch (error) {
-    return NextResponse.json({ error: error instanceof CatalogueValidationError ? error.message : 'Formulaire invalide.' }, { status: 400 })
+    return adminJson({ error: error instanceof CatalogueValidationError ? error.message : 'Formulaire invalide.' }, { status: 400 })
   }
   const { payload, categoryIds } = validated
 
   const { data: previousGame, error: previousError } = await supabaseAdmin
     .from('games').select('thumbnail_url').eq('id', id).single()
   if (previousError) {
-    return NextResponse.json({ error: previousError.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(previousError) }, { status: 500 })
   }
 
   let update = supabaseAdmin
@@ -42,7 +42,7 @@ export async function PATCH(
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: error.code === 'PGRST116' ? 409 : 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: error.code === 'PGRST116' ? 409 : 500 })
   }
 
   const { error: deleteRelationsError } = await supabaseAdmin
@@ -51,7 +51,7 @@ export async function PATCH(
     .eq('game_id', id)
 
   if (deleteRelationsError) {
-    return NextResponse.json({ error: deleteRelationsError.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(deleteRelationsError) }, { status: 500 })
   }
 
   if (categoryIds.length > 0) {
@@ -60,12 +60,12 @@ export async function PATCH(
       .insert(categoryIds.map((categoryId: string) => ({ game_id: id, category_id: categoryId })))
 
     if (categoriesError) {
-      return NextResponse.json({ error: categoriesError.message }, { status: 500 })
+      return adminJson({ error: adminErrorMessage(categoriesError) }, { status: 500 })
     }
   }
 
   await cleanupReplacedGameThumbnail(previousGame.thumbnail_url, data.thumbnail_url, supabaseAdmin)
-  return NextResponse.json({ game: data })
+  return adminJson({ game: data })
 }
 
 export async function DELETE(
@@ -87,8 +87,8 @@ export async function DELETE(
     .eq('id', id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true })
+  return adminJson({ success: true })
 }

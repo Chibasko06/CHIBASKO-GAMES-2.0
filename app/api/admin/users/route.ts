@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, adminJson, adminErrorMessage } from '../_utils'
 
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdmin(request)
@@ -20,11 +20,11 @@ export async function GET(request: NextRequest) {
     ])
 
   if (profilesError) {
-    return NextResponse.json({ error: profilesError.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(profilesError) }, { status: 500 })
   }
 
   if (authError) {
-    return NextResponse.json({ error: authError.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(authError) }, { status: 500 })
   }
 
   const emailById = new Map(
@@ -36,5 +36,5 @@ export async function GET(request: NextRequest) {
     email: emailById.get(profile.id) ?? null,
   }))
 
-  return NextResponse.json({ users })
+  return adminJson({ users })
 }

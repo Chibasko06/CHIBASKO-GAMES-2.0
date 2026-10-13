@@ -46,6 +46,7 @@ export default function LoginPage() {
           Pas besoin de te reconnecter. Tu peux retourner sur ton profil ou parcourir le catalogue.
         </p>
         <div className="mt-6 flex justify-center gap-3">
+          {next !== '/' && <Link href={next} className="rounded-full border border-cyan-700 px-5 py-3 text-sm font-black text-cyan-200">Continuer</Link>}
           <Link href="/dashboard" className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase text-black">
             Mon profil
           </Link>

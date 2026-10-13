@@ -23,9 +23,11 @@ export function multiplayerCapacityLabel(id: string) {
   return `${definition.minPlayers === definition.maxPlayers ? definition.minPlayers : `${definition.minPlayers}–${definition.maxPlayers}`} joueurs`
 }
 
-// Keep inactive form inputs locally so changing type never silently discards them.
-export function changeGameFormType<T extends { game_type: GameType; is_published: boolean }>(form: T, type: GameType, editing: boolean): T {
-  return { ...form, game_type: type, is_published: !editing && type === 'multiplayer_chibasko' ? false : form.is_published }
+// Switching launch mode clears incompatible fields, not the game or its relations.
+export function changeGameFormType<T extends { game_type: GameType; is_published: boolean; game_url: string; multiplayer_game_id: string }>(form: T, type: GameType, editing: boolean): T {
+  if (form.game_type === type) return form
+  return { ...form, game_type: type, game_url: '', multiplayer_game_id: '',
+    is_published: !editing && type === 'multiplayer_chibasko' ? false : form.is_published }
 }
 export function gameFormPayload<T extends { game_type: GameType; game_url: string; multiplayer_game_id: string }>(form: T) {
   return { ...form,

@@ -41,15 +41,18 @@ test('known multiplayer accepted, unpublished by default; beta retained; invalid
     assert.throws(() => validateGameCatalogue({ ...multi, [key]: 'arbitrary' }))
   }
 })
-test('form switching preserves inactive values and categories; serialization excludes inactive launch fields', () => {
+test('form switching clears incompatible launch fields and preserves categories/identity', () => {
   const initial = { ...classic, category_ids: ['11111111-1111-4111-8111-111111111111'], game_type: 'classic', multiplayer_game_id: '', is_published: true, is_beta: false }
   const changed = changeGameFormType(initial, 'multiplayer_chibasko', false)
   assert.equal(changed.is_published, false)
-  assert.equal(changed.game_url, initial.game_url)
+  assert.equal(changed.game_url, '')
   const chosen = { ...changed, multiplayer_game_id: 'chibasko-pong', is_beta: true }
   assert.equal(validateGameCatalogue(gameFormPayload(chosen)).payload.game_url, null)
   const back = changeGameFormType(chosen, 'classic', true)
-  const payload = validateGameCatalogue(gameFormPayload(back)).payload
+  assert.equal(back.multiplayer_game_id, '')
+  assert.equal(back.game_url, '')
+  assert.throws(() => validateGameCatalogue(gameFormPayload(back)))
+  const payload = validateGameCatalogue(gameFormPayload({...back,game_url:classic.game_url})).payload
   assert.equal(payload.game_url, classic.game_url)
   assert.equal(payload.multiplayer_game_id, null)
   assert.equal(payload.is_beta, true)

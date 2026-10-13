@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase, restoreBrowserSession } from '@/lib/supabaseClient'
 
 type AuthContextValue = {
   loading: boolean
@@ -21,9 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true
 
     const bootstrap = async () => {
-      const {
-        data: { session: currentSession },
-      } = await supabase.auth.getSession()
+      const currentSession = await restoreBrowserSession()
 
       if (!mounted) {
         return

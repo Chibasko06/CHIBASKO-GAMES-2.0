@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, adminJson, adminErrorMessage } from '../_utils'
 
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdmin(request)
@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ submissions: data ?? [] })
+  return adminJson({ submissions: data ?? [] })
 }

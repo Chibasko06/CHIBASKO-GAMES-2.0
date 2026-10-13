@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../../_utils'
 import { AvatarUpdateError, updateAvatarForUser } from '@/lib/server/avatarStorage'
 
 export async function PATCH(
@@ -14,22 +14,28 @@ export async function PATCH(
 
   const { id } = await params
   const { supabaseAdmin } = adminCheck
-  const body = await request.json()
+  let body: Record<string, unknown>
+  try { body = await readAdminJson(request) }
+  catch { return adminJson({ error: 'Formulaire invalide.' }, { status: 400 }) }
   const username = typeof body.username === 'string' ? body.username.trim() : ''
+  if ((body.avatar_url != null && typeof body.avatar_url !== 'string') ||
+      (body.bio != null && typeof body.bio !== 'string')) {
+    return adminJson({ error: 'Formulaire invalide.' }, { status: 400 })
+  }
 
   const payload = {
     username,
     display_name: username || null,
-    avatar_url: body.avatar_url || null,
-    bio: body.bio || null,
+    avatar_url: typeof body.avatar_url === 'string' ? body.avatar_url || null : null,
+    bio: typeof body.bio === 'string' ? body.bio || null : null,
   }
 
   try {
     const { avatar_url, ...fields } = payload
     const data = await updateAvatarForUser(id, avatar_url, supabaseAdmin, fields)
-    return NextResponse.json({ user: data })
+    return adminJson({ user: data })
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Sauvegarde impossible.' },
+    return adminJson({ error: adminErrorMessage(error) },
       { status: error instanceof AvatarUpdateError ? error.status : 500 })
   }
 }
@@ -50,8 +56,8 @@ export async function DELETE(
   const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true })
+  return adminJson({ success: true })
 }

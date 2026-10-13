@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../../_utils'
 
 const allowedStatuses = new Set(['pending', 'reviewing', 'accepted', 'rejected', 'archived'])
 
@@ -14,14 +14,16 @@ export async function PATCH(
   }
 
   const { supabaseAdmin } = adminCheck
-  const body = await request.json()
+  let body: Record<string, unknown>
+  try { body = await readAdminJson(request) }
+  catch { return adminJson({ error: 'Formulaire invalide.' }, { status: 400 }) }
   const { id } = await params
 
   const status = typeof body.status === 'string' ? body.status.trim() : ''
   const adminNotes = typeof body.admin_notes === 'string' ? body.admin_notes.trim() : ''
 
   if (!allowedStatuses.has(status)) {
-    return NextResponse.json({ error: 'Statut invalide.' }, { status: 400 })
+    return adminJson({ error: 'Statut invalide.' }, { status: 400 })
   }
 
   const { data, error } = await supabaseAdmin
@@ -35,10 +37,10 @@ export async function PATCH(
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ submission: data })
+  return adminJson({ submission: data })
 }
 
 export async function DELETE(
@@ -60,8 +62,8 @@ export async function DELETE(
     .eq('id', id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true })
+  return adminJson({ success: true })
 }

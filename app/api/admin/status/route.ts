@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, adminJson } from '../_utils'
 
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdmin(request)
 
   if ('error' in adminCheck) {
-    return NextResponse.json({ isAdmin: false }, { status: 200 })
+    return adminJson({ isAdmin: false }, { status: 200 })
   }
 
-  return NextResponse.json({
+  return adminJson({
     isAdmin: true,
-    email: adminCheck.user.email ?? null,
   })
 }

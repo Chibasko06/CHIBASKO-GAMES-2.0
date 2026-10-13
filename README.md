@@ -24,7 +24,7 @@ Configurer `.env.local` pour le developpement et les secrets correspondants dans
 | `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase, publique |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cle publique Supabase, soumise aux RLS |
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend uniquement ; ne jamais exposer au navigateur |
-| `ADMIN_EMAILS` | Emails administrateurs, separes par des virgules |
+| Autorisation admin | Table `admin_users` protégée, attribution manuelle : voir `docs/admin-security.md` |
 | `RESEND_API_KEY` | Envoi des codes de recuperation |
 | `RESEND_FROM_EMAIL` | Expediteur autorise et verifie dans Resend |
 | `PASSWORD_RESET_CODE_SECRET` | Secret aleatoire d'au moins 32 caracteres pour les HMAC |
@@ -80,7 +80,7 @@ POST confirm -> consommation SQL atomique -> Supabase Auth
 
 ```text
 Formulaire public -> /api/game-submissions -> validation -> service_role -> table
-Admin -> verification jeton + ADMIN_EMAILS -> service_role -> table
+Admin -> utilisateur Supabase validé + admin_users -> service_role serveur -> table
 ```
 
 La migration active RLS, retire les anciennes policies ainsi que les droits de table/colonnes publics, et reserve le CRUD au backend. Ni un visiteur ni un membre ordinaire ne peuvent lire, inserer, modifier ou supprimer directement une proposition via Supabase.

@@ -1,6 +1,6 @@
 import { validateGameCatalogue, CatalogueValidationError } from '@/lib/server/gameCatalogueValidation'
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../_utils'
 
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdmin(request)
@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ games: data })
+  return adminJson({ games: data })
 }
 
 export async function POST(request: NextRequest) {
@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
   const { supabaseAdmin } = adminCheck
   let validated: ReturnType<typeof validateGameCatalogue>
   try {
-    validated = validateGameCatalogue(await request.json())
+    validated = validateGameCatalogue(await readAdminJson(request))
   } catch (error) {
-    return NextResponse.json({ error: error instanceof CatalogueValidationError ? error.message : 'Formulaire invalide.' }, { status: 400 })
+    return adminJson({ error: error instanceof CatalogueValidationError ? error.message : 'Formulaire invalide.' }, { status: 400 })
   }
   const { payload, categoryIds } = validated
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
   if (categoryIds.length > 0) {
@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
 
     if (categoriesError) {
       await supabaseAdmin.from('games').delete().eq('id', data.id)
-      return NextResponse.json({ error: categoriesError.message }, { status: 500 })
+      return adminJson({ error: adminErrorMessage(categoriesError) }, { status: 500 })
     }
   }
 
-  return NextResponse.json({ game: data })
+  return adminJson({ game: data })
 }

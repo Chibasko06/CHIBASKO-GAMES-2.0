@@ -13,7 +13,8 @@ const sharedLinkClass =
 
 export function Navbar() {
   const { user, session, loading } = useAuth()
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminUserId, setAdminUserId] = useState<string | null>(null)
+  const isAdmin = !!user && adminUserId === user.id
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -34,6 +35,7 @@ export function Navbar() {
 
         if (session?.access_token) {
           const response = await fetch('/api/admin/status', {
+            cache: 'no-store',
             headers: {
               Authorization: `Bearer ${session.access_token}`,
             },
@@ -42,16 +44,16 @@ export function Navbar() {
           const payload = await response.json()
 
           if (mounted) {
-            setIsAdmin(Boolean(payload.isAdmin))
+            setAdminUserId(response.ok && payload.isAdmin === true ? user.id : null)
           }
         }
       } else if (mounted) {
-        setIsAdmin(false)
+        setAdminUserId(null)
         setAvatarUrl(null)
       }
     }
 
-    void loadUser()
+    void loadUser().catch(() => { if (mounted) setAdminUserId(null) })
 
     return () => {
       mounted = false

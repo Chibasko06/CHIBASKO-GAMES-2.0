@@ -1,6 +1,7 @@
 "use client";
-import { multiplayerGames, multiplayerCapacityLabel, changeGameFormType, gameFormPayload, type GameType } from '@/lib/multiplayer/catalogue'
+import { changeGameFormType, gameFormPayload, type GameType } from '@/lib/multiplayer/catalogue'
 
+import GameTypeFields from '@/components/admin/GameTypeFields'
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react'
 import { uploadAdminAvatar, uploadAdminGameThumbnail } from '@/lib/avatarUpload'
 import { supabase } from '@/lib/supabaseClient'
@@ -159,6 +160,7 @@ function toFaqFormState(entry: FaqEntry): FaqFormState {
 }
 
 export default function AdminPage() {
+  const [adminAccess, setAdminAccess] = useState(false)
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [games, setGames] = useState<Game[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -324,6 +326,8 @@ export default function AdminPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAdminAccess(false)
+      setGames([]); setUsers([]); setCategories([]); setFaqEntries([]); setSubmissions([])
       setSessionToken(session?.access_token ?? null)
     })
 
@@ -337,12 +341,20 @@ export default function AdminPage() {
       return
     }
 
+    let active = true
     const refreshAdminPanels = async () => {
+      setAdminAccess(false)
+      const response = await authorizedFetch('/api/admin/status')
+      const status = await response.json()
+      if (!active) return
+      if (!response.ok || status.isAdmin !== true) { setErrorMessage('Accès refusé.'); return }
+      setAdminAccess(true)
       await Promise.all([loadGames(), loadUsers(), loadCategories(), loadFaq(), loadSubmissions()])
     }
 
-    void refreshAdminPanels()
-  }, [sessionToken, loadGames, loadUsers, loadCategories, loadFaq, loadSubmissions])
+    void refreshAdminPanels().catch(() => { if (active) { setAdminAccess(false); setErrorMessage('Administration temporairement indisponible.') } })
+    return () => { active = false }
+  }, [sessionToken, authorizedFetch, loadGames, loadUsers, loadCategories, loadFaq, loadSubmissions])
 
   const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
     setGameForm((current) => ({ ...current, [field]: value }))
@@ -763,6 +775,7 @@ export default function AdminPage() {
     }
   }
 
+  if (!adminAccess) return <main className="mx-auto max-w-xl rounded-2xl border border-zinc-800 p-6"><p role="status">{errorMessage || 'Vérification de l’accès administrateur…'}</p></main>
   return (
     <main className="space-y-8">
       <section className="border border-zinc-800 bg-zinc-950 p-6">
@@ -807,32 +820,14 @@ export default function AdminPage() {
           </div>
 
           <form onSubmit={handleGameSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label className="space-y-2 md:col-span-2">
-              <span>Type de jeu</span>
-              <select value={gameForm.game_type} onChange={event => {
-                const type = event.target.value
-                if (type === 'classic' || type === 'multiplayer_chibasko') setGameForm(current => changeGameFormType(current, type, !!editingGameId))
-              }} className="block w-full border border-zinc-800 bg-black p-3">
-                <option value="classic">Classique / HTML5</option>
-                <option value="multiplayer_chibasko">Multijoueur Chibasko Games</option>
-              </select>
-            </label>
-            {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu, ses catégories et ses statistiques. Renseigne les champs du nouveau type avant de sauvegarder.</p>}
-            {gameForm.game_type === 'multiplayer_chibasko' && <label className="space-y-2 md:col-span-2">
-              <span>Jeu Chibasko Games</span>
-              <select required value={gameForm.multiplayer_game_id} onChange={event => handleGameChange('multiplayer_game_id', event.target.value)} className="block w-full border border-zinc-800 bg-black p-3">
-                <option value="">Choisir un jeu</option>
-                {multiplayerGames.map(game => <option key={game.gameId} value={game.gameId}>{game.label} — {game.gameId}</option>)}
-              </select>
-              <span className="block text-sm text-cyan-300">Capacité : {multiplayerCapacityLabel(gameForm.multiplayer_game_id)} (définie par le serveur)</span>
-            </label>}
+            <GameTypeFields type={gameForm.game_type} gameUrl={gameForm.game_url} gameId={gameForm.multiplayer_game_id}
+              onType={type => setGameForm(current => changeGameFormType(current, type, !!editingGameId))}
+              onUrl={url => handleGameChange('game_url', url)} onGameId={id => handleGameChange('multiplayer_game_id', id)} />
+            {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu et ses données. Les anciens champs de lancement sont effacés ; renseigne ceux du nouveau type.</p>}
             <label className="flex items-center gap-3 md:col-span-2"><input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Bêta</label>
-            <input value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <input value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            {gameForm.game_type === 'classic' && <>
-            <input value={gameForm.game_url} onChange={(e) => handleGameChange('game_url', e.target.value)} placeholder="URL du jeu" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" required />
-            </>}
-            <input value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
+            <input aria-label="Titre" value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            <input aria-label="Slug" value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            <input aria-label="Miniature" value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
             <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300 md:col-span-2">
               <span>{uploadingGameThumbnail ? 'Upload miniature...' : 'Importer une image de jeu (optimisee auto)'}</span>
               <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" className="hidden" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
@@ -846,7 +841,7 @@ export default function AdminPage() {
             <input value={gameForm.provider_name} onChange={(e) => handleGameChange('provider_name', e.target.value)} placeholder="Provider" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             <input value={gameForm.source_page_url} onChange={(e) => handleGameChange('source_page_url', e.target.value)} placeholder="Source page URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             </>}
-            <textarea value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
+            <textarea aria-label="Description" value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
 
             <div className="border border-zinc-800 bg-black/40 p-4 md:col-span-2">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -875,6 +870,7 @@ export default function AdminPage() {
               <input type="checkbox" checked={gameForm.is_published} onChange={(e) => handleGameChange('is_published', e.target.checked)} />
               Jeu publie sur le site
             </label>
+            <p className="text-sm text-zinc-400 md:col-span-2">{!gameForm.is_published ? 'Non publié : invisible dans le catalogue public.' : gameForm.is_beta ? 'Publié en Bêta : visible avec le badge Bêta.' : 'Publié : visible dans le catalogue public.'}</p>
             <button type="submit" disabled={savingGame} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2">
               {savingGame ? 'SAUVEGARDE...' : editingGameId ? 'METTRE A JOUR LE JEU' : 'AJOUTER LE JEU'}
             </button>

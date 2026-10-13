@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../../_utils'
+import { requireAdmin, adminJson, adminErrorMessage } from '../../_utils'
 
 function toCsv(rows: Record<string, unknown>[]) {
   if (!rows.length) {
@@ -35,12 +35,14 @@ export async function GET(
     const { data, error } = await supabaseAdmin.from('games').select('*').order('created_at', { ascending: false })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
     }
 
     return new NextResponse(toCsv(data || []), {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
+        'Cache-Control': 'private, no-store, max-age=0',
+        Vary: 'Cookie, Authorization',
         'Content-Disposition': 'attachment; filename="games-export.csv"',
       },
     })
@@ -54,11 +56,11 @@ export async function GET(
       ])
 
     if (profilesError) {
-      return NextResponse.json({ error: profilesError.message }, { status: 500 })
+      return adminJson({ error: adminErrorMessage(profilesError) }, { status: 500 })
     }
 
     if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 500 })
+      return adminJson({ error: adminErrorMessage(authError) }, { status: 500 })
     }
 
     const emailById = new Map(
@@ -73,10 +75,12 @@ export async function GET(
     return new NextResponse(toCsv(rows), {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
+        'Cache-Control': 'private, no-store, max-age=0',
+        Vary: 'Cookie, Authorization',
         'Content-Disposition': 'attachment; filename="users-export.csv"',
       },
     })
   }
 
-  return NextResponse.json({ error: 'Unknown export entity' }, { status: 400 })
+  return adminJson({ error: 'Unknown export entity' }, { status: 400 })
 }

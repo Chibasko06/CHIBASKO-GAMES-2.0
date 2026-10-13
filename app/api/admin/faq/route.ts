@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '../_utils'
+import { NextRequest } from 'next/server'
+import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../_utils'
 
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdmin(request)
@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ faqEntries: data ?? [] })
+  return adminJson({ faqEntries: data ?? [] })
 }
 
 export async function POST(request: NextRequest) {
@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
   }
 
   const { supabaseAdmin } = adminCheck
-  const body = await request.json()
+  let body: Record<string, unknown>
+  try { body = await readAdminJson(request) }
+  catch { return adminJson({ error: 'Formulaire invalide.' }, { status: 400 }) }
 
   const question = typeof body.question === 'string' ? body.question.trim() : ''
   const answer = typeof body.answer === 'string' ? body.answer.trim() : ''
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
   const isPublished = Boolean(body.is_published)
 
   if (!question || !answer) {
-    return NextResponse.json({ error: 'Question et reponse obligatoires.' }, { status: 400 })
+    return adminJson({ error: 'Question et reponse obligatoires.' }, { status: 400 })
   }
 
   const { data, error } = await supabaseAdmin
@@ -53,8 +55,8 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return NextResponse.json({ faqEntry: data })
+  return adminJson({ faqEntry: data })
 }

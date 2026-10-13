@@ -71,7 +71,7 @@ Workers : le build ne fournit pas de clé serveur de secours.
 | NEXT_PUBLIC_SUPABASE_ANON_KEY | PUBLIC | Obligatoire | Configurer aussi |
 | NEXT_PUBLIC_SITE_URL | PUBLIC | Facultative, canonical production | Configurer aussi si utilisée |
 | SUPABASE_SERVICE_ROLE_KEY | SECRET SERVER | Inutile pour les pages générées actuelles | Secret obligatoire |
-| ADMIN_EMAILS | SERVER, confidentiel | Inutile | Secret recommandé |
+| ADMIN_EMAILS (ancien) | Obsolète, ignoré par le code | Inutile | Rôle géré dans admin_users ; voir admin-security.md |
 | PASSWORD_RESET_CODE_SECRET | SECRET SERVER | Inutile | Secret obligatoire |
 | RESEND_API_KEY | SECRET SERVER | Inutile | Secret obligatoire |
 | RESEND_FROM_EMAIL | SERVER, non secret | Inutile | Variable obligatoire |
