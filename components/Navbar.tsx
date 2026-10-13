@@ -13,6 +13,8 @@ const sharedLinkClass =
 
 export function Navbar() {
   const { user, session, loading } = useAuth()
+  const userId = user?.id ?? null
+  const token = session?.access_token ?? null
   const [adminUserId, setAdminUserId] = useState<string | null>(null)
   const isAdmin = !!user && adminUserId === user.id
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -20,31 +22,39 @@ export function Navbar() {
 
   useEffect(() => {
     let mounted = true
+    const controller = new AbortController()
+    const timer = setTimeout(() => { controller.abort(); if (mounted) setAdminUserId(null) }, 10_000)
 
     const loadUser = async () => {
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('avatar_url')
-          .eq('id', user.id)
-          .maybeSingle()
+      if (userId) {
+        // Avatar availability must not delay the independent admin status check.
+        const profileRequest = async () => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', userId)
+            .abortSignal(controller.signal)
+            .maybeSingle()
 
-        if (mounted) {
-          setAvatarUrl(profile?.avatar_url ?? null)
+          if (mounted) {
+            setAvatarUrl(profile?.avatar_url ?? null)
+          }
         }
+        void profileRequest().catch(() => { if (mounted) setAvatarUrl(null) })
 
-        if (session?.access_token) {
+        if (token) {
           const response = await fetch('/api/admin/status', {
             cache: 'no-store',
+            signal: controller.signal,
             headers: {
-              Authorization: `Bearer ${session.access_token}`,
+              Authorization: `Bearer ${token}`,
             },
           })
 
           const payload = await response.json()
 
           if (mounted) {
-            setAdminUserId(response.ok && payload.isAdmin === true ? user.id : null)
+            setAdminUserId(response.ok && payload.isAdmin === true ? userId : null)
           }
         }
       } else if (mounted) {
@@ -53,12 +63,14 @@ export function Navbar() {
       }
     }
 
-    void loadUser().catch(() => { if (mounted) setAdminUserId(null) })
+    void loadUser().catch(() => { if (mounted) setAdminUserId(null) }).finally(() => clearTimeout(timer))
 
     return () => {
       mounted = false
+      clearTimeout(timer)
+      controller.abort()
     }
-  }, [session, user])
+  }, [token, userId])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

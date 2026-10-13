@@ -3,8 +3,10 @@ import { changeGameFormType, gameFormPayload, type GameType } from '@/lib/multip
 
 import GameTypeFields from '@/components/admin/GameTypeFields'
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/components/AuthProvider'
+import { useAdminAccess } from '@/components/admin/useAdminAccess'
 import { uploadAdminAvatar, uploadAdminGameThumbnail } from '@/lib/avatarUpload'
-import { supabase } from '@/lib/supabaseClient'
 import { Tables } from '@/types/database'
 
 type Game = Tables<'games'> & {
@@ -160,8 +162,16 @@ function toFaqFormState(entry: FaqEntry): FaqFormState {
 }
 
 export default function AdminPage() {
-  const [adminAccess, setAdminAccess] = useState(false)
-  const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const { user } = useAuth()
+  // An account change remounts the panel: drafts/private lists cannot cross users.
+  return <AdminPanel key={user?.id ?? 'anonymous'} />
+}
+
+function AdminPanel() {
+  const { session } = useAuth()
+  const sessionToken = session?.access_token ?? null
+  const { status: accessStatus, checking, retry } = useAdminAccess()
+  const router = useRouter()
   const [games, setGames] = useState<Game[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -201,86 +211,96 @@ export default function AdminPage() {
     return fetch(input, {
       ...init,
       headers,
+      signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000),
     })
   }, [sessionToken])
 
-  const loadGames = useCallback(async () => {
+  const loadGames = useCallback(async (signal?: AbortSignal) => {
     setLoadingGames(true)
     try {
-      const response = await authorizedFetch('/api/admin/games')
+      const response = await authorizedFetch('/api/admin/games', { signal })
       const payload = await response.json()
+      if (signal?.aborted) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
       setGames(payload.games || [])
       setErrorMessage(null)
     } catch (error) {
+      if (signal?.aborted) return
       setGames([])
       setErrorMessage(error instanceof Error ? error.message : 'Erreur admin.')
     } finally {
-      setLoadingGames(false)
+      if (!signal?.aborted) setLoadingGames(false)
     }
   }, [authorizedFetch])
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (signal?: AbortSignal) => {
     setLoadingUsers(true)
     try {
-      const response = await authorizedFetch('/api/admin/users')
+      const response = await authorizedFetch('/api/admin/users', { signal })
       const payload = await response.json()
+      if (signal?.aborted) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
       setUsers(payload.users || [])
       setErrorMessage(null)
     } catch (error) {
+      if (signal?.aborted) return
       setUsers([])
       setErrorMessage(error instanceof Error ? error.message : 'Erreur admin.')
     } finally {
-      setLoadingUsers(false)
+      if (!signal?.aborted) setLoadingUsers(false)
     }
   }, [authorizedFetch])
 
-  const loadCategories = useCallback(async () => {
+  const loadCategories = useCallback(async (signal?: AbortSignal) => {
     setLoadingCategories(true)
     try {
-      const response = await authorizedFetch('/api/admin/categories')
+      const response = await authorizedFetch('/api/admin/categories', { signal })
       const payload = await response.json()
+      if (signal?.aborted) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
       setCategories(payload.categories || [])
       setErrorMessage(null)
     } catch (error) {
+      if (signal?.aborted) return
       setCategories([])
       setErrorMessage(error instanceof Error ? error.message : 'Erreur categories.')
     } finally {
-      setLoadingCategories(false)
+      if (!signal?.aborted) setLoadingCategories(false)
     }
   }, [authorizedFetch])
 
-  const loadFaq = useCallback(async () => {
+  const loadFaq = useCallback(async (signal?: AbortSignal) => {
     setLoadingFaq(true)
     try {
-      const response = await authorizedFetch('/api/admin/faq')
+      const response = await authorizedFetch('/api/admin/faq', { signal })
       const payload = await response.json()
+      if (signal?.aborted) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces FAQ refuse.')
       }
       setFaqEntries(payload.faqEntries || [])
       setErrorMessage(null)
     } catch (error) {
+      if (signal?.aborted) return
       setFaqEntries([])
       setErrorMessage(error instanceof Error ? error.message : 'Erreur FAQ.')
     } finally {
-      setLoadingFaq(false)
+      if (!signal?.aborted) setLoadingFaq(false)
     }
   }, [authorizedFetch])
 
-  const loadSubmissions = useCallback(async () => {
+  const loadSubmissions = useCallback(async (signal?: AbortSignal) => {
     setLoadingSubmissions(true)
     try {
-      const response = await authorizedFetch('/api/admin/game-submissions')
+      const response = await authorizedFetch('/api/admin/game-submissions', { signal })
       const payload = await response.json()
+      if (signal?.aborted) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces propositions refuse.')
       }
@@ -293,68 +313,27 @@ export default function AdminPage() {
       )
       setErrorMessage(null)
     } catch (error) {
+      if (signal?.aborted) return
       setSubmissions([])
       setErrorMessage(error instanceof Error ? error.message : 'Erreur propositions developpeurs.')
     } finally {
-      setLoadingSubmissions(false)
+      if (!signal?.aborted) setLoadingSubmissions(false)
     }
   }, [authorizedFetch])
 
   useEffect(() => {
-    const bootstrap = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      const token = session?.access_token ?? null
-      setSessionToken(token)
-
-      if (!token) {
-        setLoadingGames(false)
-        setLoadingUsers(false)
-        setLoadingCategories(false)
-        setLoadingFaq(false)
-        setLoadingSubmissions(false)
-        setErrorMessage('Connecte-toi avec un compte admin pour acceder a cet espace.')
-      }
-    }
-
-    void bootstrap()
-  }, [])
+    if (accessStatus === 'unauthenticated') router.replace('/login?next=%2Fadmin')
+  }, [accessStatus, router])
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAdminAccess(false)
-      setGames([]); setUsers([]); setCategories([]); setFaqEntries([]); setSubmissions([])
-      setSessionToken(session?.access_token ?? null)
+    if (accessStatus !== 'allowed') return
+    const controller = new AbortController()
+    // Cancelled mounts (including Strict Mode) must not launch duplicate requests.
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void Promise.all([loadGames(controller.signal), loadUsers(controller.signal), loadCategories(controller.signal), loadFaq(controller.signal), loadSubmissions(controller.signal)])
     })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!sessionToken) {
-      return
-    }
-
-    let active = true
-    const refreshAdminPanels = async () => {
-      setAdminAccess(false)
-      const response = await authorizedFetch('/api/admin/status')
-      const status = await response.json()
-      if (!active) return
-      if (!response.ok || status.isAdmin !== true) { setErrorMessage('Accès refusé.'); return }
-      setAdminAccess(true)
-      await Promise.all([loadGames(), loadUsers(), loadCategories(), loadFaq(), loadSubmissions()])
-    }
-
-    void refreshAdminPanels().catch(() => { if (active) { setAdminAccess(false); setErrorMessage('Administration temporairement indisponible.') } })
-    return () => { active = false }
-  }, [sessionToken, authorizedFetch, loadGames, loadUsers, loadCategories, loadFaq, loadSubmissions])
+    return () => controller.abort()
+  }, [accessStatus, loadGames, loadUsers, loadCategories, loadFaq, loadSubmissions])
 
   const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
     setGameForm((current) => ({ ...current, [field]: value }))
@@ -775,9 +754,15 @@ export default function AdminPage() {
     }
   }
 
-  if (!adminAccess) return <main className="mx-auto max-w-xl rounded-2xl border border-zinc-800 p-6"><p role="status">{errorMessage || 'Vérification de l’accès administrateur…'}</p></main>
+  if (accessStatus !== 'allowed') return <main className="mx-auto max-w-xl rounded-2xl border border-zinc-800 p-6">
+    <p role={accessStatus === 'error' || accessStatus === 'denied' ? 'alert' : 'status'}>
+      {accessStatus === 'checking' ? 'Vérification de l’accès administrateur…' : accessStatus === 'unauthenticated' ? 'Connexion requise. Redirection vers la connexion…' : accessStatus === 'denied' ? 'Accès administrateur refusé.' : 'Impossible de vérifier l’accès administrateur. Réessaie.'}
+    </p>
+    {accessStatus === 'error' && <button type="button" onClick={retry} className="mt-4 rounded-xl bg-cyan-400 px-4 py-2 font-bold text-black focus-visible:outline focus-visible:outline-cyan-300">Réessayer</button>}
+  </main>
   return (
     <main className="space-y-8">
+      {checking && <p role="status" className="text-sm text-zinc-400">Vérification de l’accès en cours…</p>}
       <section className="border border-zinc-800 bg-zinc-950 p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>

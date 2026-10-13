@@ -13,7 +13,7 @@ registerHooks({
       '@/components/SiteAnalytics': 'analytics',
       '@/lib/profileSync': 'profile',
     }
-    if (stubs[specifier]) return { url: `product:${stubs[specifier]}`, shortCircuit: true }
+    if (stubs[specifier] && !(specifier === '@/components/AuthProvider' && process.env.TEST_PRODUCT_AUTH_PROVIDER)) return { url: `product:${stubs[specifier]}`, shortCircuit: true }
     if (specifier === './MultiplayerProvider') return { url: 'product:multiplayer', shortCircuit: true }
     if (specifier === '../supabaseClient') return { url: 'product:supabase', shortCircuit: true }
     if (specifier.startsWith('@/') || (specifier.startsWith('.') && context.parentURL?.startsWith(root.href))) {
@@ -39,10 +39,10 @@ registerHooks({
       'product:favorites': "import {createElement} from 'react';export default function Favorites(){return createElement('button',null,'Favoris')}",
       'product:tracker': 'export default function Tracker(){return null}',
       'product:supabase': `export const supabase = {
-        auth:{signOut:async()=>{},getSession:async()=>({data:{session:globalThis.__productSession ?? null}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),signInWithPassword:async()=>({data:{session:{user:{id:'A'}}},error:null}),signUp:async input=>{globalThis.__productSignUp=input;return {data:{session:globalThis.__productSession ?? null},error:null}},signInWithOAuth:async input=>{globalThis.__productOAuth=input;return {error:null}}},
-        from(table) { const filters=[]; const chain={select(){return chain},eq(key,value){filters.push([key,value]);return chain},order(){return chain},maybeSingle:async()=>({data:null}),then(resolve){const data=table==='games' ? (globalThis.__productRows ?? []).filter(row=>filters.every(([key,value])=>row[key]===value)) : [];return Promise.resolve({data,error:null}).then(resolve)}};return chain },
+        auth:{signOut:async()=>{},getSession:async()=>globalThis.__productGetSession ? globalThis.__productGetSession() : ({data:{session:globalThis.__productSession ?? null}}),onAuthStateChange:cb=>globalThis.__productSubscribe ? globalThis.__productSubscribe(cb) : ({data:{subscription:{unsubscribe(){}}}}),signInWithPassword:async()=>({data:{session:{user:{id:'A'}}},error:null}),signUp:async input=>{globalThis.__productSignUp=input;return {data:{session:globalThis.__productSession ?? null},error:null}},signInWithOAuth:async input=>{globalThis.__productOAuth=input;return {error:null}}},
+        from(table) { const filters=[]; const chain={select(){return chain},eq(key,value){filters.push([key,value]);return chain},order(){return chain},abortSignal(){return chain},maybeSingle:async()=>({data:null}),then(resolve){const data=table==='games' ? (globalThis.__productRows ?? []).filter(row=>filters.every(([key,value])=>row[key]===value)) : [];return Promise.resolve({data,error:null}).then(resolve)}};return chain },
         rpc:async()=>({data:[],error:null})
-      }`,
+      }; export async function restoreBrowserSession(){return globalThis.__productRestore ? globalThis.__productRestore() : (await supabase.auth.getSession()).data.session}`,
     }
     if (stubs[url]) return { format: 'module', source: stubs[url], shortCircuit: true }
     if (url.startsWith(root.href) && /\.tsx?$/.test(url)) return {

@@ -125,3 +125,21 @@ aucune donnée production. `npm run test:admin-db` crée son propre cluster loca
 loopback, vérifie anon/user/admin-JWT, auto-élévation, grants de colonne, drafts,
 soumissions et CRUD service_role, puis arrête le cluster. Aucun DSN production.
 Le compte admin et les publications de fixtures existent uniquement dans ces tests.
+
+## Retour d’onglet et renouvellement de session
+
+Supabase peut confirmer SIGNED_IN avec le même token au retour d’onglet. La page
+ne doit jamais réinitialiser son accès dans un second abonnement Auth alors que
+sa vérification dépend uniquement du token : cet effet ne repartirait pas.
+Elle utilise l’AuthProvider unique et useAdminAccess, avec une requête no-store
+au retour visible et après changement de token. La session fraîche est demandée
+hors du callback Auth. Le contrôle complet expire après 10 secondes, y compris
+si le SDK ou la réponse JSON ne termine pas ; une erreur offre Réessayer.
+
+Pendant un contrôle du même compte, l’interface déjà ouverte reste affichée.
+Cette continuité visuelle ne donne aucun droit : chaque opération reste vérifiée
+par requireAdmin. Un 401 conduit vers login, un 403 ferme le panneau, un 503 ou
+une erreur réseau affiche un échec explicite. Les listeners et requêtes sont
+retirés/annulés au démontage ; un changement de compte remonte un panneau neuf.
+Les tests admin-ui utilisent le véritable AuthProvider et la page React, avec
+Auth/réseau simulés, sans accès à la production.

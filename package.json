@@ -15,7 +15,7 @@
     "generate:game-manifest": "node scripts/generate-game-manifest.mjs",
     "check:game-manifest": "node scripts/generate-game-manifest.mjs --check",
     "test:catalogue-db": "node tests/game-catalogue-db.mjs",
-    "test:product": "node --import ./tests/product-register.mjs --test tests/multiplayer-product.test.mjs",
+    "test:product": "node --import ./tests/product-register.mjs --test tests/multiplayer-product.test.mjs && node --import ./tests/admin-ui-register.mjs --test tests/admin-ui.test.mjs",
     "test:admin": "node --import ./tests/admin-register.mjs --test tests/admin-security.test.mjs",
     "test:admin-db": "node tests/admin-db.mjs"
   },

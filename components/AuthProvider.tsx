@@ -19,17 +19,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    let authEventReceived = false
+    const timer = setTimeout(() => { if (mounted) setLoading(false) }, 10_000)
 
     const bootstrap = async () => {
-      const currentSession = await restoreBrowserSession()
+      try {
+        const currentSession = await restoreBrowserSession()
 
-      if (!mounted) {
-        return
-      }
+        if (!mounted || authEventReceived) return
 
-      setSession(currentSession)
-      setUser(currentSession?.user ?? null)
-      setLoading(false)
+        setSession(currentSession)
+        setUser(currentSession?.user ?? null)
+        setLoading(false)
+      } catch {
+        if (mounted && !authEventReceived) setLoading(false)
+      } finally { clearTimeout(timer) }
     }
 
     void bootstrap()
@@ -41,6 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      authEventReceived = true
+      clearTimeout(timer)
+
       setSession(currentSession)
       setUser(currentSession?.user ?? null)
       setLoading(false)
@@ -48,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false
+      clearTimeout(timer)
       subscription.unsubscribe()
     }
   }, [])

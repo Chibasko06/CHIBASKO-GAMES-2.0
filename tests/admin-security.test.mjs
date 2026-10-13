@@ -57,13 +57,25 @@ test('all admin handlers deny anonymous and normal users before any private CRUD
       for(const role of [null,'normal']){
         const res=await handler[method](request(role,method),{params:Promise.resolve({id:'fixture',entity:'games'})})
         if(file.href.includes('/status/'))assert.equal((await res.json()).isAdmin,false)
-        else assert.equal(res.status,role?403:401)
+        assert.equal(res.status,role?403:401)
         assert.match(res.headers.get('cache-control'),/no-store/)
       }
       methods++
     }
   }
   assert.ok(methods>=20);assert.deepEqual(calls,[])
+})
+
+test('admin status distinguishes missing session, revoked role and backend failure without private detail',async()=>{
+  const{GET}=await import('../app/api/admin/status/route.ts')
+  for(const[role,status]of[[null,401],['normal',403],['admin',200]]){
+    const response=await GET(request(role))
+    assert.equal(response.status,status);assert.deepEqual(await response.json(),{isAdmin:role==='admin'})
+    assert.match(response.headers.get('cache-control'),/private.*no-store/)
+  }
+  membershipFailure=true
+  const failed=await GET(request('admin'))
+  assert.equal(failed.status,503);assert.deepEqual(await failed.json(),{isAdmin:false})
 })
 
 test('admin creates, edits and publishes through real guard; unknown fields/IDs and SQL errors stay private',async t=>{
