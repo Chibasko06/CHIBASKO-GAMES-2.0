@@ -1,7 +1,7 @@
 'use client'
 import { Component, Suspense, lazy, type ReactNode, type LazyExoticComponent, type ComponentType } from 'react'
 import { clientGameRegistry } from '@/games/clientRegistry'
-import type { ClientGameRegistry, GameClientProps } from '@/lib/multiplayer/gameClientModule'
+import type { ClientGameRegistry, GameClientProps } from '@/games/sdk/client/types'
 
 function Unavailable() { return <p role="status">Ce jeu est temporairement indisponible sur Chibasko Games.</p> }
 class ModuleBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

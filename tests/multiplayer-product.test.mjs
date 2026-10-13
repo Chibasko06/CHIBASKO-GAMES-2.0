@@ -24,6 +24,7 @@ import PongCanvas from '../games/chibasko-pong/client/PongCanvas.tsx'
 import { createGameRuntime } from '../components/multiplayer/GameRuntime.tsx'
 import { clientGameRegistry } from '../games/clientRegistry.ts'
 import { createGameClientConnection } from '../lib/multiplayer/gameClientModule.ts'
+import { useChibaskoGame } from '../games/sdk/client/index.ts'
 
 test('client registry loads Pong on demand and contains only component loaders', async () => {
   assert.deepEqual(Object.keys(clientGameRegistry), ['chibasko-pong'])
@@ -55,17 +56,21 @@ test('real lazy Pong module renders public state, sends its own input and observ
 test('runtime renders an injected second lazy module, switches games and cleans without owning Room', async () => {
   let loads=0, mounts=0, cleanups=0
   function TestGame({connection}) {
-    useEffect(()=>{mounts++;return()=>{cleanups++;connection.send('neutral')}},[connection])
-    return createElement('p',null,'Second test module')
+    const game=useChibaskoGame(connection)
+    const {send}=game
+    useEffect(()=>{mounts++;return()=>{cleanups++;send('neutral')}},[send])
+    return createElement('button',{onClick:()=>game.send('answer',{choice:2})},`Second test module: ${game.state.question}`)
   }
   const registry={...clientGameRegistry,'test-game':async()=>{loads++;return {gameId:'test-game',default:TestGame}}}
   const Runtime=createGameRuntime(registry)
   const messages=[]
-  const owned=createGameClientConnection({localPlayerId:'local',getState:()=>({public:true}),send:(type,payload)=>messages.push([type,payload])})
+  const owned=createGameClientConnection({localPlayerId:'local',getState:()=>({question:'Question distincte'}),send:(type,payload)=>messages.push([type,payload])})
   await mounted(Runtime,{gameId:'unknown',connection:owned.connection},async root=>{
     assert.match(document.body.textContent,/temporairement indisponible/);assert.equal(loads,0)
     await act(async()=>root.render(createElement(Runtime,{gameId:'test-game',connection:owned.connection})))
     assert.match(document.body.textContent,/Second test module/);assert.equal(loads,1);assert.equal(mounts,1)
+    assert.match(document.body.textContent,/Question distincte/)
+    await click(document.querySelector('button'));assert.deepEqual(messages.shift(),['answer',{choice:2}])
     await act(async()=>root.render(createElement(Runtime,{gameId:'chibasko-pong',connection:owned.connection})))
     assert.match(document.body.textContent,/Préparation du terrain/)
     assert.equal(cleanups,1);assert.equal(messages[0][0],'neutral')
@@ -91,6 +96,32 @@ test('late lazy module resolving after unmount never mounts or installs game lis
   owned.dispose()
 })
 
+test('SDK hook follows state revisions, switches connections, unsubscribes and rejects stale sends', async () => {
+  let state={question:'First'}, observed, notifications=0
+  const sent=[]
+  const first=createGameClientConnection({localPlayerId:'A',getState:()=>state,send:(...args)=>sent.push(args)})
+  const second=createGameClientConnection({localPlayerId:'B',getState:()=>({answer:42}),send:(...args)=>sent.push(args)})
+  const watched=connection=>({...connection,subscribe(listener){notifications++;const remove=connection.subscribe(listener);return()=>{notifications--;remove()}}})
+  const connectionA=watched(first.connection),connectionB=watched(second.connection)
+  function Fixture({connection}){observed=useChibaskoGame(connection);return createElement('p',null,JSON.stringify(observed.state))}
+  await mounted(Fixture,{connection:connectionA},async root=>{
+    assert.equal(observed.localPlayerId,'A');assert.equal(notifications,1)
+    assert.deepEqual(Object.keys(observed).sort(),['localPlayerId','revision','send','state','subscribe'])
+    let callbacks=0;const unsubscribe=observed.subscribe(()=>callbacks++)
+    await act(async()=>{state={question:'Changed'};first.changed()})
+    assert.match(document.body.textContent,/Changed/);assert.equal(observed.revision,1);assert.equal(callbacks,1)
+    unsubscribe();await act(async()=>first.changed());assert.equal(callbacks,1)
+    observed.send('answer',{choice:1});assert.deepEqual(sent.shift(),['answer',{choice:1}])
+    const stale=observed
+    await act(async()=>{first.dispose();root.render(createElement(Fixture,{connection:connectionB}))})
+    assert.equal(observed.localPlayerId,'B');assert.deepEqual(observed.state,{answer:42});assert.equal(notifications,1)
+    stale.send('late');assert.equal(sent.length,0);assert.equal(first.connection.getState(),null)
+    await act(async()=>second.dispose());assert.equal(observed.state,null)
+    observed.send('late');assert.equal(sent.length,0)
+  })
+  assert.equal(notifications,0);first.dispose();second.dispose()
+})
+
 test('generic platform has no Pong import, condition or direction input; registry is the explicit boundary', async () => {
   for (const path of ['components/multiplayer/LobbyExperience.tsx','components/multiplayer/MultiplayerProvider.tsx','lib/multiplayer/productSession.ts','lib/lobbyGameSession.ts','components/multiplayer/GameRuntime.tsx','game-server/src/index.ts','game-server/src/rooms/LobbyRoom.ts','game-server/src/platform/multiplayer/GameSessionCoordinator.ts']) {
     const source=await readFile(new URL(`../${path}`,import.meta.url),'utf8')
@@ -99,6 +130,14 @@ test('generic platform has no Pong import, condition or direction input; registr
   const registry=await readFile(new URL('../games/clientRegistry.ts',import.meta.url),'utf8')
   assert.match(registry,/\(\) => import\('\.\/chibasko-pong\/client\/PongGame'\)/)
   assert.doesNotMatch(registry,/roomType|SUPABASE|https?:\/\/|minPlayers|secret/)
+  for(const path of ['games/sdk/client/index.ts','games/sdk/client/types.ts','game-server/src/games/sdk/index.ts','game-server/src/games/sdk/types.ts','game-server/src/platform/multiplayer/internalGameSdk.ts']) {
+    assert.doesNotMatch(await readFile(new URL(`../${path}`,import.meta.url),'utf8'),/Pong|chibasko-pong|set_input|direction/)
+  }
+  for(const path of ['games/chibasko-pong/client/PongGame.tsx','game-server/src/games/chibasko-pong/PongRoom.ts','game-server/src/games/chibasko-pong/register.ts']) {
+    const source=await readFile(new URL(`../${path}`,import.meta.url),'utf8')
+    assert.match(source,/sdk\/|sdk\/client/)
+    assert.doesNotMatch(source,/GameSessionCoordinator|GameAdmission|MultiplayerProvider|AuthProvider|expiresAt/)
+  }
 })
 
 test('technical Pong renders responsive logical canvas; results expose only public names/scores', () => {

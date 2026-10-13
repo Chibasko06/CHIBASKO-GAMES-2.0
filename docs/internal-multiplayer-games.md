@@ -18,6 +18,9 @@ Un module exporte `gameId` et son composant par défaut, recevant uniquement une
 temporaire et send(type,payload). Pas d'Auth, JWT, URL, catalogue ou leave.
 Le module interprète lui-même l'état et les messages de son jeu.
 L'identifiant local ne doit pas être rendu dans l'UI.
+Le contrat est formalisé dans `games/sdk/client/types.ts`. Les jeux utilisent
+`useChibaskoGame(connection)` pour lire l'état et suivre ses révisions ; aucun
+accès au provider plateforme n'est nécessaire.
 
 La plateforme possède la Room et invalide la façade avant sa fermeture. Un ancien
 module ne peut donc envoyer un message à une nouvelle partie. Le module retire ses
@@ -34,10 +37,13 @@ registration connaît sa factory Room et ses hooks locaux (exemple registerPong)
 Le point d'entrée ne connaît aucune classe de jeu.
 La disponibilité reste contrôlée par ENABLED_GAME_IDS, vide par défaut en production.
 
-Une GameRoom implémente activation, départ, admission privée et nettoyage en
-réutilisant GameAdmission/coordinator. Elle appelle `completed` côté serveur ;
+Une GameRoom implémente activation, départ, admission privée et nettoyage via le
+contexte SDK fourni par sa registration. Elle appelle `platform.complete` côté serveur ;
 aucun message client ne peut déclarer un résultat. Le coordinateur vérifie source,
 participants et unicité de complétion, sans reconnaître de gameId particulier.
+Seul l'adaptateur plateforme du SDK connaît GameAdmission/coordinator ; le jeu
+reçoit des identités publiques gelées sans expiration ni authData. Voir
+[Internal Game SDK v0](internal-game-sdk.md) pour les APIs et hooks nécessaires.
 
 ## Lifecycle et résultats
 

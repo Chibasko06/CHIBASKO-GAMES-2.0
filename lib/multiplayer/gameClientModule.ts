@@ -1,16 +1,6 @@
-import type { ComponentType } from 'react'
-
-// A public-state capability, not a Room owner: no JWT, auth, endpoint or leave.
-export type GameClientConnection = Readonly<{
-  localPlayerId: string
-  getState(): unknown
-  getRevision(): number
-  subscribe(listener: () => void): () => void
-  send(type: string, payload?: unknown): void
-}>
-export type GameClientProps = { connection: GameClientConnection }
-export type GameClientModule = { gameId: string; default: ComponentType<GameClientProps> }
-export type ClientGameRegistry = Readonly<Record<string, () => Promise<GameClientModule>>>
+import type { GameClientConnection } from '@/games/sdk/client/types'
+// Compatibility imports for platform adapters; game modules import the SDK.
+export type { GameClientConnection, GameClientProps, GameClientModule, ClientGameRegistry } from '@/games/sdk/client/types'
 
 export function createGameClientConnection(source: {
   localPlayerId: string; getState(): unknown; send(type: string, payload?: unknown): void
