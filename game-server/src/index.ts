@@ -5,7 +5,7 @@ import { createPlaygroundRoom } from './rooms/PlaygroundRoom.js'
 import { createSupabaseAuthenticator, type Authenticate } from './auth/supabaseAuth.js'
 import { createLobbyRoom, type LobbyOptions } from './rooms/LobbyRoom.js'
 import { GameSessionCoordinator, type GameBackend } from './platform/multiplayer/GameSessionCoordinator.js'
-import { createPongRoom } from './games/chibasko-pong/PongRoom.js'
+import { registerInternalGames } from './games/registerInternalGames.js'
 import { lobbyResolutionRoutes } from './lobby/resolveLobby.js'
 import { gameRegistry } from './games/registry.js'
 import { readPolicy, readRuntimeConfig, type RuntimePolicy } from './runtime/config.js'
@@ -49,7 +49,7 @@ export function createPlaygroundServer(authenticate: Authenticate = createSupaba
   })
   if (!policy.production) server.define('playground', createPlaygroundRoom(guardedAuthenticate))
   server.define('lobby', createLobbyRoom(guardedAuthenticate, coordinator, { ...lobbyOptions, registry, reserveCreation, available: () => !state.shuttingDown }))
-  server.define('pong', createPongRoom(coordinator)).on('join', (room, client) => room.admitted(client))
+  registerInternalGames(server, coordinator)
   runtimeStates.set(server, state)
   const listen = server.listen.bind(server)
   server.listen = (port, hostname, backlog, callback) => listen(port, hostname, backlog, (error?: Error) => {

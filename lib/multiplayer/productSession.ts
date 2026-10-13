@@ -2,7 +2,7 @@ import { connectLobby, normalizeLobbyCode, type LobbyPlayer } from '../lobbyConn
 import { createLobbyGameSession } from '../lobbyGameSession'
 import { consumeGameReservation } from '../gameConnection'
 import type { BridgeGameState } from '../lobbyGameSession'
-import { readPongView, type PongView } from './pongView'
+import type { GameClientConnection } from './gameClientModule'
 
 export function gameServerOrigin(config = process.env.NEXT_PUBLIC_GAME_SERVER_URL, development = process.env.NODE_ENV === 'development') {
   const value = config || (development ? 'http://127.0.0.1:2567' : '')
@@ -32,8 +32,8 @@ export function multiplayerError(error: unknown): string {
 }
 export type ProductGame = { slug: string; gameId: string }
 export type PublicPlayer = Pick<LobbyPlayer, 'username' | 'avatarUrl' | 'ready'> & { host: boolean; self: boolean }
-export type ProductLobby = ProductGame & { code: string; status: string; minPlayers: number; maxPlayers: number; players: PublicPlayer[]; result?: { winner: string; reason: string; players: { username: string; score: number }[] } }
-export type ProductSnapshot = { busy: boolean; error: string; unavailable?: boolean; lobby: ProductLobby | null; game: { connected: boolean; count: number; expected: number; status: string; pong?: PongView | null } }
+export type ProductLobby = ProductGame & { code: string; status: string; minPlayers: number; maxPlayers: number; players: PublicPlayer[]; result?: { winner: string; reason: string; players: { username: string; score?: number }[] } }
+export type ProductSnapshot = { busy: boolean; error: string; unavailable?: boolean; lobby: ProductLobby | null; game: { connected: boolean; count: number; expected: number; status: string } }
 export function isProductGameReady(state: ProductSnapshot) { return state.lobby?.status === 'PLAYING' && state.game.connected && state.game.status === 'READY' && state.game.count === state.game.expected }
 type Session = { access_token: string; user: { id: string } }
 export function createProductSession(options: {
@@ -96,15 +96,15 @@ export function createProductSession(options: {
       bridge = createLobbyGameSession((gameRoom, failed) => {
         if (room !== next) return
         let count = 0; gameRoom?.state?.players?.forEach(() => count++)
-        update({ game: { connected: !!gameRoom, count, expected: gameRoom?.state?.expectedPlayers ?? 0, status: gameRoom?.state?.status ?? '', pong: gameRoom?.state?.gameId === 'chibasko-pong' ? readPongView(gameRoom.state, gameRoom.sessionId) : null }, ...(failed && state.lobby?.status !== 'RESULTS' ? { error: 'La connexion à la partie a échoué. Tu peux réessayer depuis la salle d’attente.' } : {}) })
+        update({ game: { connected: !!gameRoom, count, expected: gameRoom?.state?.expectedPlayers ?? 0, status: gameRoom?.state?.status ?? '' }, ...(failed && state.lobby?.status !== 'RESULTS' ? { error: 'La connexion à la partie a échoué. Tu peux réessayer depuis la salle d’attente.' } : {}) })
       }, reservation => consumeGameReservation<BridgeGameState>(reservation, options.endpoint!))
       const refresh = () => {
         if (room !== next) return
         const players: PublicPlayer[] = []
         next.state.players.forEach((p, id) => players.push({ username: p.username, avatarUrl: p.avatarUrl, ready: p.ready, host: p.userId === next.state.hostUserId, self: id === next.sessionId }))
-        const scores: { username: string; score: number }[] = []
+        const scores: { username: string; score?: number }[] = []
         let winner = ''
-        next.state.resultPlayers?.forEach(p => { scores.push({ username: p.username, score: p.score }); if (p.userId === next.state.winnerUserId) winner = p.username })
+        next.state.resultPlayers?.forEach(p => { scores.push({ username: p.username, ...(p.hasScore !== false && p.score !== undefined ? { score: p.score } : {}) }); if (p.userId === next.state.winnerUserId) winner = p.username })
         update({ lobby: { ...target, code: next.state.code, status: next.state.status, minPlayers: next.state.minPlayers, maxPlayers: next.state.maxPlayers, players,
           ...(next.state.status === 'RESULTS' ? { result: { winner, reason: next.state.resultReason ?? '', players: scores } } : {}) } })
       }
@@ -143,6 +143,6 @@ export function createProductSession(options: {
     ready(value: boolean) { update({ error: '' }); room?.send('set_ready', { ready: value }) },
     start() { update({ error: '' }); room?.send('start_game') },
     returnToLobby() { update({ error: '' }); room?.send('return_to_lobby') },
-    input(direction: -1 | 0 | 1) { bridge?.input(direction) },
+    getGameConnection(): GameClientConnection | null { return bridge?.getConnection() ?? null },
   }
 }

@@ -1,3 +1,4 @@
+import { createGameClientConnection } from './multiplayer/gameClientModule'
 import { consumeGameReservation } from './gameConnection'
 
 export type BridgeGameState = {
@@ -14,7 +15,9 @@ export function createLobbyGameSession(
   let room: GameConnection | null = null
   let transitionId: string | null = null
   let disposed = false
+  let publicConnection: ReturnType<typeof createGameClientConnection> | null = null
   const close = (failed = false) => {
+    publicConnection?.dispose(); publicConnection = null
     generation++
     transitionId = null
     const previous = room
@@ -38,7 +41,8 @@ export function createLobbyGameSession(
         const next = await consume(offer.reservation)
         if (disposed || generation !== attempt) { await next.leave().catch(() => {}); return }
         room = next
-        const refresh = () => { if (room === next && !disposed) changed(next, false) }
+        publicConnection = createGameClientConnection({ localPlayerId: next.sessionId, getState: () => next.state, send: (type, payload) => { if (room === next && !disposed) next.send(type, payload) } })
+        const refresh = () => { if (room === next && !disposed) { publicConnection?.changed(); changed(next, false) } }
         next.onStateChange(refresh)
         next.onLeave(() => { if (room === next) close(true) })
         next.onError(() => { if (room === next) close(true) })
@@ -47,7 +51,7 @@ export function createLobbyGameSession(
     },
     cancelled(id: string) { if (transitionId === id) close() },
     close,
-    input(direction: -1 | 0 | 1) { room?.send('set_input', { direction }) },
+    getConnection() { return publicConnection?.connection ?? null },
     dispose() { disposed = true; close() },
   }
 }

@@ -96,10 +96,10 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
           ready: () => { if (this.transitionId === transitionId && this.state.status === 'STARTING') this.transition('PLAYING') },
           completed: result => {
             if (this.transitionId !== transitionId || this.state.status !== 'PLAYING') return
-            this.state.winnerUserId = result.winnerUserId; this.state.resultReason = result.reason
+            this.state.winnerUserId = result.winnerUserId ?? ''; this.state.resultReason = result.reason
             this.state.resultPlayers.clear()
             for (const entry of result.players) {
-              const player = new ResultPlayer(); player.userId = entry.userId; player.score = entry.score
+              const player = new ResultPlayer(); player.userId = entry.userId; player.score = entry.score ?? 0; player.hasScore = entry.score !== undefined
               player.username = snapshot.find(p => p.identity.userId === entry.userId)!.identity.username
               this.state.resultPlayers.push(player)
             }

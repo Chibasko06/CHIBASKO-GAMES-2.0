@@ -5,7 +5,7 @@ export type LobbyClientState = {
   code: string; status: string; hostUserId: string; gameId: string; minPlayers: number; maxPlayers: number
   players: { forEach(callback: (player: LobbyPlayer, id: string) => void): void; get(id: string): LobbyPlayer | undefined }
   winnerUserId?: string; resultReason?: string
-  resultPlayers?: { forEach(callback: (player: { userId: string; username: string; score: number }) => void): void }
+  resultPlayers?: { forEach(callback: (player: { userId: string; username: string; score?: number; hasScore?: boolean }) => void): void }
 }
 export function normalizeLobbyCode(input: string) {
   const code = input.trim().toUpperCase()

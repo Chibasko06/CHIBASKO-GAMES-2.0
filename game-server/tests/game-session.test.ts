@@ -28,7 +28,7 @@ test('generic completion verifies source/roster, delivers once and permits reset
   await Promise.resolve()
   assert.equal(f.coordinator.completed(f.id,'wrong-room',result),false)
   assert.equal(f.coordinator.completed(f.id,'room',{...result,winnerUserId:'outsider'}),false)
-  assert.equal(f.coordinator.completed(f.id,'room',{...result,players:[{userId:'A',score:-1},{userId:'B',score:3}]}),false)
+  assert.equal(f.coordinator.completed(f.id,'room',{...result,players:[{userId:'A',score:NaN},{userId:'B',score:3}]}),false)
   assert.equal(f.coordinator.completed(f.id,'room',result),true)
   assert.equal(f.coordinator.completed(f.id,'room',result),false)
   f.coordinator.participantLeft(f.id,'A'); assert.equal(completed,1); assert.equal(f.counts.failed,0)

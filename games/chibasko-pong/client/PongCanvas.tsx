@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import type { PongView } from '@/lib/multiplayer/pongView'
+import type { PongView } from './pongView'
 
 export default function PongCanvas({ view, onInput }: { view: PongView; onInput(direction: -1 | 0 | 1): void }) {
   const canvas = useRef<HTMLCanvasElement>(null)

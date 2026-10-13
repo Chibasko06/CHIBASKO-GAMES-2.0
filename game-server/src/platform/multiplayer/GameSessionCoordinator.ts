@@ -140,13 +140,13 @@ export class GameSessionCoordinator {
     const session = this.sessions.get(id)
     if (!session || session.phase !== 'playing' || session.room?.roomId !== roomId || this.closing || !this.available()) return false
     const ids = new Set(session.participants.map(p => p.identity.userId))
-    if (result.gameId !== session.definition.id || !ids.has(result.winnerUserId)
-      || !['score', 'forfeit'].includes(result.reason) || result.players.length !== ids.size
+    if (result.gameId !== session.definition.id || (result.winnerUserId !== null && !ids.has(result.winnerUserId))
+      || !/^[a-z][a-z0-9_]{0,31}$/.test(result.reason) || result.players.length !== ids.size
       || new Set(result.players.map(p => p.userId)).size !== ids.size
-      || result.players.some(p => !ids.has(p.userId) || !Number.isSafeInteger(p.score) || p.score < 0)) return false
+      || result.players.some(p => !ids.has(p.userId) || (p.score !== undefined && !Number.isFinite(p.score)))) return false
     session.phase = 'completed'; clearTimeout(session.timer)
     const copy = Object.freeze({ gameId: result.gameId, winnerUserId: result.winnerUserId, reason: result.reason,
-      players: Object.freeze(result.players.map(p => Object.freeze({ userId: p.userId, score: p.score }))) })
+      players: Object.freeze(result.players.map(p => Object.freeze({ userId: p.userId, ...(p.score !== undefined ? { score: p.score } : {}) }))) })
     session.events.completed?.(copy)
     return true
   }

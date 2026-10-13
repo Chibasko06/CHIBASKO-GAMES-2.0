@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { createElement, act } from 'react'
+import { createElement, act, useEffect } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createRoot } from 'react-dom/client'
 import { JSDOM } from 'jsdom'
@@ -20,7 +20,86 @@ import LobbyPage, { metadata as lobbyMetadata } from '../app/games/[slug]/lobby/
 import LoginPage from '../app/login/page.tsx'
 import RegisterPage from '../app/register/page.tsx'
 import AuthCallbackPage from '../app/auth/callback/page.tsx'
-import PongCanvas from '../components/multiplayer/PongCanvas.tsx'
+import PongCanvas from '../games/chibasko-pong/client/PongCanvas.tsx'
+import { createGameRuntime } from '../components/multiplayer/GameRuntime.tsx'
+import { clientGameRegistry } from '../games/clientRegistry.ts'
+import { createGameClientConnection } from '../lib/multiplayer/gameClientModule.ts'
+
+test('client registry loads Pong on demand and contains only component loaders', async () => {
+  assert.deepEqual(Object.keys(clientGameRegistry), ['chibasko-pong'])
+  assert.equal(Object.hasOwn(clientGameRegistry,'unknown'),false)
+  assert.equal(typeof clientGameRegistry['chibasko-pong'],'function')
+  const loaded = await clientGameRegistry['chibasko-pong']()
+  assert.deepEqual(Object.keys(loaded).sort(), ['default','gameId'])
+  assert.equal(loaded.gameId,'chibasko-pong'); assert.equal(typeof loaded.default,'function')
+})
+
+test('real lazy Pong module renders public state, sends its own input and observes revisions', async () => {
+  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:3000/lobby-playground'})
+  globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true
+  const noop=()=>{};dom.window.HTMLCanvasElement.prototype.getContext=()=>({fillRect:noop,setLineDash:noop,beginPath:noop,moveTo:noop,lineTo:noop,stroke:noop,arc:noop,fill:noop,fillText:noop})
+  const state={phase:'PLAYING',remainingMs:0,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,players:new Map([['local',{username:'Alice',side:'LEFT'}],['remote',{username:'Bob',side:'RIGHT'}]])}
+  const sent=[];const owned=createGameClientConnection({localPlayerId:'local',getState:()=>state,send:(...args)=>sent.push(args)})
+  const Runtime=createGameRuntime(clientGameRegistry),root=createRoot(document.getElementById('root'))
+  try {
+    await act(async()=>root.render(createElement(Runtime,{gameId:'chibasko-pong',connection:owned.connection})))
+    const canvas=document.querySelector('canvas');assert.ok(canvas)
+    await act(async()=>canvas.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true,cancelable:true})))
+    assert.deepEqual(sent[0],['set_input',{direction:-1}])
+    await act(async()=>{state.leftScore=2;owned.changed()})
+    assert.match(document.body.textContent,/Alice · 2/)
+    await act(async()=>root.unmount());assert.deepEqual(sent.at(-1),['set_input',{direction:0}])
+  } finally {owned.dispose();dom.window.close();delete globalThis.window;delete globalThis.document;delete globalThis.IS_REACT_ACT_ENVIRONMENT}
+})
+
+test('runtime renders an injected second lazy module, switches games and cleans without owning Room', async () => {
+  let loads=0, mounts=0, cleanups=0
+  function TestGame({connection}) {
+    useEffect(()=>{mounts++;return()=>{cleanups++;connection.send('neutral')}},[connection])
+    return createElement('p',null,'Second test module')
+  }
+  const registry={...clientGameRegistry,'test-game':async()=>{loads++;return {gameId:'test-game',default:TestGame}}}
+  const Runtime=createGameRuntime(registry)
+  const messages=[]
+  const owned=createGameClientConnection({localPlayerId:'local',getState:()=>({public:true}),send:(type,payload)=>messages.push([type,payload])})
+  await mounted(Runtime,{gameId:'unknown',connection:owned.connection},async root=>{
+    assert.match(document.body.textContent,/temporairement indisponible/);assert.equal(loads,0)
+    await act(async()=>root.render(createElement(Runtime,{gameId:'test-game',connection:owned.connection})))
+    assert.match(document.body.textContent,/Second test module/);assert.equal(loads,1);assert.equal(mounts,1)
+    await act(async()=>root.render(createElement(Runtime,{gameId:'chibasko-pong',connection:owned.connection})))
+    assert.match(document.body.textContent,/Préparation du terrain/)
+    assert.equal(cleanups,1);assert.equal(messages[0][0],'neutral')
+    await act(async()=>root.render(createElement(Runtime,{gameId:'test-game',connection:owned.connection})))
+    assert.equal(loads,1);assert.equal(mounts,2)
+  })
+  assert.equal(cleanups,2)
+  owned.dispose();const count=messages.length;owned.connection.send('late');assert.equal(messages.length,count)
+  assert.deepEqual(Object.keys(owned.connection).sort(),['getRevision','getState','localPlayerId','send','subscribe'])
+})
+
+test('late lazy module resolving after unmount never mounts or installs game listeners', async () => {
+  let release, mountedCount=0
+  function DeferredGame(){useEffect(()=>{mountedCount++},[]);return createElement('p',null,'Late')}
+  const Runtime=createGameRuntime({'test-game':()=>new Promise(resolve=>{release=resolve})})
+  const owned=createGameClientConnection({localPlayerId:'local',getState:()=>null,send(){}})
+  await mounted(Runtime,{gameId:'test-game',connection:owned.connection},async root=>{
+    assert.match(document.body.textContent,/Chargement du jeu/)
+    await act(async()=>root.render(null))
+    await act(async()=>release({gameId:'test-game',default:DeferredGame}))
+    assert.equal(mountedCount,0)
+  })
+  owned.dispose()
+})
+
+test('generic platform has no Pong import, condition or direction input; registry is the explicit boundary', async () => {
+  for (const path of ['components/multiplayer/LobbyExperience.tsx','components/multiplayer/MultiplayerProvider.tsx','lib/multiplayer/productSession.ts','lib/lobbyGameSession.ts','components/multiplayer/GameRuntime.tsx','game-server/src/index.ts','game-server/src/rooms/LobbyRoom.ts','game-server/src/platform/multiplayer/GameSessionCoordinator.ts']) {
+    const source=await readFile(new URL(`../${path}`,import.meta.url),'utf8')
+    assert.doesNotMatch(source,/chibasko-pong|PongCanvas|PongRoom|pongView|set_input|direction/)
+  }
+  const registry=await readFile(new URL('../games/clientRegistry.ts',import.meta.url),'utf8')
+  assert.match(registry,/\(\) => import\('\.\/chibasko-pong\/client\/PongGame'\)/)
+  assert.doesNotMatch(registry,/roomType|SUPABASE|https?:\/\/|minPlayers|secret/)
+})
 
 test('technical Pong renders responsive logical canvas; results expose only public names/scores', () => {
   const view = { phase:'COUNTDOWN', remainingMs:3000,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,leftName:'Alice',rightName:'Bob',selfSide:'LEFT' }

@@ -15,7 +15,7 @@ export function getMultiplayerDefinition(id: string) {
   return Object.hasOwn(definitions, id) ? definitions[id] : undefined
 }
 export const multiplayerGames = Object.entries(manifest).map(([gameId, capacity]) => ({
-  gameId, ...capacity, label: gameId === 'chibasko-pong' ? 'Chibasko Pong' : gameId,
+  gameId, ...capacity, label: gameId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
 }))
 export function multiplayerCapacityLabel(id: string) {
   const definition = getMultiplayerDefinition(id)
