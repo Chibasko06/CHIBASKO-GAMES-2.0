@@ -20,7 +20,7 @@ export class GameAdmission {
     const member = this.members.get(client.sessionId)
     if (!member) return false
     member.cancel(); this.members.delete(client.sessionId)
-    this.coordinator.participantLeft(this.transitionId)
+    this.coordinator.participantLeft(this.transitionId, member.userId)
     return true
   }
   dispose() { for (const member of this.members.values()) member.cancel(); this.members.clear() }

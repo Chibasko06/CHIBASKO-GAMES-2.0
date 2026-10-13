@@ -20,6 +20,36 @@ import LobbyPage, { metadata as lobbyMetadata } from '../app/games/[slug]/lobby/
 import LoginPage from '../app/login/page.tsx'
 import RegisterPage from '../app/register/page.tsx'
 import AuthCallbackPage from '../app/auth/callback/page.tsx'
+import PongCanvas from '../components/multiplayer/PongCanvas.tsx'
+
+test('technical Pong renders responsive logical canvas; results expose only public names/scores', () => {
+  const view = { phase:'COUNTDOWN', remainingMs:3000,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,leftName:'Alice',rightName:'Bob',selfSide:'LEFT' }
+  const canvas = renderToStaticMarkup(createElement(PongCanvas,{view,onInput(){}}))
+  assert.match(canvas,/width="1000"/); assert.match(canvas,/height="600"/); assert.match(canvas,/w-full/); assert.match(canvas,/tabindex="0"/)
+  assert.match(canvas,/Alice/); assert.match(canvas,/Bob/); assert.doesNotMatch(canvas,/userId|sessionId|JWT/)
+  const result = renderToStaticMarkup(createElement(LobbyView,{title:'Test local',state:{error:'',lobby:{slug:'test',gameId:'chibasko-pong',code:'AB7KQ2',status:'RESULTS',minPlayers:2,maxPlayers:2,players:[{username:'Alice',avatarUrl:'',ready:true,self:true,host:true}],result:{winner:'Alice',reason:'forfeit',players:[{username:'Alice',score:3},{username:'Bob',score:1}]}},game:{connected:true,count:2,expected:2,status:'READY'}},onReady(){},onStart(){},onLeave(){},onReturn(){}}))
+  assert.match(result,/Partie terminée/); assert.match(result,/Alice gagne/); assert.match(result,/3 – 1/); assert.match(result,/Victoire par abandon/); assert.match(result,/Retour à la salle d’attente/)
+})
+
+test('Pong keyboard sends direction changes only; blur and unmount clear input/listeners', async () => {
+  const dom = new JSDOM('<div id="root"></div>', {url:'http://localhost:3000/lobby-playground'})
+  globalThis.window=dom.window; globalThis.document=dom.window.document; globalThis.IS_REACT_ACT_ENVIRONMENT=true
+  const noop=()=>{}; const calls=[]
+  dom.window.HTMLCanvasElement.prototype.getContext=()=>({fillRect:noop,setLineDash:noop,beginPath:noop,moveTo:noop,lineTo:noop,stroke:noop,arc:noop,fill:noop,fillText:noop})
+  const view={phase:'PLAYING',remainingMs:0,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,leftName:'Alice',rightName:'Bob',selfSide:'LEFT'}
+  const root=createRoot(document.getElementById('root'))
+  try {
+    await act(async()=>root.render(createElement(PongCanvas,{view,onInput:direction=>calls.push(direction)})))
+    const canvas=document.querySelector('canvas')
+    const key=async(type,key)=>act(async()=>canvas.dispatchEvent(new window.KeyboardEvent(type,{key,bubbles:true,cancelable:true})))
+    await key('keydown','ArrowUp'); await key('keydown','ArrowUp'); await key('keydown','ArrowDown'); await key('keyup','ArrowUp'); await key('keyup','ArrowDown')
+    assert.deepEqual(calls,[-1,0,1,0])
+    await key('keydown','w'); window.dispatchEvent(new window.Event('blur')); assert.equal(calls.at(-1),0)
+    await act(async()=>root.unmount()); const count=calls.length
+    window.dispatchEvent(new window.Event('blur')); assert.equal(calls.length,count)
+    assert.equal(canvas.width,1000); assert.equal(canvas.height,600)
+  } finally { dom.window.close(); delete globalThis.window; delete globalThis.document; delete globalThis.IS_REACT_ACT_ENVIRONMENT }
+})
 
 const classic = { id:'classic', title:'Arcade Classic', slug:'classic', game_type:'classic', game_url:'https://example.com/game', multiplayer_game_id:null, thumbnail_url:null, is_beta:false, is_published:true, views_count:5, mobile_compatible:'oui', created_at:'2026-01-01', categories:[{id:'arcade',slug:'arcade',name:'Arcade'}] }
 const multi = {...classic,id:'multi',title:'Chibasko Pong',slug:'pong',game_type:'multiplayer_chibasko',game_url:null,multiplayer_game_id:'chibasko-pong',is_beta:true}

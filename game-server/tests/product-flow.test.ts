@@ -60,7 +60,10 @@ test('product network: create, global code resolution, expected game, duplicate,
     }
     for (const url of urls) { assert.equal(url.includes('_authToken'), false); assert.deepEqual([...new URL(url, endpoint).searchParams.keys()], ['sessionId']) }
     a.disconnect()
-    await until(() => b.getSnapshot().lobby?.status === 'WAITING' && b.getSnapshot().lobby?.players.length === 1)
+    await until(() => b.getSnapshot().lobby?.status === 'RESULTS' && b.getSnapshot().lobby?.players.length === 1)
+    assert.equal(b.getSnapshot().lobby?.result?.reason, 'forfeit')
+    b.returnToLobby()
+    await until(() => b.getSnapshot().lobby?.status === 'WAITING')
     assert.equal(b.getSnapshot().lobby?.players[0]?.host, true)
     assert.equal(b.getSnapshot().lobby?.players[0]?.ready, false)
     b.accountChanged(null); assert.equal(b.getSnapshot().lobby, null)

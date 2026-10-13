@@ -57,8 +57,26 @@ WAITING → STARTING (3 s) → GameSessionCoordinator crée PongRoom privée et 
 réservations individuelles → admissions réelles → PLAYING.
 Échec/timeout (10 s après countdown) ou départ : nettoyage et retour WAITING,
 ready remis à false. Lobby connecté en parallèle. Lobby vide détruit.
-PongRoom est un squelette d'admission, sans balle, raquette, score ou gameplay.
-RESULTS est préparé dans les types seulement.
+PongRoom est un prototype technique local 1v1 : simulation serveur 30 Hz,
+terrain 1000 × 600, premier à 5, countdown 3 s et pause entre points 1 s.
+Le seul input client est `set_input { direction: -1 | 0 | 1 }`.
+La GameRoom attribue les côtés et décide de toute la physique et du résultat.
+Abandon pendant countdown/jeu/pause : victoire adverse, sans score enregistré.
+Le coordinateur reçoit `completed(result)` puis le lobby passe RESULTS.
+L'hôte envoie `return_to_lobby` : destruction de la GameRoom, WAITING et ready false.
+Les connexions lobby restent ouvertes ; chacun se prépare pour une nouvelle partie.
+
+## Test Pong local avec deux comptes
+
+Lancer le site et le game-server, puis connecter deux comptes distincts sur
+http://localhost:3000 (deux profils/navigateurs). Ouvrir /lobby-playground dans
+les deux : A crée, B rejoint avec le code, les deux prêts, A lance.
+Cliquer le canvas ou y placer le focus : ↑/W et ↓/S. Premier à 5 → résultats.
+L'hôte revient à la salle d'attente, chacun Ready, nouvelle partie.
+Le canvas conserve le ratio 1000/600 sur mobile ; contrôles tactiles non implémentés.
+La page réutilise le produit sans aucune fiche/catalogue publiée ou SQL.
+Chibasko Pong reste un jeu technique non publié, non déployé et désactivé par défaut
+en production. Le VPS reste en pause.
 
 ## Production et exploitation
 

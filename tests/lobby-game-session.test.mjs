@@ -2,6 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createLobbyGameSession } from '../lib/lobbyGameSession.ts'
 import { consumeGameReservation } from '../lib/gameConnection.ts'
+import { readPongView } from '../lib/multiplayer/pongView.ts'
+
+test('Pong view projects public positions and local side, never identity/auth fields', () => {
+  const state = { phase:'PLAYING', remainingMs:0,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:1,rightScore:0,players:new Map([['a',{username:'Alice',side:'LEFT',userId:'private-id'}],['b',{username:'Bob',side:'RIGHT',expiresAt:42}]]) }
+  const view = readPongView(state,'a'); assert.equal(view.selfSide,'LEFT'); assert.equal(view.leftName,'Alice')
+  assert.doesNotMatch(JSON.stringify(view),/private-id|expiresAt|userId|sessionId/)
+  assert.equal(readPongView({...state,width:NaN},'a'),null); assert.equal(readPongView({},'a'),null)
+})
 
 function room() {
   const callbacks = {}

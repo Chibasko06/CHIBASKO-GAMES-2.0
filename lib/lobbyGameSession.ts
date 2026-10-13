@@ -19,7 +19,10 @@ export function createLobbyGameSession(
     transitionId = null
     const previous = room
     room = null
-    void previous?.leave().catch(() => {})
+    if (previous) {
+      if (previous.connection?.isOpen === false) previous.removeAllListeners?.()
+      else void previous.leave().catch(() => {}).finally(() => previous.removeAllListeners?.())
+    }
     if (!disposed) changed(null, failed)
   }
   return {
@@ -44,6 +47,7 @@ export function createLobbyGameSession(
     },
     cancelled(id: string) { if (transitionId === id) close() },
     close,
+    input(direction: -1 | 0 | 1) { room?.send('set_input', { direction }) },
     dispose() { disposed = true; close() },
   }
 }

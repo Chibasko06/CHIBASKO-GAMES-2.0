@@ -4,7 +4,7 @@ import type { Authenticate, AuthenticatedPlayer } from '../auth/supabaseAuth.js'
 import { scheduleSessionExpiry } from '../auth/sessionExpiry.js'
 import { allocateLobbyCode } from '../lobby/lobbyCode.js'
 import { canTransition, MAX_PLAYERS, readReady, rosterCanStart, type LobbyStatus } from '../lobby/lobbyRules.js'
-import { LobbyState } from '../schema/LobbyState.js'
+import { LobbyState, ResultPlayer } from '../schema/LobbyState.js'
 import { LobbyPlayerState } from '../schema/LobbyPlayerState.js'
 import { resolveGame, gameRegistry } from '../games/registry.js'
 import type { GameDefinition, GameRegistry } from '../games/types.js'
@@ -48,6 +48,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
     private countdown: ReturnType<typeof setTimeout> | undefined
     private definition!: GameDefinition
     private transitionId: string | undefined
+    private returning = false
     getPublicGameId() { return this.state.gameId }
 
     async onCreate(options: { _creatorUserId?: unknown; gameId?: unknown }) {
@@ -81,6 +82,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
         if (client.auth?.userId !== this.state.hostUserId) return this.reject(client, 'HOST_REQUIRED')
         if (this.state.status !== 'WAITING') return this.reject(client, 'INVALID_STATE')
         if (!this.canStart()) return this.reject(client, 'NOT_READY')
+        this.state.winnerUserId = ''; this.state.resultReason = ''; this.state.resultPlayers.clear()
         this.transition('STARTING')
         const snapshot = [...this.participants].map(([lobbySessionId, participant]) => ({ lobbySessionId, identity: participant.identity }))
         const transitionId = coordinator.begin(this.roomId, this.definition, snapshot, {
@@ -92,6 +94,17 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
             member.send('game_reservation', message)
           },
           ready: () => { if (this.transitionId === transitionId && this.state.status === 'STARTING') this.transition('PLAYING') },
+          completed: result => {
+            if (this.transitionId !== transitionId || this.state.status !== 'PLAYING') return
+            this.state.winnerUserId = result.winnerUserId; this.state.resultReason = result.reason
+            this.state.resultPlayers.clear()
+            for (const entry of result.players) {
+              const player = new ResultPlayer(); player.userId = entry.userId; player.score = entry.score
+              player.username = snapshot.find(p => p.identity.userId === entry.userId)!.identity.username
+              this.state.resultPlayers.push(player)
+            }
+            this.transition('RESULTS')
+          },
           failed: () => {
             if (this.transitionId !== transitionId) return
             this.transitionId = undefined
@@ -109,6 +122,22 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
             else coordinator.cancel(transitionId)
           }, config.startDelayMs ?? 3000)
         }).catch(() => { if (this.transitionId === transitionId) coordinator.cancel(transitionId) })
+      })
+      this.onMessage('return_to_lobby', async (client, payload: unknown) => {
+        if (payload !== undefined) return this.reject(client, 'INVALID_PAYLOAD')
+        if (!this.isPresent(client)) return this.reject(client, 'NOT_PRESENT')
+        if (client.auth?.userId !== this.state.hostUserId) return this.reject(client, 'HOST_REQUIRED')
+        if (this.state.status !== 'RESULTS' || this.returning) return this.reject(client, 'INVALID_STATE')
+        this.returning = true
+        const id = this.transitionId; this.transitionId = undefined
+        try { if (id) { this.broadcast('game_cancelled', { transitionId: id }); await coordinator.reset(id) } }
+        catch { this.returning = false; this.closeLobby(); return }
+        this.returning = false
+        if (this.state.status !== 'RESULTS') return
+        this.state.winnerUserId = ''; this.state.resultReason = ''; this.state.resultPlayers.clear()
+        this.transition('WAITING')
+        for (const player of this.state.players.values()) player.ready = false
+        void this.unlock().catch(() => this.closeLobby())
       })
     }
     async onJoin(client: LobbyClient) {
@@ -143,7 +172,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
         // Map insertion order is private server admission order.
         this.state.hostUserId = this.participants.values().next().value!.identity.userId
       }
-      if (this.transitionId) coordinator.participantLeft(this.transitionId)
+      if (this.transitionId) coordinator.participantLeft(this.transitionId, leaving.userId)
     }
     onDispose() {
       this.releaseCreation?.()

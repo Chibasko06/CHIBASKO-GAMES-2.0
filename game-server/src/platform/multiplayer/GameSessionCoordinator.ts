@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { matchMaker } from '@colyseus/core'
 import type { AuthenticatedPlayer } from '../../auth/supabaseAuth.js'
 import type { GameDefinition } from '../../games/types.js'
+import type { GameResult } from './GameResult.js'
 
 export type GameIdentity = Readonly<{ transitionId: string; lobbySessionId: string; identity: AuthenticatedPlayer }>
 export type Reservation = Awaited<ReturnType<typeof matchMaker.reserveSeatFor>>
@@ -13,22 +14,25 @@ export type SessionEvents = {
   reservation: (lobbySessionId: string, message: { transitionId: string; gameId: string; reservation: Reservation }) => void
   ready: () => void
   failed: () => void
+  completed?: (result: GameResult) => void
 }
 export interface GameBackend {
   create: (definition: GameDefinition, transitionId: string) => Promise<IRoomCache>
   reserve: (room: IRoomCache, auth: GameIdentity) => Promise<Reservation>
   activate: (roomId: string, transitionId: string) => Promise<unknown>
   destroy: (roomId: string) => Promise<unknown>
+  depart?: (roomId: string, userId: string) => Promise<unknown>
 }
 const backend: GameBackend = {
   create: (game, transitionId) => matchMaker.createRoom(game.roomType, { transitionId }),
   reserve: (room, auth) => matchMaker.reserveSeatFor(room, {}, auth),
   activate: (roomId, transitionId) => matchMaker.remoteRoomCall(roomId, 'activate', [transitionId]),
   destroy: async roomId => { await matchMaker.getLocalRoomById(roomId)?.disconnect() },
+  depart: (roomId, userId) => matchMaker.remoteRoomCall(roomId, 'participantLeft', [userId]),
 }
 type Session = {
   id: string; lobbyId: string; definition: GameDefinition; participants: readonly Participant[]; events: SessionEvents
-  phase: 'countdown' | 'preparing' | 'admitting' | 'activating' | 'playing'
+  phase: 'countdown' | 'preparing' | 'admitting' | 'activating' | 'playing' | 'completed'
   deadline: number; timer?: ReturnType<typeof setTimeout>; room?: IRoomCache
   seats: Map<string, string>; admitted: Set<string>
 }
@@ -125,9 +129,30 @@ export class GameSessionCoordinator {
     return !!session && session.phase === 'activating' && session.room?.roomId === roomId && this.valid(session)
       && session.admitted.size === session.participants.length
   }
-  participantLeft(id: string) { this.cancel(id) } // Prototype policy, replaceable independently of LobbyRoom.
+  participantLeft(id: string, userId?: string) {
+    const session = this.sessions.get(id)
+    if (!session || session.phase === 'completed') return
+    if (session.phase === 'playing' && userId && session.room && this.backend.depart) {
+      void this.backend.depart(session.room.roomId, userId).catch(() => { safeLog('coordinator_error'); this.cancel(id) })
+    } else this.cancel(id)
+  }
+  completed(id: string, roomId: string, result: GameResult) {
+    const session = this.sessions.get(id)
+    if (!session || session.phase !== 'playing' || session.room?.roomId !== roomId || this.closing || !this.available()) return false
+    const ids = new Set(session.participants.map(p => p.identity.userId))
+    if (result.gameId !== session.definition.id || !ids.has(result.winnerUserId)
+      || !['score', 'forfeit'].includes(result.reason) || result.players.length !== ids.size
+      || new Set(result.players.map(p => p.userId)).size !== ids.size
+      || result.players.some(p => !ids.has(p.userId) || !Number.isSafeInteger(p.score) || p.score < 0)) return false
+    session.phase = 'completed'; clearTimeout(session.timer)
+    const copy = Object.freeze({ gameId: result.gameId, winnerUserId: result.winnerUserId, reason: result.reason,
+      players: Object.freeze(result.players.map(p => Object.freeze({ userId: p.userId, score: p.score }))) })
+    session.events.completed?.(copy)
+    return true
+  }
   disposed(id: string, roomId: string) {
-    if (this.sessions.get(id)?.room?.roomId === roomId) this.cancel(id)
+    const session = this.sessions.get(id)
+    if (session?.room?.roomId === roomId && session.phase !== 'completed') this.cancel(id)
   }
   cancel(id: string, notify = true) {
     const session = this.sessions.get(id)
@@ -137,6 +162,11 @@ export class GameSessionCoordinator {
     clearTimeout(session.timer)
     if (session.room) this.destroy(session.room.roomId)
     if (notify) session.events.failed()
+  }
+  async reset(id: string) {
+    this.cancel(id, false)
+    await Promise.all([...this.cleanups])
+    if (this.cleanupFailed) throw new Error('CLEANUP_FAILED')
   }
   private destroy(roomId: string) {
     const task = (async () => {
@@ -152,5 +182,5 @@ export class GameSessionCoordinator {
     while (this.operations.size || this.cleanups.size) await Promise.all([...this.operations, ...this.cleanups])
     if (this.cleanupFailed) throw new Error('CLEANUP_FAILED')
   }
-  // Future completed(result) belongs here; no client-supplied results are accepted.
+  // Completion is called by the server GameRoom only, never a client message.
 }

@@ -89,6 +89,9 @@ test('network bridge: private seats, real admissions, PLAYING, timeout, retry an
     }
     t.diagnostic('A+B: two private reservations, first admission keeps STARTING, second admission activates PongRoom and Lobby PLAYING')
     await gameA.leave()
+    await until(() => a.state.status === 'RESULTS' && b.state.status === 'RESULTS')
+    assert.equal(a.state.resultReason, 'forfeit')
+    a.send('return_to_lobby')
     await until(() => a.state.status === 'WAITING' && b.state.status === 'WAITING' && !matchMaker.getLocalRoomById(firstA.reservation.roomId))
     assert.equal(a.state.players.get(a.sessionId)?.ready, false)
     assert.equal(b.state.players.get(b.sessionId)?.ready, false)

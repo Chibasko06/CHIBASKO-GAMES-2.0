@@ -109,6 +109,8 @@ test('lobby authenticated lifecycle, creator guarantee, duplicates, security, re
     const local = matchMaker.getLocalRoomById(closedId)!
     await a.leave()
     await until(() => b.state.hostUserId === 'user-B' && count(b) === 1)
+    await until(() => b.state.status === 'RESULTS')
+    b.send('return_to_lobby')
     await until(() => b.state.status === 'WAITING')
     await b.leave()
     await until(() => !matchMaker.getLocalRoomById(closedId))
@@ -125,7 +127,9 @@ test('lobby authenticated lifecycle, creator guarantee, duplicates, security, re
       await until(() => members.every(member => { let all = true; member.state.players.forEach(player => { all &&= player.ready }); return all }))
       host.send('start_game')
       await until(() => members.every(member => member.state.status === 'STARTING'))
-      await until(() => members.every(member => member.state.status === 'PLAYING'))
+      // Generic lobby capacity stays 2–4; Pong itself now requires exactly two.
+      await until(() => members.every(member => member.state.status === 'WAITING'))
+      assert.ok(members.every(member => member.state.players.get(member.sessionId)?.ready === false))
       await Promise.all(members.map(member => member.leave()))
     }
     const host = await join('A')
@@ -155,7 +159,10 @@ test('lobby authenticated lifecycle, creator guarantee, duplicates, security, re
     survivor.send('start_game')
     await until(() => survivor.state.status === 'STARTING')
     await until(() => !expiring.connection.isOpen && count(survivor) === 1)
-    assert.equal(survivor.state.status, 'WAITING')
+    await until(() => survivor.state.status === 'RESULTS')
+    assert.equal(survivor.state.resultReason, 'forfeit')
+    survivor.send('return_to_lobby')
+    await until(() => survivor.state.status === 'WAITING')
     assert.equal(survivor.state.players.get(survivor.sessionId)?.ready, false)
     await delay(1050)
     assert.equal(survivor.state.status, 'WAITING')

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { GameSessionCoordinator, type GameBackend } from '../src/platform/multiplayer/GameSessionCoordinator.js'
+import { GameSessionCoordinator, type GameBackend, type SessionEvents } from '../src/platform/multiplayer/GameSessionCoordinator.js'
 import { resolveGame } from '../src/games/registry.js'
 
 const participants = () => ['A', 'B'].map(id => ({ lobbySessionId: `lobby-${id}`, identity: { userId: id, username: id, avatarUrl: null, expiresAt: Date.now() + 60000 } }))
@@ -13,10 +13,29 @@ function fixture(overrides: Partial<GameBackend> = {}, timeout = 1000) {
     activate: async () => {}, destroy: async () => { counts.destroyed++ }, ...overrides,
   })
   const people = participants()
-  const events = { valid: () => true, reservation: () => { counts.published++ }, ready: () => { counts.ready++ }, failed: () => { counts.failed++ } }
+  const events: SessionEvents = { valid: () => true, reservation: () => { counts.published++ }, ready: () => { counts.ready++ }, failed: () => { counts.failed++ } }
   const id = coordinator.begin('lobby', resolveGame('chibasko-pong'), people, events)
   return { coordinator, counts, id, people, events }
 }
+
+test('generic completion verifies source/roster, delivers once and permits reset/new session', async () => {
+  const f = fixture(); let completed = 0
+  f.events.completed = result => { completed++; assert.ok(Object.isFrozen(result)); assert.ok(Object.isFrozen(result.players)) }
+  const result = { gameId:'chibasko-pong',winnerUserId:'A',reason:'score' as const,players:[{userId:'A',score:5},{userId:'B',score:3}] }
+  assert.equal(f.coordinator.completed(f.id,'room',result),false)
+  await f.coordinator.prepare(f.id)
+  for (const p of f.people) f.coordinator.admitted({transitionId:f.id,...p},'room',`seat-${p.identity.userId}`)
+  await Promise.resolve()
+  assert.equal(f.coordinator.completed(f.id,'wrong-room',result),false)
+  assert.equal(f.coordinator.completed(f.id,'room',{...result,winnerUserId:'outsider'}),false)
+  assert.equal(f.coordinator.completed(f.id,'room',{...result,players:[{userId:'A',score:-1},{userId:'B',score:3}]}),false)
+  assert.equal(f.coordinator.completed(f.id,'room',result),true)
+  assert.equal(f.coordinator.completed(f.id,'room',result),false)
+  f.coordinator.participantLeft(f.id,'A'); assert.equal(completed,1); assert.equal(f.counts.failed,0)
+  await f.coordinator.reset(f.id); assert.equal(f.counts.destroyed,1)
+  const next = f.coordinator.begin('lobby',resolveGame('chibasko-pong'),f.people,f.events)
+  assert.notEqual(next,f.id); f.coordinator.cancel(next,false)
+})
 
 test('shutdown waits for late room creation, cleans it and forbids subsequent sessions', async () => {
   let release!: (room: typeof fakeRoom) => void

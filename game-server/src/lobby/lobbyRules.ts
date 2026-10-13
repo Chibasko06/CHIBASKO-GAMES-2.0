@@ -4,7 +4,7 @@ export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 4
 const transitions: Record<LobbyStatus, readonly LobbyStatus[]> = {
   WAITING: ['STARTING', 'CLOSED'], STARTING: ['WAITING', 'PLAYING', 'CLOSED'],
-  PLAYING: ['WAITING', 'RESULTS', 'CLOSED'], RESULTS: ['CLOSED'], CLOSED: [],
+  PLAYING: ['WAITING', 'RESULTS', 'CLOSED'], RESULTS: ['WAITING', 'CLOSED'], CLOSED: [],
 }
 export function canTransition(from: LobbyStatus, to: LobbyStatus) { return transitions[from].includes(to) }
 export function rosterCanStart(players: readonly { ready: boolean; expiresAt: number }[], now: number, limits = { minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS }) {
