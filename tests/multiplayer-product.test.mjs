@@ -25,6 +25,87 @@ import { createGameRuntime } from '../components/multiplayer/GameRuntime.tsx'
 import { clientGameRegistry } from '../games/clientRegistry.ts'
 import { createGameClientConnection } from '../lib/multiplayer/gameClientModule.ts'
 import { useChibaskoGame } from '../games/sdk/client/index.ts'
+import { createPongPresentation } from '../games/chibasko-pong/client/pongPresentation.ts'
+import { createPongControls } from '../games/chibasko-pong/client/pongControls.ts'
+import { drawPong } from '../games/chibasko-pong/client/pongRenderer.ts'
+import GameResults from '../components/multiplayer/GameResults.tsx'
+
+test('Pong touch controls send only directions and neutralize release, cancellation, focus, visibility and unmount',async()=>{
+  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:3000/lobby-playground'})
+  globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true
+  dom.window.HTMLCanvasElement.prototype.getContext=mockCanvas
+  let scheduled=0,cancelled=0;window.requestAnimationFrame=()=>++scheduled;window.cancelAnimationFrame=()=>cancelled++
+  const sent=[],view={phase:'PLAYING',remainingMs:0,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,leftName:'Alice',rightName:'Bob',selfSide:'LEFT'}
+  const root=createRoot(document.getElementById('root'))
+  const onInput=direction=>sent.push(['set_input',{direction}])
+  try {
+    await act(async()=>root.render(createElement(PongCanvas,{view,onInput})))
+    const up=document.querySelector('[aria-label="Monter la raquette"]'),down=document.querySelector('[aria-label="Descendre la raquette"]')
+    const pointer=async(target,type,id=1)=>act(async()=>{
+      const event=new window.Event(type,{bubbles:true,cancelable:true})
+      Object.defineProperties(event,{pointerId:{value:id},pointerType:{value:'touch'},button:{value:0}})
+      target.dispatchEvent(event)
+    })
+    await pointer(up,'pointerdown');assert.deepEqual(sent.at(-1),['set_input',{direction:-1}])
+    await pointer(up,'pointerup');assert.equal(sent.at(-1)[1].direction,0)
+    await pointer(down,'pointerdown');assert.equal(sent.at(-1)[1].direction,1)
+    await pointer(down,'pointercancel');assert.equal(sent.at(-1)[1].direction,0)
+    await pointer(up,'pointerdown');await pointer(up,'pointerout');assert.equal(sent.at(-1)[1].direction,0)
+    await pointer(up,'pointerdown');await pointer(up,'lostpointercapture');assert.equal(sent.at(-1)[1].direction,0)
+    await pointer(down,'pointerdown')
+    Object.defineProperty(document,'hidden',{configurable:true,value:true})
+    await act(async()=>document.dispatchEvent(new window.Event('visibilitychange')));assert.equal(sent.at(-1)[1].direction,0)
+    await pointer(up,'pointerdown');await act(async()=>window.dispatchEvent(new window.Event('blur')));assert.equal(sent.at(-1)[1].direction,0)
+    await pointer(down,'pointerdown');await act(async()=>root.unmount());assert.equal(sent.at(-1)[1].direction,0)
+    assert.equal(cancelled,1);assert.equal(scheduled,1)
+    const count=sent.length;window.dispatchEvent(new window.Event('blur'));assert.equal(sent.length,count)
+    for(const [,payload] of sent){assert.deepEqual(Object.keys(payload),['direction']);assert.ok([-1,0,1].includes(payload.direction))}
+  }finally{await act(async()=>root.unmount());dom.window.close();delete globalThis.window;delete globalThis.document;delete globalThis.IS_REACT_ACT_ENVIRONMENT}
+})
+
+test('Pong simultaneous inputs remain directional and reset clears every source',()=>{
+  const sent=[],controls=createPongControls(v=>sent.push(v))
+  controls.press(1,-1);controls.press(2,1);controls.release(1);controls.release(2)
+  assert.deepEqual(sent,[-1,0,1,0])
+  controls.key('W',true);controls.reset();controls.key('W',false)
+  assert.equal(sent.at(-1),0);assert.equal(controls.key('x',true),false)
+})
+
+test('Pong presentation keeps motion out of React snapshots, projects points and invalidates through SDK',()=>{
+  const state={phase:'COUNTDOWN',remainingMs:3000,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,players:new Map([['local',{username:'Alice',side:'LEFT',avatarUrl:'https://assets.chibaskogames.fr/avatars/test/a.webp'}],['remote',{username:'Bob',side:'RIGHT'}]])}
+  const owned=createGameClientConnection({localPlayerId:'local',getState:()=>state,send(){}})
+  let time=0;const presentation=createPongPresentation(owned.connection,()=>time)
+  assert.equal(presentation.getSnapshot().leftAvatar,state.players.get('local').avatarUrl)
+  state.phase='PLAYING';time=10;owned.changed();presentation.getSnapshot()
+  assert.equal(presentation.getFrame().goUntil,460)
+  const hud=presentation.getSnapshot()
+  state.ballX=550;time=60;owned.changed();assert.equal(presentation.getSnapshot(),hud)
+  assert.equal(presentation.getFrame().current.ballX,550)
+  const frame=presentation.getFrame(),positions=[],ctx=mockCanvas()
+  ctx.arc=(x,y)=>positions.push([x,y])
+  drawPong(ctx,frame,85,false);assert.equal(positions.at(-1)[0],525)
+  drawPong(ctx,frame,85,true);assert.equal(positions.at(-1)[0],550)
+  state.leftScore=1;state.phase='POINT_PAUSE';owned.changed()
+  assert.equal(presentation.getSnapshot().pointName,'Alice');assert.equal(presentation.getFrame().previous,null)
+  owned.dispose();assert.equal(presentation.getSnapshot(),null);assert.equal(presentation.getFrame(),null)
+})
+
+test('results communicate local outcome, forfeit, host action and waiting without game-specific logic',()=>{
+  const result={winner:'Alice',reason:'score',outcome:'win',players:[{username:'Alice',score:5},{username:'Bob',score:3}]}
+  const win=html(GameResults,{result,host:true,onReturn(){}})
+  assert.match(win,/Victoire !|Alice remporte la partie|5 – 3|Retour à la salle d’attente/)
+  const loss=html(GameResults,{result:{...result,outcome:'loss',reason:'forfeit'},host:false})
+  assert.match(loss,/Défaite/);assert.match(loss,/Victoire par abandon/);assert.match(loss,/En attente de l’hôte/)
+  assert.doesNotMatch(loss,/<button|userId|sessionId/)
+  const noScore=html(GameResults,{result:{winner:'',reason:'completed',players:[{username:'A'}]},host:false})
+  assert.match(noScore,/Merci d’avoir joué/);assert.doesNotMatch(noScore,/undefined/)
+})
+
+
+const mockCanvas = () => {
+  const noop=()=>{}
+  return {fillRect:noop,strokeRect:noop,setLineDash:noop,beginPath:noop,moveTo:noop,lineTo:noop,stroke:noop,arc:noop,fill:noop,fillText:noop,createLinearGradient:()=>({addColorStop:noop})}
+}
 
 test('client registry loads Pong on demand and contains only component loaders', async () => {
   assert.deepEqual(Object.keys(clientGameRegistry), ['chibasko-pong'])
@@ -32,13 +113,13 @@ test('client registry loads Pong on demand and contains only component loaders',
   assert.equal(typeof clientGameRegistry['chibasko-pong'],'function')
   const loaded = await clientGameRegistry['chibasko-pong']()
   assert.deepEqual(Object.keys(loaded).sort(), ['default','gameId'])
-  assert.equal(loaded.gameId,'chibasko-pong'); assert.equal(typeof loaded.default,'function')
+  assert.equal(loaded.gameId,'chibasko-pong'); assert.equal(loaded.default.$$typeof,Symbol.for('react.memo'))
 })
 
 test('real lazy Pong module renders public state, sends its own input and observes revisions', async () => {
   const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:3000/lobby-playground'})
   globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true
-  const noop=()=>{};dom.window.HTMLCanvasElement.prototype.getContext=()=>({fillRect:noop,setLineDash:noop,beginPath:noop,moveTo:noop,lineTo:noop,stroke:noop,arc:noop,fill:noop,fillText:noop})
+  dom.window.HTMLCanvasElement.prototype.getContext=mockCanvas
   const state={phase:'PLAYING',remainingMs:0,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,players:new Map([['local',{username:'Alice',side:'LEFT'}],['remote',{username:'Bob',side:'RIGHT'}]])}
   const sent=[];const owned=createGameClientConnection({localPlayerId:'local',getState:()=>state,send:(...args)=>sent.push(args)})
   const Runtime=createGameRuntime(clientGameRegistry),root=createRoot(document.getElementById('root'))
@@ -48,7 +129,7 @@ test('real lazy Pong module renders public state, sends its own input and observ
     await act(async()=>canvas.dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true,cancelable:true})))
     assert.deepEqual(sent[0],['set_input',{direction:-1}])
     await act(async()=>{state.leftScore=2;owned.changed()})
-    assert.match(document.body.textContent,/Alice · 2/)
+    assert.match(document.querySelector('[aria-label^="Score"]').getAttribute('aria-label'),/Alice 2/)
     await act(async()=>root.unmount());assert.deepEqual(sent.at(-1),['set_input',{direction:0}])
   } finally {owned.dispose();dom.window.close();delete globalThis.window;delete globalThis.document;delete globalThis.IS_REACT_ACT_ENVIRONMENT}
 })
@@ -146,14 +227,14 @@ test('technical Pong renders responsive logical canvas; results expose only publ
   assert.match(canvas,/width="1000"/); assert.match(canvas,/height="600"/); assert.match(canvas,/w-full/); assert.match(canvas,/tabindex="0"/)
   assert.match(canvas,/Alice/); assert.match(canvas,/Bob/); assert.doesNotMatch(canvas,/userId|sessionId|JWT/)
   const result = renderToStaticMarkup(createElement(LobbyView,{title:'Test local',state:{error:'',lobby:{slug:'test',gameId:'chibasko-pong',code:'AB7KQ2',status:'RESULTS',minPlayers:2,maxPlayers:2,players:[{username:'Alice',avatarUrl:'',ready:true,self:true,host:true}],result:{winner:'Alice',reason:'forfeit',players:[{username:'Alice',score:3},{username:'Bob',score:1}]}},game:{connected:true,count:2,expected:2,status:'READY'}},onReady(){},onStart(){},onLeave(){},onReturn(){}}))
-  assert.match(result,/Partie terminée/); assert.match(result,/Alice gagne/); assert.match(result,/3 – 1/); assert.match(result,/Victoire par abandon/); assert.match(result,/Retour à la salle d’attente/)
+  assert.match(result,/Partie terminée/); assert.match(result,/Alice remporte la partie/); assert.match(result,/3 – 1/); assert.match(result,/Victoire par abandon/); assert.match(result,/Retour à la salle d’attente/)
 })
 
 test('Pong keyboard sends direction changes only; blur and unmount clear input/listeners', async () => {
   const dom = new JSDOM('<div id="root"></div>', {url:'http://localhost:3000/lobby-playground'})
   globalThis.window=dom.window; globalThis.document=dom.window.document; globalThis.IS_REACT_ACT_ENVIRONMENT=true
-  const noop=()=>{}; const calls=[]
-  dom.window.HTMLCanvasElement.prototype.getContext=()=>({fillRect:noop,setLineDash:noop,beginPath:noop,moveTo:noop,lineTo:noop,stroke:noop,arc:noop,fill:noop,fillText:noop})
+  const calls=[]
+  dom.window.HTMLCanvasElement.prototype.getContext=mockCanvas
   const view={phase:'PLAYING',remainingMs:0,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,leftName:'Alice',rightName:'Bob',selfSide:'LEFT'}
   const root=createRoot(document.getElementById('root'))
   try {

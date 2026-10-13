@@ -7,6 +7,7 @@ import { useMultiplayer } from './MultiplayerProvider'
 import MultiplayerEntry, { multiplayerButton } from './MultiplayerEntry'
 import { isProductGameReady, type ProductGame, type ProductSnapshot } from '@/lib/multiplayer/productSession'
 import GameRuntime from './GameRuntime'
+import GameResults from './GameResults'
 import type { GameClientConnection } from '@/lib/multiplayer/gameClientModule'
 const noSubscription = () => () => {}
 const canShare = () => typeof navigator !== 'undefined' && typeof navigator.share === 'function'
@@ -42,11 +43,11 @@ export function LobbyView({ title, state, onReady, onStart, onLeave, onReturn, c
       <div className="min-w-0 flex-1"><p className="break-words font-bold">{player.username} {player.self && <span className="font-normal text-zinc-400">(toi)</span>}</p>{player.host && <span className="text-xs text-amber-200">♛ Hôte</span>}</div>
       <span className="shrink-0 text-sm">{player.ready ? '✓ Prêt' : 'Pas prêt'}</span>
     </li>)}</ul>
-    <div role="status" aria-live="polite">
-      {lobby.status === 'STARTING' && <div className="rounded-2xl border border-cyan-900 bg-cyan-950/20 p-5"><h2 className="text-xl font-bold">La partie démarre…</h2><p className="mt-2 text-zinc-300">{state.game.connected ? 'En attente des autres joueurs…' : 'Connexion au serveur de jeu…'}</p></div>}
+    <div>
+      {lobby.status === 'STARTING' && <div role="status" aria-live="polite" className="rounded-2xl border border-cyan-900 bg-cyan-950/20 p-5"><h2 className="text-xl font-bold">La partie démarre…</h2><p className="mt-2 text-zinc-300">{state.game.connected ? 'En attente des autres joueurs…' : 'Connexion au serveur de jeu…'}</p></div>}
       {playing && connection && <GameRuntime gameId={lobby.gameId} connection={connection} />}
       {playing && !connection && <p role="status">{state.game.count} / {state.game.expected} joueurs connectés. Préparation du jeu…</p>}
-      {lobby.status === 'RESULTS' && lobby.result && <div className="space-y-3 rounded-2xl border border-cyan-800 p-6 text-center"><h2 className="text-2xl font-black">Partie terminée</h2><p className="break-words text-xl">{lobby.result.winner ? `${lobby.result.winner} gagne !` : 'La partie est terminée.'}</p>{lobby.result.players.every(p => p.score !== undefined) && <p>{lobby.result.players.map(p => p.score).join(' – ')}</p>}{lobby.result.reason === 'forfeit' && <p>Victoire par abandon</p>}{self?.host ? <button type="button" className={multiplayerButton} onClick={onReturn}>Retour à la salle d’attente</button> : <p>L’hôte peut revenir à la salle d’attente.</p>}</div>}
+      {lobby.status === 'RESULTS' && lobby.result && <GameResults result={lobby.result} host={!!self?.host} onReturn={onReturn} />}
       {lobby.status === 'PLAYING' && !playing && <p>Connexion à la partie…</p>}
     </div>
     {state.error && <p role="alert" className="text-sm text-amber-200">{state.error}</p>}

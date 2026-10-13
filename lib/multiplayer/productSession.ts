@@ -32,7 +32,8 @@ export function multiplayerError(error: unknown): string {
 }
 export type ProductGame = { slug: string; gameId: string }
 export type PublicPlayer = Pick<LobbyPlayer, 'username' | 'avatarUrl' | 'ready'> & { host: boolean; self: boolean }
-export type ProductLobby = ProductGame & { code: string; status: string; minPlayers: number; maxPlayers: number; players: PublicPlayer[]; result?: { winner: string; reason: string; players: { username: string; score?: number }[] } }
+export type ProductResult = { winner: string; reason: string; outcome?: 'win' | 'loss'; players: { username: string; score?: number }[] }
+export type ProductLobby = ProductGame & { code: string; status: string; minPlayers: number; maxPlayers: number; players: PublicPlayer[]; result?: ProductResult }
 export type ProductSnapshot = { busy: boolean; error: string; unavailable?: boolean; lobby: ProductLobby | null; game: { connected: boolean; count: number; expected: number; status: string } }
 export function isProductGameReady(state: ProductSnapshot) { return state.lobby?.status === 'PLAYING' && state.game.connected && state.game.status === 'READY' && state.game.count === state.game.expected }
 type Session = { access_token: string; user: { id: string } }
@@ -106,7 +107,9 @@ export function createProductSession(options: {
         let winner = ''
         next.state.resultPlayers?.forEach(p => { scores.push({ username: p.username, ...(p.hasScore !== false && p.score !== undefined ? { score: p.score } : {}) }); if (p.userId === next.state.winnerUserId) winner = p.username })
         update({ lobby: { ...target, code: next.state.code, status: next.state.status, minPlayers: next.state.minPlayers, maxPlayers: next.state.maxPlayers, players,
-          ...(next.state.status === 'RESULTS' ? { result: { winner, reason: next.state.resultReason ?? '', players: scores } } : {}) } })
+          ...(next.state.status === 'RESULTS' ? { result: { winner, reason: next.state.resultReason ?? '', players: scores,
+            ...(next.state.winnerUserId && next.state.players.get(next.sessionId)?.userId
+              ? { outcome: next.state.winnerUserId === next.state.players.get(next.sessionId)?.userId ? 'win' as const : 'loss' as const } : {}) } } : {}) } })
       }
       next.onStateChange(refresh)
       next.onMessage('game_reservation', offer => { if (room === next) void bridge?.receive(offer, target.gameId) })

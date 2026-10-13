@@ -5,6 +5,21 @@ import { createProductSession, gameServerOrigin, multiplayerError } from '../lib
 import { JSDOM } from 'jsdom'
 import { protectLobbyNavigation, analyticsId } from '../lib/multiplayer/analyticsPrivacy.ts'
 
+test('local result outcome uses server identities rather than names and exposes no raw IDs',async()=>{
+  let refresh
+  const state={code:'AB7KQ2',status:'WAITING',hostUserId:'A',minPlayers:2,maxPlayers:2,players:new Map([['seat',{userId:'A',username:'Same',avatarUrl:'',ready:false}]])}
+  const room={sessionId:'seat',state,onStateChange(fn){refresh=fn},onMessage(){},onError(){},onLeave(){},removeAllListeners(){},async leave(){}}
+  const controller=createProductSession({endpoint:'http://127.0.0.1:2567',getSession:async()=>({access_token:'mock',user:{id:'A'}}),catalogue:async()=>null,connect:async()=>room})
+  try{
+    await controller.connect({slug:'fixture',gameId:'test-game'})
+    Object.assign(state,{status:'RESULTS',winnerUserId:'B',resultReason:'score',resultPlayers:new Map([['A',{userId:'A',username:'Same',score:3,hasScore:true}],['B',{userId:'B',username:'Same',score:5,hasScore:true}]])})
+    refresh();assert.equal(controller.getSnapshot().lobby.result.outcome,'loss')
+    state.winnerUserId='A';refresh();assert.equal(controller.getSnapshot().lobby.result.outcome,'win')
+    state.winnerUserId='';refresh();assert.equal(controller.getSnapshot().lobby.result.outcome,undefined)
+    assert.doesNotMatch(JSON.stringify(controller.getSnapshot().lobby.result),/userId|sessionId|access_token/)
+  }finally{controller.disconnect()}
+})
+
 test('analytics is disabled before history listeners observe private lobby URLs and guards are removed',()=>{
   const dom=new JSDOM('',{url:'https://chibaskogames.fr/multiplayer'})
   const win=dom.window, observed=[]
