@@ -34,8 +34,8 @@ export type RuntimeState = { shuttingDown: boolean }
 export function installRequestPolicy(server: HttpServer, policy: RuntimePolicy, state: RuntimeState) {
   const handlers = server.listeners('request') as RequestListener[]
   server.removeAllListeners('request')
-  const resolve = new WindowLimiter(10), create = new WindowLimiter(policy.production ? 10 : 100), matchmaking = new WindowLimiter(policy.production ? 60 : 600)
-  server.on('close', () => { resolve.clear(); create.clear(); matchmaking.clear() })
+  const resolve = new WindowLimiter(10), listing = new WindowLimiter(30), create = new WindowLimiter(policy.production ? 10 : 100), matchmaking = new WindowLimiter(policy.production ? 60 : 600)
+  server.on('close', () => { resolve.clear(); listing.clear(); create.clear(); matchmaking.clear() })
   server.on('request', (req, res) => {
     const path = (req.url ?? '/').split('?')[0]!.replace(/\/+$/, '') || '/'
     res.setHeader('Cache-Control', 'no-store')
@@ -52,7 +52,7 @@ export function installRequestPolicy(server: HttpServer, policy: RuntimePolicy, 
       if (req.headers.origin) res.setHeader('Access-Control-Allow-Origin', req.headers.origin)
       res.setHeader('Vary', 'Origin')
       res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
       return typeof messageOrHeaders === 'string' ? writeHead(status, messageOrHeaders, headers) : writeHead(status, messageOrHeaders)
     }
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
@@ -60,7 +60,7 @@ export function installRequestPolicy(server: HttpServer, policy: RuntimePolicy, 
     // Remove untrusted alternate headers before Colyseus constructs AuthContext.
     delete req.headers['x-forwarded-for']; delete req.headers['x-client-ip']; delete req.headers['cf-connecting-ip']
     req.headers['x-real-ip'] = ip
-    const limiter = path.startsWith('/lobbies/') ? resolve : path === '/matchmake/create/lobby' ? create : path.startsWith('/matchmake/') ? matchmaking : undefined
+    const limiter = path === '/lobbies/public' ? listing : path.startsWith('/lobbies/') ? resolve : path === '/matchmake/create/lobby' ? create : path.startsWith('/matchmake/') ? matchmaking : undefined
     if (limiter && !limiter.take(ip)) { res.setHeader('Retry-After', '60'); reply(429, { error: 'RATE_LIMIT' }); return }
     for (const handler of handlers) handler.call(server, req, res)
   })

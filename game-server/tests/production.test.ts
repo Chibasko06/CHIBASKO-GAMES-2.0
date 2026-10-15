@@ -42,7 +42,7 @@ test('HTTP and real WebSocket origins, health, production playground, game avail
     await server.listen(0, '127.0.0.1')
     const address = server.transport.server!.address(); assert.ok(address && typeof address !== 'string')
     const endpoint = `http://127.0.0.1:${address.port}`
-    const request = (path: string, extra: HeadersInit = {}, method = 'POST', body = { gameId: 'chibasko-pong' }) => fetch(endpoint + path, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer A', ...extra }, ...(method === 'POST' ? { body: JSON.stringify(body) } : {}) })
+    const request = (path: string, extra: HeadersInit = {}, method = 'POST', body = { gameId: 'chibasko-pong', visibility: 'private' }) => fetch(endpoint + path, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer A', ...extra }, ...(method === 'POST' ? { body: JSON.stringify(body) } : {}) })
     assert.deepEqual(await (await fetch(endpoint + '/health')).json(), { status: 'ok' })
     assert.equal((await fetch(endpoint + '/')).status, 404)
     for (const path of ['/matchmake/create/lobby', '/lobbies/ABCDEF']) {
@@ -87,7 +87,7 @@ test('HTTP and real WebSocket origins, health, production playground, game avail
   const disabled = createPlaygroundServer(identity, {}, {}, production())
   try {
     await disabled.listen(0, '127.0.0.1'); const address = disabled.transport.server!.address(); assert.ok(address && typeof address !== 'string')
-    const result = await fetch(`http://127.0.0.1:${address.port}/matchmake/create/lobby`, { method: 'POST', headers: { Origin: origin, Authorization: 'Bearer A', 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: 'chibasko-pong' }) })
+    const result = await fetch(`http://127.0.0.1:${address.port}/matchmake/create/lobby`, { method: 'POST', headers: { Origin: origin, Authorization: 'Bearer A', 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: 'chibasko-pong', visibility: 'private' }) })
     assert.equal(result.ok, false)
   } finally { await disabled.gracefullyShutdown(false) }
 })

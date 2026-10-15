@@ -1,8 +1,9 @@
-import { connectLobby, normalizeLobbyCode, type LobbyPlayer } from '../lobbyConnection'
+import { connectLobby, normalizeLobbyCode, type LobbyPlayer, type LobbyAccess } from '../lobbyConnection'
 import { createLobbyGameSession } from '../lobbyGameSession'
 import { consumeGameReservation } from '../gameConnection'
 import type { BridgeGameState } from '../lobbyGameSession'
 import type { GameClientConnection } from './gameClientModule'
+import { fetchPublicLobbies } from './publicLobbies'
 
 export function gameServerOrigin(config = process.env.NEXT_PUBLIC_GAME_SERVER_URL, development = process.env.NODE_ENV === 'development') {
   const value = config || (development ? 'http://127.0.0.1:2567' : '')
@@ -27,13 +28,14 @@ export function multiplayerError(error: unknown): string {
     HOST_REQUIRED: 'Seul l’hôte peut lancer la partie.', NOT_READY: 'Tous les joueurs doivent être prêts.',
     INVALID_STATE: 'Cette action n’est plus disponible.', CLOSED: 'La connexion à la partie a été interrompue. Tu peux réessayer.',
     UNAVAILABLE: 'Le multijoueur de Chibasko Games est temporairement indisponible.',
+    LOBBY_UNAVAILABLE: 'Ce salon n’est plus disponible.', ACCESS_UNSUPPORTED: 'Ce mode de jeu n’est pas disponible.', UNKNOWN_GAME: 'Ce jeu n’est pas disponible.',
   }
   return messages[key] ?? 'Connexion impossible. Vérifie le code et la disponibilité du multijoueur de Chibasko Games.'
 }
 export type ProductGame = { slug: string; gameId: string }
 export type PublicPlayer = Pick<LobbyPlayer, 'username' | 'avatarUrl' | 'ready'> & { host: boolean; self: boolean }
 export type ProductResult = { winner: string; reason: string; outcome?: 'win' | 'loss'; players: { username: string; score?: number }[] }
-export type ProductLobby = ProductGame & { code: string; status: string; minPlayers: number; maxPlayers: number; players: PublicPlayer[]; result?: ProductResult }
+export type ProductLobby = ProductGame & { code: string; visibility?: 'public' | 'private'; status: string; minPlayers: number; maxPlayers: number; players: PublicPlayer[]; result?: ProductResult }
 export type ProductSnapshot = { busy: boolean; error: string; unavailable?: boolean; lobby: ProductLobby | null; game: { connected: boolean; count: number; expected: number; status: string } }
 export function isProductGameReady(state: ProductSnapshot) { return state.lobby?.status === 'PLAYING' && state.game.connected && state.game.status === 'READY' && state.game.count === state.game.expected }
 type Session = { access_token: string; user: { id: string } }
@@ -58,7 +60,7 @@ export function createProductSession(options: {
     if (previous) void previous.leave().catch(() => {}).finally(() => previous.removeAllListeners())
     update({ busy: false, error, unavailable: false, lobby: null, game: { connected: false, count: 0, expected: 0, status: '' } })
   }
-  async function connect(game: ProductGame | null, input?: string) {
+  async function connect(game: ProductGame | null, input?: string, access: LobbyAccess = {}) {
     if (state.busy) return null
     disconnect(); context = game
     const attempt = generation
@@ -85,7 +87,7 @@ export function createProductSession(options: {
       if (attempt !== generation) return null
       const target = game
       let timer: ReturnType<typeof setTimeout> | undefined
-      const pending = (options.connect ?? connectLobby)(session.access_token, code, options.endpoint, target.gameId).then(async next => {
+      const pending = (options.connect ?? connectLobby)(session.access_token, code, options.endpoint, target.gameId, access).then(async next => {
         if (attempt !== generation) { await next.leave().catch(() => {}); return null }
         return next
       })
@@ -105,7 +107,7 @@ export function createProductSession(options: {
         const scores: { username: string; score?: number }[] = []
         let winner = ''
         next.state.resultPlayers?.forEach(p => { scores.push({ username: p.username, ...(p.hasScore !== false && p.score !== undefined ? { score: p.score } : {}) }); if (p.userId === next.state.winnerUserId) winner = p.username })
-        update({ lobby: { ...target, code: next.state.code, status: next.state.status, minPlayers: next.state.minPlayers, maxPlayers: next.state.maxPlayers, players,
+        update({ lobby: { ...target, code: next.state.code, visibility: next.state.visibility ?? 'private', status: next.state.status, minPlayers: next.state.minPlayers, maxPlayers: next.state.maxPlayers, players,
           ...(next.state.status === 'RESULTS' ? { result: { winner, reason: next.state.resultReason ?? '', players: scores,
             ...(next.state.winnerUserId && next.state.players.get(next.sessionId)?.userId
               ? { outcome: next.state.winnerUserId === next.state.players.get(next.sessionId)?.userId ? 'win' as const : 'loss' as const } : {}) } } : {}) } })
@@ -120,7 +122,8 @@ export function createProductSession(options: {
       return { ...target, code: next.state.code }
     } catch (error) {
       if (attempt === generation) {
-        disconnect(multiplayerError(error instanceof Error && error.name === 'TimeoutError' ? 'TIMEOUT' : error))
+        const reason = error instanceof Error && error.name === 'TimeoutError' ? 'TIMEOUT' : access.publicOnly && error instanceof Error && ['LOBBY_NOT_FOUND', 'LOBBY_FULL', 'LOBBY_STARTED'].includes(error.message) ? 'LOBBY_UNAVAILABLE' : error
+        disconnect(multiplayerError(reason))
         if (error instanceof TypeError) update({ unavailable: true })
       }
       return null
@@ -130,6 +133,21 @@ export function createProductSession(options: {
     subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn) } },
     getSnapshot: () => state,
     connect,
+    async listPublic(gameId: string, signal?: AbortSignal) {
+      const attempt = generation
+      if (!options.endpoint) throw new Error('UNAVAILABLE')
+      const deadline = signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000)
+      deadline.throwIfAborted()
+      let abort: () => void = () => {}
+      const session = await Promise.race([options.getSession(), new Promise<never>((_, reject) => {
+        abort = () => reject(deadline.reason); deadline.addEventListener('abort', abort, { once: true })
+      })]).finally(() => deadline.removeEventListener('abort', abort))
+      if (deadline.aborted || attempt !== generation) throw new DOMException('Cancelled', 'AbortError')
+      if (!session || (account && account !== session.user.id)) throw new Error('AUTH_REQUIRED')
+      const lobbies = await fetchPublicLobbies(options.endpoint, gameId, session.access_token, deadline)
+      if (deadline.aborted || attempt !== generation) throw new DOMException('Cancelled', 'AbortError')
+      return lobbies
+    },
     disconnect,
     retry() { if (!state.busy && state.unavailable) update({ unavailable: false, error: '' }) },
     accountChanged(id: string | null) { if (!id || (account && id !== account)) disconnect(); account = id },

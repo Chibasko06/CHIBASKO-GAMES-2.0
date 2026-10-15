@@ -18,8 +18,9 @@ test('two clients play, share score/results, return WAITING and replay; game-onl
   try {
     await server.listen(0, '127.0.0.1'); const address = server.transport.server!.address(); assert.ok(address && typeof address !== 'string')
     const endpoint = `http://127.0.0.1:${address.port}`
+    const listed = async () => (await (await fetch(`${endpoint}/lobbies/public?gameId=chibasko-pong`, { headers: { Authorization: 'Bearer B' } })).json()).lobbies
     const urls: string[] = []; server.transport.server!.on('upgrade', req => urls.push(req.url ?? ''))
-    const a = await connectLobby('A', undefined, endpoint), b = await connectLobby('B', a.roomId, endpoint); connections.push(a, b)
+    const a = await connectLobby('A', undefined, endpoint, 'chibasko-pong', { visibility: 'public' }), b = await connectLobby('B', a.roomId, endpoint, 'chibasko-pong', { publicOnly: true }); connections.push(a, b)
     for (const lobby of [a, b]) { lobby.onMessage('game_cancelled', () => {}); lobby.onMessage('lobby_error', () => {}) }
     const start = async () => {
       const offerA = new Promise<Reservation>(resolve => a.onMessage('game_reservation', msg => resolve(msg.reservation)))
@@ -30,6 +31,7 @@ test('two clients play, share score/results, return WAITING and replay; game-onl
       const ga = await consumeGameReservation<PongState>(await offerA, endpoint), gb = await consumeGameReservation<PongState>(await offerB, endpoint)
       connections.push(ga, gb); ga.onMessage('game_error', () => {}); gb.onMessage('game_error', () => {})
       await until(() => a.state.status === 'PLAYING' && gb.state?.players?.size === 2)
+      assert.deepEqual(await listed(), [], 'PLAYING is never listed')
       assert.equal([...ga.state.players.values()].find(p=>p.username==='Player A')?.side, 'LEFT'); assert.equal([...gb.state.players.values()].find(p=>p.username==='Player B')?.side, 'RIGHT')
       return { ga, gb }
     }
@@ -50,6 +52,7 @@ test('two clients play, share score/results, return WAITING and replay; game-onl
         await until(() => ga.state.leftScore === point && gb.state.leftScore === point)
       }
       await until(() => a.state.status === 'RESULTS' && b.state.status === 'RESULTS')
+      assert.deepEqual(await listed(), [], 'RESULTS is never listed')
       assert.equal(a.state.winnerUserId, 'user-A'); assert.equal(a.state.resultReason, 'score')
       assert.deepEqual(JSON.parse(JSON.stringify(a.state.resultPlayers)), JSON.parse(JSON.stringify(b.state.resultPlayers)))
       assert.equal(ga.state.phase, 'FINISHED'); assert.ok(!ga.state.players.has(ga.sessionId)); assert.ok(!gb.state.players.has(gb.sessionId))
@@ -65,6 +68,10 @@ test('two clients play, share score/results, return WAITING and replay; game-onl
     const { ga } = await start(); await ga.leave()
     await until(() => a.state.status === 'RESULTS' && b.state.status === 'RESULTS')
     assert.equal(a.state.winnerUserId, 'user-B'); assert.equal(a.state.resultReason, 'forfeit')
+    await a.leave(); await until(() => b.state.players.size === 1)
+    assert.deepEqual(await listed(), [], 'RESULTS with a free seat remains hidden')
+    b.send('return_to_lobby'); await until(() => b.state.status === 'WAITING'); await delay(80)
+    assert.equal((await listed())[0]?.host.username, 'Player B', 'public room reappears after host returns to WAITING with a free seat')
     for (const url of urls) assert.deepEqual([...new URL(url, endpoint).searchParams.keys()], ['sessionId'])
     t.diagnostic('Two score-complete games: private admissions → inputs visible across clients → five server-scored goals → identical RESULTS → WAITING and cleanup; third game proves countdown forfeit.')
   } finally { for (const room of connections) if (room.connection.isOpen) await room.leave().catch(() => {}); await server.gracefullyShutdown(false) }

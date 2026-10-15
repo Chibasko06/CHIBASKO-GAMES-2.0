@@ -15,17 +15,17 @@ export function AuthInvitation({ next }: { next: string }) {
   const query = `?next=${encodeURIComponent(safeAuthNext(next))}`
   return <div role="status" className="space-y-3 text-sm text-zinc-300"><p>Connecte-toi à ton compte Chibasko Games pour rejoindre ou créer une partie.</p><div className="flex flex-wrap gap-3"><Link className={multiplayerButton} href={`/login${query}`}>Se connecter</Link><Link className={multiplayerButton} href={`/register${query}`}>Créer un compte</Link></div></div>
 }
-export default function MultiplayerEntry({ available = true, game, directCode, global = false }: { available?: boolean; game?: ProductGame; directCode?: string; global?: boolean }) {
+export default function MultiplayerEntry({ available = true, game, directCode, global = false, expanded = false, returnPath }: { available?: boolean; game?: ProductGame; directCode?: string; global?: boolean; expanded?: boolean; returnPath?: string }) {
   const { user, loading } = useAuth()
   const { controller, state, available: serviceAvailable } = useMultiplayer()
   const router = useRouter()
   const params = useSearchParams()
-  const [open, setOpen] = useState(global || !!directCode || params.get('multiplayer') === '1')
+  const [open, setOpen] = useState(expanded || global || !!directCode || params.get('multiplayer') === '1')
   const [invitation, setInvitation] = useState(false)
   const [error, setError] = useState('')
   const [code, setCode] = useState(directCode ?? params.get('join') ?? '')
   const id = useId()
-  const next = game ? `/games/${game.slug}${directCode ? `/lobby/${directCode}` : '?multiplayer=1'}` : '/multiplayer'
+  const next = returnPath ?? (game ? `/games/${game.slug}${directCode ? `/lobby/${directCode}` : '?multiplayer=1'}` : '/multiplayer')
   const [authNext, setAuthNext] = useState(next)
   async function action(create: boolean) {
     setError('')
@@ -48,12 +48,12 @@ export default function MultiplayerEntry({ available = true, game, directCode, g
   return <div className="space-y-4">
     {(!serviceAvailable || !available) && <p role="status" className="text-sm text-zinc-400">Le multijoueur de Chibasko Games est temporairement indisponible.</p>}
     {state.unavailable && <button type="button" onClick={controller.retry} className={multiplayerButton}>Réessayer la connexion</button>}
-    {!global && !directCode && <div className="space-y-2">
+    {!expanded && !global && !directCode && <div className="space-y-2">
       <button type="button" disabled={!available} aria-expanded={open} aria-controls={`${id}-entry`} onClick={() => setOpen(v => !v)} className={multiplayerButton}>{privateGameLaunch.label}</button>
       <p className="text-sm text-zinc-400">{privateGameLaunch.description}</p>
     </div>}
     {open && <div id={`${id}-entry`} className="space-y-4 rounded-2xl border border-zinc-800 bg-black/30 p-4 sm:p-5">
-      {game && !directCode && <button type="button" onClick={() => void action(true)} disabled={disabled} className={multiplayerButton}>Créer une partie</button>}
+      {game && !directCode && <button type="button" onClick={() => void action(true)} disabled={disabled} className={multiplayerButton}>{expanded ? 'Créer une partie privée' : 'Créer une partie'}</button>}
       <form onSubmit={event => { event.preventDefault(); void action(false) }} className="space-y-2">
         <label htmlFor={`${id}-code`} className="block text-sm font-semibold">{directCode ? 'Code de cette partie' : 'Code de partie'}</label>
         <div className="flex flex-col gap-3 sm:flex-row">

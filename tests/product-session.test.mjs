@@ -4,6 +4,41 @@ import { safeAuthNext, getOAuthRedirectUrl } from '../lib/authRedirect.ts'
 import { createProductSession, gameServerOrigin, multiplayerError } from '../lib/multiplayer/productSession.ts'
 import { JSDOM } from 'jsdom'
 import { protectLobbyNavigation, analyticsId } from '../lib/multiplayer/analyticsPrivacy.ts'
+import { fetchPublicLobbies } from '../lib/multiplayer/publicLobbies.ts'
+
+test('public discovery uses fresh HTTP auth only, strips extra fields and rejects malformed responses',async()=>{
+  const original=globalThis.fetch,calls=[]
+  const summary={code:'ABCDEF',gameId:'test-game',host:{username:'Alice',avatarUrl:null,userId:'private'},currentPlayers:1,maxPlayers:2,reservation:'private'}
+  try{
+    globalThis.fetch=async(url,init)=>{calls.push([url,init]);return Response.json({lobbies:[summary]})}
+    const data=await fetchPublicLobbies('https://game.example','test-game','test-token')
+    assert.deepEqual(data,[{code:'ABCDEF',gameId:'test-game',host:{username:'Alice',avatarUrl:null},currentPlayers:1,maxPlayers:2}])
+    assert.equal(calls[0][0].search,'?gameId=test-game');assert.equal(calls[0][0].href.includes('test-token'),false)
+    assert.equal(calls[0][1].headers.Authorization,'Bearer test-token');assert.equal(calls[0][1].cache,'no-store')
+    summary.currentPlayers=2;await assert.rejects(fetchPublicLobbies('https://game.example','test-game','test-token'),/UNAVAILABLE/)
+    globalThis.fetch=async()=>Response.json({error:'secret raw error'},{status:401})
+    await assert.rejects(fetchPublicLobbies('https://game.example','test-game','test-token'),/AUTH_REQUIRED/)
+    globalThis.fetch=async()=>new Response('<html>proxy detail</html>',{status:502})
+    await assert.rejects(fetchPublicLobbies('https://game.example','test-game','test-token'),/UNAVAILABLE/)
+  }finally{globalThis.fetch=original}
+})
+
+test('public listing aborts during session refresh and invalidates a response after account change',async()=>{
+  let finish
+  const controller=createProductSession({endpoint:'https://game.example',getSession:()=>new Promise(resolve=>{finish=resolve}),catalogue:async()=>null})
+  const request=new AbortController(),pending=controller.listPublic('test-game',request.signal)
+  request.abort();await assert.rejects(pending,{name:'AbortError'})
+  finish(null)
+  const original=globalThis.fetch;let answer
+  const c=createProductSession({endpoint:'https://game.example',getSession:async()=>({access_token:'fresh',user:{id:'A'}}),catalogue:async()=>null})
+  c.accountChanged('A')
+  try{
+    globalThis.fetch=()=>new Promise(resolve=>{answer=resolve})
+    const list=c.listPublic('test-game');await new Promise(resolve=>setImmediate(resolve))
+    c.accountChanged('B');answer(Response.json({lobbies:[]}));await assert.rejects(list,{name:'AbortError'})
+    assert.equal(c.getSnapshot().lobby,null);assert.equal(c.getSnapshot().busy,false)
+  }finally{globalThis.fetch=original;c.disconnect();controller.disconnect()}
+})
 
 test('local result outcome uses server identities rather than names and exposes no raw IDs',async()=>{
   let refresh

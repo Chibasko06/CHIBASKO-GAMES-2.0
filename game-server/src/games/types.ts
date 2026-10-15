@@ -12,6 +12,6 @@ export type GameDefinition = ServerGameRegistration
 export type GameRegistry = ReadonlyMap<string, GameDefinition>
 export function serverGameRegistration(definition: SdkGameDefinition, roomType: string): ServerGameRegistration {
   const online = definition.capabilities.online
-  if (!online || !online.access.includes('private')) throw new Error('UNSUPPORTED_INSTALLATION')
+  if (!online || !online.access.length) throw new Error('UNSUPPORTED_INSTALLATION')
   return Object.freeze({ definition, id: definition.id, roomType, minPlayers: online.players.min, maxPlayers: online.players.max })
 }

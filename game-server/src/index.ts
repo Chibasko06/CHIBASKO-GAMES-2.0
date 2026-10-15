@@ -12,6 +12,7 @@ import { readPolicy, readRuntimeConfig, type RuntimePolicy } from './runtime/con
 import { installRequestPolicy, originAllowed, type RuntimeState } from './runtime/requestPolicy.js'
 import { safeLog, sdkLogger } from './runtime/logging.js'
 import { createShutdown } from './runtime/lifecycle.js'
+import { PublicLobbyDirectory } from './lobby/PublicLobbyDirectory.js'
 export const runtimeStates = new WeakMap<Server, RuntimeState>()
 
 export function createPlaygroundServer(authenticate: Authenticate = createSupabaseAuthenticator(
@@ -34,6 +35,7 @@ export function createPlaygroundServer(authenticate: Authenticate = createSupaba
     return () => { if (released) return; released = true; const next = (creators.get(userId) ?? 1) - 1; if (next) creators.set(userId, next); else creators.delete(userId) }
   }
   const registry = new Map([...(lobbyOptions.registry ?? gameRegistry)].filter(([id]) => policy.enabledGames.includes(id)))
+  const directory = new PublicLobbyDirectory()
   const server = new Server({
     transport: new WebSocketTransport({ beforeUpgrade: request => {
       if (state.shuttingDown) return new Response(null, { status: 503 })
@@ -45,10 +47,10 @@ export function createPlaygroundServer(authenticate: Authenticate = createSupaba
     logger: sdkLogger,
     greet: false,
     gracefullyShutdown: false,
-    express: lobbyResolutionRoutes(guardedAuthenticate),
+    express: lobbyResolutionRoutes(guardedAuthenticate, directory, registry),
   })
   if (!policy.production) server.define('playground', createPlaygroundRoom(guardedAuthenticate))
-  server.define('lobby', createLobbyRoom(guardedAuthenticate, coordinator, { ...lobbyOptions, registry, reserveCreation, available: () => !state.shuttingDown }))
+  server.define('lobby', createLobbyRoom(guardedAuthenticate, coordinator, { ...lobbyOptions, registry, reserveCreation, directory, available: () => !state.shuttingDown }))
   registerInternalGames(server, coordinator)
   runtimeStates.set(server, state)
   const listen = server.listen.bind(server)
@@ -57,7 +59,7 @@ export function createPlaygroundServer(authenticate: Authenticate = createSupaba
     callback?.(error)
   })
   let completed = false
-  server.onBeforeShutdown(async () => { state.shuttingDown = true; await coordinator.shutdown() })
+  server.onBeforeShutdown(async () => { state.shuttingDown = true; directory.clear(); await coordinator.shutdown() })
   server.onShutdown(() => { completed = true })
   const graceful = server.gracefullyShutdown.bind(server)
   server.gracefullyShutdown = async (exit = true, error) => {

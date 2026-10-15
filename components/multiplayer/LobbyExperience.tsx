@@ -30,7 +30,7 @@ export function LobbyView({ title, state, onReady, onStart, onLeave, onReturn, c
     catch { setFeedback('Le partage a été annulé. Tu peux copier le code.') }
   }
   return <section className="mx-auto max-w-3xl space-y-6 rounded-[28px] border border-cyan-900/60 bg-zinc-950 p-5 sm:p-8">
-    <header><p className="text-xs uppercase tracking-widest text-cyan-300">Partie privée · Chibasko Games</p><h1 className="mt-3 break-words text-3xl font-black">{title}</h1></header>
+    <header><p className="text-xs uppercase tracking-widest text-cyan-300">{lobby.visibility === 'public' ? 'Salon public' : 'Partie privée'} · Chibasko Games</p><h1 className="mt-3 break-words text-3xl font-black">{title}</h1></header>
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-800 bg-black/40 p-4">
       <div className="min-w-0 flex-1"><p className="text-sm text-zinc-400">Code de partie</p><strong className="font-mono text-2xl tracking-[0.15em] text-cyan-200">{lobby.code}</strong></div>
       <button type="button" className={multiplayerButton} onClick={() => void copy()}>Copier</button>

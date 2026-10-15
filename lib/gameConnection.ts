@@ -14,7 +14,7 @@ export async function connectGameRoom<State>(token: string, method: 'create' | '
     const data: unknown = await response.json().catch(() => null)
     const message = data && typeof data === 'object' && 'error' in data ? data.error : null
     const code = data && typeof data === 'object' && 'code' in data ? data.code : null
-    const allowed = ['AUTH_REQUIRED', 'WRONG_GAME', 'LOBBY_NOT_FOUND', 'LOBBY_FULL', 'LOBBY_STARTED', 'DUPLICATE_USER', 'CREATOR_PENDING']
+    const allowed = ['AUTH_REQUIRED', 'WRONG_GAME', 'LOBBY_NOT_FOUND', 'LOBBY_FULL', 'LOBBY_STARTED', 'DUPLICATE_USER', 'CREATOR_PENDING', 'LOBBY_UNAVAILABLE', 'ACCESS_UNSUPPORTED', 'UNKNOWN_GAME', 'RATE_LIMIT', 'UNAVAILABLE']
     // Colyseus rejects locked/full rooms before onAuth. Resolve only that failure
     // with an authenticated minimal lookup, never by exposing its raw error text.
     if (method === 'joinById' && code === 522) {

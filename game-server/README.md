@@ -57,7 +57,10 @@ ferme les connexions. Aucun User complet/email/token synchronisé.
 PlaygroundRoom : déplacement validé et état public, en dev/test seulement.
 LobbyRoom : code 6 caractères sans I/O/0/1, créateur hôte garanti après admission,
 ready strict, transfert au plus ancien, un userId par lobby. Même compte permis
-sur d'autres lobbies. Création `{ gameId }`, join `{ expectedGameId }` obligatoires.
+sur d'autres lobbies. Création `{ gameId, visibility }`, join `{ expectedGameId }`
+obligatoires. Visibilité public/private fixée à la création, capacités vérifiées
+côté serveur. Le directory public authentifié ne contient que des snapshots
+minimaux de salons WAITING rejoignables. Voir [accès online](../docs/online-access.md).
 GameRegistry : chibasko-pong, 2 joueurs, aucune règle réseau choisie par navigateur.
 Le manifeste catalogue est généré depuis ce registre.
 
@@ -81,7 +84,7 @@ http://localhost:3000 (deux profils/navigateurs). Ouvrir /lobby-playground dans
 les deux : A crée, B rejoint avec le code, les deux prêts, A lance.
 Cliquer le canvas ou y placer le focus : ↑/W et ↓/S. Premier à 5 → résultats.
 L'hôte revient à la salle d'attente, chacun Ready, nouvelle partie.
-Le canvas conserve le ratio 1000/600 sur mobile ; contrôles tactiles non implémentés.
+Le canvas conserve le ratio 1000/600 sur mobile ; contrôles tactiles disponibles.
 La page réutilise le produit sans aucune fiche/catalogue publiée ou SQL.
 Chibasko Pong reste un jeu technique non publié, non déployé et désactivé par défaut
 en production. Le VPS reste en pause.

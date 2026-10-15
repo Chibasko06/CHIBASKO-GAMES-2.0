@@ -5,6 +5,7 @@
     "capabilities": {
       "online": {
         "access": [
+          "public",
           "private"
         ],
         "players": {

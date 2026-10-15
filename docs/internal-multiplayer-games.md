@@ -16,6 +16,8 @@ n'est installé que par les tests.
 
 Lifecycle plateforme : WAITING → STARTING → PLAYING → RESULTS → WAITING.
 Les phases internes du jeu sont indépendantes.
+Public/private sont des politiques d'accès plateforme au même online ; le mode
+local reste autonome. Voir [salons publics et privés](online-access.md).
 
 Pour les étapes d'ajout, capacités, résultats, frontières et futurs adaptateurs,
 voir [SDK commun](game-sdk.md).

@@ -45,14 +45,16 @@ GameDefinition contient id, integrationVersion: 1 et des capabilities explicites
 Online contient access (public/private) et players (min/max). Local peut posséder
 une capacité différente. Aucun mode n'est activé par défaut.
 
-Pong déclare uniquement online/private, 2–2. Aucun runtime local/public n'existe.
+Pong déclare online/public et online/private (2–2), ainsi que local (2–2).
+Public et privé sont des politiques d'accès au même gameplay online. Le directory
+et sa liste sont une responsabilité plateforme, hors SDK gameplay.
 Les capacités décrivent le jeu, pas son hébergeur. Pas de hosting, roomType, URL,
 Room ou secret dans cette définition.
 
 Le registre serveur reste l'autorité d'installation. serverGameRegistration
 associe la définition à un roomType privé et dérive id/minPlayers/maxPlayers pour
-le lobby/coordinator existants. Le manifeste conserve exactement la projection
-gameId → minPlayers/maxPlayers. Activation production et publication catalogue
+le lobby/coordinator existants. Le manifeste projette gameId → capacités explicites
+et minPlayers/maxPlayers online. Activation production et publication catalogue
 restent deux contrôles distincts, inchangés.
 
 ## Participants et session

@@ -41,16 +41,16 @@ test('network bridge: private seats, real admissions, PLAYING, timeout, retry an
     const request = (method: string, target: string, body: unknown = {}) => fetch(`${endpoint}/matchmake/${method}/${target}`, {
       method: 'POST', headers: { Authorization: 'Bearer C', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     })
-    for (const body of [{ gameId: 'unknown' }, { gameId: 'chibasko-pong', maxPlayers: 4 }, { gameId: 'chibasko-pong', roomType: 'playground' }, { gameId: 'chibasko-pong', provider: 'external' }, { gameId: 'chibasko-pong', url: 'http://other.invalid' }]) {
+    for (const body of [{ gameId: 'unknown', visibility: 'private' }, { gameId: 'chibasko-pong', visibility: 'private', maxPlayers: 4 }, { gameId: 'chibasko-pong', visibility: 'private', roomType: 'playground' }, { gameId: 'chibasko-pong', visibility: 'private', provider: 'external' }, { gameId: 'chibasko-pong', visibility: 'private', url: 'http://other.invalid' }]) {
       assert.equal((await request('create', 'lobby', body)).ok, false)
     }
-    const a = await connectLobby('A', undefined, endpoint)
-    const b = await connectLobby('B', a.roomId, endpoint)
+    const a = await connectLobby('A', undefined, endpoint, 'chibasko-pong')
+    const b = await connectLobby('B', a.roomId, endpoint, 'chibasko-pong')
     connections.push(a, b)
     for (const room of [a, b]) { room.onMessage('lobby_error', () => {}); room.onMessage('game_cancelled', () => {}) }
     assert.equal(a.state.gameId, 'chibasko-pong')
     assert.equal(a.state.minPlayers, 2); assert.equal(a.state.maxPlayers, 2)
-    await assert.rejects(connectLobby('C', a.roomId, endpoint))
+    await assert.rejects(connectLobby('C', a.roomId, endpoint, 'chibasko-pong'))
     type Offer = { transitionId: string; gameId: string; reservation: Reservation }
     const offersA: Offer[] = [], offersB: Offer[] = []
     a.onMessage('game_reservation', offer => offersA.push(offer))
@@ -113,7 +113,7 @@ test('network bridge: private seats, real admissions, PLAYING, timeout, retry an
     await b.leave()
     await until(() => a.state.status === 'WAITING' && !matchMaker.getLocalRoomById(third.reservation.roomId))
     await assert.rejects(consumeGameReservation(third.reservation, endpoint))
-    const replacement = await connectLobby('B', a.roomId, endpoint)
+    const replacement = await connectLobby('B', a.roomId, endpoint, 'chibasko-pong')
     connections.push(replacement)
     replacement.onMessage('lobby_error', () => {})
     replacement.onMessage('game_cancelled', () => {})

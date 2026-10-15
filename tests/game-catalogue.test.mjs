@@ -10,7 +10,7 @@ const classic = { title: 'Test', slug: 'test', game_url: 'https://example.com/ga
 const multi = { ...classic, game_type: 'multiplayer_chibasko', game_url: null, multiplayer_game_id: 'chibasko-pong', is_beta: true }
 test('manifest matches registry, exposes public capabilities and detects stale content', async () => {
   await checkManifest()
-  const definition = { minPlayers: 2, maxPlayers: 2, capabilities: { online: { access: ['private'], players: { min: 2, max: 2 } }, local: { players: { min: 2, max: 2 } } } }; assert.deepEqual(JSON.parse(generateManifest()), { 'chibasko-pong': definition })
+  const definition = { minPlayers: 2, maxPlayers: 2, capabilities: { online: { access: ['public', 'private'], players: { min: 2, max: 2 } }, local: { players: { min: 2, max: 2 } } } }; assert.deepEqual(JSON.parse(generateManifest()), { 'chibasko-pong': definition })
   assert.throws(() => assertManifestCurrent(generateManifest(new Map())), /stale/)
   assert.deepEqual(getMultiplayerDefinition('chibasko-pong'), definition)
   assert.equal(getMultiplayerDefinition('toString'), undefined)

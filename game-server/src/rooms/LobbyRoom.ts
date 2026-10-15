@@ -9,9 +9,10 @@ import { LobbyPlayerState } from '../schema/LobbyPlayerState.js'
 import { resolveGame, gameRegistry } from '../games/registry.js'
 import type { GameDefinition, GameRegistry } from '../games/types.js'
 import type { GameSessionCoordinator } from '../platform/multiplayer/GameSessionCoordinator.js'
+import type { PublicLobbyDirectory, LobbyVisibility } from '../lobby/PublicLobbyDirectory.js'
 
 type LobbyClient = Client<{ auth: AuthenticatedPlayer }>
-export type LobbyOptions = { allocateCode?: () => string; startDelayMs?: number; registry?: GameRegistry; reserveCreation?: (userId: string) => (() => void) | undefined; available?: () => boolean }
+export type LobbyOptions = { allocateCode?: () => string; startDelayMs?: number; registry?: GameRegistry; reserveCreation?: (userId: string) => (() => void) | undefined; available?: () => boolean; directory?: PublicLobbyDirectory }
 
 export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSessionCoordinator, config: LobbyOptions = {}) {
   return class LobbyRoom extends Room<{ state: LobbyState; client: LobbyClient }> {
@@ -24,15 +25,20 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
       let identity: AuthenticatedPlayer
       try { identity = await authenticate(token) } catch { throw new ServerError(401, 'AUTH_REQUIRED') }
       if (creating) {
-        if (Object.keys(options).length !== 1 || !('gameId' in options)) throw new ServerError(400, 'INVALID_PAYLOAD')
-        try { resolveGame(options.gameId, config.registry ?? gameRegistry) } catch { throw new ServerError(400, 'UNKNOWN_GAME') }
+        if (Object.keys(options).length !== 2 || !('gameId' in options) || !('visibility' in options)
+          || !['public', 'private'].includes(options.visibility as string)) throw new ServerError(400, 'INVALID_PAYLOAD')
+        let definition: GameDefinition
+        try { definition = resolveGame(options.gameId, config.registry ?? gameRegistry) } catch { throw new ServerError(400, 'UNKNOWN_GAME') }
+        if (!definition.definition.capabilities.online?.access.includes(options.visibility as LobbyVisibility)) throw new ServerError(403, 'ACCESS_UNSUPPORTED')
       } else {
-        if (Object.keys(options).length !== 1 || !('expectedGameId' in options) || typeof options.expectedGameId !== 'string') throw new ServerError(400, 'INVALID_PAYLOAD')
+        if (Object.keys(options).some(key => !['expectedGameId', 'publicOnly'].includes(key)) || !('expectedGameId' in options)
+          || typeof options.expectedGameId !== 'string' || ('publicOnly' in options && options.publicOnly !== true)) throw new ServerError(400, 'INVALID_PAYLOAD')
         const code = path.split('/').pop()!
         const lobby = matchMaker.getLocalRoomById(code)
         if (!lobby || lobby.roomName !== 'lobby') throw new ServerError(404, 'LOBBY_NOT_FOUND')
         const gameId = await matchMaker.remoteRoomCall(code, 'getPublicGameId')
         if (gameId !== options.expectedGameId) throw new ServerError(409, 'WRONG_GAME')
+        await matchMaker.remoteRoomCall(code, 'assertJoinable', ['publicOnly' in options && options.publicOnly === true])
       }
       // This field is injected only AFTER strict input validation and verified Auth.
       // Colyseus passes these creation options to onCreate; the browser cannot set it.
@@ -50,11 +56,29 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
     private transitionId: string | undefined
     private returning = false
     getPublicGameId() { return this.state.gameId }
+    assertJoinable(publicOnly = false) {
+      if (config.available?.() === false) throw new ServerError(503, 'UNAVAILABLE')
+      if (!(config.registry ?? gameRegistry).has(this.state.gameId)) throw new ServerError(403, 'UNKNOWN_GAME')
+      if (publicOnly && this.state.visibility !== 'public') throw new ServerError(409, 'LOBBY_UNAVAILABLE')
+      if (this.state.status !== 'WAITING') throw new ServerError(409, 'LOBBY_STARTED')
+    }
+    private publishDirectory() {
+      const host = [...this.participants.values()].find(p => p.identity.userId === this.state.hostUserId)?.identity
+      const visible = config.available?.() !== false && this.state.visibility === 'public' && this.state.status === 'WAITING'
+        && this.creatorAdmitted && !!host && this.state.players.size > 0 && this.state.players.size < this.maxClients && !this.locked && !this.hasReachedMaxClients()
+        && (config.registry ?? gameRegistry).get(this.state.gameId)?.definition.capabilities.online?.access.includes('public')
+      config.directory?.update(this.roomId, visible && host ? { code: this.state.code, gameId: this.state.gameId,
+        host: { username: host.username, avatarUrl: host.avatarUrl }, currentPlayers: this.state.players.size, maxPlayers: this.maxClients } : null,
+      Math.min(...[...this.participants.values()].map(p => p.identity.expiresAt)))
+    }
+    onBeforePatch() { this.publishDirectory() }
 
-    async onCreate(options: { _creatorUserId?: unknown; gameId?: unknown }) {
+    async onCreate(options: { _creatorUserId?: unknown; gameId?: unknown; visibility?: unknown }) {
       if (typeof options._creatorUserId !== 'string' || !options._creatorUserId) throw new ServerError(401, 'AUTH_REQUIRED')
       this.creatorUserId = options._creatorUserId
       this.definition = resolveGame(options.gameId, config.registry ?? gameRegistry)
+      if (!['public', 'private'].includes(options.visibility as string) || !this.definition.definition.capabilities.online?.access.includes(options.visibility as LobbyVisibility)) throw new ServerError(403, 'ACCESS_UNSUPPORTED')
+      this.state.visibility = options.visibility as LobbyVisibility
       this.maxClients = this.definition.maxPlayers
       this.state.gameId = this.definition.id
       this.state.minPlayers = this.definition.minPlayers
@@ -140,7 +164,8 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
         void this.unlock().catch(() => this.closeLobby())
       })
     }
-    async onJoin(client: LobbyClient) {
+    async onJoin(client: LobbyClient, options: { publicOnly?: boolean } = {}) {
+      this.assertJoinable(options.publicOnly === true)
       if (config.available?.() === false) throw new ServerError(503, 'UNAVAILABLE')
       if (!client.auth || client.auth.expiresAt <= Date.now()) throw new ServerError(401, 'AUTH_REQUIRED')
       if (this.state.status !== 'WAITING') throw new ServerError(409, 'LOBBY_STARTED')
@@ -160,6 +185,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
         this.state.hostUserId = client.auth.userId
         await this.unlock()
       }
+      this.publishDirectory()
     }
     onLeave(client: LobbyClient) {
       const leaving = this.state.players.get(client.sessionId)
@@ -173,8 +199,10 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
         this.state.hostUserId = this.participants.values().next().value!.identity.userId
       }
       if (this.transitionId) coordinator.participantLeft(this.transitionId, leaving.userId)
+      this.publishDirectory()
     }
     onDispose() {
+      config.directory?.remove(this.roomId)
       this.releaseCreation?.()
       if (this.transitionId) coordinator.cancel(this.transitionId, false)
       clearTimeout(this.countdown)
@@ -192,6 +220,7 @@ export function createLobbyRoom(authenticate: Authenticate, coordinator: GameSes
     private transition(next: LobbyStatus) {
       if (!canTransition(this.state.status as LobbyStatus, next)) throw new Error('Invalid lobby transition')
       this.state.status = next
+      this.publishDirectory()
     }
     private cancelStart() {
       clearTimeout(this.countdown)

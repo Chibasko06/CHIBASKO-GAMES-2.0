@@ -8,6 +8,6 @@ test('lobby code normalizes without accepting ambiguous characters', () => {
 test('invalid lobby code never starts HTTP matchmaking', async () => {
   const original = globalThis.fetch
   globalThis.fetch = () => { throw new Error('Unexpected network request') }
-  try { await assert.rejects(connectLobby('test-token', 'invalid-code'), /Code invalide/) }
+  try { await assert.rejects(connectLobby('test-token', 'invalid-code', undefined, 'test-game'), /Code invalide/) }
   finally { globalThis.fetch = original }
 })

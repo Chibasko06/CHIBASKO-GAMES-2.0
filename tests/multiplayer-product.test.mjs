@@ -30,6 +30,9 @@ import { createPongControls } from '../games/chibasko-pong/client/pongControls.t
 import { drawPong } from '../games/chibasko-pong/client/pongRenderer.ts'
 import { gameLaunchOptions } from '../lib/multiplayer/gameLaunchOptions.ts'
 import GameResults from '../components/multiplayer/GameResults.tsx'
+import PublicLobbyBrowser from '../components/multiplayer/PublicLobbyBrowser.tsx'
+import OnlinePage, { metadata as onlineMetadata } from '../app/games/[slug]/online/page.tsx'
+import PrivatePage from '../app/games/[slug]/private/page.tsx'
 import GameTypeFields from '../components/admin/GameTypeFields.tsx'
 import { changeGameFormType, gameFormPayload } from '../lib/multiplayer/catalogue.ts'
 import { validateGameCatalogue } from '../lib/server/gameCatalogueValidation.ts'
@@ -263,7 +266,7 @@ test('SDK hook follows state revisions, switches connections, unsubscribes and r
 })
 
 test('generic platform has no Pong import, condition or direction input; registry is the explicit boundary', async () => {
-  for (const path of ['components/multiplayer/LobbyExperience.tsx','components/multiplayer/MultiplayerProvider.tsx','lib/multiplayer/productSession.ts','lib/lobbyGameSession.ts','components/multiplayer/GameRuntime.tsx','game-server/src/index.ts','game-server/src/rooms/LobbyRoom.ts','game-server/src/platform/multiplayer/GameSessionCoordinator.ts']) {
+  for (const path of ['components/multiplayer/LobbyExperience.tsx','components/multiplayer/MultiplayerProvider.tsx','lib/multiplayer/productSession.ts','lib/lobbyGameSession.ts','components/multiplayer/GameRuntime.tsx','components/multiplayer/PublicLobbyBrowser.tsx','lib/multiplayer/publicLobbies.ts','game-server/src/index.ts','game-server/src/rooms/LobbyRoom.ts','game-server/src/platform/multiplayer/GameSessionCoordinator.ts']) {
     const source=await readFile(new URL(`../${path}`,import.meta.url),'utf8')
     assert.doesNotMatch(source,/chibasko-pong|PongCanvas|PongRoom|pongView|set_input|direction/)
   }
@@ -326,6 +329,85 @@ async function mounted(Component, props, run) {
 }
 const click=async element=>{await act(async()=>element.click())}
 
+test('online/private routes require a session, validate catalogue/capability, and retain exact safe returns', async()=>{
+  for(const [Page,path] of [[OnlinePage,'online'],[PrivatePage,'private']]){
+    await assert.rejects(Page({params:Promise.resolve({slug:'pong'})}),new RegExp('REDIRECT /login\\?next='+encodeURIComponent('/games/pong/'+path)))
+    for(const slug of ['missing','classic','hidden']) await assert.rejects(Page({params:Promise.resolve({slug})}),/NOT_FOUND/)
+    globalThis.__productAuth={user:{id:'A'},loading:false}
+    const content=renderToStaticMarkup(await Page({params:Promise.resolve({slug:'pong'})}))
+    assert.match(content,/Chibasko Pong/); assert.match(content,path==='online'?/Salons publics/:/Créer une partie privée/)
+    globalThis.__productAuth={user:null,loading:false}
+  }
+  assert.equal(onlineMetadata.robots.index,false)
+  globalThis.__productRows=[{...multi,multiplayer_game_id:'unknown'}]
+  await assert.rejects(OnlinePage({params:Promise.resolve({slug:'pong'})}),/NOT_FOUND/)
+})
+
+test('public browser loads only explicitly, refreshes, creates and joins using the shared product controller', async()=>{
+  const calls=[],game={slug:'pong',gameId:'chibasko-pong'}
+  let lists=0
+  globalThis.__productAuth={user:{id:'A'},loading:false}
+  globalThis.__productMultiplayer={available:true,state:{busy:false,error:''},controller:{
+    async listPublic(id,signal){lists++;assert.equal(id,game.gameId);assert.equal(signal.aborted,false);return lists===1?[]:[{code:'ABCDEF',gameId:game.gameId,host:{username:'Alice très long nom public',avatarUrl:null},currentPlayers:1,maxPlayers:2}]},
+    async connect(...args){calls.push(args);return {...game,code:'ABCDEF'}},
+  }}
+  try{
+    await mounted(PublicLobbyBrowser,{game},async()=>{
+      assert.equal(lists,1);assert.match(document.body.textContent,/Aucun salon public/)
+      assert.equal(calls.length,0,'viewing a page never joins')
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Actualiser'))
+      assert.equal(lists,2);assert.match(document.body.textContent,/Salon de Alice/);assert.match(document.body.textContent,/1 \/ 2 joueurs/)
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Rejoindre'))
+      assert.deepEqual(calls[0],[game,'ABCDEF',{publicOnly:true}]);assert.equal(globalThis.__productNavigation,'/games/pong/lobby/ABCDEF')
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Créer un salon public'))
+      assert.deepEqual(calls[1],[game,undefined,{visibility:'public'}])
+    })
+  }finally{delete globalThis.__productMultiplayer}
+})
+
+test('public browser handles errors, expired auth, unavailable server and aborts old listing on account change/unmount',async()=>{
+  const game={slug:'pong',gameId:'chibasko-pong'}
+  const state={busy:false,error:''};let mode='network',requests=[]
+  globalThis.__productAuth={user:{id:'A'},loading:false}
+  globalThis.__productMultiplayer={available:true,state,controller:{async listPublic(_id,signal){requests.push(signal);if(mode==='pending')return new Promise(()=>{});throw mode==='expired'?new Error('AUTH_REQUIRED'):new TypeError('fetch failed')}}}
+  try{
+    await mounted(PublicLobbyBrowser,{game},async root=>{
+      assert.match(document.querySelector('[role=alert]').textContent,/temporairement indisponible/)
+      const refresh=[...document.querySelectorAll('button')].find(b=>b.textContent==='Actualiser')
+      assert.equal(refresh.disabled,false,'failed request never leaves an infinite spinner')
+      mode='expired';await click(refresh);assert.equal(globalThis.__productNavigation,'/login?next=%2Fgames%2Fpong%2Fonline')
+      mode='pending';await click(refresh);assert.equal(refresh.disabled,true)
+      const previous=requests.at(-1);globalThis.__productAuth={user:{id:'B'},loading:false}
+      await act(async()=>root.render(createElement(PublicLobbyBrowser,{game})));assert.equal(previous.aborted,true)
+      await act(async()=>root.unmount());assert.equal(requests.at(-1).aborted,true)
+    })
+    globalThis.__productMultiplayer.available=false
+    await mounted(PublicLobbyBrowser,{game},async()=>{
+      assert.match(document.body.textContent,/temporairement indisponible/)
+      assert.ok([...document.querySelectorAll('button')].every(b=>b.disabled))
+    })
+    globalThis.__productAuth={user:null,loading:false}
+    await mounted(PublicLobbyBrowser,{game},async()=>{
+      assert.ok(document.querySelector('a[href="/login?next=%2Fgames%2Fpong%2Fonline"]'))
+      assert.equal(document.querySelector('ul'),null)
+    })
+  }finally{delete globalThis.__productMultiplayer}
+})
+
+test('dedicated private form creates through the existing pipeline; lobby identifies public access',async()=>{
+  const game={slug:'pong',gameId:'chibasko-pong'},calls=[]
+  globalThis.__productAuth={user:{id:'A'},loading:false}
+  globalThis.__productMultiplayer={available:true,state:{busy:false,error:''},controller:{async connect(...args){calls.push(args);return {...game,code:'ABCDEF'}}}}
+  try{
+    await mounted(MultiplayerEntry,{game,expanded:true,returnPath:'/games/pong/private'},async()=>{
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Créer une partie privée'))
+      assert.deepEqual(calls[0],[game,undefined]);assert.equal(globalThis.__productNavigation,'/games/pong/lobby/ABCDEF')
+    })
+    const markup=html(LobbyView,{title:'Fixture',state:{error:'',lobby:{...game,visibility:'public',code:'ABCDEF',status:'WAITING',minPlayers:2,maxPlayers:2,players:[]},game:{}},onReady(){},onStart(){},onLeave(){}})
+    assert.match(markup,/Salon public/)
+  }finally{delete globalThis.__productMultiplayer}
+})
+
 test('navbar desktop/mobile has Multiplayer, no Home link, logo still links home',async()=>{
   assert.match(html(ChibaskoLogo),/href="\/"/)
   await mounted(Navbar,{},async()=>{
@@ -384,7 +466,7 @@ test('shared game detail keeps classic iframe and exposes multiplayer without if
   const b=await render('pong');assert.doesNotMatch(b,/<iframe/);assert.match(b,/2 joueurs/);assert.match(b,/Bêta/);assert.match(b,/Partie privée/)
   assert.match(b,/Crée une partie privée ou rejoins-en une avec un code\./)
   assert.match(b,/Jouer en local/);assert.match(b,/Joue à deux sur le même appareil\./)
-  assert.doesNotMatch(b,/Jouer en multijoueur|Jouer en ligne/)
+  assert.doesNotMatch(b,/Jouer en multijoueur/);assert.ok(b.includes('href="/games/pong/online"'));assert.ok(b.includes('href="/games/pong/private"'));assert.match(b,/Rejoins un salon public ou crée le tien/)
   for(const content of [a,b]){assert.match(content,/Favoris/);assert.match(content,/data-testid="reviews"/);assert.match(content,/👍/)}
   globalThis.__productRows=[{...multi,multiplayer_game_id:'unknown'}]
   assert.match(await render('pong'),/temporairement indisponible/)
