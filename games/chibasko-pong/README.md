@@ -11,7 +11,7 @@ Un duel Pong 1v1 de Chibasko Games. **Non publié**, disponible pour recette loc
 - client/pongView.ts : projection publique, sans Auth ni configuration serveur.
 - shared/simulation.ts : unique moteur pur, constantes, modèle initial et pas fixe communs.
 - local/localRuntime.ts : runtime hors réseau ; local/PongLocalGame.tsx : boucle navigateur et résultats locaux.
-- Serveur : game-server/src/games/chibasko-pong/ (driver, State, registration), utilisant le même moteur.
+- server/ : driver SDK et PongState ; installation par l'adaptateur privé extérieur au jeu.
 
 Règles inchangées : 2 joueurs, terrain 1000 × 600, 30 ticks/s, premier à 5,
 countdown 3 s, pause point 1 s, abandon, résultats et retour salle d'attente.
@@ -86,14 +86,12 @@ même accumulateur à 30 Hz, avec un delta borné à 250 ms. Les valeurs 1000×6
 3 secondes de countdown, 1 seconde de pause et victoire à 5 ne changent pas.
 Seul le driver online possède admission, limitation d'inputs et abandon réseau.
 
-Le moteur est aussi un package **local privé**, `@chibaskogames/pong-engine`,
-dans shared/, sans dépendance. Le navigateur importe sa source ; le serveur
-importe sa compilation TypeScript. Cela conserve `game-server/dist/index.js`
-et évite d'élargir le rootDir du serveur à toute la plateforme. Les précommandes
-build/test/dev compilent le SDK puis ce moteur. Garder shared/ dans les releases
-avec game-server/ et packages/game-sdk/. Aucun package n'est publié.
+Le package privé `@chibaskogames/chibasko-pong` expose /shared pour le moteur,
+/client, /local et /server. Sa définition est dans definition.ts. Le SDK est un
+peer fourni par l'hôte. Aucun package n'est publié. Conserver tout ce dossier
+dans les releases actuelles avec game-server/ et packages/game-sdk/.
 
-La définition déclare online/private/2 et local/2, jamais public. Le manifeste
+La définition déclare online/public et online/private (2 joueurs), et local/2. Le manifeste
 généré expose ces capacités. La fiche propose « Jouer en local » seulement si
 la capacité et le loader local existent. `/games/[slug]/local` utilise la même
 lecture de catalogue publié que la fiche : une fiche absente/non publiée,
@@ -144,7 +142,37 @@ pong-local-parity.test.ts et pong-network.test.ts. La parité compare chaque cha
 du modèle entre drivers sur deux parties complètes ; les tests physiques restent
 ceux du moteur existant. Les imports shared sont contrôlés par les boundaries.
 
-Avant extraction future du dépôt : next/image pour les avatars online,
-Tailwind/CSS/fonts du site, @colyseus/schema pour la projection serveur et
-enregistrement privé de la Room restent des dépendances explicites. Le moteur,
-lui, ne dépend d'aucun de ces éléments.
+## Package autonome et extraction
+
+Depuis ce dossier : `npm run build`, `npm run typecheck`, `npm test`.
+Cibles distinctes : build:shared, build:server, build:client. Le SDK compilé et les
+dépendances déclarées doivent être installés ; aucun build Next.js requis.
+Les tests possèdent leur propre hôte React/jsdom et leur loader CSS Module.
+Tests séparés : test:shared (sans SDK/schema/React), test:server (sans React),
+test:client (hôte React minimal). Le test global inclut les trois familles.
+
+Après copie hors du repository, avec Node 24 et un SDK compilé fourni localement :
+
+```sh
+npm install --no-save /chemin/vers/chibaskogames-sdk-0.0.0.tgz
+npm run build
+npm run typecheck
+npm test
+```
+
+Le package ne contient aucun chemin relatif vers le SDK de la plateforme.
+Exports publics : root (pongDefinition), /client et /local (default + gameId),
+/server (pongServerModule, PongState), /shared (moteur pur).
+L'hôte React doit supporter les CSS Modules ; le CSS est livré dans dist.
+Le serveur n'utilise pas React. @colyseus/schema est sa seule dépendance de projection.
+
+Styles, reset, palette et typographie sont intégralement locaux. Les avatars
+utilisent un élément img standard, avec URL publique fournie par le SDK.
+Aucun asset, font loader, variable CSS ou classe Tailwind privée du site.
+La surface sombre du composant reste lisible même sur un hôte HTML clair.
+
+À la racine : `npm run test:pong-extraction` copie réellement le package hors du
+repository, le construit et teste avec le SDK et des dépendances génériques seuls.
+Voir [audit, exports et préparation SDK](../../docs/pong-extraction.md).
+La future distribution du SDK et le lockfile du futur repository restent à choisir.
+Chibasko Pong reste non publié et non déployé.

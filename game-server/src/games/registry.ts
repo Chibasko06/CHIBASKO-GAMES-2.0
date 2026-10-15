@@ -1,6 +1,6 @@
 import type { GameDefinition, GameRegistry } from './types.js'
 import { serverGameRegistration } from './types.ts'
-import { pongDefinition } from './chibasko-pong/definition.ts'
+import { pongDefinition } from '@chibaskogames/chibasko-pong'
 
 const pong: GameDefinition = serverGameRegistration(pongDefinition, 'pong')
 export const gameRegistry: GameRegistry = new Map([[pong.id, pong]])

@@ -6,7 +6,7 @@ import { createPlaygroundServer } from '../src/index.js'
 import { connectLobby } from '../../lib/lobbyConnection.js'
 import { consumeGameReservation } from '../../lib/gameConnection.js'
 import type { Reservation } from '../src/platform/multiplayer/GameSessionCoordinator.js'
-import type { PongState } from '../src/games/chibasko-pong/PongState.js'
+import type { PongState } from '@chibaskogames/chibasko-pong/server'
 
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 4000

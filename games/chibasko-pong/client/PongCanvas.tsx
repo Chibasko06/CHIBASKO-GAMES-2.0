@@ -1,21 +1,21 @@
 'use client'
+/* eslint-disable @next/next/no-img-element -- Portable React game: avatars are public URLs supplied by the SDK. */
 import { useEffect, useId, useMemo, useRef } from 'react'
-import Image from 'next/image'
-import type { PongView } from './pongView'
-import type { PongFrame } from './pongPresentation'
-import { createPongControls, localLeftKeys, type Direction } from './pongControls'
-import { fitPongCourt } from './pongLayout'
-import { drawPong } from './pongRenderer'
+import type { PongView } from './pongView.js'
+import type { PongFrame } from './pongPresentation.js'
+import { createPongControls, localLeftKeys, type Direction } from './pongControls.js'
+import { fitPongCourt } from './pongLayout.js'
+import { drawPong } from './pongRenderer.js'
 import styles from './pong.module.css'
-import PongLocalControls from '../local/PongLocalControls'
+import PongLocalControls from '../local/PongLocalControls.js'
 
 const ignoreInput = () => {}
-const controlClass = 'min-h-16 flex-1 touch-none select-none rounded-2xl border border-cyan-800 bg-cyan-950/50 px-4 py-4 text-3xl text-cyan-100 hover:bg-cyan-900/60 active:bg-cyan-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300 disabled:opacity-40'
+const controlClass = styles.touchButton
 function Player({ name, avatar, local, right, keys }: { name: string; avatar?: string; local: boolean; right?: boolean; keys?: string }) {
-  return <div className={styles.player + ' flex min-w-0 flex-col gap-2 ' + (right ? styles.rightPlayer + ' items-end text-right' : 'items-start')}>
-    {avatar ? <Image src={avatar} alt="" width={36} height={36} className="h-9 w-9 rounded-full object-cover" /> : <span aria-hidden="true" className={'flex h-9 w-9 items-center justify-center rounded-full ' + (right ? 'bg-amber-950 text-amber-200' : 'bg-cyan-950 text-cyan-200')}>{name.slice(0, 1).toUpperCase() || '?'}</span>}
-    <p className={'w-full break-words text-sm font-bold sm:text-base ' + (right ? 'text-amber-100' : 'text-cyan-100')}>{name || 'Joueur'}</p>
-    <span className="text-xs text-zinc-400">{keys ?? (local ? 'Toi' : 'Adversaire')} · {right ? 'Droite' : 'Gauche'}</span>
+  return <div className={styles.player + (right ? ' ' + styles.rightPlayer : '')}>
+    {avatar ? <img loading="lazy" decoding="async" referrerPolicy="no-referrer" src={avatar} alt="" width={36} height={36} className={styles.avatar} /> : <span aria-hidden="true" className={styles.avatarFallback + (right ? ' ' + styles.warmAvatar : '')}>{name.slice(0, 1).toUpperCase() || '?'}</span>}
+    <p className={styles.playerName + (right ? ' ' + styles.warmName : '')}>{name || 'Joueur'}</p>
+    <span className={styles.playerHint}>{keys ?? (local ? 'Toi' : 'Adversaire')} · {right ? 'Droite' : 'Gauche'}</span>
   </div>
 }
 export default function PongCanvas({ view, onInput, onRightInput, readFrame }: { view: PongView; onInput(direction: Direction): void; onRightInput?: (direction: Direction) => void; readFrame?: () => PongFrame | null }) {
@@ -66,38 +66,38 @@ export default function PongCanvas({ view, onInput, onRightInput, readFrame }: {
   const phaseText = view.phase === 'COUNTDOWN' ? 'Départ dans ' + Math.max(1, Math.ceil(view.remainingMs / 1000)) + '…'
     : view.phase === 'POINT_PAUSE' ? (view.pointName ? 'Point pour ' + view.pointName + ' !' : 'Point marqué !')
     : view.phase === 'FINISHED' ? (local ? 'Victoire ' + (view.winnerSide === 'LEFT' ? view.leftName : view.rightName) + ' !' : view.winnerSide === view.selfSide ? 'Victoire !' : 'Partie terminée.') : view.phase === 'READY' ? 'Préparation du terrain…' : 'À toi de jouer !'
-  return <section ref={root} aria-label="Chibasko Pong" className={styles.game + (local ? ' ' + styles.localGame : '') + ' min-w-0 space-y-4'} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) clear() }}>
-    <header className={styles.heading + ' flex flex-wrap items-center justify-between gap-2'}><h2 className="text-xl font-black tracking-tight">Chibasko Pong</h2><span className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">Duel · 2 joueurs · Premier à 5</span></header>
-    <div className={styles.hud + ' grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-zinc-800 bg-black/40 p-3 sm:p-4'}>
+  return <section ref={root} aria-label="Chibasko Pong" className={styles.game + (local ? ' ' + styles.localGame : '')} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) clear() }}>
+    <header className={styles.heading}><h2 className={styles.title}>Chibasko Pong</h2><span className={styles.badge}>Duel · 2 joueurs · Premier à 5</span></header>
+    <div className={styles.hud}>
       <Player name={view.leftName} avatar={view.leftAvatar} local={view.selfSide === 'LEFT'} keys={local ? 'Z / S' : undefined} />
-      <div className="text-center"><p aria-label={'Score : ' + view.leftName + ' ' + view.leftScore + ', ' + view.rightName + ' ' + view.rightScore} className="whitespace-nowrap text-3xl font-black tabular-nums sm:text-5xl"><span className="text-cyan-200">{view.leftScore}</span><span className="mx-2 text-zinc-600">—</span><span className="text-amber-200">{view.rightScore}</span></p><p className="mt-1 text-[10px] uppercase tracking-widest text-zinc-500">Premier à 5</p></div>
+      <div className={styles.center}><p aria-label={'Score : ' + view.leftName + ' ' + view.leftScore + ', ' + view.rightName + ' ' + view.rightScore} className={styles.score}><span className={styles.coolScore}>{view.leftScore}</span><span className={styles.scoreDash}>—</span><span className={styles.warmScore}>{view.rightScore}</span></p><p className={styles.scoreHint}>Premier à 5</p></div>
       <Player name={view.rightName} avatar={view.rightAvatar} local={view.selfSide === 'RIGHT'} right keys={local ? '↑ / ↓' : undefined} />
     </div>
-    <div data-pong-court className={styles.court + ' relative overflow-hidden rounded-2xl border border-cyan-900/70 bg-zinc-950 shadow-[0_0_32px_rgba(34,211,238,0.08)]'}>
+    <div data-pong-court className={styles.court}>
       <canvas ref={canvas} width={view.width} height={view.height} tabIndex={0} onKeyDown={event => keyboard(event, true)} onKeyUp={event => keyboard(event, false)} onBlur={clear}
         aria-label={local ? 'Terrain de Pong local. Joueur 1 : Z et S. Joueur 2 : flèches haut et bas.' : 'Terrain de Pong. Flèche haut ou W pour monter, flèche bas ou S pour descendre.'} aria-describedby={controlsId}
-        className="block h-auto w-full focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-cyan-300">Ton navigateur ne permet pas d’afficher le terrain.</canvas>
-      {['READY', 'COUNTDOWN', 'POINT_PAUSE', 'FINISHED'].includes(view.phase) && <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-zinc-950/55 p-4 text-center">
+        className={styles.canvas}>Ton navigateur ne permet pas d’afficher le terrain.</canvas>
+      {['READY', 'COUNTDOWN', 'POINT_PAUSE', 'FINISHED'].includes(view.phase) && <div className={styles.overlay}>
         <div key={view.phase === 'COUNTDOWN' ? Math.ceil(view.remainingMs / 1000) : view.phase + '-' + view.leftScore + '-' + view.rightScore} className={styles.reveal}>
-          {view.phase === 'COUNTDOWN' ? <><p className="text-xs uppercase tracking-widest text-cyan-200">Prépare-toi</p><p aria-hidden="true" className={styles.countdown + ' text-6xl font-black text-white sm:text-8xl'}>{Math.max(1, Math.ceil(view.remainingMs / 1000))}</p></> : <p className="break-words text-xl font-black text-white sm:text-3xl">{view.phase === 'READY' ? 'Préparation du terrain…' : phaseText}</p>}
-          {view.phase === 'POINT_PAUSE' && <p className="mt-2 text-sm text-zinc-300">La partie reprend…</p>}
+          {view.phase === 'COUNTDOWN' ? <><p className={styles.prepare}>Prépare-toi</p><p aria-hidden="true" className={styles.countdown}>{Math.max(1, Math.ceil(view.remainingMs / 1000))}</p></> : <p className={styles.phaseTitle}>{view.phase === 'READY' ? 'Préparation du terrain…' : phaseText}</p>}
+          {view.phase === 'POINT_PAUSE' && <p className={styles.resume}>La partie reprend…</p>}
         </div>
       </div>}
     </div>
-    <p role="status" aria-live="polite" aria-atomic="true" className={styles.status + ' min-h-6 break-words text-center text-sm font-semibold text-cyan-100'}>{phaseText}</p>
+    <p role="status" aria-live="polite" aria-atomic="true" className={styles.status}>{phaseText}</p>
     <div className={styles.controls} onKeyDown={event => keyboard(event, true)} onKeyUp={event => keyboard(event, false)}>
-      <p id={controlsId} className={styles.instructions + ' text-sm text-zinc-400'}>{local ? 'Protège ton côté et marque 5 points. Place le focus sur le terrain : Joueur 1 utilise Z / S ; Joueur 2 utilise ↑ / ↓. Sur écran tactile, chacun utilise les boutons de son côté.' : <>Protège ton côté : déplace ta raquette pour empêcher la balle de passer. Sur ordinateur, place le focus sur le terrain : <kbd className="text-zinc-100">↑ / W</kbd> pour monter, <kbd className="text-zinc-100">↓ / S</kbd> pour descendre.</>}</p>
-      {local ? <PongLocalControls left={controls} right={rightControls} active={active} /> : <div className="mt-3 flex gap-3" role="group" aria-label="Contrôles de ta raquette" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.reset() }}>
+      <p id={controlsId} className={styles.instructions}>{local ? 'Protège ton côté et marque 5 points. Place le focus sur le terrain : Joueur 1 utilise Z / S ; Joueur 2 utilise ↑ / ↓. Sur écran tactile, chacun utilise les boutons de son côté.' : <>Protège ton côté : déplace ta raquette pour empêcher la balle de passer. Sur ordinateur, place le focus sur le terrain : <kbd className={styles.key}>↑ / W</kbd> pour monter, <kbd className={styles.key}>↓ / S</kbd> pour descendre.</>}</p>
+      {local ? <PongLocalControls left={controls} right={rightControls} active={active} /> : <div className={styles.onlineControls} role="group" aria-label="Contrôles de ta raquette" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.reset() }}>
         {([-1, 1] as const).map(direction => <button key={direction} type="button" disabled={!active} className={controlClass} aria-label={direction === -1 ? 'Monter la raquette' : 'Descendre la raquette'}
           onPointerDown={event => press(event, direction)} onPointerUp={event => controls.release(event.pointerId)} onPointerCancel={event => controls.release(event.pointerId)} onLostPointerCapture={event => controls.release(event.pointerId)}
           onPointerLeave={event => controls.release(event.pointerId)}
           onBlur={controls.reset}
           onKeyDown={event => { if (active && [' ', 'Enter'].includes(event.key)) { event.preventDefault(); controls.press(direction - 10, direction) } }}
           onKeyUp={event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); controls.release(direction - 10) } }}>
-          <span aria-hidden="true">{direction === -1 ? '▲' : '▼'}</span><span className="ml-3 align-middle text-sm font-semibold">{direction === -1 ? 'Monter' : 'Descendre'}</span>
+          <span aria-hidden="true">{direction === -1 ? '▲' : '▼'}</span><span className={styles.controlLabel}>{direction === -1 ? 'Monter' : 'Descendre'}</span>
         </button>)}
       </div>}
     </div>
-    <p className="text-center text-xs text-zinc-500 sm:hidden">Pour plus de confort, joue en mode paysage.</p>
+    <p className={styles.suggestion}>Pour plus de confort, joue en mode paysage.</p>
   </section>
 }

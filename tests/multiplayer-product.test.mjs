@@ -271,12 +271,12 @@ test('generic platform has no Pong import, condition or direction input; registr
     assert.doesNotMatch(source,/chibasko-pong|PongCanvas|PongRoom|pongView|set_input|direction/)
   }
   const registry=await readFile(new URL('../games/clientRegistry.ts',import.meta.url),'utf8')
-  assert.match(registry,/\(\) => import\('\.\/chibasko-pong\/client\/PongGame'\)/)
+  assert.ok(registry.includes("() => import('@chibaskogames/chibasko-pong/client')"))
   assert.doesNotMatch(registry,/roomType|SUPABASE|https?:\/\/|minPlayers|secret/)
   for(const path of ['packages/game-sdk/src/index.ts','packages/game-sdk/src/client/index.ts','packages/game-sdk/src/react/index.ts','packages/game-sdk/src/server/index.ts','game-server/src/platform/multiplayer/internalGameAdapter.ts']) {
     assert.doesNotMatch(await readFile(new URL(`../${path}`,import.meta.url),'utf8'),/Pong|chibasko-pong|set_input|direction/)
   }
-  for(const path of ['games/chibasko-pong/client/PongGame.tsx','game-server/src/games/chibasko-pong/PongRoom.ts']) {
+  for(const path of ['games/chibasko-pong/client/PongGame.tsx','games/chibasko-pong/server/PongRoom.ts']) {
     const source=await readFile(new URL(`../${path}`,import.meta.url),'utf8')
     assert.match(source,/@chibaskogames\/sdk/)
     assert.doesNotMatch(source,/GameSessionCoordinator|GameAdmission|MultiplayerProvider|AuthProvider|expiresAt/)
@@ -286,7 +286,7 @@ test('generic platform has no Pong import, condition or direction input; registr
 test('technical Pong renders responsive logical canvas; results expose only public names/scores', () => {
   const view = { phase:'COUNTDOWN', remainingMs:3000,width:1000,height:600,paddleWidth:16,paddleHeight:100,inset:30,radius:10,leftPaddleY:250,rightPaddleY:250,ballX:500,ballY:300,leftScore:0,rightScore:0,leftName:'Alice',rightName:'Bob',selfSide:'LEFT' }
   const canvas = renderToStaticMarkup(createElement(PongCanvas,{view,onInput(){}}))
-  assert.match(canvas,/width="1000"/); assert.match(canvas,/height="600"/); assert.match(canvas,/w-full/); assert.match(canvas,/tabindex="0"/)
+  assert.match(canvas,/width="1000"/); assert.match(canvas,/height="600"/); assert.match(canvas,/class="canvas"/); assert.match(canvas,/tabindex="0"/)
   assert.match(canvas,/Alice/); assert.match(canvas,/Bob/); assert.doesNotMatch(canvas,/userId|sessionId|JWT/)
   const result = renderToStaticMarkup(createElement(LobbyView,{title:'Test local',state:{error:'',lobby:{slug:'test',gameId:'chibasko-pong',code:'AB7KQ2',status:'RESULTS',minPlayers:2,maxPlayers:2,players:[{username:'Alice',avatarUrl:'',ready:true,self:true,host:true}],result:{winner:'Alice',reason:'forfeit',players:[{username:'Alice',score:3},{username:'Bob',score:1}]}},game:{connected:true,count:2,expected:2,status:'READY'}},onReady(){},onStart(){},onLeave(){},onReturn(){}}))
   assert.match(result,/Partie terminée/); assert.match(result,/Alice remporte la partie/); assert.match(result,/3 – 1/); assert.match(result,/Victoire par abandon/); assert.match(result,/Retour à la salle d’attente/)

@@ -18,6 +18,10 @@ registerHooks({
     if (specifier === './supabaseSession' && context.parentURL?.endsWith('/lib/server/onlineGamePage.ts')) return { url: 'product:serverSession', shortCircuit: true }
     if (specifier === './MultiplayerProvider') return { url: 'product:multiplayer', shortCircuit: true }
     if (specifier === '../supabaseClient') return { url: 'product:supabase', shortCircuit: true }
+    if (specifier === 'react' || specifier.startsWith('react/')) return nextResolve(specifier, { ...context, parentURL: import.meta.url })
+    if (specifier.startsWith('.') && specifier.endsWith('.js') && context.parentURL?.startsWith(root.href)) {
+      for (const ext of ['.ts','.tsx']) { const url = new URL(specifier.slice(0,-3)+ext, context.parentURL); if (existsSync(url)) return {url:url.href,shortCircuit:true} }
+    }
     if (specifier.startsWith('@/') || (specifier.startsWith('.') && context.parentURL?.startsWith(root.href))) {
       const base = specifier.startsWith('@/') ? new URL(specifier.slice(2), root) : new URL(specifier, context.parentURL)
       for (const suffix of ['', '.ts', '.tsx']) {

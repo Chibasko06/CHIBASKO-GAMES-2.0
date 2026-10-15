@@ -6,7 +6,7 @@ import { createPlaygroundServer } from '../src/index.js'
 import { connectLobby } from '../../lib/lobbyConnection.js'
 import { consumeGameReservation } from '../../lib/gameConnection.js'
 import type { Reservation } from '../src/platform/multiplayer/GameSessionCoordinator.js'
-import type { PongState } from '../src/games/chibasko-pong/PongState.js'
+import type { PongState } from '@chibaskogames/chibasko-pong/server'
 
 async function until(check: () => boolean) { const deadline = Date.now() + 12000; while (!check()) { if (Date.now() > deadline) throw new Error('Network assertion deadline'); await delay(15) } }
 test('two clients play, share score/results, return WAITING and replay; game-only forfeit', { timeout: 35000 }, async t => {

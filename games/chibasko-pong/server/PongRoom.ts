@@ -1,8 +1,8 @@
 import type { GameParticipant } from '@chibaskogames/sdk'
 import type { GameServerModule } from '@chibaskogames/sdk/server'
-import { pongDefinition } from './definition.js'
+import { pongDefinition } from '../definition.js'
 import { PongState, PongPlayer } from './PongState.js'
-import { PONG, PongSimulation, createPongStepper, readInput, type Side } from '@chibaskogames/pong-engine'
+import { PONG, PongSimulation, createPongStepper, readInput, type Side } from '../shared/simulation.js'
 
 // Gameplay driver. The platform adapter owns Room, admission and activation.
 export const pongServerModule: GameServerModule<PongState> = {

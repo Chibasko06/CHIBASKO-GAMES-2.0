@@ -4,7 +4,7 @@ import type { GameServerModule } from '@chibaskogames/sdk/server'
 import type { GameSessionCoordinator } from '../platform/multiplayer/GameSessionCoordinator.js'
 import { createInternalGameAdapter } from '../platform/multiplayer/internalGameAdapter.js'
 import { registerColyseusGame } from '../platform/multiplayer/colyseusGameAdapter.js'
-import { pongServerModule } from './chibasko-pong/register.js'
+import { pongServerModule } from '@chibaskogames/chibasko-pong/server'
 import { resolveGame } from './registry.js'
 
 export type InternalGameRegistration = { roomType: string; module: GameServerModule<Schema> }

@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
     "strict": true, "declaration": true, "rootDir": ".", "outDir": "dist",
-    "types": [], "lib": ["ES2022"], "skipLibCheck": true
+    "types": [], "lib": ["ES2022", "DOM", "DOM.Iterable"], "skipLibCheck": true, "jsx": "react-jsx"
   },
-  "include": ["simulation.ts"]
+  "exclude": ["dist", "node_modules", "tests"]
 }

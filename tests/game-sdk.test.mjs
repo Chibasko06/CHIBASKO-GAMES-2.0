@@ -57,6 +57,11 @@ test('game boundaries reject platform imports, SDK internals and computed module
   for (const spec of ['@/app/admin', '@/lib/auth', '@/lib/supabaseClient', '../../../lib/auth',
     '@chibaskogames/sdk/src/private', '@colyseus/core']) assert.equal(allowedGameImport(file, spec, root), false)
   for (const spec of ['../shared/engine', '@chibaskogames/sdk', '@chibaskogames/sdk/client']) assert.equal(allowedGameImport(file, spec, root), true)
+  for (const spec of ['next/image', '@colyseus/schema', 'react-dom', '@chibaskogames/pong-engine', '@chibaskogames/sdk/server','../server/Room']) assert.equal(allowedGameImport(file, spec, root), false)
+  assert.equal(allowedGameImport(resolve(root,'server/State.ts'),'@colyseus/schema',root),true)
+  const pong=resolve('games/chibasko-pong')
+  assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/shared',pong),true)
+  assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/server',pong),false)
   assert.deepEqual(imports('const x = import(path);'), ['<non-literal import>'])
   for (const file of ['packages/game-sdk/src/index.ts','packages/game-sdk/src/client/index.ts','packages/game-sdk/src/server/index.ts']) {
     assert.doesNotMatch(await readFile(file,'utf8'), /from ['"](react|next|@colyseus|@supabase|node:)/)

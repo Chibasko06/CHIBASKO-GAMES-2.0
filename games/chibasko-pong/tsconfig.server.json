@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "lib": ["ES2022"] },
+  "include": ["index.ts", "definition.ts", "server/**/*.ts", "shared/**/*.ts"]
+}

@@ -100,8 +100,12 @@ Pour une nouvelle release, depuis un clone de déploiement propre :
 # SHA exact revu et disponible sur GitHub ; jamais un checkout sale en service.
 git fetch origin
 git worktree add --detach /opt/chibasko-games/releases/<sha> <sha>
-cd /opt/chibasko-games/releases/<sha>/game-server
-npm ci
+cd /opt/chibasko-games/releases/<sha>
+npm --prefix game-server ci
+# SDK fourni localement au jeu, aucune dépendance Next ni publication nécessaire.
+# Hors workspace : installe les seules dépendances génériques de Pong et ses outils.
+npm --prefix games/chibasko-pong install --workspaces=false --ignore-scripts --no-save --package-lock=false "$PWD/packages/game-sdk"
+cd game-server
 npm test
 npm run build
 # Optionnel après build/tests : npm prune --omit=dev

@@ -1,5 +1,5 @@
 import { schema, t, type SchemaType } from '@colyseus/schema'
-import { PONG, createPongModel } from '@chibaskogames/pong-engine'
+import { PONG, createPongModel } from '../shared/simulation.js'
 const initial = createPongModel()
 const PongPlayer = schema({ participantId: t.string(), username: t.string(), avatarUrl: t.string(), side: t.string() }, 'PongPlayer')
 export const PongState = schema({

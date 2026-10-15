@@ -22,6 +22,10 @@ registerHooks({
       return { url: 'phase0:admin-check', shortCircuit: true }
     }
     if (stubs[specifier]) return { url: `phase0:${stubs[specifier]}`, shortCircuit: true }
+    if (specifier === 'react' || specifier.startsWith('react/')) return nextResolve(specifier, { ...context, parentURL: import.meta.url })
+    if (specifier.startsWith('.') && specifier.endsWith('.js') && context.parentURL?.startsWith(root.href)) {
+      for (const ext of ['.ts','.tsx']) { const url = new URL(specifier.slice(0,-3)+ext, context.parentURL); if (existsSync(url)) return {url:url.href,shortCircuit:true} }
+    }
     if (specifier.startsWith('@/')) {
       return { url: new URL(`${specifier.slice(2)}.ts`, root).href, shortCircuit: true }
     }

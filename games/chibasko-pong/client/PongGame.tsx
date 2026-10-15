@@ -1,8 +1,9 @@
 'use client'
 import { memo, useCallback, useMemo, useSyncExternalStore } from 'react'
 import type { GameClientProps } from '@chibaskogames/sdk/client'
-import { createPongPresentation } from './pongPresentation'
-import PongCanvas from './PongCanvas'
+import { createPongPresentation } from './pongPresentation.js'
+import PongCanvas from './PongCanvas.js'
+import styles from './pong.module.css'
 
 export const gameId = 'chibasko-pong'
 const serverSnapshot = () => null
@@ -11,7 +12,7 @@ function PongGame({ connection }: GameClientProps) {
   const view = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot, serverSnapshot)
   const { send } = connection
   const input = useCallback((direction: -1 | 0 | 1) => send('set_input', { direction }), [send])
-  if (!view) return <p role="status">Préparation du terrain…</p>
+  if (!view) return <p role="status" className={styles.preparing}>Préparation du terrain…</p>
   return <PongCanvas view={view} readFrame={presentation.getFrame} onInput={input} />
 }
 export default memo(PongGame)

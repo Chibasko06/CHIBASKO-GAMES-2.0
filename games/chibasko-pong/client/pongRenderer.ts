@@ -1,4 +1,4 @@
-import type { PongFrame } from './pongPresentation'
+import type { PongFrame } from './pongPresentation.js'
 const backgrounds = new WeakMap<CanvasRenderingContext2D, CanvasGradient>()
 
 export function drawPong(ctx: CanvasRenderingContext2D, frame: PongFrame, time: number, reducedMotion: boolean) {

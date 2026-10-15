@@ -1,8 +1,0 @@
-{
-  "name": "@chibaskogames/pong-engine",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "exports": { ".": { "types": "./dist/simulation.d.ts", "default": "./dist/simulation.js" } },
-  "files": ["dist"]
-}

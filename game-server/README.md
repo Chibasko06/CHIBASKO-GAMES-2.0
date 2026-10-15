@@ -4,12 +4,15 @@ Processus Node 24 / TypeScript strict autonome, hors build Next.js/Cloudflare.
 Le package frère packages/game-sdk est une dépendance locale : conserver ce
 dossier dans chaque release. Les précommandes build/test/dev le compilent sans
 React via tsconfig.server.json. Aucun build Next.js n'est nécessaire côté VPS.
-Le moteur pur games/chibasko-pong/shared est également une dépendance locale ;
-conserver ce dossier dans la release. Les mêmes précommandes le compilent.
+Pong est le package local games/chibasko-pong ; conserver tout ce dossier dans la
+release et installer ses dépendances génériques avec le SDK fourni. Les précommandes
+compilent seulement son serveur, sans client React. Les tests compilent également
+le runtime local pur pour la parité. Voir [autonomie Pong](../docs/pong-extraction.md).
 Online reste autoritaire : seul le serveur applique ce moteur aux inputs réseau.
 Le mode local navigateur utilise la même source, sans accès à l'admission ni
 au coordinateur ; ses résultats ne sont ni envoyés ni persistés.
-Une instance Colyseus 0.18, sans workspace, Redis ou Docker.
+Une instance Colyseus 0.18, sans Redis ni Docker. Le frontend utilise un seul
+workspace npm pour Pong ; le game-server reste un package indépendant.
 
 ## Développement
 
@@ -21,6 +24,7 @@ activer les jeux connus ; une valeur vide les désactive.
 Depuis la racine, dans deux terminaux séparés :
 
 ```sh
+npm ci # racine : installe le workspace Pong et le SDK local
 npm --prefix game-server ci
 npm --prefix game-server run dev
 ```

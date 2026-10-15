@@ -108,7 +108,7 @@ Serveur :
 `game-server/src/lobby/resolveLobby.ts`, `game-server/src/rooms/LobbyRoom.ts`,
 `game-server/src/schema/LobbyState.ts`, `game-server/src/index.ts`,
 `game-server/src/runtime/requestPolicy.ts`, `game-server/src/games/types.ts`,
-`game-server/src/games/chibasko-pong/definition.ts` (capacités seulement).
+`games/chibasko-pong/definition.ts` (capacités seulement ; déplacé dans le jeu depuis).
 
 Tests :
 `game-server/tests/public-lobbies.test.ts`, `game-server/tests/game-registry.test.ts`,

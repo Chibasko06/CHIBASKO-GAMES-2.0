@@ -1,6 +1,6 @@
-import { PONG, PongSimulation, createPongModel, createPongStepper, type Side } from '../shared/simulation'
-import type { PongView } from '../client/pongView'
-import type { PongFrame } from '../client/pongPresentation'
+import { PONG, PongSimulation, createPongModel, createPongStepper, type Side } from '../shared/simulation.js'
+import type { PongView } from '../client/pongView.js'
+import type { PongFrame } from '../client/pongPresentation.js'
 
 // No transport, identity, storage or browser APIs. The browser supplies elapsed time.
 export function createLocalPongRuntime() {

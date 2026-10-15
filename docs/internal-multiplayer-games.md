@@ -21,3 +21,4 @@ local reste autonome. Voir [salons publics et privés](online-access.md).
 
 Pour les étapes d'ajout, capacités, résultats, frontières et futurs adaptateurs,
 voir [SDK commun](game-sdk.md).
+Pong est un package autonome : [audit et exports](pong-extraction.md).

@@ -1,5 +1,5 @@
 import type { GameClientConnection } from '@chibaskogames/sdk/client'
-import { readPongView, type PongView } from './pongView'
+import { readPongView, type PongView } from './pongView.js'
 
 export type PongFrame = { previous: PongView | null; current: PongView; receivedAt: number; goUntil: number }
 // One SDK subscription. React observes HUD changes; motion is read imperatively.

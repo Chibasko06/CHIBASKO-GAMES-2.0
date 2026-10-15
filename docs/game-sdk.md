@@ -144,10 +144,10 @@ status ou expectedPlayers, et un résultat sans score/gagnant via le flow produi
 npm run check:game-boundaries analyse les imports statiques/dynamiques littéraux.
 Les jeux ne peuvent pas importer les autres jeux ou les internes plateforme.
 Les imports calculés ne sont pas autorisés. SDK pur ne peut pas importer /react.
-Exceptions actuelles explicites : react, next/image côté Pong client et
-@colyseus/schema pour son état serveur. Tailwind/préflight/fonts du site restent
-nécessaires au rendu actuel. Ces dépendances visuelles seront traitées avant une
-extraction de Pong ; aucune UI n'est changée ici.
+Pong est un package local autonome consommé par ses exports publics. React côté
+client/local et @colyseus/schema côté serveur sont des dépendances génériques
+explicites. Aucun Next/Tailwind/font loader de plateforme requis.
+Voir [extractabilité de Pong](pong-extraction.md).
 
 PongState conserve encore gameId/status/expectedPlayers pour compatibilité des
 outils de debug/tests. Aucun fonctionnement produit ne dépend plus de ces champs.
