@@ -1,6 +1,6 @@
 import { schema, t, type SchemaType } from '@colyseus/schema'
 import { PONG } from './simulation.js'
-const PongPlayer = schema({ userId: t.string(), username: t.string(), avatarUrl: t.string(), side: t.string() }, 'PongPlayer')
+const PongPlayer = schema({ participantId: t.string(), username: t.string(), avatarUrl: t.string(), side: t.string() }, 'PongPlayer')
 export const PongState = schema({
   gameId: t.string().default(''), status: t.string().default('PREPARING'), expectedPlayers: t.number().default(0), players: t.map(PongPlayer),
   phase: t.string().default('READY'), remainingMs: t.number().default(0),

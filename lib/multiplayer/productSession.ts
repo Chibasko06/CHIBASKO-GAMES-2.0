@@ -94,10 +94,9 @@ export function createProductSession(options: {
       finally { clearTimeout(timer) }
       if (!next || attempt !== generation) return null
       room = next
-      bridge = createLobbyGameSession((gameRoom, failed) => {
+      bridge = createLobbyGameSession((gameRoom, failed, session) => {
         if (room !== next) return
-        let count = 0; gameRoom?.state?.players?.forEach(() => count++)
-        update({ game: { connected: !!gameRoom, count, expected: gameRoom?.state?.expectedPlayers ?? 0, status: gameRoom?.state?.status ?? '' }, ...(failed && state.lobby?.status !== 'RESULTS' ? { error: 'La connexion à la partie a échoué. Tu peux réessayer depuis la salle d’attente.' } : {}) })
+        update({ game: { connected: !!gameRoom && !!session, count: session?.connectedParticipantIds.length ?? 0, expected: session?.participants.length ?? 0, status: session && session.availability !== 'preparing' ? 'READY' : '' }, ...(failed && state.lobby?.status !== 'RESULTS' ? { error: 'La connexion à la partie a échoué. Tu peux réessayer depuis la salle d’attente.' } : {}) })
       }, reservation => consumeGameReservation<BridgeGameState>(reservation, options.endpoint!))
       const refresh = () => {
         if (room !== next) return

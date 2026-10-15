@@ -4,7 +4,7 @@ import { resolveGame } from '../src/games/registry.js'
 import { rosterCanStart } from '../src/lobby/lobbyRules.js'
 test('internal registry owns game type and capacities; unknown games fail closed', () => {
   const game = resolveGame('chibasko-pong')
-  assert.deepEqual(game, { id: 'chibasko-pong', roomType: 'pong', minPlayers: 2, maxPlayers: 2 })
+  const {definition,...transport}=game; assert.equal(definition.integrationVersion,1); assert.equal(definition.capabilities.local,undefined); assert.deepEqual(definition.capabilities.online.access,['private']); assert.deepEqual(transport, { id: 'chibasko-pong', roomType: 'pong', minPlayers: 2, maxPlayers: 2 })
   assert.ok(Object.isFrozen(game))
   for (const id of ['external', 'unknown', undefined, { roomType: 'pong' }]) assert.throws(() => resolveGame(id))
   const player = { ready: true, expiresAt: 100 }

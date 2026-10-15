@@ -30,7 +30,7 @@ test('two clients play, share score/results, return WAITING and replay; game-onl
       const ga = await consumeGameReservation<PongState>(await offerA, endpoint), gb = await consumeGameReservation<PongState>(await offerB, endpoint)
       connections.push(ga, gb); ga.onMessage('game_error', () => {}); gb.onMessage('game_error', () => {})
       await until(() => a.state.status === 'PLAYING' && gb.state?.players?.size === 2)
-      assert.equal(ga.state.players.get(ga.sessionId)?.side, 'LEFT'); assert.equal(gb.state.players.get(gb.sessionId)?.side, 'RIGHT')
+      assert.equal([...ga.state.players.values()].find(p=>p.username==='Player A')?.side, 'LEFT'); assert.equal([...gb.state.players.values()].find(p=>p.username==='Player B')?.side, 'RIGHT')
       return { ga, gb }
     }
     for (let game = 0; game < 2; game++) {
@@ -52,7 +52,7 @@ test('two clients play, share score/results, return WAITING and replay; game-onl
       await until(() => a.state.status === 'RESULTS' && b.state.status === 'RESULTS')
       assert.equal(a.state.winnerUserId, 'user-A'); assert.equal(a.state.resultReason, 'score')
       assert.deepEqual(JSON.parse(JSON.stringify(a.state.resultPlayers)), JSON.parse(JSON.stringify(b.state.resultPlayers)))
-      assert.equal(ga.state.phase, 'FINISHED')
+      assert.equal(ga.state.phase, 'FINISHED'); assert.ok(!ga.state.players.has(ga.sessionId)); assert.ok(!gb.state.players.has(gb.sessionId))
       const refused = new Promise<{ code: string }>(resolve => b.onMessage('lobby_error', resolve))
       b.send('return_to_lobby'); assert.equal((await refused).code, 'HOST_REQUIRED')
       assert.equal(b.state.status, 'RESULTS')

@@ -2,7 +2,7 @@
 
 Un duel Pong 1v1 de Chibasko Games. **Non publié**, disponible pour recette locale.
 
-- client/PongGame.tsx : module lazy/mémoïsé utilisant la façade Internal Game SDK v0.
+- client/PongGame.tsx : module lazy/mémoïsé utilisant le SDK commun @chibaskogames/sdk/client.
 - client/PongCanvas.tsx : terrain responsive, score, avatars, clavier et tactile.
 - client/pongPresentation.ts : abonnement SDK unique, HUD sélectif et frames publiques.
 - client/pongRenderer.ts : canvas natif, terrain cyan/ambre, interpolation visuelle bornée.

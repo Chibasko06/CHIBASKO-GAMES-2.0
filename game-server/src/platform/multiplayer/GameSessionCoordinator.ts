@@ -95,6 +95,7 @@ export class GameSessionCoordinator {
     } catch (error) { if (!(error instanceof Error && error.message === 'SESSION_INVALID')) safeLog('coordinator_error'); this.cancel(id) }
   }
   definition(id: string) { return this.sessions.get(id)?.definition }
+  participants(id: string) { return this.sessions.get(id)?.participants ?? [] }
   expectedPlayers(id: string) { return this.sessions.get(id)?.participants.length ?? 0 }
   reservationSeconds(id: string) {
     const session = this.sessions.get(id)

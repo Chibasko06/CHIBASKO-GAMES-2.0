@@ -1,8 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { GameSessionCoordinator, type GameBackend } from '../src/platform/multiplayer/GameSessionCoordinator.js'
-import { createInternalGamePlatform } from '../src/platform/multiplayer/internalGameSdk.js'
-import type { InternalGameClient, GameResult } from '../src/games/sdk/index.js'
+import { createInternalGameAdapter } from '../src/platform/multiplayer/internalGameAdapter.js'
+import type { GameResult } from '@chibaskogames/sdk'
+import type { GameClient as InternalGameClient } from '../src/platform/multiplayer/GameAdmission.js'
+import { defineGame } from '@chibaskogames/sdk'
+import { serverGameRegistration } from '../src/games/types.js'
 
 async function fixture() {
   const counts = { ready: 0, completed: 0, failed: 0, destroyed: 0, expired: 0 }
@@ -12,12 +15,12 @@ async function fixture() {
   const coordinator = new GameSessionCoordinator(5000, {
     create: async () => room,
     reserve: async (_room, auth) => ({ name: 'fixture', roomId: room.roomId, processId: 'fixture', sessionId: `seat-${auth.identity.userId}` }),
-    activate: async () => { context.assertCanActivate(id) },
+    activate: async () => { context.activate(id) },
     destroy: async () => { counts.destroyed++ },
   })
-  const id = coordinator.begin('sdk-lobby', { id: 'test-game', roomType: 'fixture', minPlayers: 2, maxPlayers: 2 }, people,
+  const id = coordinator.begin('sdk-lobby', serverGameRegistration(defineGame({ id: 'test-game', integrationVersion: 1, capabilities: { online: { access: ['private'], players: { min: 2, max: 2 } } } }), 'fixture'), people,
     { valid: () => true, reservation() {}, ready() { counts.ready++ }, failed() { counts.failed++ }, completed() { counts.completed++ } })
-  const platform = createInternalGamePlatform(coordinator)
+  const platform = createInternalGameAdapter(coordinator)
   const context = platform.createContext({ transitionId: id, roomId: room.roomId, roomType: 'fixture' })
   const clients = people.map(person => ({ sessionId: `seat-${person.identity.userId}`, auth: { transitionId: id, ...person },
     leave() { counts.expired++ } }) as unknown as InternalGameClient)
@@ -35,8 +38,8 @@ test('SDK admission is bound to platform seats and exposes frozen public identit
     const forged = { ...first, auth: { ...auth, identity: { ...auth.identity, userId: 'outsider' } } } as InternalGameClient
     assert.throws(() => f.context.admit(forged))
     const player = f.context.admit(first)
-    assert.deepEqual(player, { userId: 'A', username: 'Player A', avatarUrl: null })
-    assert.ok(Object.isFrozen(player)); assert.ok(Object.isFrozen(f.context))
+    assert.deepEqual(player, { participantId: player.participantId, username: 'Player A', avatarUrl: null }); assert.notEqual(player.participantId, first.sessionId); assert.notEqual(player.participantId, 'A')
+    assert.doesNotMatch(JSON.stringify(f.context.session), /transitionId|roomType|roomId|reservation|expiresAt|userId/); assert.ok(Object.isFrozen(player)); assert.ok(Object.isFrozen(f.context))
     assert.equal(f.context.getPlayer(first), player)
     assert.equal(f.context.getPlayer({ ...first } as InternalGameClient), null)
     assert.throws(() => f.context.admit(first))
@@ -44,7 +47,7 @@ test('SDK admission is bound to platform seats and exposes frozen public identit
     assert.doesNotMatch(JSON.stringify(player), /expiresAt|JWT|email|auth|token/)
     // Mutating transport auth cannot change the admitted identity or notification.
     first.auth = forged.auth
-    assert.equal(f.context.getPlayer(first)?.userId, 'A')
+    assert.equal(f.context.getPlayer(first)?.participantId, player.participantId)
     f.context.admitted(first)
     f.context.admit(f.clients[1]!); f.context.admitted(f.clients[1]!)
     await Promise.resolve(); assert.equal(f.counts.ready, 1)
@@ -53,23 +56,23 @@ test('SDK admission is bound to platform seats and exposes frozen public identit
 
 test('SDK completion validates results, delivers once, supports no winner/score and invalidates operations', async () => {
   const f = await fixture()
-  const result: GameResult = { gameId: 'test-game', winnerUserId: null, reason: 'completed', players: [{ userId: 'A' }, { userId: 'B' }] }
+  const result: GameResult = { gameId: 'test-game', winnerParticipantId: null, reason: 'completed', players: f.context.session.participants.map(p => ({ participantId: p.participantId })) }
   try {
-    assert.equal(f.context.complete(result), false)
-    assert.throws(() => f.context.assertCanActivate('other'))
+    assert.equal(f.context.session.complete(result), false)
+    assert.throws(() => f.context.activate('other'))
     for (const client of f.clients) { f.context.admit(client); f.context.admitted(client) }
     await Promise.resolve()
-    for (const invalid of [null, {}, { ...result, players: null }, { ...result, winnerUserId: 'outside' },
+    for (const invalid of [null, {}, { ...result, players: null }, { ...result, winnerParticipantId: 'outside' },
       { ...result, gameId: 'other' }, { ...result, email: 'private' }, { ...result, reason: 'bad reason' },
-      { ...result, players: [{ userId: 'A', score: Infinity }, { userId: 'B' }] },
-      { ...result, players: [{ userId: 'A' }, { userId: 'A' }] }]) {
-      assert.equal(f.context.complete(invalid as GameResult), false)
+      { ...result, players: [{ participantId: f.context.session.participants[0]!.participantId, score: Infinity }, { participantId: f.context.session.participants[1]!.participantId }] },
+      { ...result, players: [{ participantId: f.context.session.participants[0]!.participantId }, { participantId: f.context.session.participants[0]!.participantId }] }]) {
+      assert.equal(f.context.session.complete(invalid as GameResult), false)
     }
-    assert.equal(f.context.complete(result), true); assert.equal(f.context.complete(result), false)
+    assert.equal(f.context.session.complete(result), true); assert.equal(f.context.session.complete(result), false)
     assert.equal(f.counts.completed, 1); assert.equal(f.context.getPlayer(f.clients[0]!), null)
     assert.throws(() => f.context.admit(f.clients[0]!))
     f.context.dispose(); f.context.dispose()
-    assert.equal(f.context.complete(result), false)
+    assert.equal(f.context.session.complete(result), false)
     await f.coordinator.reset(f.id); assert.equal(f.counts.destroyed, 1)
   } finally { f.context.dispose(); await f.coordinator.shutdown() }
 })
@@ -100,7 +103,7 @@ test('SDK game failure cancels and cleans once without logging game data', async
   t.mock.method(console, 'info', (...args: unknown[]) => { logs.push(JSON.stringify(args)) })
   try {
     f.context.admit(f.clients[0]!)
-    f.context.fail(); f.context.fail(); f.context.dispose()
+    f.context.session.fail(); f.context.session.fail(); f.context.dispose()
     await f.coordinator.shutdown()
     assert.equal(f.counts.failed, 1); assert.equal(f.counts.destroyed, 1)
     assert.equal(f.context.getPlayer(f.clients[0]!), null)

@@ -1,6 +1,6 @@
 'use client'
 import { memo, useCallback, useMemo, useSyncExternalStore } from 'react'
-import type { GameClientProps } from '@/games/sdk/client/types'
+import type { GameClientProps } from '@chibaskogames/sdk/client'
 import { createPongPresentation } from './pongPresentation'
 import PongCanvas from './PongCanvas'
 

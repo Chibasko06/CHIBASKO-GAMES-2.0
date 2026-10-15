@@ -4,7 +4,7 @@ export type PongView = {
   leftName: string; rightName: string; selfSide: string
   leftAvatar?: string; rightAvatar?: string; winnerSide?: string; pointName?: string
 }
-export function readPongView(state: unknown, sessionId: string): PongView | null {
+export function readPongView(state: unknown, participantId: string): PongView | null {
   if (!state || typeof state !== 'object') return null
   const s = state as Record<string, unknown>
   const fields = ['remainingMs', 'width', 'height', 'paddleWidth', 'paddleHeight', 'inset', 'radius', 'leftPaddleY', 'rightPaddleY', 'ballX', 'ballY', 'leftScore', 'rightScore'] as const
@@ -15,7 +15,7 @@ export function readPongView(state: unknown, sessionId: string): PongView | null
   players.forEach((p, id) => {
     if (p.side === 'LEFT') { leftName = p.username; leftAvatar = typeof p.avatarUrl === 'string' ? p.avatarUrl : '' }
     if (p.side === 'RIGHT') { rightName = p.username; rightAvatar = typeof p.avatarUrl === 'string' ? p.avatarUrl : '' }
-    if (id === sessionId) selfSide = p.side
+    if (id === participantId) selfSide = p.side
   })
   return { phase: s.phase, ...Object.fromEntries(fields.map(key => [key, s[key]])), leftName, rightName, selfSide,
     leftAvatar, rightAvatar, winnerSide: typeof s.winnerSide === 'string' ? s.winnerSide : '' } as PongView

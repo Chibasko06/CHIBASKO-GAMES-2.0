@@ -1,4 +1,4 @@
-import type { GameClientConnection } from '@/games/sdk/client/types'
+import type { GameClientConnection } from '@chibaskogames/sdk/client'
 import { readPongView, type PongView } from './pongView'
 
 export type PongFrame = { previous: PongView | null; current: PongView; receivedAt: number; goUntil: number }

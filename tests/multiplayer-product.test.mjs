@@ -24,7 +24,7 @@ import PongCanvas from '../games/chibasko-pong/client/PongCanvas.tsx'
 import { createGameRuntime } from '../components/multiplayer/GameRuntime.tsx'
 import { clientGameRegistry } from '../games/clientRegistry.ts'
 import { createGameClientConnection } from '../lib/multiplayer/gameClientModule.ts'
-import { useChibaskoGame } from '../games/sdk/client/index.ts'
+import { useChibaskoGame } from '@chibaskogames/sdk/react'
 import { createPongPresentation } from '../games/chibasko-pong/client/pongPresentation.ts'
 import { createPongControls } from '../games/chibasko-pong/client/pongControls.ts'
 import { drawPong } from '../games/chibasko-pong/client/pongRenderer.ts'
@@ -202,7 +202,7 @@ test('runtime renders an injected second lazy module, switches games and cleans 
   })
   assert.equal(cleanups,2)
   owned.dispose();const count=messages.length;owned.connection.send('late');assert.equal(messages.length,count)
-  assert.deepEqual(Object.keys(owned.connection).sort(),['getRevision','getState','localPlayerId','send','subscribe'])
+  assert.deepEqual(Object.keys(owned.connection).sort(),['getRevision','getSession','getState','localPlayerId','send','subscribe'])
 })
 
 test('late lazy module resolving after unmount never mounts or installs game listeners', async () => {
@@ -229,7 +229,7 @@ test('SDK hook follows state revisions, switches connections, unsubscribes and r
   function Fixture({connection}){observed=useChibaskoGame(connection);return createElement('p',null,JSON.stringify(observed.state))}
   await mounted(Fixture,{connection:connectionA},async root=>{
     assert.equal(observed.localPlayerId,'A');assert.equal(notifications,1)
-    assert.deepEqual(Object.keys(observed).sort(),['localPlayerId','revision','send','state','subscribe'])
+    assert.deepEqual(Object.keys(observed).sort(),['localPlayerId','revision','send','session','state','subscribe'])
     let callbacks=0;const unsubscribe=observed.subscribe(()=>callbacks++)
     await act(async()=>{state={question:'Changed'};first.changed()})
     assert.match(document.body.textContent,/Changed/);assert.equal(observed.revision,1);assert.equal(callbacks,1)
@@ -253,12 +253,12 @@ test('generic platform has no Pong import, condition or direction input; registr
   const registry=await readFile(new URL('../games/clientRegistry.ts',import.meta.url),'utf8')
   assert.match(registry,/\(\) => import\('\.\/chibasko-pong\/client\/PongGame'\)/)
   assert.doesNotMatch(registry,/roomType|SUPABASE|https?:\/\/|minPlayers|secret/)
-  for(const path of ['games/sdk/client/index.ts','games/sdk/client/types.ts','game-server/src/games/sdk/index.ts','game-server/src/games/sdk/types.ts','game-server/src/platform/multiplayer/internalGameSdk.ts']) {
+  for(const path of ['packages/game-sdk/src/index.ts','packages/game-sdk/src/client/index.ts','packages/game-sdk/src/react/index.ts','packages/game-sdk/src/server/index.ts','game-server/src/platform/multiplayer/internalGameAdapter.ts']) {
     assert.doesNotMatch(await readFile(new URL(`../${path}`,import.meta.url),'utf8'),/Pong|chibasko-pong|set_input|direction/)
   }
-  for(const path of ['games/chibasko-pong/client/PongGame.tsx','game-server/src/games/chibasko-pong/PongRoom.ts','game-server/src/games/chibasko-pong/register.ts']) {
+  for(const path of ['games/chibasko-pong/client/PongGame.tsx','game-server/src/games/chibasko-pong/PongRoom.ts']) {
     const source=await readFile(new URL(`../${path}`,import.meta.url),'utf8')
-    assert.match(source,/sdk\/|sdk\/client/)
+    assert.match(source,/@chibaskogames\/sdk/)
     assert.doesNotMatch(source,/GameSessionCoordinator|GameAdmission|MultiplayerProvider|AuthProvider|expiresAt/)
   }
 })

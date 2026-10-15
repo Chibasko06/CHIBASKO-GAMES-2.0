@@ -1,4 +1,4 @@
-import type { ClientGameRegistry } from './sdk/client/types'
+import type { ClientGameRegistry } from '@chibaskogames/sdk/react'
 
 // Explicit literal imports give Next.js one lazy chunk per internal game.
 // No server registration, authoritative capacities or endpoint in this registry.

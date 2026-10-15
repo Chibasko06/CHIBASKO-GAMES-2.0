@@ -1,6 +1,9 @@
 # Serveur multijoueur Chibasko Games
 
-Projet Node 24 / TypeScript strict autonome, hors build Next.js/Cloudflare.
+Processus Node 24 / TypeScript strict autonome, hors build Next.js/Cloudflare.
+Le package frère packages/game-sdk est une dépendance locale : conserver ce
+dossier dans chaque release. Les précommandes build/test/dev le compilent sans
+React via tsconfig.server.json. Aucun build Next.js n'est nécessaire côté VPS.
 Une instance Colyseus 0.18, sans workspace, Redis ou Docker.
 
 ## Développement

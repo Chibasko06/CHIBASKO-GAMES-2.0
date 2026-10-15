@@ -7,6 +7,8 @@ import { createPlaygroundServer } from '../src/index.js'
 import { connectLobby } from '../../lib/lobbyConnection.js'
 import type { LobbyState } from '../src/schema/LobbyState.js'
 import { consumeGameReservation } from '../../lib/gameConnection.js'
+import { defineGame } from '@chibaskogames/sdk'
+import { serverGameRegistration } from '../src/games/types.js'
 
 async function until(predicate: () => boolean) {
   const deadline = Date.now() + 4000
@@ -14,7 +16,7 @@ async function until(predicate: () => boolean) {
 }
 test('lobby authenticated lifecycle, creator guarantee, duplicates, security, ready, launch, host and expiry', { timeout: 20000 }, async () => {
   const expirations = new Map<string, number>()
-  const lobbyConfig = { startDelayMs: 300, registry: new Map([['chibasko-pong', { id: 'chibasko-pong', roomType: 'pong', minPlayers: 2, maxPlayers: 4 }]]) }
+  const lobbyConfig = { startDelayMs: 300, registry: new Map([['chibasko-pong', serverGameRegistration(defineGame({ id: 'chibasko-pong', integrationVersion: 1, capabilities: { online: { access: ['private'], players: { min: 2, max: 4 } } } }), 'pong')]]) }
   const server = createPlaygroundServer(async token => {
     if (!token || !['A', 'B', 'C', 'D', 'E'].includes(token)) throw new Error('Denied')
     return { userId: `user-${token}`, username: `Name ${token}`, avatarUrl: null, expiresAt: expirations.get(token) ?? Date.now() + 60000 }

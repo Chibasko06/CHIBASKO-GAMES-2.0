@@ -5,6 +5,8 @@ import { gameRegistry } from '../game-server/src/games/registry.ts'
 export function generateManifest(registry = gameRegistry) {
   const manifest = {}
   for (const [id, game] of [...registry].sort(([a], [b]) => a.localeCompare(b))) {
+    const capacity = game.definition.capabilities.online?.players
+    if (!capacity || game.minPlayers !== capacity.min || game.maxPlayers !== capacity.max) throw new Error('Invalid game definition')
     if (id !== game.id || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)
       || !Number.isInteger(game.minPlayers) || !Number.isInteger(game.maxPlayers)
       || game.minPlayers < 1 || game.maxPlayers < game.minPlayers) throw new Error('Invalid game definition')

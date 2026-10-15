@@ -4,6 +4,7 @@
 /node_modules
 /game-server/node_modules/
 /game-server/dist/
+/packages/game-sdk/dist/
 /.pnp
 .pnp.*
 .yarn/*
