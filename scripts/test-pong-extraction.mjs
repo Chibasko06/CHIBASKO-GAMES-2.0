@@ -38,9 +38,10 @@ try {
   // Pure engine has now built and passed its tests, before supplying SDK/schema/React.
   // Only the SDK's distributable contract is supplied; no platform source.
   const sdk = join(modules, '@chibaskogames/sdk')
+  const installedSdk = await dependencyDirectory('@chibaskogames/sdk')
   await mkdir(sdk)
-  await cp(resolve(repository, 'packages/game-sdk/package.json'), join(sdk, 'package.json'))
-  await cp(resolve(repository, 'packages/game-sdk/dist'), join(sdk, 'dist'), { recursive: true })
+  await cp(join(installedSdk, 'package.json'), join(sdk, 'package.json'))
+  await cp(join(installedSdk, 'dist'), join(sdk, 'dist'), { recursive: true })
   // Reuse explicitly declared generic dependencies already installed. No registry,
   // network access, app config, platform aliases or game-server source in this host.
   await provide('@colyseus/schema')

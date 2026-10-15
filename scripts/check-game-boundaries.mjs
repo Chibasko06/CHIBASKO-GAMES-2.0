@@ -50,7 +50,9 @@ async function files(dir) {
 }
 export async function checkGameBoundaries() {
   const errors = []
-  for (const file of await files(sdk)) {
+  // SDK source is audited here while local; an extracted SDK audits itself.
+  const sdkFiles = await files(sdk).catch(error => { if (error.code === 'ENOENT') return []; throw error })
+  for (const file of sdkFiles) {
     for (const specifier of imports(await readFile(file, 'utf8'))) {
       const target = resolve(dirname(file), specifier)
       const internal = specifier.startsWith('.') && within(target, sdk)

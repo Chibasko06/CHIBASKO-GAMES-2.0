@@ -11,16 +11,25 @@ relatif adapté dans game-server). Aucun workspace ou registry externe ajouté.
 Après npm ci, npm run build:sdk compile le package. npm run build à la racine
 le fait automatiquement et vérifie les frontières d'import. npm test le compile
 avant les tests. npm run dev le compile aussi avant le démarrage local.
-npm run test:sdk compile les contrats de types négatifs. Après modification du
+npm run test:sdk vérifie l'intégration plateforme. Depuis packages/game-sdk,
+npm test vérifie les contrats de types négatifs et le hook sans plateforme.
+Après modification du
 SDK pendant une session dev, relancer npm run build:sdk (pas de watcher ajouté).
 
-Le game-server reste un processus autonome, mais sa release doit désormais inclure
-le dossier frère packages/game-sdk. Ses précommandes build/test/dev compilent
-ce package. La configuration tsconfig.server.json exclut l'entrypoint React :
+Le SDK expérimental est préparé en version 0.1.0, avec integrationVersion 1 inchangée.
+Le game-server reste un processus autonome. Tant que sa dépendance est locale,
+sa release inclut le dossier frère packages/game-sdk. Le helper build-game-sdk
+compile la source locale, ou vérifie et utilise directement un SDK distribué
+déjà construit, sans exiger ses sources. La configuration tsconfig.server.json exclut l'entrypoint React :
 une installation serveur seule n'a pas besoin de React ou des dépendances Next.
 Les fichiers dist sont générés et ignorés par Git. Ne pas publier ni copier un
 node_modules contenant un lien absolu vers la machine de développement :
 refaire npm ci dans le checkout/release cible.
+
+Le [README autonome](../packages/game-sdk/README.md) documente le contrat public,
+et la [procédure d'extraction](./sdk-extraction.md) décrit le tarball, les tests
+isolés, la licence à décider et la future consommation GitHub/tag. Aucun remote
+ni package npm n'est créé dans cette préparation.
 
 Next déclare le SDK dans transpilePackages. Sous Windows, le cache de build
 Webpack est désactivé à cause du bug de snapshot des liens absolus npm

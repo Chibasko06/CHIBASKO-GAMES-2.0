@@ -273,7 +273,11 @@ test('generic platform has no Pong import, condition or direction input; registr
   const registry=await readFile(new URL('../games/clientRegistry.ts',import.meta.url),'utf8')
   assert.ok(registry.includes("() => import('@chibaskogames/chibasko-pong/client')"))
   assert.doesNotMatch(registry,/roomType|SUPABASE|https?:\/\/|minPlayers|secret/)
-  for(const path of ['packages/game-sdk/src/index.ts','packages/game-sdk/src/client/index.ts','packages/game-sdk/src/react/index.ts','packages/game-sdk/src/server/index.ts','game-server/src/platform/multiplayer/internalGameAdapter.ts']) {
+  for(const entry of ['@chibaskogames/sdk','@chibaskogames/sdk/client','@chibaskogames/sdk/react','@chibaskogames/sdk/server']) {
+    const url=import.meta.resolve(entry)
+    for(const path of [url,url.replace(/\.js$/,'.d.ts')]) assert.doesNotMatch(await readFile(new URL(path),'utf8'),/Pong|chibasko-pong|set_input|direction/)
+  }
+  for(const path of ['game-server/src/platform/multiplayer/internalGameAdapter.ts']) {
     assert.doesNotMatch(await readFile(new URL(`../${path}`,import.meta.url),'utf8'),/Pong|chibasko-pong|set_input|direction/)
   }
   for(const path of ['games/chibasko-pong/client/PongGame.tsx','games/chibasko-pong/server/PongRoom.ts']) {

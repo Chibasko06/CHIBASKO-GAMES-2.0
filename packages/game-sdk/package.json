@@ -1,10 +1,20 @@
 {
   "name": "@chibaskogames/sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
+  "description": "Experimental integration contract between games and Chibasko Games",
+  "license": "UNLICENSED",
   "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:server": "tsc -p tsconfig.server.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "npm run build && npm run typecheck && node --test tests/*.test.mjs",
+    "prepare": "npm run build"
+  },
   "files": [
-    "dist"
+    "dist", "README.md", "CHANGELOG.md"
   ],
   "exports": {
     ".": {
@@ -31,5 +41,13 @@
     "react": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jsdom": "29.1.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "typescript": "5.9.3"
   }
 }

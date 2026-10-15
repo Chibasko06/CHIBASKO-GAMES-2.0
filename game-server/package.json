@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build:sdk": "tsc -p ../packages/game-sdk/tsconfig.server.json",
+    "build:sdk": "node ../scripts/build-game-sdk.mjs --server",
     "prebuild": "npm run build:sdk && npm run build:pong",
     "pretest": "npm run build:sdk && npm run build:pong && node ../games/chibasko-pong/scripts/build.mjs runtime",
     "predev": "npm run build:sdk && npm run build:pong",

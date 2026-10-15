@@ -63,7 +63,10 @@ test('game boundaries reject platform imports, SDK internals and computed module
   assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/shared',pong),true)
   assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/server',pong),false)
   assert.deepEqual(imports('const x = import(path);'), ['<non-literal import>'])
-  for (const file of ['packages/game-sdk/src/index.ts','packages/game-sdk/src/client/index.ts','packages/game-sdk/src/server/index.ts']) {
-    assert.doesNotMatch(await readFile(file,'utf8'), /from ['"](react|next|@colyseus|@supabase|node:)/)
+  for (const entry of ['@chibaskogames/sdk','@chibaskogames/sdk/client','@chibaskogames/sdk/server']) {
+    const url = import.meta.resolve(entry)
+    for (const path of [url, url.replace(/\.js$/, '.d.ts')]) {
+      assert.doesNotMatch(await readFile(new URL(path),'utf8'), /from ['"](react|next|@colyseus|@supabase|node:)/)
+    }
   }
 })

@@ -25,7 +25,7 @@
     "test": "node --import ./tests/css-loader.mjs --test tests/*.test.mjs"
   },
   "dependencies": { "@colyseus/schema": "5.0.36" },
-  "peerDependencies": { "@chibaskogames/sdk": "0.0.0", "react": "^19.0.0" },
+  "peerDependencies": { "@chibaskogames/sdk": "0.1.0", "react": "^19.0.0" },
   "peerDependenciesMeta": { "react": { "optional": true } },
   "devDependencies": {
     "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0",
