@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { PongState } from '../src/games/chibasko-pong/PongState.js'
-import { PONG, PongSimulation, readInput } from '../src/games/chibasko-pong/simulation.js'
+import { PONG, PongSimulation, readInput } from '@chibaskogames/pong-engine'
 
 function fixture() { const state = new PongState(); const sim = new PongSimulation(state); sim.start(); sim.step(PONG.countdownMs); return { state, sim } }
 test('strict input rejects identities, coordinates and result injection', () => {

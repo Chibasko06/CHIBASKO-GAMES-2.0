@@ -8,6 +8,10 @@ const sdk = resolve(root, 'packages/game-sdk/src')
 const within = (file, dir) => file === dir || file.startsWith(dir + sep)
 const generic = new Set(['react', 'next/image', '@colyseus/schema'])
 export function allowedGameImport(file, specifier, gameRoot) {
+  if (within(file, resolve(root, 'games/chibasko-pong/shared'))) {
+    return specifier.startsWith('.') && within(resolve(dirname(file), specifier), resolve(root, 'games/chibasko-pong/shared'))
+  }
+  if (specifier === '@chibaskogames/pong-engine') return gameRoot === resolve(root, 'game-server/src/games/chibasko-pong')
   if (specifier === '@chibaskogames/sdk' || ['client','react','server'].some(p => specifier === '@chibaskogames/sdk/' + p)) return true
   if (generic.has(specifier)) return true
   return specifier.startsWith('.') && within(resolve(dirname(file), specifier), gameRoot)
@@ -27,6 +31,7 @@ export function imports(source) {
 async function files(dir) {
   const out = []
   for (const e of await readdir(dir, { withFileTypes: true })) {
+    if (['dist', 'node_modules'].includes(e.name)) continue
     const path = resolve(dir, e.name)
     if (e.isDirectory()) out.push(...await files(path))
     else if (/\.(ts|tsx|js|mjs)$/.test(path)) out.push(path)

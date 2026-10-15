@@ -10,7 +10,7 @@ export function generateManifest(registry = gameRegistry) {
     if (id !== game.id || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)
       || !Number.isInteger(game.minPlayers) || !Number.isInteger(game.maxPlayers)
       || game.minPlayers < 1 || game.maxPlayers < game.minPlayers) throw new Error('Invalid game definition')
-    manifest[id] = { minPlayers: game.minPlayers, maxPlayers: game.maxPlayers }
+    manifest[id] = { minPlayers: game.minPlayers, maxPlayers: game.maxPlayers, capabilities: game.definition.capabilities }
   }
   return JSON.stringify(manifest, null, 2) + '\n'
 }

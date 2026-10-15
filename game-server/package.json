@@ -8,21 +8,23 @@
   },
   "scripts": {
     "build:sdk": "tsc -p ../packages/game-sdk/tsconfig.server.json",
-    "prebuild": "npm run build:sdk",
-    "pretest": "npm run build:sdk",
-    "predev": "npm run build:sdk",
+    "prebuild": "npm run build:sdk && npm run build:pong-engine",
+    "pretest": "npm run build:sdk && npm run build:pong-engine",
+    "predev": "npm run build:sdk && npm run build:pong-engine",
     "dev": "node --env-file=.env.local --import tsx --watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "tsx --test tests/*.test.ts",
-    "test:auth": "tsx --test tests/auth.test.ts"
+    "test:auth": "tsx --test tests/auth.test.ts",
+    "build:pong-engine": "tsc -p ../games/chibasko-pong/shared/tsconfig.json"
   },
   "dependencies": {
     "@chibaskogames/sdk": "file:../packages/game-sdk",
     "@colyseus/core": "0.18.18",
     "@colyseus/schema": "5.0.36",
     "@colyseus/ws-transport": "0.18.4",
-    "@supabase/supabase-js": "2.104.0"
+    "@supabase/supabase-js": "2.104.0",
+    "@chibaskogames/pong-engine": "file:../games/chibasko-pong/shared"
   },
   "devDependencies": {
     "@colyseus/sdk": "0.18.5",

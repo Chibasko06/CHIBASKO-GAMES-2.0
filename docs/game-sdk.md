@@ -149,10 +149,26 @@ extraction de Pong ; aucune UI n'est changée ici.
 
 PongState conserve encore gameId/status/expectedPlayers pour compatibilité des
 outils de debug/tests. Aucun fonctionnement produit ne dépend plus de ces champs.
-La physique n'est pas déplacée ni réécrite. Le moteur local sera une phase séparée.
+La physique Pong vit maintenant dans games/chibasko-pong/shared : un seul moteur
+pur est exécuté par le serveur online et le runtime local navigateur.
+
+## Modules locaux
+
+La définition possède explicitement capabilities.local.players seulement lorsque
+le jeu fournit son implémentation locale. Aucun mode n'est activé par défaut.
+Le manifeste public généré propage les capacités sans roomType ni détails privés.
+Le registre client expose deux ensembles de loaders optionnels : online et local.
+Les imports restent littéraux et lazy. Un jeu sans module local n'en charge aucun.
+
+L'entrypoint React ajoute uniquement LocalGameProps { onExit() }, LocalGameModule
+et LocalGameRegistry. Le jeu gère son runtime local, le parent gère la navigation.
+Il ne reçoit aucune façade réseau fictive, aucun compte, ticket ou connexion.
+Le contrat core/server reste inchangé. Les résultats locaux ne passent jamais
+par la completion serveur et ne constituent pas des résultats online vérifiés.
+La plateforme reste générique : capacités + loader → /games/[slug]/local.
 
 Extension future : même contrat → adaptateur distant sécurisé et serveur tiers ;
-même définition → runtime local. Aucun ticket tiers, réseau externe, sandbox,
+même définition → runtime local (désormais utilisé par Pong). Aucun ticket tiers, réseau externe, sandbox,
 bridge iframe, hébergement payant ou protocole de confiance n'est implémenté.
 La completion synchrone actuelle pourra devenir une commande asynchrone versionnée
 quand l'adaptateur distant sera réellement nécessaire.

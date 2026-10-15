@@ -26,7 +26,7 @@ registerHooks({
     return nextResolve(specifier, context.parentURL?.startsWith('product:') ? { ...context, parentURL: import.meta.url } : context)
   },
   load(url, context, nextLoad) {
-    if (url.endsWith('.module.css')) return { format: 'module', shortCircuit: true, source: 'export default {reveal:"reveal",court:"court",instructions:"instructions"}' }
+    if (url.endsWith('.module.css')) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, {get:(_target,key)=>String(key)})' }
     const stubs = {
       'product:link': "import {createElement} from 'react'; export default function Link({children, ...props}) {return createElement('a', props, children)}",
       'product:image': "import {createElement} from 'react'; export default function Image({fill,priority,unoptimized,...props}) {return createElement('img', props)}",

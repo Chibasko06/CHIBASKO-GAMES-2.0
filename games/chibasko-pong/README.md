@@ -9,7 +9,9 @@ Un duel Pong 1v1 de Chibasko Games. **Non publié**, disponible pour recette loc
 - client/pongControls.ts : uniquement des directions, neutralisation de tous les inputs.
 - client/pong.module.css : apparition légère, désactivée avec reduced-motion.
 - client/pongView.ts : projection publique, sans Auth ni configuration serveur.
-- Serveur : game-server/src/games/chibasko-pong/ (Room, State, simulation, registration).
+- shared/simulation.ts : unique moteur pur, constantes, modèle initial et pas fixe communs.
+- local/localRuntime.ts : runtime hors réseau ; local/PongLocalGame.tsx : boucle navigateur et résultats locaux.
+- Serveur : game-server/src/games/chibasko-pong/ (driver, State, registration), utilisant le même moteur.
 
 Règles inchangées : 2 joueurs, terrain 1000 × 600, 30 ticks/s, premier à 5,
 countdown 3 s, pause point 1 s, abandon, résultats et retour salle d'attente.
@@ -42,7 +44,7 @@ Reduced-motion désactive interpolation et animations décoratives. Aucun son aj
 
 La façade SDK expose état/révision/abonnement/send et identifiant local seulement.
 React observe les changements du HUD, pas chaque position de balle. Le canvas utilise
-requestAnimationFrame et annule sa boucle au démontage. Aucun ajout au SDK v0.
+requestAnimationFrame et annule sa boucle au démontage. Le contrat réseau du SDK reste inchangé.
 
 Plateforme : WAITING → STARTING → PLAYING → RESULTS → WAITING.
 Jeu : READY → COUNTDOWN → PLAYING ↔ POINT_PAUSE → FINISHED.
@@ -68,3 +70,81 @@ petit texte, HUD minuscule ou badges intégrés. Aucun fichier image généré/u
 La future Bêta publique nécessitera une décision explicite, un game-server public
 validé et is_published=true + is_beta=true. Cette phase ne change aucune donnée DB,
 configuration production, disponibilité serveur ou publication.
+
+## Moteur partagé et partie locale
+
+```
+Chibasko Pong
+├── shared/ : simulation déterministe, sans SDK/React/Node/Colyseus/API navigateur
+├── online : serveur autoritaire → SDK → rendu interpolé
+└── local : navigateur → même moteur → rendu direct, sans réseau
+```
+
+Le moteur reçoit explicitement les directions et le temps écoulé. La physique,
+le service, le score et la victoire sont uniques. Les deux runtimes utilisent le
+même accumulateur à 30 Hz, avec un delta borné à 250 ms. Les valeurs 1000×600,
+3 secondes de countdown, 1 seconde de pause et victoire à 5 ne changent pas.
+Seul le driver online possède admission, limitation d'inputs et abandon réseau.
+
+Le moteur est aussi un package **local privé**, `@chibaskogames/pong-engine`,
+dans shared/, sans dépendance. Le navigateur importe sa source ; le serveur
+importe sa compilation TypeScript. Cela conserve `game-server/dist/index.js`
+et évite d'élargir le rootDir du serveur à toute la plateforme. Les précommandes
+build/test/dev compilent le SDK puis ce moteur. Garder shared/ dans les releases
+avec game-server/ et packages/game-sdk/. Aucun package n'est publié.
+
+La définition déclare online/private/2 et local/2, jamais public. Le manifeste
+généré expose ces capacités. La fiche propose « Jouer en local » seulement si
+la capacité et le loader local existent. `/games/[slug]/local` utilise la même
+lecture de catalogue publié que la fiche : une fiche absente/non publiée,
+classique, inconnue ou sans capacité locale renvoie 404. Aucun login n'est requis.
+
+Pour recetter sans publier Pong : `npm run dev`, puis `/lobby-playground` et
+« Tester à deux sur cet appareil, sans compte ». Cet accès reste DEV ONLY ;
+aucune fiche n'est créée pour le test. Le game-server peut rester arrêté.
+
+Contrôles locaux : Joueur 1 Z/S (W également accepté pour QWERTY), Joueur 2 ↑/↓.
+Les touches utilisent KeyboardEvent.key, normalisé en minuscules, pour suivre les
+lettres du clavier. Z et W sont mémorisées séparément ; relâcher l'une ne neutralise
+pas l'autre si elle est encore tenue. Les commandes online restent inchangées.
+Cliquer le terrain ou utiliser Tab.
+Chaque côté possède aussi deux boutons tactiles indépendants, compatibles multi-touch.
+Relâchement, annulation, perte de capture, blur, onglet masqué et démontage
+neutralisent les inputs. Les flèches ne bloquent le scroll que dans le jeu actif.
+Un onglet masqué suspend la progression locale. « Rejouer » crée un modèle et un
+accumulateur neufs ; « Quitter » démonte le jeu et retourne à la fiche (ou au test).
+
+Le terrain garde sa définition logique 1000×600. Sa largeur visuelle respecte le
+ratio 5:3 et le budget de hauteur réellement disponible (HUD, contexte de page,
+contrôles et sortie inclus), recalculé par ResizeObserver, resize/scroll et
+visualViewport. Aucun setState par frame pour le layout. Un fallback CSS 100dvh
+couvre l'attente de mesure. À faible hauteur, gaps/HUD/textes sont plus compacts ;
+les boutons tactiles restent au moins à 44 px (64 px en portrait tactile).
+En paysage court, les mêmes quatre boutons se placent de part et d'autre du
+terrain pour libérer sa hauteur, sans recouvrir l'aire de jeu.
+Les safe areas sont conservées. Aucun changement de physique ou d'interpolation.
+
+tests/pong-layout.test.mjs est une recette Chromium **isolée**, sans site, compte,
+réseau ou game-server, facultative si Playwright est déjà installé. Exécution :
+node --import ./tests/product-register.mjs --test tests/pong-layout.test.mjs.
+PONG_LAYOUT_PLAYWRIGHT peut indiquer ce module déjà installé et PONG_LAYOUT_BROWSER
+un navigateur existant. Aucune dépendance npm ajoutée. La fixture utilise les vrais
+composants/CSS, vérifie 1366×768, 1440×900, 390×844, 768×1024 et 844×390 (online/local).
+En paysage court elle place la zone de jeu en vue, comme lors d'un défilement.
+Captures dans .next/pong-polish-qa/, jamais versionnées. Cela ne remplace pas une
+recette sur appareil tactile réel (barres navigateur, safe areas et multi-touch).
+
+Le mode local affiche Joueur 1/Joueur 2 : **aucun résultat vérifié, aucun envoi,
+aucune persistance, aucune statistique compétitive**. Le jeu ne fabrique pas de
+fausse session SDK réseau. Il réutilise le terrain, le HUD et GO ; le rendu local
+n'interpole pas les positions. React ne suit que phase/countdown/score/vainqueur.
+
+Validations ciblées : `npm run test:pong-local`, tests serveur pong.test.ts,
+pong-local-parity.test.ts et pong-network.test.ts. La parité compare chaque champ
+du modèle entre drivers sur deux parties complètes ; les tests physiques restent
+ceux du moteur existant. Les imports shared sont contrôlés par les boundaries.
+
+Avant extraction future du dépôt : next/image pour les avatars online,
+Tailwind/CSS/fonts du site, @colyseus/schema pour la projection serveur et
+enregistrement privé de la Room restent des dépendances explicites. Le moteur,
+lui, ne dépend d'aucun de ces éléments.

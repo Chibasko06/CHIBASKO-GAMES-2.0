@@ -6,6 +6,25 @@ export type PongModel = {
   phase: string; remainingMs: number; leftPaddleY: number; rightPaddleY: number
   ballX: number; ballY: number; leftScore: number; rightScore: number; winnerSide: string
 }
+export function createPongModel(): PongModel {
+  return { phase: 'READY', remainingMs: 0, leftPaddleY: (PONG.height - PONG.paddleHeight) / 2,
+    rightPaddleY: (PONG.height - PONG.paddleHeight) / 2, ballX: PONG.width / 2, ballY: PONG.height / 2,
+    leftScore: 0, rightScore: 0, winnerSide: '' }
+}
+
+// Both runtimes use the same bounded, fixed timestep. Time is supplied by the caller.
+export function createPongStepper(simulation: PongSimulation) {
+  let accumulator = 0
+  const step = 1000 / PONG.tickRate
+  return (deltaMs: number) => {
+    if (!Number.isFinite(deltaMs) || deltaMs < 0) return
+    accumulator += Math.min(deltaMs, 250)
+    while (accumulator >= step && simulation.state.phase !== 'FINISHED') {
+      simulation.step(step)
+      accumulator -= step
+    }
+  }
+}
 export function readInput(payload: unknown): -1 | 0 | 1 {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length !== 1
     || !('direction' in payload) || ![-1, 0, 1].includes(payload.direction as number)) throw new Error('INVALID_INPUT')

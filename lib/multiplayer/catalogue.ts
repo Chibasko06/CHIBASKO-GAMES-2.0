@@ -1,5 +1,6 @@
 import manifest from './gameManifest.generated.json' with { type: 'json' }
 import type { Tables } from '@/types/database'
+import type { GameCapabilities } from '@chibaskogames/sdk'
 
 export type GameType = 'classic' | 'multiplayer_chibasko'
 export type ClassicGame = Tables<'games'> & { game_type: 'classic'; game_url: string; multiplayer_game_id: null }
@@ -11,7 +12,8 @@ export function isChibaskoMultiplayerGame(game: Tables<'games'>): game is Chibas
   return game.game_type === 'multiplayer_chibasko' && game.game_url === null && typeof game.multiplayer_game_id === 'string'
 }
 export function getMultiplayerDefinition(id: string) {
-  const definitions: Readonly<Record<string, { minPlayers: number; maxPlayers: number }>> = manifest
+  // Generated from validated SDK definitions; JSON widens string literals to string[].
+  const definitions = manifest as Readonly<Record<string, { minPlayers: number; maxPlayers: number; capabilities: GameCapabilities }>>
   return Object.hasOwn(definitions, id) ? definitions[id] : undefined
 }
 export const multiplayerGames = Object.entries(manifest).map(([gameId, capacity]) => ({

@@ -2,7 +2,7 @@ import type { GameParticipant } from '@chibaskogames/sdk'
 import type { GameServerModule } from '@chibaskogames/sdk/server'
 import { pongDefinition } from './definition.js'
 import { PongState, PongPlayer } from './PongState.js'
-import { PONG, PongSimulation, readInput, type Side } from './simulation.js'
+import { PONG, PongSimulation, createPongStepper, readInput, type Side } from '@chibaskogames/pong-engine'
 
 // Gameplay driver. The platform adapter owns Room, admission and activation.
 export const pongServerModule: GameServerModule<PongState> = {
@@ -13,9 +13,10 @@ export const pongServerModule: GameServerModule<PongState> = {
     state.expectedPlayers = platform.participants.length
     if (state.expectedPlayers !== 2) throw new Error('INVALID_ROSTER')
     const simulation = new PongSimulation(state)
+    const advance = createPongStepper(simulation)
     const quotas = new Map<string, { count: number; until: number }>()
     const roster: { participantId: string; side: Side }[] = []
-    let accumulator = 0, stopped = false
+    let stopped = false
     function finish(reason: 'score' | 'forfeit') {
       if (stopped) return
       stopped = true; simulation.clearInputs(); quotas.clear()
@@ -48,12 +49,8 @@ export const pongServerModule: GameServerModule<PongState> = {
       start() { state.status = 'READY'; simulation.start() },
       tick(delta) {
         if (stopped) return
-        accumulator += Math.min(delta, 250)
-        const step = 1000 / PONG.tickRate
-        while (accumulator >= step && !stopped) {
-          simulation.step(step); accumulator -= step
-          if (state.phase === 'FINISHED') finish('score')
-        }
+        advance(delta)
+        if (state.phase === 'FINISHED') finish('score')
       },
       participantLeft(id) {
         const player = roster.find(p => p.participantId === id)

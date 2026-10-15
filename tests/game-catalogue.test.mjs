@@ -8,11 +8,11 @@ import { PATCH } from '../app/api/admin/games/[id]/route.ts'
 
 const classic = { title: 'Test', slug: 'test', game_url: 'https://example.com/game', category_ids: [] }
 const multi = { ...classic, game_type: 'multiplayer_chibasko', game_url: null, multiplayer_game_id: 'chibasko-pong', is_beta: true }
-test('manifest matches registry, exposes only public capacities and detects stale content', async () => {
+test('manifest matches registry, exposes public capabilities and detects stale content', async () => {
   await checkManifest()
-  assert.deepEqual(JSON.parse(generateManifest()), { 'chibasko-pong': { minPlayers: 2, maxPlayers: 2 } })
+  const definition = { minPlayers: 2, maxPlayers: 2, capabilities: { online: { access: ['private'], players: { min: 2, max: 2 } }, local: { players: { min: 2, max: 2 } } } }; assert.deepEqual(JSON.parse(generateManifest()), { 'chibasko-pong': definition })
   assert.throws(() => assertManifestCurrent(generateManifest(new Map())), /stale/)
-  assert.deepEqual(getMultiplayerDefinition('chibasko-pong'), { minPlayers: 2, maxPlayers: 2 })
+  assert.deepEqual(getMultiplayerDefinition('chibasko-pong'), definition)
   assert.equal(getMultiplayerDefinition('toString'), undefined)
   assert.equal(multiplayerCapacityLabel('chibasko-pong'), '2 joueurs')
 })

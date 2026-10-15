@@ -28,10 +28,27 @@ import { useChibaskoGame } from '@chibaskogames/sdk/react'
 import { createPongPresentation } from '../games/chibasko-pong/client/pongPresentation.ts'
 import { createPongControls } from '../games/chibasko-pong/client/pongControls.ts'
 import { drawPong } from '../games/chibasko-pong/client/pongRenderer.ts'
+import { gameLaunchOptions } from '../lib/multiplayer/gameLaunchOptions.ts'
 import GameResults from '../components/multiplayer/GameResults.tsx'
 import GameTypeFields from '../components/admin/GameTypeFields.tsx'
 import { changeGameFormType, gameFormPayload } from '../lib/multiplayer/catalogue.ts'
 import { validateGameCatalogue } from '../lib/server/gameCatalogueValidation.ts'
+
+test('game launch options follow explicit capabilities and keep future public access separate from private/local',()=>{
+  const players={min:2,max:2}
+  assert.deepEqual(gameLaunchOptions(undefined),[])
+  assert.deepEqual(gameLaunchOptions({online:{access:['private'],players}}),[
+    {kind:'private',label:'Partie privée',description:'Crée une partie privée ou rejoins-en une avec un code.'},
+  ])
+  assert.deepEqual(gameLaunchOptions({local:{players}}),[
+    {kind:'local',label:'Jouer en local',description:'Joue à deux sur le même appareil.'},
+  ])
+  const future=gameLaunchOptions({online:{access:['public','private'],players},local:{players}})
+  assert.deepEqual(future.map(({kind,label})=>[kind,label]),[
+    ['public','Jouer en ligne'],['private','Partie privée'],['local','Jouer en local'],
+  ])
+  assert.deepEqual(gameLaunchOptions({online:{access:['public'],players}}).map(({kind})=>kind),['public'])
+})
 
 test('admin form modes show controlled fields, clear launch values, preserve beta/categories and restore edits',async()=>{
   const saved=[]
@@ -364,7 +381,10 @@ test('home multiplayer section works with published games or an empty catalogue'
 test('shared game detail keeps classic iframe and exposes multiplayer without iframe',async()=>{
   const render=async slug=>renderToStaticMarkup(await GamePage({params:Promise.resolve({slug})}))
   const a=await render('classic');assert.match(a,/<iframe/);assert.match(a,/https:\/\/example.com\/game/)
-  const b=await render('pong');assert.doesNotMatch(b,/<iframe/);assert.match(b,/2 joueurs/);assert.match(b,/Bêta/);assert.match(b,/Jouer en multijoueur/)
+  const b=await render('pong');assert.doesNotMatch(b,/<iframe/);assert.match(b,/2 joueurs/);assert.match(b,/Bêta/);assert.match(b,/Partie privée/)
+  assert.match(b,/Crée une partie privée ou rejoins-en une avec un code\./)
+  assert.match(b,/Jouer en local/);assert.match(b,/Joue à deux sur le même appareil\./)
+  assert.doesNotMatch(b,/Jouer en multijoueur|Jouer en ligne/)
   for(const content of [a,b]){assert.match(content,/Favoris/);assert.match(content,/data-testid="reviews"/);assert.match(content,/👍/)}
   globalThis.__productRows=[{...multi,multiplayer_game_id:'unknown'}]
   assert.match(await render('pong'),/temporairement indisponible/)
@@ -373,7 +393,7 @@ test('entry invites guests before any network request; absent service disables a
   let calls=0;const originalFetch=globalThis.fetch;globalThis.fetch=async()=>{calls++;throw new Error('Network forbidden')}
   try {
     await mounted(MultiplayerEntry,{game:{slug:'pong',gameId:'chibasko-pong'}},async()=>{
-      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Jouer en multijoueur'))
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Partie privée'))
       await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Créer une partie'))
       assert.ok(document.querySelector('a[href^="/login?next="]'));assert.ok(document.querySelector('a[href^="/register?next="]'))
       globalThis.__productAuth={user:{id:'verified'},session:{},loading:false}
@@ -381,7 +401,7 @@ test('entry invites guests before any network request; absent service disables a
     })
     globalThis.__productMultiplayer={available:false,state:{busy:false,error:''},controller:{}}
     await mounted(MultiplayerEntry,{game:{slug:'pong',gameId:'chibasko-pong'}},async()=>{
-      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Jouer en multijoueur'))
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Partie privée'))
       for(const label of ['Créer une partie','Rejoindre'])assert.ok([...document.querySelectorAll('button')].find(b=>b.textContent===label).disabled)
     })
     assert.equal(calls,0)
@@ -398,7 +418,7 @@ test('network outage disables create/join and offers an explicit retry',async()=
   globalThis.__productMultiplayer={available:true,state:{busy:false,unavailable:true,error:'Le multijoueur de Chibasko Games est temporairement indisponible.'},controller:{retry(){retried++}}}
   try {
     await mounted(MultiplayerEntry,{game:{slug:'pong',gameId:'chibasko-pong'}},async()=>{
-      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Jouer en multijoueur'))
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Partie privée'))
       assert.ok([...document.querySelectorAll('button')].find(b=>b.textContent==='Créer une partie').disabled)
       assert.ok([...document.querySelectorAll('button')].find(b=>b.textContent==='Rejoindre').disabled)
       assert.match(document.querySelector('[role="alert"]').textContent,/temporairement indisponible/)
@@ -477,7 +497,7 @@ test('authenticated entry hands off to the correct product route without browser
   globalThis.__productMultiplayer={available:true,state:{busy:false,error:''},controller:{connect:async(...args)=>{calls.push(args);return {...game,code:'AB7KQ2'}}}}
   try {
     await mounted(MultiplayerEntry,{game},async()=>{
-      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Jouer en multijoueur'))
+      await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Partie privée'))
       await click([...document.querySelectorAll('button')].find(b=>b.textContent==='Créer une partie'))
       assert.deepEqual(calls[0],[game,undefined]);assert.equal(globalThis.__productNavigation,'/games/pong/lobby/AB7KQ2')
     })

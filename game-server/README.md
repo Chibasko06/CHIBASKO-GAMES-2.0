@@ -4,6 +4,11 @@ Processus Node 24 / TypeScript strict autonome, hors build Next.js/Cloudflare.
 Le package frère packages/game-sdk est une dépendance locale : conserver ce
 dossier dans chaque release. Les précommandes build/test/dev le compilent sans
 React via tsconfig.server.json. Aucun build Next.js n'est nécessaire côté VPS.
+Le moteur pur games/chibasko-pong/shared est également une dépendance locale ;
+conserver ce dossier dans la release. Les mêmes précommandes le compilent.
+Online reste autoritaire : seul le serveur applique ce moteur aux inputs réseau.
+Le mode local navigateur utilise la même source, sans accès à l'admission ni
+au coordinateur ; ses résultats ne sont ni envoyés ni persistés.
 Une instance Colyseus 0.18, sans workspace, Redis ou Docker.
 
 ## Développement

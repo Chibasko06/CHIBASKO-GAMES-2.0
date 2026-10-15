@@ -8,6 +8,7 @@ import { normalizeLobbyCode } from '@/lib/lobbyConnection'
 import { multiplayerError, type ProductGame } from '@/lib/multiplayer/productSession'
 import { safeAuthNext } from '@/lib/authRedirect'
 import { suppressLobbyAnalytics } from '@/components/SiteAnalytics'
+import { privateGameLaunch } from '@/lib/multiplayer/gameLaunchOptions'
 
 export const multiplayerButton = 'rounded-full border border-cyan-700 px-5 py-3 text-sm font-bold text-cyan-200 hover:bg-cyan-950/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50'
 export function AuthInvitation({ next }: { next: string }) {
@@ -47,7 +48,10 @@ export default function MultiplayerEntry({ available = true, game, directCode, g
   return <div className="space-y-4">
     {(!serviceAvailable || !available) && <p role="status" className="text-sm text-zinc-400">Le multijoueur de Chibasko Games est temporairement indisponible.</p>}
     {state.unavailable && <button type="button" onClick={controller.retry} className={multiplayerButton}>Réessayer la connexion</button>}
-    {!global && !directCode && <button type="button" disabled={!available} aria-expanded={open} aria-controls={`${id}-entry`} onClick={() => setOpen(v => !v)} className={multiplayerButton}>Jouer en multijoueur</button>}
+    {!global && !directCode && <div className="space-y-2">
+      <button type="button" disabled={!available} aria-expanded={open} aria-controls={`${id}-entry`} onClick={() => setOpen(v => !v)} className={multiplayerButton}>{privateGameLaunch.label}</button>
+      <p className="text-sm text-zinc-400">{privateGameLaunch.description}</p>
+    </div>}
     {open && <div id={`${id}-entry`} className="space-y-4 rounded-2xl border border-zinc-800 bg-black/30 p-4 sm:p-5">
       {game && !directCode && <button type="button" onClick={() => void action(true)} disabled={disabled} className={multiplayerButton}>Créer une partie</button>}
       <form onSubmit={event => { event.preventDefault(); void action(false) }} className="space-y-2">
