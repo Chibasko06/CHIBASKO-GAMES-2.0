@@ -1,227 +1,257 @@
-# PONG-EXTRACT-1 — autonomie de Chibasko Pong
+# Chibasko Pong — préparation de l'extraction réelle
 
-## Audit et frontière obtenue
+## État et décision
 
-| Catégorie | Avant | Après |
-|---|---|---|
-| A — code du jeu | Règles, contrôles, canvas, interpolation, runtime local | Conservés dans le package, sans changement de règles |
-| B — SDK | Contrats root/client/react/server | Peer dependency explicite @chibaskogames/sdk |
-| C — infrastructure générique | @colyseus/schema pour PongState | Dépendance serveur seulement ; aucune Room Colyseus dans le driver |
-| D — plateforme | next/image ; sources serveur dans game-server | img web ; sources regroupées dans le jeu ; installation privée extérieure |
-| E — visuel implicite | Tailwind, preflight, police/couleur du body | CSS Module : reset, palette, typographie, états, responsive et reduced-motion |
+Copie autonome : `C:/Users/chiba/ChibaskoGames/chibasko-pong`, hors du repository
+plateforme. Aucun `.git`, remote, commit, push, publication ou déploiement créé.
+Package privé `@chibaskogames/chibasko-pong`, version **0.1.0**, `UNLICENSED`.
 
-Aucun import Auth, Supabase, app/, lib/, components/ plateforme, alias @/,
-variable d'environnement plateforme, GameAdmission, LobbyRoom ou coordinateur
-n'existait dans le driver SDK. Ces dépendances restent interdites.
+Le dossier `games/chibasko-pong` reste provisoirement dans la plateforme. Il ne
+sera supprimé qu'après création et validation du vrai dépôt/tag Git privé : avant
+cela, aucune référence Git Pong portable ne peut être installée sur un autre poste.
+On ne remplace pas ce dossier par une dépendance absolue vers la copie sœur ni par
+un tarball versionné. Les registres et builds consomment déjà les exports publics.
 
-Assets : Canvas, contrôles Unicode, aucun son/image/font à copier. Les avatars
-online sont des URLs publiques fournies explicitement par l'état SDK ; img portable
-avec largeur/hauteur, lazy loading et no-referrer. Aucun chemin d'asset privé,
-optimizer Next ou font loader. Le CSS nomme les mêmes polices système que le site.
+## Audit des consommateurs
 
-## Structure et exports
+| Consommateur | Contrat utilisé / changement |
+| --- | --- |
+| `games/clientRegistry.ts` | Imports dynamiques littéraux `/client` et `/local`, déjà publics ; inchangés. |
+| `game-server/src/games/registry.ts` | `pongDefinition` exportée par la racine du package ; inchangé. |
+| `game-server/src/games/registerInternalGames.ts` | `/server` fournit `pongServerModule`, branché à l'adaptateur privé ; inchangé. |
+| `scripts/generate-game-manifest.mjs` | Registre installé et définition publique ; ne lit pas les sources Pong. |
+| Précommandes web/backend/manifeste | `build:pong` vérifie désormais les exports compilés installés, sans compiler un dossier source. |
+| `scripts/check-game-boundaries.mjs` | Vérifie le dist installé et interdit les imports privés Pong dans runtime et tests plateforme. Le jeu possède aussi son propre checker autonome. |
+| Tests produit/local/lobby/results | Conservent les intégrations plateforme, imports publics seulement. Les tests internes de contrôles/rendu ont rejoint Pong. |
+| Tests serveur/network/public/private | Restent plateforme : admission, orchestration, concurrence, deux parties, abandon et résultats. Les wrappers de tests moteur/parité sont supprimés. |
+| Layout optionnel plateforme | Hôte réel Navbar/Footer + jeu importé par ses exports, sans lecture de ses sources/styles internes. |
+| Scripts extraction SDK/Pong | SDK teste seulement son contrat ; Pong teste un tarball installé hors dépôt, sans liens vers le node_modules plateforme. |
+| Next | Conserve la configuration existante du package et le lazy loading. Aucun chemin source SDK/Pong requis par le bundler. |
+| Lockfiles / workspaces / exclusions TS | Références locales conservées uniquement pour l'installation transitoire, à retirer lors de la vraie bascule Git Pong. |
 
-```text
-games/chibasko-pong/
-  package.json                 @chibaskogames/chibasko-pong, privé
-  index.ts, definition.ts       définition portable
-  shared/simulation.ts         moteur unique, pur, inchangé
-  client/                      rendu online + CSS Module
-  local/                       boucle et contrôles deux joueurs
-  server/                      driver SDK, PongState, index
-  scripts/build.mjs            TypeScript et copie du CSS
-  tsconfig*.json               configurations indépendantes
-  tests/                       règles, parité, local, hôte React minimal
-  dist/                        JS ESM, déclarations, CSS (généré/ignoré)
-```
+Les chaînes de routes `/games/chibasko-pong/...` dans les scénarios produit et les
+chemins synthétiques dans les tests de frontières ne sont pas des imports source.
+Aucune modification de la physique, du rendu, du CSS, des inputs, des règles ou
+des capacités n'est nécessaire à cette extraction.
 
-| Export | Contenu |
-|---|---|
-| @chibaskogames/chibasko-pong | pongDefinition, sans React/Node/transport |
-| /client | default composant online + gameId, façade SDK fournie par l'hôte |
-| /local | default composant local + gameId, callback onExit fourni par l'hôte |
-| /server | pongServerModule et PongState, sans adaptateur privé |
-| /shared | modèle, constantes, simulation et stepper purs |
+## Package et exports
 
-Pas de wildcard d'exports ni de chemins privés autorisés. sideEffects conserve
-le CSS dans les bundlers. Le CSS est chargé automatiquement par les composants ;
-l'hôte doit supporter les CSS Modules. Les directives use client sont conservées
-pour Next, sans import/dépendance Next.
+| Export public | Contenu |
+| --- | --- |
+| `@chibaskogames/chibasko-pong` | Définition portable, integrationVersion 1, online public/private et local, deux joueurs. |
+| `/client` | Composant React online, `gameId`. |
+| `/local` | Composant React local, `gameId`, sortie via callback hôte. |
+| `/server` | Driver SDK `pongServerModule`, `PongState`. |
+| `/shared` | Constantes, modèle, simulation pure. |
 
-Le sous-package historique pong-engine disparaît : /shared expose le même moteur.
-Les sources serveur ont changé de dossier et d'imports, pas de comportement.
-Le roomType pong, la création de Room et l'installation restent privés à la plateforme.
-PongState conserve gameId/status/expectedPlayers pour les outils existants ;
-ces champs n'introduisent aucune dépendance vers les internes plateforme.
+ESM ES2022 et déclarations TypeScript. Le CSS Module est copié dans dist ;
+`sideEffects: ["**/*.css"]` protège son inclusion. Aucun asset/font/CSS plateforme,
+Next, auth, Supabase, Colyseus Room/Client ou endpoint n'est importé par Pong.
+Le serveur utilise légitimement `@colyseus/schema@5.0.36` ; le graphe du bundle
+client/local est vérifié pour exclure schema et les modules serveur.
 
-## Installation et builds
+### Dépendances
 
-Dans ce repository, seul Pong devient un workspace npm. Cela installe ses
-dépendances et partage React avec son hôte. Le SDK vient maintenant du repository
-privé Chibasko06/chibasko-games-sdk, v0.1.0, consommé par Git avec un SHA figé.
-Voir [distribution SDK et accès CI](sdk-extraction.md). Aucun orchestrateur ou
-registry supplémentaire n'est nécessaire.
+- SDK : peer **exact 0.1.0**, fourni explicitement par la plateforme/backend.
+  DevDependency Git `git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0`
+  pour le build autonome et la préparation d'une installation Git.
+  Le lockfile fige `7bc73cc335e7dbd52b411a751fcc689969c5a5d4`.
+  Aucun SDK local, embarqué dans dist, ou seconde implémentation runtime.
+- React : peer optionnel `^19.0.0`, devDependency de build/test. L'hôte React le
+  fournit ; root/shared/server n'en ont pas besoin. React n'est pas bundlé.
+- Schema : dépendance runtime serveur. Le package unique installe cette petite
+  dépendance même chez un consommateur client, mais ne l'inclut pas au bundle web.
+- Outils : TypeScript, ReactDOM/types et jsdom déclarés dans le package autonome.
+
+## Build et prepare
+
+Depuis la copie autonome, avec Node 24 et accès Git en lecture au SDK privé :
 
 ```sh
-# Racine du repository : lockfile existant
 npm ci
-npm run build:sdk
-cd games/chibasko-pong
-npm run build:shared
-npm run build:server
-npm run build:client
-npm run typecheck
-npm test
-# Ou cibles autonomes : npm run test:shared / test:server / test:client
-```
-
-build exécute les trois cibles ; test reconstruit seulement Pong. Aucun build
-Next, Auth, secret ou serveur requis. Les tests utilisent Node/jsdom ; leur seul
-loader simule un CSS Module pour Node. Le navigateur utilise le CSS livré.
-host.test.mjs monte local et online SDK, vérifie clavier, neutralisation, sortie
-et cleanup sous StrictMode, en interdisant réseau/WebSocket. Les tests physiques
-et de parité appartiennent au jeu ; les anciennes suites plateforme y délèguent.
-
-build:server ne compile pas le client et ne nécessite pas React. Le moteur se
-construit sans SDK/DOM/Node dans sa configuration ES2022. La cible interne runtime
-compile le runtime local pur pour la parité game-server, sans renderer React.
-Les tests réseau restent des tests d'intégration plateforme.
-
-Après copie dans un autre repository, fournir un SDK déjà compilé :
-
-```sh
-# Archive locale fournie, jamais un registry fictif
-npm install --no-save /chemin/vers/chibaskogames-sdk-0.1.0.tgz
 npm run build
 npm run typecheck
 npm test
+npm pack
 ```
 
-Cela fournit le peer SDK et installe les dépendances génériques du jeu. Aucun
-chemin relatif vers le SDK du repository principal n'est inscrit dans Pong.
-Créer un lockfile propre au futur repository après choix de la distribution SDK ;
-aujourd'hui le lock workspace principal reste l'autorité locale.
+`prepare: npm run build` produit tous les exports et le CSS. Dist n'est pas
+versionné. Pour une dépendance Git, npm installe aussi les devDependencies avant
+prepare puis empaquette ; le build est constitué de scripts Node portables.
+Ne pas utiliser `--ignore-scripts` pour une installation Git sans dist.
+Référence : [cycle prepare npm](https://docs.npmjs.com/cli/v11/using-npm/scripts/).
 
-## Preuve d'extractabilité
+Windows a été exécuté. Linux n'a pas été exécuté dans cette phase. Aucun commit
+n'étant autorisé et aucun dépôt/tag Pong n'existant encore, **une installation Git
+réelle de Pong reste à tester après sa création**. La chaîne actuelle prouvée est :
+copie autonome → npm ci → SDK Git privé réel → prepare → build → tarball → hôtes.
+Une installation tarball utilise le dist déjà généré et ne requiert pas les outils
+de build Pong. Les installations depuis Git exigeront l'accès aux deux dépôts privés.
 
-npm run test:pong-extraction copie les sources Pong dans un dossier temporaire
-hors du repository, sans dist/node_modules. Il fournit seulement le SDK compilé
-et les bibliothèques génériques déclarées déjà installées. Il construit et teste
-shared avant même de fournir le SDK/schema/React, puis construit et typechecke
-le serveur sans React, et enfin construit/typechecke
-l'ensemble et lance les dix tests autonomes. Aucun app/, game-server/, alias
-Next, configuration, token ou secret fourni. Les bibliothèques sont réutilisées
-par liens locaux, sans téléchargement. Cleanup après vérification stricte du chemin.
+## Tests et preuves reproductibles
 
-tests/pong-layout.test.mjs vérifie dix combinaisons online/local × 1366×768,
-1440×900, 390×844, 768×1024 et 844×390. Fixtures HTML isolées, vrais composants/CSS,
-jamais le site ou les comptes. Captures générées sous .next/, non versionnées.
-Six autres combinaisons online/local × desktop/portrait/paysage vérifient un
-hôte HTML clair, sans aucun CSS global/Tailwind, et la surface/police du jeu.
-Cela ne remplace pas un téléphone physique.
+Dans Pong : moteur/règles, parité online/local sur deux matchs complets, inputs
+stricts, abandons, contrôles clavier/tactiles, reset/focus/visibility/cleanup,
+budget responsive, hôte React sans plateforme, frontières et CSS autonome.
+Le test Playwright est optionnel et ignoré si le navigateur/outillage est absent.
 
-## Consommation et frontières
+Dans la plateforme :
 
-- Registres client/local : imports dynamiques littéraux des exports /client et
-  /local, toujours lazy. Aucun import d'un fichier privé de Pong.
-- GameRegistry : définition root. Registration : module /server branché par
-  l'adaptateur Colyseus privé existant.
-- Moteur : seulement ses propres imports relatifs purs.
-- Jeu : son code, SDK, React côté client/local, schema côté serveur.
-- Scripts/tests : bibliothèques génériques et Node, sans internes hôte.
-- Plateforme : exports publics du package, pas de deep import source.
-- CSS : ni Tailwind, ni import global, ni variable d'hôte non déclarée.
+```sh
+# Chemin explicite optionnel si le tarball n'est pas à l'emplacement sœur attendu.
+npm run test:pong-extraction -- /chemin/chibaskogames-chibasko-pong-0.1.0.tgz
+npm run test:pong-platform -- /chemin/chibaskogames-chibasko-pong-0.1.0.tgz
+```
 
-npm run check:game-boundaries contrôle ces frontières et refuse les imports
-dynamiques calculés dans les jeux. Aucun changement SDK requis.
+`test:pong-extraction` crée un véritable projet temporaire extérieur au dépôt,
+installe tarball + SDK Git, vérifie root/server/shared sans React, puis les cinq
+exports/types dans un hôte React/jsdom. Il bundle client/local, contrôle l'absence
+du serveur/schema, inspecte le tarball et scanne le contenu réellement distribué.
+Il ne réutilise pas les dépendances par symlink. Rapports dans le dossier temporaire.
 
-## Distribution future du SDK
+`test:pong-platform` installe le tarball dans un préfixe de preuve, puis copie les
+seuls fichiers distribués aux emplacements node_modules web/backend comme des
+installations normales. Il remplace temporairement les références du manifeste,
+désactive le workspace, masque tous les fichiers du dossier source (les dossiers
+vides restent en place sous Windows), et appelle les validations SDK/plateforme :
+TypeScript, tests produit, SDK, admission/session, réseau deux clients, public/privé,
+résultats, WAITING, deuxième partie, manifeste, boundaries, Next puis Cloudflare local.
+Les lockfiles existants du SDK restent contrôlés ; les lockfiles Pong définitifs
+seront régénérés par npm lors de la vraie bascule Git. Un finally restaure les
+fichiers, installations et manifests d'origine, même en cas d'erreur.
+Rapports ignorés dans `node_modules/.cache/pong-package-proof-*`.
 
-Recommandation quand le contrat sera prêt : npm public versionné, exports et
-déclarations actuels, artefacts construits et tests de compatibilité. Semver décrit
-la version du package ; integrationVersion=1 reste la compatibilité du contrat.
+Le tarball contient **40 fichiers**, environ 19 Ko compressés : package.json,
+README, CHANGELOG, JavaScript/déclarations de dist et le CSS. Aucun test, source,
+cache, node_modules, historique Git, secret ou fichier plateforme.
 
-GitHub Packages convient si le SDK doit rester privé, avec credentials/configuration
-registry pour les consommateurs. Git par tag/SHA est acceptable provisoirement,
-avec artefacts construits ou build documenté, sans sources privées de plateforme.
-Le SHA est reproductible ; les tags doivent rester immuables. Aucun mécanisme
-distant n'est installé ou publié ici.
+### Résultats de cette phase
 
-Copier Pong aujourd'hui avec le SDK fourni ne casse rien de structurel : restent
-les prérequis normaux (Node/outillage, React 19 pour le rendu, CSS Modules et
-schema pour le serveur), ainsi que son installation/enregistrement par l'hôte.
-La distribution SDK est désormais Git privé v0.1.0 ; l'extraction réelle nécessite
-encore le build automatique de Pong à son installation, son accès de build au SDK,
-un nouveau lockfile et l'adaptation des scripts hôtes liés à sa source locale.
-Pas de modification gameplay ou de services privés à
-recréer dans Pong. Même SDK ne signifie jamais même niveau de confiance tiers.
+- Copie sœur : npm install puis **npm ci**, prepare, build et typecheck réussis.
+- Tests Pong : **20 réussis**, un layout Playwright optionnel ignoré faute de
+  Playwright installé. Pas de test visuel sur téléphone réel ni d'exécution Linux.
+- Tarball : **40 fichiers**, 19 069 octets compressés, 67 652 décompressés ;
+  SHA-1 npm `bd9a1b1a5086c85a33f19fde181e6bbeaae1aa2e`.
+- Consommateur extérieur : cinq exports, types, serveur sans React, hôte React
+  local/online, graphe browser sans schema/serveur, scan du contenu : réussis.
+- Plateforme sans fichiers Pong locaux : TypeScript ; **24 tests SDK/session +
+  33 tests produit/local** ; manifeste et boundaries : réussis.
+- Backend sur tarball : build et **32 tests** réussis, notamment health,
+  admissions, publics/privés, concurrence, sécurité et réseau deux clients.
+  Deux parties finies au score, résultats identiques, WAITING et deuxième partie ;
+  une troisième admission vérifie l'abandon. Identités de test contrôlées, pas
+  de nouvelle recette manuelle avec des comptes réels pendant cette phase.
+- Next Webpack : réussi ; Cloudflare local réussi à partir de ce build frais
+  (`--skipNextBuild`). Avertissements habituels OpenNext Windows/middleware Node.
+- Script de consommation SDK adapté : ses quatre exports/types restent valides.
+- Lint ciblé, scan des 40 fichiers source autonomes + tarball + diff et
+  `git diff --check` : réussis.
+- Empreintes comparées avant/après : **22 fichiers runtime/build inchangés** ;
+  toutes les sources client/local/server/shared/définition/index de la copie sœur
+  sont identiques octet pour octet. Les changements concernent packaging, tests,
+  scripts et documentation.
+- Installations locales originales restaurées. Un ancien cache caché
+  `games/chibasko-pong/node_modules/.package-lock.json` référençait encore le SDK
+  local supprimé ; mis de côté dans le cache ignoré, sans modifier les lockfiles
+  publics du SDK. npm list web/backend/Pong affiche maintenant SDK 0.1.0 correctement.
 
-Ni publication catalogue, ni déploiement, ni serveur tiers, ni nouveau SDK.
+Ces preuves portent sur le **package externe empaqueté** et le vrai SDK Git.
+Elles ne prétendent pas prouver une installation Git Pong inexistante ni l'accès
+des futurs runners Cloudflare aux repositories privés.
 
-## Inventaire des fichiers de cette phase
+## Inventaire exact du futur dépôt
 
-Les anciens fichiers serveur sont deplaces dans le package ; le moteur shared est inchange.
+Copier les fichiers ci-dessous, pas `dist`, `node_modules` ni les tarballs générés.
+Ils sont déjà présents dans la copie sœur autonome :
 
-- `.gitignore`
-- `docs/game-sdk.md`
-- `docs/internal-multiplayer-games.md`
-- `docs/online-access.md`
-- `game-server/PRODUCTION.md`
-- `game-server/README.md`
-- `game-server/package-lock.json`
-- `game-server/package.json`
-- `game-server/src/games/chibasko-pong/PongRoom.ts` (ancien emplacement supprime)
-- `game-server/src/games/chibasko-pong/PongState.ts` (ancien emplacement supprime)
-- `game-server/src/games/chibasko-pong/definition.ts` (ancien emplacement supprime)
-- `game-server/src/games/chibasko-pong/register.ts` (ancien emplacement supprime)
-- `game-server/src/games/registerInternalGames.ts`
-- `game-server/src/games/registry.ts`
-- `game-server/tests/lobby-game-bridge.test.ts`
-- `game-server/tests/pong-local-parity.test.ts`
-- `game-server/tests/pong-network.test.ts`
-- `game-server/tests/pong.test.ts`
-- `games/chibasko-pong/README.md`
-- `games/chibasko-pong/client/PongCanvas.tsx`
-- `games/chibasko-pong/client/PongGame.tsx`
-- `games/chibasko-pong/client/pong.module.css`
-- `games/chibasko-pong/client/pongPresentation.ts`
-- `games/chibasko-pong/client/pongRenderer.ts`
-- `games/chibasko-pong/local/PongLocalControls.tsx`
-- `games/chibasko-pong/local/PongLocalGame.tsx`
-- `games/chibasko-pong/local/localRuntime.ts`
-- `games/chibasko-pong/shared/package.json` (ancien emplacement supprime)
-- `games/chibasko-pong/shared/tsconfig.json` (ancien emplacement supprime)
-- `games/clientRegistry.ts`
-- `next.config.ts`
-- `package-lock.json`
-- `package.json`
-- `scripts/check-game-boundaries.mjs`
-- `tests/game-sdk.test.mjs`
-- `tests/multiplayer-product.test.mjs`
-- `tests/pong-layout.test.mjs`
-- `tests/pong-local.test.mjs`
-- `tests/product-register.mjs`
-- `tests/register.mjs`
-- `tsconfig.json`
-- `docs/pong-extraction.md`
-- `games/chibasko-pong/client/css.d.ts`
-- `games/chibasko-pong/client/index.ts`
-- `games/chibasko-pong/definition.ts`
-- `games/chibasko-pong/index.ts`
-- `games/chibasko-pong/local/index.ts`
-- `games/chibasko-pong/package.json`
-- `games/chibasko-pong/scripts/build.mjs`
-- `games/chibasko-pong/server/PongRoom.ts`
-- `games/chibasko-pong/server/PongState.ts`
-- `games/chibasko-pong/server/index.ts`
-- `games/chibasko-pong/tests/css-loader.mjs`
-- `games/chibasko-pong/tests/driver-parity.test.mjs`
-- `games/chibasko-pong/tests/engine.test.mjs`
-- `games/chibasko-pong/tests/host.test.mjs`
-- `games/chibasko-pong/tests/local-runtime.test.mjs`
-- `games/chibasko-pong/tsconfig.client.json`
-- `games/chibasko-pong/tsconfig.json`
-- `games/chibasko-pong/tsconfig.runtime.json`
-- `games/chibasko-pong/tsconfig.server.json`
-- `games/chibasko-pong/tsconfig.shared.json`
-- `scripts/test-pong-extraction.mjs`
+```text
+.gitignore
+CHANGELOG.md
+README.md
+package.json
+package-lock.json
+definition.ts
+index.ts
+tsconfig.json
+tsconfig.client.json
+tsconfig.runtime.json
+tsconfig.server.json
+tsconfig.shared.json
+client/css.d.ts
+client/index.ts
+client/PongCanvas.tsx
+client/PongGame.tsx
+client/pong.module.css
+client/pongControls.ts
+client/pongLayout.ts
+client/pongPresentation.ts
+client/pongRenderer.ts
+client/pongView.ts
+local/index.ts
+local/localRuntime.ts
+local/PongLocalControls.tsx
+local/PongLocalGame.tsx
+server/index.ts
+server/PongRoom.ts
+server/PongState.ts
+shared/simulation.ts
+scripts/build.mjs
+scripts/check-boundaries.mjs
+tests/connection.mjs
+tests/controls.test.mjs
+tests/css-loader.mjs
+tests/driver-parity.test.mjs
+tests/engine.test.mjs
+tests/host.test.mjs
+tests/layout.test.mjs
+tests/local-runtime.test.mjs
+```
+
+## Vraie bascule future (non exécutée)
+
+1. Créer le dépôt GitHub **privé** `Chibasko06/chibasko-pong` à partir de cette copie.
+2. Revoir les fichiers ; créer un commit en français et le tag `v0.1.0` immuable.
+3. Tester depuis un projet vierge l'installation Git réelle de Pong, avec SDK Git
+   explicitement fourni à la même version ; vérifier SHA, prepare et exports.
+4. Remplacer les deux dépendances Pong par
+   `git+https://github.com/Chibasko06/chibasko-pong.git#v0.1.0`, supprimer le seul
+   workspace restant, régénérer les deux lockfiles via npm et vérifier les SHA.
+5. Refaire les validations plateforme, supprimer alors le dossier local Pong et
+   ses exclusions devenues inutiles ; conserver les tests d'intégration publics.
+6. Préparer séparément les credentials CI avant tout build/déploiement distant.
+
+| Plateforme | SDK | Pong | Intégration |
+| --- | --- | --- | --- |
+| combinaison vérifiée par tests d'intégration | 0.1.0 / v0.1.0 | 0.1.0 / futur v0.1.0 | 1 |
+
+Les versions package et integrationVersion sont indépendantes. Pendant le 0.x,
+mettre à jour cette combinaison explicitement et vérifier le SDK peer unique.
+
+## Deux dépendances Git privées : blocage opérationnel CI
+
+La réussite locale utilise les identifiants Git du poste. L'intégration GitHub
+Cloudflare de la plateforme ne garantit pas l'accès aux dépôts dépendants.
+
+Pour deux dépôts privés, recommandation actuelle : **PAT GitHub finement limité**
+aux seuls SDK/Pong, permission Contents en lecture, expiration et rotation,
+distinct par environnement. Utiliser HTTPS avec un credential helper éphémère et,
+si les lockfiles normalisent en SSH, une réécriture Git SSH→HTTPS non sensible.
+Le token reste uniquement dans un secret de build ; jamais URL, package.json,
+lockfile, config Git persistée, script versionné, log, NEXT_PUBLIC ou Worker runtime.
+Une GitHub App à jetons courts devient préférable à plus grande échelle.
+
+Alternative sans PAT : deux deploy keys de lecture distinctes, une par dépôt,
+avec routage SSH explicite. Une même deploy key n'est pas réutilisable entre dépôts ;
+c'est davantage de configuration pour notre petite installation.
+Références : [PAT GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens),
+[deploy keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys).
+
+Le secret doit être disponible **avant** l'installation automatique. Si Workers
+Builds est utilisé, prévoir `SKIP_DEPENDENCY_INSTALL=1` puis bootstrap Git sécurisé
+et npm ci dans la commande de build ; rétablir la vérification des clés d'hôte si
+SSH est choisi. [Image de build Cloudflare](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/).
+Pour toute autre CI, utiliser son mécanisme équivalent. Ne jamais supposer qu'un
+script npm exécuté après npm ci peut réparer une authentification déjà échouée.
+
+Aucun token, deploy key, secret Cloudflare ou pipeline n'est créé ici. Le build
+Cloudflare **local** valide le bundling, pas cette future installation distante.

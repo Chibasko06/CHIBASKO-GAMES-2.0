@@ -1,9 +1,10 @@
 {
   "name": "@chibaskogames/chibasko-pong",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
-  "files": ["dist", "README.md"],
+  "files": ["dist", "README.md", "CHANGELOG.md"],
   "sideEffects": ["**/*.css"],
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
@@ -18,16 +19,19 @@
     "build:server": "node scripts/build.mjs server",
     "build:shared": "node scripts/build.mjs shared",
     "typecheck": "node scripts/build.mjs --check",
+    "prepare": "npm run build",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
     "test:shared": "npm run build:shared && node --test tests/engine.test.mjs",
     "test:server": "npm run build:server && node scripts/build.mjs runtime && node --test tests/driver-parity.test.mjs",
     "test:client": "npm run build:client && node --import ./tests/css-loader.mjs --test tests/host.test.mjs",
     "pretest": "npm run build",
-    "test": "node --import ./tests/css-loader.mjs --test tests/*.test.mjs"
+    "test": "npm run check:boundaries && node --import ./tests/css-loader.mjs --test tests/*.test.mjs"
   },
   "dependencies": { "@colyseus/schema": "5.0.36" },
   "peerDependencies": { "@chibaskogames/sdk": "0.1.0", "react": "^19.0.0" },
   "peerDependenciesMeta": { "react": { "optional": true } },
   "devDependencies": {
+    "@chibaskogames/sdk": "git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0",
     "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0",
     "jsdom": "29.1.1", "react": "19.2.4", "react-dom": "19.2.4", "typescript": "5.9.3"
   }

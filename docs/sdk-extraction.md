@@ -28,9 +28,9 @@ sans dépendance runtime obligatoire. React reste un peer optionnel de /react.
 ## Consommateurs audités
 
 Les seuls installateurs directs sont `package.json` et `game-server/package.json`,
-avec leurs deux lockfiles. Pong déclare déjà le peer SDK exact `0.1.0` dans
-`games/chibasko-pong/package.json` ; il utilise le package fourni par l'hôte,
-sans nouvelle dépendance Git ni modification de source dans cette phase.
+avec leurs deux lockfiles. Pong déclare le peer SDK exact `0.1.0`, fourni par
+l'hôte. Depuis sa préparation d'extraction, son build autonome possède aussi une
+devDependency vers le même SDK Git privé ; son lockfile fige le même commit.
 
 Imports applicatifs, tous via les exports documentés du package :
 
@@ -56,7 +56,6 @@ games/chibasko-pong/server/PongRoom.ts
 ```
 
 Consommateurs de tests : `tests/game-sdk.test.mjs`, `tests/multiplayer-product.test.mjs`,
-`tests/pong-local.test.mjs` (assertions de frontières),
 `tests/fixtures/sdk-consumer/contracts.ts`, `games/chibasko-pong/tests/host.test.mjs`,
 et `game-server/tests/{internal-game-sdk,internal-game-module,lobby,public-lobbies}.test.ts`.
 Les scripts concernés sont classés ci-dessous. Aucun alias TypeScript ne redirige
@@ -68,9 +67,9 @@ le SDK vers une source locale ; web, game-server et Pong résolvent node_modules
 | --- | --- |
 | `build-game-sdk.mjs` / `build:sdk` | Adapté : vérifie les exports installés, leur version et la résolution Git. Ne compile plus de source SDK. Nom conservé pour les précommandes existantes. |
 | `check-game-boundaries.mjs` | Adapté : inspecte le dist installé, JS et déclarations. Aucun SDK source local requis. Les frontières Pong/plateforme restent contrôlées. |
-| `test-sdk-extraction.mjs` | Adapté : repackage le SDK installé sans exécuter prepare, installe son tarball hors repository, vérifie ses quatre entrées/types et Pong autonome. Ne prétend plus exécuter les unit tests du repository SDK. |
+| `test-sdk-extraction.mjs` | Repackage le SDK installé sans prepare, installe son tarball hors repository et vérifie ses quatre entrées/types. Les tests propres à Pong vivent désormais dans le jeu, sans duplication ici. |
 | `test-sdk-platform.mjs` | Adapté : teste l'installation Git réelle, les versions et SHA des deux consommateurs, puis les tests web/serveur, Next et le bundle Cloudflare local. Cache toute ancienne implémentation locale pendant la validation et restaure dans finally. |
-| `test-pong-extraction.mjs` | Conservé : utilise déjà le package SDK installé et les dépendances génériques ; aucune source SDK locale. |
+| `test-pong-extraction.mjs` | Installe le tarball Pong et le SDK Git réel dans un projet extérieur ; vérifie exports, types, hôte React et frontières navigateur/serveur. Voir [extraction Pong](pong-extraction.md). |
 | `generate-game-manifest.mjs` | Conservé : lit le registre serveur et les exports publics de Pong ; aucune source SDK locale. |
 | Unit tests/builds source SDK | Responsabilité du repository SDK séparé. Les tests d'intégration plateforme et de contrats publics restent ici. |
 
@@ -114,6 +113,10 @@ réellement écrite par npm. La clé privée doit être un secret du build, jama
 variable publique Next, un secret runtime Worker, un fichier versionné ou un log.
 La clé publique s'autorise sur GitHub ; seule la clé privée reste dans le stockage
 de secrets du build. Aucune clé n'est créée par cette phase.
+
+Avec l'ajout prochain du dépôt Pong privé, privilégier pour notre taille un PAT
+finement limité en lecture aux deux dépôts, ou deux deploy keys distinctes ; le
+choix et le bootstrap avant npm ci sont décrits dans [extraction Pong](pong-extraction.md).
 
 Configuration future à effectuer séparément :
 

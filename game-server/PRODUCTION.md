@@ -103,10 +103,11 @@ Git en lecture au SDK privé déjà configuré sur la machine de build (voir
 git fetch origin
 git worktree add --detach /opt/chibasko-games/releases/<sha> <sha>
 cd /opt/chibasko-games/releases/<sha>
+# Transitoire tant que Pong est un package file: conservé dans cette release.
+# Son prepare construit le package avec ses outils et son SDK Git privé verrouillés.
+npm --prefix games/chibasko-pong ci --workspaces=false
 npm --prefix game-server ci
-# SDK Git v0.1.0 au même commit que les lockfiles. prepare doit pouvoir s'exécuter.
-# Hors workspace : installe les seules dépendances génériques de Pong et ses outils.
-npm --prefix games/chibasko-pong install --workspaces=false --no-save --package-lock=false "git+https://github.com/Chibasko06/chibasko-games-sdk.git#7bc73cc335e7dbd52b411a751fcc689969c5a5d4"
+# Après la vraie bascule Git Pong, son prepare sera géré par npm ci du consommateur.
 cd game-server
 npm test
 npm run build

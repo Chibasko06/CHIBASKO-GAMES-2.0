@@ -9,14 +9,14 @@
   "scripts": {
     "build:sdk": "node ../scripts/build-game-sdk.mjs --server",
     "prebuild": "npm run build:sdk && npm run build:pong",
-    "pretest": "npm run build:sdk && npm run build:pong && node ../games/chibasko-pong/scripts/build.mjs runtime",
+    "pretest": "npm run build:sdk && npm run build:pong",
     "predev": "npm run build:sdk && npm run build:pong",
     "dev": "node --env-file=.env.local --import tsx --watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "tsx --test tests/*.test.ts",
     "test:auth": "tsx --test tests/auth.test.ts",
-    "build:pong": "npm --prefix ../games/chibasko-pong run build:server"
+    "build:pong": "node ../scripts/build-pong.mjs --server"
   },
   "dependencies": {
     "@chibaskogames/sdk": "git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0",

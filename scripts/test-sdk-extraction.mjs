@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process'
 const repository = fileURLToPath(new URL('../', import.meta.url))
 const scratch = await mkdtemp(join(await realpath(tmpdir()), 'chibasko-sdk-extract-'))
 assert.ok(relative(repository, scratch).startsWith('..' + sep), 'Fixture must be outside the repository')
-const sdk = join(scratch, 'sdk'), consumer = join(scratch, 'consumer'), pong = join(scratch, 'pong')
+const sdk = join(scratch, 'sdk'), consumer = join(scratch, 'consumer')
 const npm = process.env.npm_execpath || join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
 const installArgs = ['install', ...(process.argv.includes('--offline') ? ['--offline'] : []), '--no-audit', '--no-fund']
 function run(cwd, command, args, capture = false) {
@@ -82,10 +82,7 @@ export function local(props: LocalGameProps) { props.onExit() }
 run(consumer, process.execPath, ['react-smoke.mjs'])
 run(consumer, process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.json'])
 
-await cp(join(repository, 'games/chibasko-pong'), pong, { recursive: true, filter: path => !['node_modules', 'dist'].includes(path.split(/[\\/]/).at(-1)) })
-npmRun(pong, [...installArgs, '--save-exact', artifact])
-for (const script of ['build', 'typecheck', 'test']) npmRun(pong, ['run', script])
-const report = { sdk, consumer, pong, artifact, integrity: packed.integrity, files: expected,
-  result: 'Installed Git SDK repacked and consumed outside repository; four entrypoints/type contracts; no React needed by non-React entries; standalone Pong installed/built/typechecked/tested; sensitive content scan passed.' }
+const report = { sdk, consumer, artifact, integrity: packed.integrity, files: expected,
+  result: 'Installed Git SDK repacked and consumed outside repository; four entrypoints/type contracts; no React needed by non-React entries; sensitive content scan passed. Pong owns its separate package tests.' }
 await writeFile(join(scratch, 'report.json'), JSON.stringify(report, null, 2))
 console.log('SDK extraction proof OK. Evidence retained outside repository:', join(scratch, 'report.json'))

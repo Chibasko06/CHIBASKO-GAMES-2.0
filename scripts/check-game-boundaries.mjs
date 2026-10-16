@@ -1,15 +1,16 @@
 import { readFile, readdir } from 'node:fs/promises'
-import { resolve, dirname, relative, sep } from 'node:path'
+import { resolve, dirname, relative, sep, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const sdk = dirname(fileURLToPath(import.meta.resolve('@chibaskogames/sdk')))
+const pongRoot = dirname(dirname(fileURLToPath(import.meta.resolve('@chibaskogames/chibasko-pong'))))
 const within = (file, dir) => file === dir || file.startsWith(dir + sep)
 const generic = new Set(['react'])
 export function allowedGameImport(file, specifier, gameRoot) {
-  if (within(file, resolve(root, 'games/chibasko-pong/shared'))) {
-    return specifier.startsWith('.') && within(resolve(dirname(file), specifier), resolve(root, 'games/chibasko-pong/shared'))
+  if (within(file, resolve(gameRoot, 'shared'))) {
+    return specifier.startsWith('.') && within(resolve(dirname(file), specifier), resolve(gameRoot, 'shared'))
   }
   if (publicGameExport(specifier, gameRoot)) {
     const server = within(file, resolve(gameRoot, 'server'))
@@ -20,7 +21,7 @@ export function allowedGameImport(file, specifier, gameRoot) {
   if (specifier === '@colyseus/schema') return within(file, resolve(gameRoot, 'server'))
   if (specifier === '@chibaskogames/sdk/server') return within(file, resolve(gameRoot, 'server'))
   if (specifier === '@chibaskogames/sdk' || ['client','react'].some(p => specifier === '@chibaskogames/sdk/' + p)) return true
-  if (generic.has(specifier)) return within(file, resolve(gameRoot, 'client')) || within(file, resolve(gameRoot, 'local'))
+  if (generic.has(specifier) || specifier === 'react/jsx-runtime') return within(file, resolve(gameRoot, 'client')) || within(file, resolve(gameRoot, 'local'))
   const target = resolve(dirname(file), specifier)
   if ((within(file, resolve(gameRoot, 'client')) || within(file, resolve(gameRoot, 'local'))) && within(target, resolve(gameRoot, 'server'))) return false
   if (within(file, resolve(gameRoot, 'server')) && (within(target, resolve(gameRoot, 'client')) || within(target, resolve(gameRoot, 'local')))) return false
@@ -68,26 +69,32 @@ export async function checkGameBoundaries() {
       for (const file of await files(gameRoot)) for (const specifier of imports(await readFile(file, 'utf8'))) {
         const tool = within(file, resolve(gameRoot, 'tests')) || within(file, resolve(gameRoot, 'scripts'))
         const own = specifier.startsWith('.') && within(resolve(dirname(file), specifier), gameRoot)
-        const toolDependency = specifier.startsWith('node:') || ['react', 'react-dom/client', 'react-dom/server', 'jsdom'].includes(specifier)
+        const toolDependency = specifier.startsWith('node:') || ['react', 'react-dom/client', 'react-dom/server', 'jsdom', 'typescript'].includes(specifier)
           || publicGameExport(specifier, gameRoot)
         const sdkExport = ['@chibaskogames/sdk', ...['client','react','server'].map(name => '@chibaskogames/sdk/' + name)].includes(specifier)
         if (!(tool ? own || toolDependency || sdkExport : allowedGameImport(file, specifier, gameRoot))) errors.push(relative(root, file) + ': forbidden game import ' + specifier)
       }
     }
   }
+  // Installed package must be just as isolated when source isn't in this repo.
+  const gameDist = resolve(pongRoot, 'dist')
+  for (const file of await files(gameDist)) for (const specifier of imports(await readFile(file, 'utf8'))) {
+    if (!allowedGameImport(file, specifier, gameDist)) errors.push('Installed Pong: forbidden import ' + specifier)
+  }
   // Platform runtime consumes only public package exports, never game source paths.
   const publicPong = new Set(['@chibaskogames/chibasko-pong', ...['client','local','server','shared'].map(name => '@chibaskogames/chibasko-pong/' + name)])
   const platform = [...await files(resolve(root, 'app')), ...await files(resolve(root, 'components')), ...await files(resolve(root, 'lib')),
-    ...await files(resolve(root, 'game-server/src')), resolve(root, 'games/clientRegistry.ts')]
+    ...await files(resolve(root, 'game-server/src')), ...await files(resolve(root, 'tests')), ...await files(resolve(root, 'game-server/tests')), resolve(root, 'games/clientRegistry.ts')]
   for (const file of platform) for (const specifier of imports(await readFile(file, 'utf8'))) {
     if (specifier.includes('chibasko-pong') && !publicPong.has(specifier)) errors.push(relative(root, file) + ': private Pong import ' + specifier)
   }
-  const pongCss = await readFile(resolve(root, 'games/chibasko-pong/client/pong.module.css'), 'utf8')
+  const pongCss = await readFile(resolve(pongRoot, 'dist/client/pong.module.css'), 'utf8')
   if (/@import|@apply|@tailwind|var\(--(?!pong-)/.test(pongCss)) errors.push('Pong styles depend on host CSS')
   if (errors.length) throw new Error(errors.join('\n'))
 }
 function publicGameExport(specifier, gameRoot) {
-  return gameRoot === resolve(root, 'games/chibasko-pong') && ['@chibaskogames/chibasko-pong', ...['client','local','server','shared'].map(name => '@chibaskogames/chibasko-pong/' + name)].includes(specifier)
+  const own = '@chibaskogames/' + basename(gameRoot)
+  return [own, ...['client','local','server','shared'].map(name => own + '/' + name)].includes(specifier)
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await checkGameBoundaries()

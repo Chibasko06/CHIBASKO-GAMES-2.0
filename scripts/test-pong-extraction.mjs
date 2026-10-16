@@ -1,65 +1,64 @@
 import assert from 'node:assert/strict'
-import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, readdir } from 'node:fs/promises'
-import { createRequire } from 'node:module'
-import { dirname, join, resolve, basename } from 'node:path'
+import { cp, mkdtemp, readFile, writeFile, realpath, access } from 'node:fs/promises'
+import { join, dirname, resolve, relative, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { build } from 'esbuild'
 
-const require = createRequire(import.meta.url)
-const repository = fileURLToPath(new URL('../', import.meta.url))
-const temporaryRoot = await realpath(tmpdir())
-const scratch = await mkdtemp(join(temporaryRoot, 'chibasko-pong-extract-'))
-const game = join(scratch, 'pong'), modules = join(scratch, 'node_modules')
-
-async function dependencyDirectory(name) {
-  let cursor = dirname(require.resolve(name))
-  while (dirname(cursor) !== cursor) {
-    try { if (JSON.parse(await readFile(join(cursor, 'package.json'), 'utf8')).name === name) return cursor } catch {}
-    cursor = dirname(cursor)
-  }
-  throw new Error('Missing generic dependency ' + name)
-}
-function run(args) {
-  const result = spawnSync(process.execPath, args, { cwd: game, stdio: 'inherit', env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot } })
+const root = resolve(fileURLToPath(new URL('../', import.meta.url)))
+const artifact = resolve(process.argv[2] || join(root, '../chibasko-pong/chibaskogames-chibasko-pong-0.1.0.tgz'))
+await access(artifact)
+const consumer = await mkdtemp(join(await realpath(tmpdir()), 'chibasko-pong-consumer-'))
+assert.ok(relative(root, consumer).startsWith('..' + sep))
+const npm = process.env.npm_execpath || join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
+function run(command, args, capture = false) {
+  const result = spawnSync(command, args, { cwd: consumer, encoding: 'utf8', stdio: capture ? 'pipe' : 'inherit', env: { ...process.env, NODE_PATH: '', NODE_OPTIONS: '' } })
   if (result.error) throw result.error
-  assert.equal(result.status, 0, 'Standalone Pong command failed')
+  if (result.status !== 0 && capture) console.error(result.stdout, result.stderr)
+  assert.equal(result.status, 0, 'External Pong consumer failed: ' + args.join(' '))
+  return result.stdout
 }
-try {
-  await cp(resolve(repository, 'games/chibasko-pong'), game, { recursive: true, filter: path => !['node_modules', 'dist'].includes(basename(path)) })
-  await mkdir(join(modules, '@chibaskogames'), { recursive: true })
-  async function provide(name) {
-    const target = join(modules, name); await mkdir(dirname(target), { recursive: true })
-    await symlink(await dependencyDirectory(name), target, process.platform === 'win32' ? 'junction' : 'dir')
-  }
-  await provide('typescript')
-  run(['scripts/build.mjs', 'shared'])
-  run(['--test', 'tests/engine.test.mjs'])
-  // Pure engine has now built and passed its tests, before supplying SDK/schema/React.
-  // Only the SDK's distributable contract is supplied; no platform source.
-  const sdk = join(modules, '@chibaskogames/sdk')
-  const installedSdk = await dependencyDirectory('@chibaskogames/sdk')
-  await mkdir(sdk)
-  await cp(join(installedSdk, 'package.json'), join(sdk, 'package.json'))
-  await cp(join(installedSdk, 'dist'), join(sdk, 'dist'), { recursive: true })
-  // Reuse explicitly declared generic dependencies already installed. No registry,
-  // network access, app config, platform aliases or game-server source in this host.
-  await provide('@colyseus/schema')
-  run(['scripts/build.mjs', 'server'])
-  run(['scripts/build.mjs', 'server', '--check'])
-  // Server and engine have already built with no React/DOM host present.
-  for (const name of ['react', 'react-dom', 'jsdom']) await provide(name)
-  for (const name of ['react', 'react-dom']) {
-    const target = join(modules, '@types', name); await mkdir(dirname(target), { recursive: true })
-    await symlink(dirname(require.resolve(`@types/${name}/package.json`)), target, process.platform === 'win32' ? 'junction' : 'dir')
-  }
-  assert.equal((await readdir(scratch)).includes('app'), false)
-  run(['scripts/build.mjs'])
-  run(['scripts/build.mjs', '--check'])
-  run(['--import', './tests/css-loader.mjs', '--test', ...((await readdir(join(game, 'tests'))).filter(file => file.endsWith('.test.mjs')).map(file => 'tests/' + file))])
-  console.log('Extraction proof OK: copied source builds and tests outside the repository with only SDK + declared generic dependencies.')
-} finally {
-  // Never recursively remove a computed path without verifying its absolute scope.
-  if (dirname(resolve(scratch)) !== temporaryRoot || !basename(scratch).startsWith('chibasko-pong-extract-')) throw new Error('Unsafe cleanup path')
-  await rm(scratch, { recursive: true, force: true })
+const npmRun = args => run(process.execPath, [npm, ...args])
+const files = run('tar', ['-tzf', artifact], true).trim().split(/\r?\n/).sort()
+for (const file of files) assert.match(file, /^package\/(?:package\.json|README\.md|CHANGELOG\.md|dist\/.+\.(?:js|d\.ts|css))$/)
+await writeFile(join(consumer, 'package.json'), JSON.stringify({ name: 'external-pong-consumer', private: true, type: 'module', dependencies: {
+  '@chibaskogames/sdk': 'git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0',
+  '@chibaskogames/chibasko-pong': 'file:' + artifact,
+}, devDependencies: { typescript: '5.9.3' } }, null, 2))
+npmRun(['install', '--no-audit', '--no-fund'])
+await assert.rejects(access(join(consumer, 'node_modules/react')))
+await writeFile(join(consumer, 'server-smoke.mjs'), `import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { pongDefinition } from '@chibaskogames/chibasko-pong'
+import { pongServerModule } from '@chibaskogames/chibasko-pong/server'
+import { PONG } from '@chibaskogames/chibasko-pong/shared'
+assert.equal(pongDefinition, pongServerModule.definition)
+assert.equal(PONG.width, 1000); assert.equal(PONG.height, 600)
+assert.throws(() => createRequire(import.meta.url).resolve('react'), {code:'MODULE_NOT_FOUND'})
+await assert.rejects(import('@chibaskogames/chibasko-pong/client/PongCanvas.js'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'})
+console.log('Root/server/shared work without React; private imports are rejected.')
+`)
+run(process.execPath, ['server-smoke.mjs'])
+const lock = JSON.parse(await readFile(join(consumer, 'package-lock.json'), 'utf8'))
+assert.equal(lock.packages['node_modules/@chibaskogames/sdk'].version, '0.1.0')
+assert.ok(lock.packages['node_modules/@chibaskogames/sdk'].resolved.endsWith('#7bc73cc335e7dbd52b411a751fcc689969c5a5d4'))
+npmRun(['install', '--save-dev', '--no-audit', '--no-fund', 'react@19.2.4', 'react-dom@19.2.4', '@types/react@^19', '@types/react-dom@^19', 'jsdom@29.1.1'])
+await cp(join(root, 'tests/fixtures/pong-consumer'), join(consumer, 'fixture'), { recursive: true })
+await writeFile(join(consumer, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target:'ES2022', module:'NodeNext', moduleResolution:'NodeNext', strict:true, noEmit:true, skipLibCheck:true }, include:['fixture/*.ts'] }))
+run(process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.json'])
+run(process.execPath, ['--import', './fixture/css-loader.mjs', 'fixture/host.mjs'])
+const browser = await build({ absWorkingDir:consumer, stdin:{ contents:"export { default as Online } from '@chibaskogames/chibasko-pong/client'; export { default as Local } from '@chibaskogames/chibasko-pong/local'", resolveDir:consumer }, bundle:true, platform:'browser', format:'esm', outdir:'bundle', write:false, metafile:true, loader:{'.css':'local-css'} })
+const browserInputs = Object.keys(browser.metafile.inputs)
+assert.ok(browserInputs.some(path => path.endsWith('/PongGame.js')))
+assert.ok(browserInputs.some(path => path.endsWith('/PongLocalGame.js')))
+assert.ok(browserInputs.some(path => path.endsWith('/pong.module.css')))
+assert.equal(browserInputs.some(path => /@colyseus|\/server\/|supabase|\/app\//i.test(path)), false)
+const sensitive = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\beyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}|\bsb_(?:secret|publishable)_[A-Za-z0-9_-]{16,}|\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}|https?:\/\/(?:127\.0\.0\.1|localhost|[^\s/]+\.supabase\.co)/i
+for (const file of files) {
+  const content = await readFile(join(consumer, 'node_modules/@chibaskogames/chibasko-pong', file.slice('package/'.length)), 'utf8')
+  assert.doesNotMatch(content, sensitive, file)
+  if (file.startsWith('package/dist/')) assert.doesNotMatch(content, /GameSessionCoordinator|GameAdmission|LobbyRoom|Supabase|service_role|@\/|C:\\Users|game-server\/src\/platform/i)
 }
+await writeFile(join(consumer, 'report.json'), JSON.stringify({ artifact, files, sdk:lock.packages['node_modules/@chibaskogames/sdk'].resolved, browserInputs, result:'Five public exports, TypeScript, external React host, server without React, browser/server isolation and packaged-content scan passed.' }, null, 2))
+console.log('External Pong tarball consumer OK. Evidence:', join(consumer, 'report.json'))
