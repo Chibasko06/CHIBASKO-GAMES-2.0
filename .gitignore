@@ -4,9 +4,6 @@
 /node_modules
 /game-server/node_modules/
 /game-server/dist/
-/games/chibasko-pong/dist/
-/games/chibasko-pong/node_modules/
-/games/chibasko-pong/shared/dist/
 /.pnp
 .pnp.*
 .yarn/*

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile, realpath } from 'node:fs/promises'
+import { readFile, realpath, lstat } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { defineGame, INTEGRATION_VERSION } from '@chibaskogames/sdk'
 import { checkGameBoundaries, allowedGameImport, imports } from '../scripts/check-game-boundaries.mjs'
@@ -29,6 +30,30 @@ test('platform and game-server install the same immutable Git SDK release withou
     consumed.push({ specifier, version: sdk.version, resolved: sdk.resolved })
   }
   assert.deepEqual(consumed[0], consumed[1])
+})
+
+test('web and game-server consume the same Git Pong release, public exports and their deduplicated host SDK', async () => {
+  const releases = []
+  for (const directory of ['.', 'game-server']) {
+    const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
+    const lock = JSON.parse(await readFile(resolve(directory, 'package-lock.json'), 'utf8'))
+    const name = '@chibaskogames/chibasko-pong', installed = resolve(directory, 'node_modules', name)
+    assert.equal(manifest.dependencies[name], 'git+https://github.com/Chibasko06/Chibasko-Pong.git#v0.1.0')
+    assert.equal(manifest.workspaces, undefined)
+    const release = lock.packages['node_modules/' + name]
+    assert.equal(release.version, '0.1.0'); assert.equal(release.link, undefined)
+    assert.match(release.resolved, /^git\+(?:https:\/\/github\.com|ssh:\/\/git@github\.com)\/Chibasko06\/Chibasko-Pong\.git#07c23b83f6493e03113c43d1f56d21d15831c87b$/)
+    assert.equal(Object.keys(lock.packages).some(key => /^(?:\.\.\/)?games\//.test(key)), false)
+    assert.equal((await lstat(installed)).isSymbolicLink(), false)
+    assert.equal(await realpath(installed), installed)
+    const metadata = JSON.parse(await readFile(resolve(installed, 'package.json'), 'utf8'))
+    assert.equal(metadata.peerDependencies['@chibaskogames/sdk'], lock.packages['node_modules/@chibaskogames/sdk'].version)
+    const fromGame = createRequire(resolve(installed, 'dist/server/index.js'))
+    assert.equal(await realpath(fromGame.resolve('@chibaskogames/sdk')), await realpath(resolve(directory, 'node_modules/@chibaskogames/sdk/dist/index.js')))
+    assert.deepEqual(Object.keys(metadata.exports).sort(), ['.','./client','./local','./server','./shared'].sort())
+    releases.push(release.resolved)
+  }
+  assert.equal(releases[0], releases[1])
 })
 
 test('pure SDK explicitly declares capabilities/version; local can differ without enabling a runtime', () => {
@@ -78,7 +103,7 @@ test('game boundaries reject platform imports, SDK internals and computed module
   for (const spec of ['../shared/engine', '@chibaskogames/sdk', '@chibaskogames/sdk/client']) assert.equal(allowedGameImport(file, spec, root), true)
   for (const spec of ['next/image', '@colyseus/schema', 'react-dom', '@chibaskogames/pong-engine', '@chibaskogames/sdk/server','../server/Room']) assert.equal(allowedGameImport(file, spec, root), false)
   assert.equal(allowedGameImport(resolve(root,'server/State.ts'),'@colyseus/schema',root),true)
-  const pong=resolve('games/chibasko-pong')
+  const pong=resolve('node_modules/@chibaskogames/chibasko-pong')
   assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/shared',pong),true)
   assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/server',pong),false)
   assert.deepEqual(imports('const x = import(path);'), ['<non-literal import>'])

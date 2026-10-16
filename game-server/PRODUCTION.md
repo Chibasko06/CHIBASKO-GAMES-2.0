@@ -95,7 +95,7 @@ Les exemples deploy/systemd et deploy/caddy doivent être adaptés et validés.
 Ne jamais installer/compiler comme root. Ne pas copier de .env du poste de travail.
 
 Pour une nouvelle release, depuis un clone de déploiement propre, avec un accès
-Git en lecture au SDK privé déjà configuré sur la machine de build (voir
+Git en lecture aux dépôts privés SDK et Pong déjà configuré sur la machine de build (voir
 [distribution SDK et accès CI](../docs/sdk-extraction.md)) :
 
 ```sh
@@ -103,11 +103,9 @@ Git en lecture au SDK privé déjà configuré sur la machine de build (voir
 git fetch origin
 git worktree add --detach /opt/chibasko-games/releases/<sha> <sha>
 cd /opt/chibasko-games/releases/<sha>
-# Transitoire tant que Pong est un package file: conservé dans cette release.
-# Son prepare construit le package avec ses outils et son SDK Git privé verrouillés.
-npm --prefix games/chibasko-pong ci --workspaces=false
 npm --prefix game-server ci
-# Après la vraie bascule Git Pong, son prepare sera géré par npm ci du consommateur.
+# SDK/Pong Git v0.1.0 aux commits verrouillés ; prepare doit pouvoir s'exécuter.
+# Aucun source Pong local ni build Next requis. Accès Git aux deux dépôts obligatoire.
 cd game-server
 npm test
 npm run build

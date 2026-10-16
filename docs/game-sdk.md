@@ -157,14 +157,14 @@ status ou expectedPlayers, et un résultat sans score/gagnant via le flow produi
 npm run check:game-boundaries analyse les imports statiques/dynamiques littéraux.
 Les jeux ne peuvent pas importer les autres jeux ou les internes plateforme.
 Les imports calculés ne sont pas autorisés. SDK pur ne peut pas importer /react.
-Pong est un package local autonome consommé par ses exports publics. React côté
+Pong est un package Git privé externe consommé par ses exports publics. React côté
 client/local et @colyseus/schema côté serveur sont des dépendances génériques
 explicites. Aucun Next/Tailwind/font loader de plateforme requis.
 Voir [extractabilité de Pong](pong-extraction.md).
 
 PongState conserve encore gameId/status/expectedPlayers pour compatibilité des
 outils de debug/tests. Aucun fonctionnement produit ne dépend plus de ces champs.
-La physique Pong vit maintenant dans games/chibasko-pong/shared : un seul moteur
+La physique Pong vit dans `shared/` du dépôt privé `Chibasko06/Chibasko-Pong` : un seul moteur
 pur est exécuté par le serveur online et le runtime local navigateur.
 
 ## Modules locaux

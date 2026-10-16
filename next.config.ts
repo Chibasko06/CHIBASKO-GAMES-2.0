@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Pong is still local; the Git SDK already ships compiled JavaScript.
-  transpilePackages: ['@chibaskogames/chibasko-pong'],
+  // Git SDK and Pong packages provide precompiled JavaScript and public exports.
   // Keep the normal Turbopack path; the workaround below is Webpack-only.
   turbopack: {},
   webpack(config) {

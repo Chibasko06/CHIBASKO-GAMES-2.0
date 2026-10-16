@@ -8,16 +8,17 @@ Son installation produit son dist via prepare ; les précommandes build/test/dev
 vérifient ses exports installés. Aucun dossier source SDK frère n'est nécessaire.
 Un accès Git en lecture au repository SDK est requis pendant npm ci, pas au runtime.
 Aucun build Next.js n'est nécessaire côté VPS. Voir [bascule SDK et CI](../docs/sdk-extraction.md).
-Pong est consommé uniquement via ses exports publics compilés. Les précommandes
-vérifient le package installé ; elles ne compilent plus ses sources. La copie locale
-games/chibasko-pong est conservée jusqu'à la création de son vrai dépôt/tag privé.
-prepare construit ce package lors de son installation ; la physique et la parité
-sont testées dans le jeu. Voir [extraction Pong](../docs/pong-extraction.md).
+Pong vient du repository privé `Chibasko06/Chibasko-Pong`, tag `v0.1.0`, commit
+`07c23b83f6493e03113c43d1f56d21d15831c87b`, figé dans le lockfile. Il est consommé
+uniquement via ses exports publics compilés. Les précommandes vérifient le package
+installé et son SDK partagé ; elles ne compilent plus ses sources, absentes de ce
+dépôt. prepare construit Pong pendant l'installation Git. La physique et la parité
+sont testées dans le dépôt du jeu. Voir [extraction Pong](../docs/pong-extraction.md).
 Online reste autoritaire : seul le serveur applique ce moteur aux inputs réseau.
 Le mode local navigateur utilise la même source, sans accès à l'admission ni
 au coordinateur ; ses résultats ne sont ni envoyés ni persistés.
-Une instance Colyseus 0.18, sans Redis ni Docker. Le frontend utilise un seul
-workspace npm pour Pong ; le game-server reste un package indépendant.
+Une instance Colyseus 0.18, sans Redis ni Docker. Web et game-server restent deux
+installations npm indépendantes, au même SDK/Pong Git, sans workspace de jeu local.
 
 ## Développement
 
@@ -29,7 +30,7 @@ activer les jeux connus ; une valeur vide les désactive.
 Depuis la racine, dans deux terminaux séparés :
 
 ```sh
-npm ci # racine : workspace Pong transitoire et vrai SDK Git privé
+npm ci # racine : SDK et Pong Git privés, accès lecture aux deux repos requis
 npm --prefix game-server ci
 npm --prefix game-server run dev
 ```

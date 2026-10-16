@@ -1,6 +1,20 @@
 # Chibasko Games
 
-Site de jeux navigateur : Next.js 16, React, TypeScript, Supabase Auth/PostgreSQL/Storage et Resend. L'hebergement reste Vercel. Aucune migration Cloudflare, R2, Colyseus ou monorepo n'est incluse dans la Phase 0.
+Site de jeux navigateur : Next.js 16, React, TypeScript, Supabase Auth/PostgreSQL/Storage et Resend. Pour le socle multijoueur et le build Cloudflare local actuels, voir les packages ci-dessous et la documentation serveur ; les notes Phase 0 plus bas conservent l'historique initial.
+
+## Packages multijoueurs externes
+
+Le web et le game-server installent deux dépendances Git privées, toutes deux
+taggées `v0.1.0` et figées par leurs lockfiles :
+
+- SDK `Chibasko06/chibasko-games-sdk` : `7bc73cc335e7dbd52b411a751fcc689969c5a5d4`.
+- Pong `Chibasko06/Chibasko-Pong` : `07c23b83f6493e03113c43d1f56d21d15831c87b`.
+
+Ce dépôt ne contient plus leurs sources ni de workspace jeu. Les registres
+consomment les exports publics, avec lazy loading client/local. Un accès Git en
+lecture aux deux dépôts est requis avant npm ci ; aucun credential n'est versionné.
+Voir [consommation Pong](docs/pong-extraction.md), [SDK](docs/sdk-extraction.md)
+et [serveur](game-server/README.md), notamment le prérequis d'accès privé Cloudflare/CI.
 
 ## Developpement
 

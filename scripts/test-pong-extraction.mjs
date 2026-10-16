@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { cp, mkdtemp, readFile, writeFile, realpath, access } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, writeFile, realpath, lstat, access } from 'node:fs/promises'
 import { join, dirname, resolve, relative, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -7,8 +7,6 @@ import { spawnSync } from 'node:child_process'
 import { build } from 'esbuild'
 
 const root = resolve(fileURLToPath(new URL('../', import.meta.url)))
-const artifact = resolve(process.argv[2] || join(root, '../chibasko-pong/chibaskogames-chibasko-pong-0.1.0.tgz'))
-await access(artifact)
 const consumer = await mkdtemp(join(await realpath(tmpdir()), 'chibasko-pong-consumer-'))
 assert.ok(relative(root, consumer).startsWith('..' + sep))
 const npm = process.env.npm_execpath || join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
@@ -20,11 +18,21 @@ function run(command, args, capture = false) {
   return result.stdout
 }
 const npmRun = args => run(process.execPath, [npm, ...args])
+// Inspect the distribution actually installed from Git, not a sibling checkout.
+const installed = join(root, 'node_modules/@chibaskogames/chibasko-pong')
+assert.equal((await lstat(installed)).isSymbolicLink(), false)
+const packDirectory = join(consumer, 'distribution')
+await cp(installed, packDirectory, {recursive:true, filter:path => !['node_modules','.git'].includes(path.split(/[\\/]/).at(-1))})
+const packedResult = spawnSync(process.execPath, [npm, 'pack', '--ignore-scripts', '--json'], {cwd:packDirectory, encoding:'utf8', env:{...process.env}})
+if (packedResult.error) throw packedResult.error
+assert.equal(packedResult.status, 0, 'Packing installed Pong failed')
+const packed = JSON.parse(packedResult.stdout)[0]
+const artifact = join(packDirectory, packed.filename)
 const files = run('tar', ['-tzf', artifact], true).trim().split(/\r?\n/).sort()
 for (const file of files) assert.match(file, /^package\/(?:package\.json|README\.md|CHANGELOG\.md|dist\/.+\.(?:js|d\.ts|css))$/)
 await writeFile(join(consumer, 'package.json'), JSON.stringify({ name: 'external-pong-consumer', private: true, type: 'module', dependencies: {
   '@chibaskogames/sdk': 'git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0',
-  '@chibaskogames/chibasko-pong': 'file:' + artifact,
+  '@chibaskogames/chibasko-pong': 'git+https://github.com/Chibasko06/Chibasko-Pong.git#v0.1.0',
 }, devDependencies: { typescript: '5.9.3' } }, null, 2))
 npmRun(['install', '--no-audit', '--no-fund'])
 await assert.rejects(access(join(consumer, 'node_modules/react')))
@@ -43,6 +51,7 @@ run(process.execPath, ['server-smoke.mjs'])
 const lock = JSON.parse(await readFile(join(consumer, 'package-lock.json'), 'utf8'))
 assert.equal(lock.packages['node_modules/@chibaskogames/sdk'].version, '0.1.0')
 assert.ok(lock.packages['node_modules/@chibaskogames/sdk'].resolved.endsWith('#7bc73cc335e7dbd52b411a751fcc689969c5a5d4'))
+assert.ok(lock.packages['node_modules/@chibaskogames/chibasko-pong'].resolved.endsWith('#07c23b83f6493e03113c43d1f56d21d15831c87b'))
 npmRun(['install', '--save-dev', '--no-audit', '--no-fund', 'react@19.2.4', 'react-dom@19.2.4', '@types/react@^19', '@types/react-dom@^19', 'jsdom@29.1.1'])
 await cp(join(root, 'tests/fixtures/pong-consumer'), join(consumer, 'fixture'), { recursive: true })
 await writeFile(join(consumer, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target:'ES2022', module:'NodeNext', moduleResolution:'NodeNext', strict:true, noEmit:true, skipLibCheck:true }, include:['fixture/*.ts'] }))
@@ -60,5 +69,6 @@ for (const file of files) {
   assert.doesNotMatch(content, sensitive, file)
   if (file.startsWith('package/dist/')) assert.doesNotMatch(content, /GameSessionCoordinator|GameAdmission|LobbyRoom|Supabase|service_role|@\/|C:\\Users|game-server\/src\/platform/i)
 }
-await writeFile(join(consumer, 'report.json'), JSON.stringify({ artifact, files, sdk:lock.packages['node_modules/@chibaskogames/sdk'].resolved, browserInputs, result:'Five public exports, TypeScript, external React host, server without React, browser/server isolation and packaged-content scan passed.' }, null, 2))
-console.log('External Pong tarball consumer OK. Evidence:', join(consumer, 'report.json'))
+await writeFile(join(consumer, 'report.json'), JSON.stringify({ artifact, integrity:packed.integrity, files, sdk:lock.packages['node_modules/@chibaskogames/sdk'].resolved,
+  pong:lock.packages['node_modules/@chibaskogames/chibasko-pong'].resolved, browserInputs, result:'Real Git installations of Pong and SDK: five public exports, TypeScript, external React host, server without React, browser/server isolation and packaged-content scan passed.' }, null, 2))
+console.log('External Git Pong consumer OK. Evidence:', join(consumer, 'report.json'))

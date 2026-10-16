@@ -1,8 +1,0 @@
-node_modules/
-dist/
-*.tgz
-*.tsbuildinfo
-.env
-.env.*
-test-results/
-npm-debug.log*

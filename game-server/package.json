@@ -24,7 +24,7 @@
     "@colyseus/schema": "5.0.36",
     "@colyseus/ws-transport": "0.18.4",
     "@supabase/supabase-js": "2.104.0",
-    "@chibaskogames/chibasko-pong": "file:../games/chibasko-pong"
+    "@chibaskogames/chibasko-pong": "git+https://github.com/Chibasko06/Chibasko-Pong.git#v0.1.0"
   },
   "devDependencies": {
     "@colyseus/sdk": "0.18.5",

@@ -30,7 +30,7 @@
     "test:pong-local": "npm run build:sdk && npm run build:pong && node --import ./tests/product-register.mjs --test tests/pong-local-product.test.mjs",
     "build:pong": "node scripts/build-pong.mjs",
     "test:pong": "npm run test:pong-local",
-    "test:pong-extraction": "npm run build:sdk && node scripts/test-pong-extraction.mjs",
+    "test:pong-extraction": "npm run build:sdk && npm run build:pong && node scripts/test-pong-extraction.mjs",
     "test:pong-platform": "node scripts/test-pong-platform.mjs",
     "pretest:product": "npm run build:sdk && npm run build:pong"
   },
@@ -46,7 +46,7 @@
     "react-dom": "19.2.4",
     "resend": "^6.12.2",
     "server-only": "0.0.1",
-    "@chibaskogames/chibasko-pong": "file:games/chibasko-pong"
+    "@chibaskogames/chibasko-pong": "git+https://github.com/Chibasko06/Chibasko-Pong.git#v0.1.0"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "1.20.9",
@@ -60,8 +60,5 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "4.148.0"
-  },
-  "workspaces": [
-    "games/chibasko-pong"
-  ]
+  }
 }
