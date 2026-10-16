@@ -34,7 +34,7 @@
     "pretest:product": "npm run build:sdk && npm run build:pong"
   },
   "dependencies": {
-    "@chibaskogames/sdk": "file:packages/game-sdk",
+    "@chibaskogames/sdk": "git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0",
     "@colyseus/sdk": "0.18.5",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "^2.104.0",

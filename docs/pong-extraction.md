@@ -57,8 +57,10 @@ ces champs n'introduisent aucune dépendance vers les internes plateforme.
 ## Installation et builds
 
 Dans ce repository, seul Pong devient un workspace npm. Cela installe ses
-dépendances et partage React avec son hôte. Le SDK reste le package local existant.
-Aucun orchestrateur, registry ou nouveau repository ajouté.
+dépendances et partage React avec son hôte. Le SDK vient maintenant du repository
+privé Chibasko06/chibasko-games-sdk, v0.1.0, consommé par Git avec un SHA figé.
+Voir [distribution SDK et accès CI](sdk-extraction.md). Aucun orchestrateur ou
+registry supplémentaire n'est nécessaire.
 
 ```sh
 # Racine du repository : lockfile existant
@@ -89,7 +91,7 @@ Après copie dans un autre repository, fournir un SDK déjà compilé :
 
 ```sh
 # Archive locale fournie, jamais un registry fictif
-npm install --no-save /chemin/vers/chibaskogames-sdk-0.0.0.tgz
+npm install --no-save /chemin/vers/chibaskogames-sdk-0.1.0.tgz
 npm run build
 npm run typecheck
 npm test
@@ -148,8 +150,10 @@ distant n'est installé ou publié ici.
 Copier Pong aujourd'hui avec le SDK fourni ne casse rien de structurel : restent
 les prérequis normaux (Node/outillage, React 19 pour le rendu, CSS Modules et
 schema pour le serveur), ainsi que son installation/enregistrement par l'hôte.
-L'extraction réelle nécessite encore la décision de distribution/version du SDK
-et le nouveau lockfile. Pas de modification gameplay ou de services privés à
+La distribution SDK est désormais Git privé v0.1.0 ; l'extraction réelle nécessite
+encore le build automatique de Pong à son installation, son accès de build au SDK,
+un nouveau lockfile et l'adaptation des scripts hôtes liés à sa source locale.
+Pas de modification gameplay ou de services privés à
 recréer dans Pong. Même SDK ne signifie jamais même niveau de confiance tiers.
 
 Ni publication catalogue, ni déploiement, ni serveur tiers, ni nouveau SDK.

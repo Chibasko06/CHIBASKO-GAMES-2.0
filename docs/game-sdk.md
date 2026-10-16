@@ -1,37 +1,41 @@
 # SDK commun Chibasko Games — intégration 1
 
 Un seul contrat pour les jeux officiels et les futurs jeux tiers. Le package
-local privé `@chibaskogames/sdk` n'est pas publié sur npm. Les anciens dossiers
+privé `@chibaskogames/sdk` n'est pas publié sur npm. Sa source vit dans le dépôt
+[Chibasko06/chibasko-games-sdk](https://github.com/Chibasko06/chibasko-games-sdk),
+version `v0.1.0`, commit `7bc73cc335e7dbd52b411a751fcc689969c5a5d4`.
+Les anciens dossiers
 games/sdk et game-server/src/games/sdk sont supprimés, pas maintenus en parallèle.
 
 ## Installation et builds
 
-La racine et game-server dépendent du même `file:packages/game-sdk` (chemin
-relatif adapté dans game-server). Aucun workspace ou registry externe ajouté.
-Après npm ci, npm run build:sdk compile le package. npm run build à la racine
-le fait automatiquement et vérifie les frontières d'import. npm test le compile
-avant les tests. npm run dev le compile aussi avant le démarrage local.
-npm run test:sdk vérifie l'intégration plateforme. Depuis packages/game-sdk,
-npm test vérifie les contrats de types négatifs et le hook sans plateforme.
-Après modification du
-SDK pendant une session dev, relancer npm run build:sdk (pas de watcher ajouté).
+La racine et game-server déclarent exactement
+`git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0`.
+Les deux lockfiles figent le SHA indiqué ci-dessus. npm normalise leur URL résolue
+en `git+ssh://git@github.com/Chibasko06/chibasko-games-sdk.git#<SHA>`.
+L'installation nécessite donc un accès Git au dépôt privé avant `npm ci`.
+Aucun credential n'est enregistré dans les manifests ou lockfiles.
 
-Le SDK expérimental est préparé en version 0.1.0, avec integrationVersion 1 inchangée.
-Le game-server reste un processus autonome. Tant que sa dépendance est locale,
-sa release inclut le dossier frère packages/game-sdk. Le helper build-game-sdk
-compile la source locale, ou vérifie et utilise directement un SDK distribué
-déjà construit, sans exiger ses sources. La configuration tsconfig.server.json exclut l'entrypoint React :
-une installation serveur seule n'a pas besoin de React ou des dépendances Next.
-Les fichiers dist sont générés et ignorés par Git. Ne pas publier ni copier un
-node_modules contenant un lien absolu vers la machine de développement :
-refaire npm ci dans le checkout/release cible.
+Le SDK expérimental reste en version 0.1.0, avec integrationVersion 1 inchangée.
+Son script prepare produit le build lors de l'installation Git. Le nom historique
+`npm run build:sdk` est conservé : il vérifie seulement les exports compilés,
+leur version et la résolution Git, sans compiler de source SDK dans la plateforme.
+Les mêmes contrôles sont utilisés par le game-server avec --server.
+Root/client/server n'importent pas React au runtime ; la préparation Git du SDK
+installe temporairement ses outils de développement, dont React et ses types.
 
-Le [README autonome](../packages/game-sdk/README.md) documente le contrat public,
-et la [procédure d'extraction](./sdk-extraction.md) décrit le tarball, les tests
-isolés, la licence à décider et la future consommation GitHub/tag. Aucun remote
-ni package npm n'est créé dans cette préparation.
+`npm run test:sdk` teste l'intégration plateforme. Les unit tests et le build source
+du SDK appartiennent à son repository. `npm run test:sdk-extraction` teste hors du
+repository la distribution installée, ses types et une copie autonome de Pong.
+`npm run test:sdk-platform` vérifie les consommateurs et builds sur le SDK Git,
+avec toute éventuelle ancienne implémentation locale temporairement indisponible.
 
-Next déclare le SDK dans transpilePackages. Sous Windows, le cache de build
+Le [README du SDK](https://github.com/Chibasko06/chibasko-games-sdk/tree/v0.1.0)
+documente son API ; la [bascule SDK Git](./sdk-extraction.md) décrit les consommateurs,
+les scripts et le prérequis d'authentification Cloudflare/CI avant déploiement.
+
+Next ne transpile plus spécialement le SDK précompilé ; seul Pong demeure local.
+Sous Windows, le cache de build
 Webpack est désactivé à cause du bug de snapshot des liens absolus npm
 ([webpack #21636](https://github.com/webpack/webpack/issues/21636)). Turbopack
 reste disponible ; aucun cache runtime/Cloudflare n'est désactivé. Ce contournement

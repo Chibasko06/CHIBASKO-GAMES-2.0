@@ -88,8 +88,9 @@ Seul le driver online possède admission, limitation d'inputs et abandon réseau
 
 Le package privé `@chibaskogames/chibasko-pong` expose /shared pour le moteur,
 /client, /local et /server. Sa définition est dans definition.ts. Le SDK est un
-peer fourni par l'hôte. Aucun package n'est publié. Conserver tout ce dossier
-dans les releases actuelles avec game-server/ et packages/game-sdk/.
+peer fourni par l'hôte. Le SDK vient du repository privé Chibasko06/chibasko-games-sdk,
+tag v0.1.0 ; aucun package n'est publié sur npm. Conserver tout ce dossier dans
+les releases actuelles avec game-server/. Aucune source SDK locale n'est requise.
 
 La définition déclare online/public et online/private (2 joueurs), et local/2. Le manifeste
 généré expose ces capacités. La fiche propose « Jouer en local » seulement si
@@ -174,5 +175,6 @@ La surface sombre du composant reste lisible même sur un hôte HTML clair.
 À la racine : `npm run test:pong-extraction` copie réellement le package hors du
 repository, le construit et teste avec le SDK et des dépendances génériques seuls.
 Voir [audit, exports et préparation SDK](../../docs/pong-extraction.md).
-La future distribution du SDK et le lockfile du futur repository restent à choisir.
+La distribution SDK est désormais Git privé v0.1.0. Le futur repository Pong doit
+encore préparer son build à l'installation, son accès au SDK et son propre lockfile.
 Chibasko Pong reste non publié et non déployé.

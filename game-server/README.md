@@ -1,9 +1,13 @@
 # Serveur multijoueur Chibasko Games
 
 Processus Node 24 / TypeScript strict autonome, hors build Next.js/Cloudflare.
-Le package frère packages/game-sdk est une dépendance locale : conserver ce
-dossier dans chaque release. Les précommandes build/test/dev le compilent sans
-React via tsconfig.server.json. Aucun build Next.js n'est nécessaire côté VPS.
+Le SDK `@chibaskogames/sdk` vient du repository Git privé
+`Chibasko06/chibasko-games-sdk`, tag `v0.1.0`, commit
+`7bc73cc335e7dbd52b411a751fcc689969c5a5d4` figé dans le lockfile.
+Son installation produit son dist via prepare ; les précommandes build/test/dev
+vérifient ses exports installés. Aucun dossier source SDK frère n'est nécessaire.
+Un accès Git en lecture au repository SDK est requis pendant npm ci, pas au runtime.
+Aucun build Next.js n'est nécessaire côté VPS. Voir [bascule SDK et CI](../docs/sdk-extraction.md).
 Pong est le package local games/chibasko-pong ; conserver tout ce dossier dans la
 release et installer ses dépendances génériques avec le SDK fourni. Les précommandes
 compilent seulement son serveur, sans client React. Les tests compilent également

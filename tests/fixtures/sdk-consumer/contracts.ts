@@ -16,7 +16,7 @@ function contracts(client: GameClientConnection, server: GameServerSession) {
   client.complete(result)
   // @ts-expect-error No raw transport.
   void client.room
-  // @ts-expect-error No Colyseus/transition details.
+  // @ts-expect-error No private transition.
   void server.transitionId
   // @ts-expect-error No raw network admission in the game-facing session.
   server.admit({})

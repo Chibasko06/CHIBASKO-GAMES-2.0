@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Local SDK package; let Next track its real source directory behind npm's link.
-  transpilePackages: ['@chibaskogames/sdk', '@chibaskogames/chibasko-pong'],
+  // Pong is still local; the Git SDK already ships compiled JavaScript.
+  transpilePackages: ['@chibaskogames/chibasko-pong'],
   // Keep the normal Turbopack path; the workaround below is Webpack-only.
   turbopack: {},
   webpack(config) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { defineGame, INTEGRATION_VERSION } from '@chibaskogames/sdk'
 import { checkGameBoundaries, allowedGameImport, imports } from '../scripts/check-game-boundaries.mjs'
@@ -11,6 +11,25 @@ const definition = { id: 'test-game', integrationVersion: 1, capabilities: { onl
 export const envelope = () => ({ session: { id: 'opaque-session', gameId: 'test-game', integrationVersion: 1, execution: 'online' },
   participants: [{ participantId: 'participant-A', username: 'Alice', avatarUrl: null }, { participantId: 'participant-B', username: 'Bob', avatarUrl: null }],
   localParticipantIds: ['participant-A'], connectedParticipantIds: ['participant-A'], availability: 'preparing' })
+
+test('platform and game-server install the same immutable Git SDK release without a local link', async () => {
+  const consumed = []
+  for (const directory of ['.', 'game-server']) {
+    const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
+    const lock = JSON.parse(await readFile(resolve(directory, 'package-lock.json'), 'utf8'))
+    const sdk = lock.packages['node_modules/@chibaskogames/sdk']
+    const specifier = manifest.dependencies['@chibaskogames/sdk']
+    assert.match(specifier, /^git\+https:\/\/github\.com\/Chibasko06\/chibasko-games-sdk\.git#v\d+\.\d+\.\d+$/)
+    assert.equal(lock.packages[''].dependencies['@chibaskogames/sdk'], specifier)
+    assert.equal(sdk.link, undefined)
+    assert.match(sdk.resolved, /^git\+(?:https:\/\/github\.com|ssh:\/\/git@github\.com)\/Chibasko06\/chibasko-games-sdk\.git#[a-f0-9]{40}$/)
+    const installed = resolve(directory, 'node_modules/@chibaskogames/sdk')
+    assert.equal(await realpath(installed), installed)
+    assert.equal(JSON.parse(await readFile(resolve(installed, 'package.json'), 'utf8')).version, sdk.version)
+    consumed.push({ specifier, version: sdk.version, resolved: sdk.resolved })
+  }
+  assert.deepEqual(consumed[0], consumed[1])
+})
 
 test('pure SDK explicitly declares capabilities/version; local can differ without enabling a runtime', () => {
   assert.equal(INTEGRATION_VERSION, 1)

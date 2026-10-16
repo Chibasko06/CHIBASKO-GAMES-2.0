@@ -19,7 +19,7 @@
     "build:pong": "npm --prefix ../games/chibasko-pong run build:server"
   },
   "dependencies": {
-    "@chibaskogames/sdk": "file:../packages/game-sdk",
+    "@chibaskogames/sdk": "git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0",
     "@colyseus/core": "0.18.18",
     "@colyseus/schema": "5.0.36",
     "@colyseus/ws-transport": "0.18.4",

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const sdk = resolve(root, 'packages/game-sdk/src')
+const sdk = dirname(fileURLToPath(import.meta.resolve('@chibaskogames/sdk')))
 const within = (file, dir) => file === dir || file.startsWith(dir + sep)
 const generic = new Set(['react'])
 export function allowedGameImport(file, specifier, gameRoot) {
@@ -50,8 +50,8 @@ async function files(dir) {
 }
 export async function checkGameBoundaries() {
   const errors = []
-  // SDK source is audited here while local; an extracted SDK audits itself.
-  const sdkFiles = await files(sdk).catch(error => { if (error.code === 'ENOENT') return []; throw error })
+  // Audit the installed distribution; SDK source/tests belong to its own repo.
+  const sdkFiles = await files(sdk)
   for (const file of sdkFiles) {
     for (const specifier of imports(await readFile(file, 'utf8'))) {
       const target = resolve(dirname(file), specifier)

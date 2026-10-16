@@ -94,7 +94,9 @@ Structure : `/opt/chibasko-games/releases/<sha>` et `current` symlink vers une r
 Les exemples deploy/systemd et deploy/caddy doivent être adaptés et validés.
 Ne jamais installer/compiler comme root. Ne pas copier de .env du poste de travail.
 
-Pour une nouvelle release, depuis un clone de déploiement propre :
+Pour une nouvelle release, depuis un clone de déploiement propre, avec un accès
+Git en lecture au SDK privé déjà configuré sur la machine de build (voir
+[distribution SDK et accès CI](../docs/sdk-extraction.md)) :
 
 ```sh
 # SHA exact revu et disponible sur GitHub ; jamais un checkout sale en service.
@@ -102,9 +104,9 @@ git fetch origin
 git worktree add --detach /opt/chibasko-games/releases/<sha> <sha>
 cd /opt/chibasko-games/releases/<sha>
 npm --prefix game-server ci
-# SDK fourni localement au jeu, aucune dépendance Next ni publication nécessaire.
+# SDK Git v0.1.0 au même commit que les lockfiles. prepare doit pouvoir s'exécuter.
 # Hors workspace : installe les seules dépendances génériques de Pong et ses outils.
-npm --prefix games/chibasko-pong install --workspaces=false --ignore-scripts --no-save --package-lock=false "$PWD/packages/game-sdk"
+npm --prefix games/chibasko-pong install --workspaces=false --no-save --package-lock=false "git+https://github.com/Chibasko06/chibasko-games-sdk.git#7bc73cc335e7dbd52b411a751fcc689969c5a5d4"
 cd game-server
 npm test
 npm run build
