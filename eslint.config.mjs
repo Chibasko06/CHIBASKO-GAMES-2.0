@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     ".open-next/**",
     ".wrangler/**",
+    "**/.distribution/**",
     "game-server/node_modules/**",
     "game-server/dist/**",
   ]),

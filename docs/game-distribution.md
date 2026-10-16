@@ -1,4 +1,4 @@
-# Game Distribution v1 — architecture et fondation
+# Game Distribution v1 — architecture, fondation et pipeline d'upload
 
 **Décision : ARCHITECTURE APPROUVÉE**, avec deux précisions : un serveur hébergé
 chez nous n'est pas automatiquement un jeu honnête, et les exports Web multithreadés
@@ -476,3 +476,224 @@ Next/Cloudflare, jeu réseau et téléphones n'ont pas été recettés à nouvea
 fondation n'est branchée à aucun parcours. Les dépendances Git et le blocage
 d'installation Cloudflare actuel restent inchangés. Une recette complète sera
 requise lors du branchement du player, du pipeline et des serveurs gameplay.
+
+## 19. GAME-DISTRIBUTION-2 : pipeline client générique
+
+La phase 2 ajoute les routes API, une session/job mutable, l'upload R2 multipart,
+un dispatcher d'outbox, un consumer de validation isolé et le nettoyage. Aucun jeu
+n'est migré. Le flag `GAME_DISTRIBUTION_UPLOADS_ENABLED` est désactivé par défaut.
+Rien n'est créé/configuré/appliqué à distance par le code ou les tests.
+
+```text
+Bearer vérifié → permission DB par jeu → session created
+ → multipart R2 privé → uploading → parts PUT directement vers R2
+ → finalize → finalizing → objet assemblé privé figé
+ → transaction queued + outbox
+ → dispatcher planifié → Cloudflare Queue (uploadId seulement)
+ → consumer Node isolé → claim/lease → validating
+ → download streamé vers disque privé → parser enfant borné
+ → contrôles ZIP/manifest + hashes → fichiers immuables R2
+ → archive originale + inventory.json écrit en dernier
+ → transaction game_version draft + upload completed
+```
+
+Le payload reste identique pour un jeu officiel, tiers, local, online ou mixte.
+Ni Git, npm, SDK JS, React ni technologie de moteur ne sont requis pour l'upload.
+Le game-server, les règles et l'UX actuels restent inchangés.
+
+## 20. API développeur exacte
+
+Toutes les réponses sont JSON, `Cache-Control: private, no-store`, avec `{data:...}`
+ou `{error:{code:...}}`. Authentification par `Authorization: Bearer ...` seulement,
+session validée par Supabase `getUser`. Aucun rôle/owner pris dans le body.
+Un Origin navigateur fourni doit correspondre au portail ; CLI/CI sans Origin
+sont autorisés avec la même authentification. Pas de cookie-only ni redirect UI.
+
+| Méthode / route | Entrée | Résultat |
+| --- | --- | --- |
+| POST `/api/developer/games/{gameId}/uploads` | `Idempotency-Key`: UUID ; JSON `{version,archiveSize}` | 201, session et géométrie multipart |
+| POST `/api/developer/uploads/{uploadId}/parts` | `{partNumbers:[1,...]}`, max 32 par appel | URLs PUT courtes, numéro et taille de chaque part |
+| GET `/api/developer/uploads/{uploadId}/parts` | aucune | parts réellement présentes dans R2, pour reprise |
+| POST `/api/developer/uploads/{uploadId}/finalize` | aucun body requis | 202, état courant/idempotent ; aucune validation lourde HTTP |
+| GET `/api/developer/uploads/{uploadId}` | aucune | statut, erreur stable éventuelle et gameVersionId après succès |
+
+La session expose id/gameId/version/status/expiresAt, jamais lease, clé interne,
+multipart ID, checkpoint ou identité d'upload. Les URLs présignées contiennent
+nécessairement la destination staging autorisée : ce sont des capacités sensibles,
+à ne pas logger. Elles n'autorisent qu'une part précise d'un multipart précis,
+avec Content-Length signé. Un navigateur envoie un Blob de la taille indiquée
+et laisse son agent gérer Content-Length ; une CLI peut définir ce header.
+La taille de l'archive est obligatoire (File.size/stat), pas son hash client.
+
+Codes : `unauthorized` 401, `forbidden` 403, `game_not_found`/`upload_not_found`
+404, `upload_expired` 410, `invalid_request`/`invalid_version`/`invalid_part` 400
+(413/415 pour un body trop gros ou non JSON),
+`upload_incomplete`/`invalid_state`/`version_conflict`/`idempotency_conflict` 409,
+`quota_exceeded` 429, `storage_error`/`database_error`/`service_unavailable` 503.
+Une validation asynchrone échouée est un état failed avec `validation_failed` ou
+`validation_timeout`, pas une erreur SQL renvoyée au navigateur. Les clients
+peuvent interroger le statut à intervalle de plusieurs secondes avec backoff ;
+aucun polling React n'est ajouté. Les tokens d'automatisation développeur/CLI sont
+une future couche d'auth, pas un nouveau format d'upload.
+
+## 21. Permissions, migration et session transitoire
+
+Migration séparée `20261016000200_game_build_uploads.sql`, après la phase 1, sans
+modifier la migration déjà poussée. Elle ajoute :
+
+- `game_developer_members(game_id,user_id,role)` : owner/editor ; collaborateurs
+  par jeu dès maintenant, extension équipes possible, aucun grant automatique.
+- `game_build_uploads` : cible, auteur vérifié, idempotency key, version UUID réservée,
+  clé staging générée, transport, policy figée, expiration, état, lease et résumé
+  de validation. Le manifest ne confère aucun droit.
+- `game_build_outbox` : travail à envoyer, atomique avec l'état queued.
+- `game_build_api_limits` : compteur partagé par compte/minute, sans mémoire locale.
+
+RLS et révocations interdisent lecture/écriture/RPC directs aux rôles navigateur.
+Seul le backend vérifié appelle les RPC service_role. Cette clé reste serveur,
+jamais dans le build du jeu. Chaque opération revérifie permission actuelle ;
+un collaborateur ne peut pas consulter/finaliser l'upload d'un autre. Un admin
+peut superviser ces uploads. La revocation est aussi vérifiée au claim et juste
+avant création de version. Compte supprimé : auteur anonymisé, travail refusé.
+
+L'assignation initiale owner/editor se fera par un opérateur/admin autorisé dans
+la relation dédiée, après vérification de la propriété du jeu, jamais depuis un
+champ auto-déclaré de soumission. Aucune API de gestion de collaborateurs n'est
+ajoutée. Aucun compte existant n'obtient de permission par cette migration.
+
+Lifecycle : created → uploading → finalizing → queued → validating → completed.
+Avant queue, expiration possible ; après queue, tentatives bornées vers failed.
+`uploaded` n'est pas un état séparé : queued atteste déjà l'objet assemblé vérifié.
+finalizing permet de récupérer un crash entre CompleteMultipart et le commit DB.
+Un finalize incomplet rend la session uploading pour poursuivre les parts.
+
+## 22. Gros fichiers, queue et isolation
+
+Multipart dès la première version du protocole, y compris un petit ZIP avec une
+seule part. Aucune archive ne traverse une route Next. Les parts sont envoyées
+au domaine S3 de R2, sans limite de body du portail. Le backend signe/assemble,
+liste les parts lui-même et vérifie taille/ordre/ETag ; il ne fait pas confiance
+à une liste d'ETags client. L'upload terminé n'est plus réécrivable par les URLs
+UploadPart restantes. Le download du job utilise ensuite If-Match sur l'ETag figé.
+[R2 URLs présignées](https://developers.cloudflare.com/r2/api/s3/presigned-urls/).
+
+Le Worker planifié `cloudflare/build-dispatcher.ts` envoie l'outbox vers Queues.
+Le consumer Node 24 dédié utilise HTTP pull, batch 1, visibilité 2 h, message
+**text JSON** (évite l'encodage base64 des messages JSON du pull API), jamais des
+octets ZIP. Sans succès queue, l'outbox reste réessayable ; crash après send =
+doublon normal. Réconciliation d'un queued non claimé après 1 h ; une lease
+expirée redevient queued/failed selon budget. La DB reste l'autorité.
+[Queues pull](https://developers.cloudflare.com/queues/configuration/pull-consumers/).
+
+Le consumer télécharge en flux sur disque, lit le ZIP par plages, décompresse en
+flux vers des fichiers privés à noms ordinaux et calcule SHA-256 côté serveur.
+Il réutilise les contrôles structurels ZIP de phase 1. Le hash d'inventaire est
+strictement identique au validateur en mémoire (test de parité). Aucun script,
+HTML, WASM ou binaire du jeu n'est exécuté. Le parser enfant reçoit uniquement
+cible/policy/chemin scratch, pas les credentials de son superviseur.
+
+Policy unique : `lib/game-distribution/uploads/policy.ts`, snapshot DB par session.
+Par défaut : archive 4 GiB, extrait 16 GiB, fichier 4 GiB, 50k entrées, profondeur
+32, ratio 200, manifest 64 KiB, parsing 15 min, job 1 h, session 24 h, URLs 15 min,
+3 tentatives, 2 uploads actifs/compte, 20/jour, 120 opérations/minute. Ces valeurs
+doivent être dimensionnées et testées sur l'hôte avant activation, pas considérées
+comme une promesse d'offre commerciale ou une limite imposée par un moteur.
+
+L'hôte doit imposer quotas OS disque/RSS/CPU et isolation réseau. Node permissions,
+env enfant nettoyé, heap borné et kill à expiration sont de la défense en profondeur,
+pas une sandbox OS complète. Le [service validator](../services/build-validator/README.md)
+précise la configuration attendue. Aucun container, queue, bucket ou secret réel
+n'est créé ; l'exemple de configuration est distinct du Wrangler du portail.
+
+## 23. Finalisation immuable et modèle d'échec
+
+Le résumé DB ne contient pas les dizaines de milliers d'entrées d'inventaire :
+elles sont dans inventory.json privé. Les réponses de statut/outbox restent petites.
+Les fichiers, l'archive originale validée et l'inventaire utilisent exactement les
+clés phase 1. Les puts passent par le même port `ImmutableArtifactBucket`, étendu
+aux flux ; If-None-Match:* reste obligatoire. Une reprise ne réutilise un objet
+existant que si taille ET hash serveur correspondent, sans l'écraser.
+
+La version n'est insérée qu'après tous les objets et l'inventaire final. Le RPC
+transactionnel insère `draft` et complète l'upload, sans modifier active_version
+ni is_published. UNIQUE(game_id,version) est le dernier verrou : deux uploads de
+même version donnent exactement un succès, même si les octets sont identiques.
+Les leases avec token empêchent un ancien worker de terminer une tentative remplacée.
+
+| Panne | Comportement |
+| --- | --- |
+| Upload interrompu | Reprise des parts existantes, sinon expiration et abort/cleanup |
+| R2 finalisation indisponible | Erreur stable ; même finalize peut reprendre après un succès dont la réponse a été perdue |
+| ZIP/schema/cible invalide | failed, aucune game_version, aucun objet final publiable |
+| Timeout validation | retry borné ; failed après budget |
+| Worker crash | Lease expirée récupérée par dispatcher, message redélivrable |
+| Extraction/put partiel | Namespace unique, aucun draft ; reprise conditionnelle ou GC |
+| DB échoue après R2 | Retry avec mêmes hashes ; inventaire seul ne rend rien public |
+| Commit DB réussi/réponse perdue | État completed persistant, aucun nouvel insert |
+| Version concurrente gagnante | failed/version_conflict, nettoyage du seul namespace perdant |
+| Queue indisponible | Outbox conservée, dispatcher réessaie ; pas de job oublié |
+
+GC : après un jour terminal, suppression staging et abort multipart ; suppression
+du préfixe final uniquement pour failed/expired, jamais completed. Le marqueur
+cleaned_at est posé après succès des suppressions. Configurer un lifecycle R2
+d'abort des multipart incomplets pour couvrir le crash avant attachement DB.
+Conserver les lignes de job pour audit ; aucune persistance compétitive ajoutée.
+Pas de suppression du gagnant, de préfixe partagé ni d'overwrite compensatoire.
+
+## 24. Validations et suite
+
+Commandes : `npm run test:game-distribution`, `npm run test:game-uploads`,
+`npm run test:game-uploads-db`, TypeScript et lint ciblé. Le scénario PostgreSQL
+applique les deux migrations dans un cluster jetable, sans DSN production.
+Il exécute ownership, admin, IDOR/RLS, expiration, outbox, retry/fencing et une vraie
+concurrence de création : un draft et un version_conflict. Les tests storage utilisent
+des adapters mémoire et un transport S3 simulé ; un vrai processus parser enfant
+est exécuté. Les ZIP malveillants sont réellement construits et refusés.
+
+GAME-DISTRIBUTION-3 devra résoudre une version validée privée pour preview,
+autoriser son accès et construire le player/profils CSP. Il pourra lire
+game_versions + les clés/inventaire finaux, sans connaître le staging.
+Aucun preview/player, SDK bridge, portail, CLI, artifact serveur ni migration Pong
+n'est ajouté. Aucune publication automatique ou modification de gameplay.
+
+Cloudflare : **blocage existant, destiné à disparaître lors de PONG-MIGRATION +
+SDK distribution**. Les dépendances Git privées restent provisoirement inchangées.
+Aucun PAT, deploy key ou GitHub App ne sera configuré pour les contourner.
+
+## 25. Fichiers de phase 2 et résultat local
+
+```text
+app/api/developer/games/[gameId]/uploads/route.ts
+app/api/developer/uploads/[uploadId]/{route.ts,parts/route.ts,finalize/route.ts}
+lib/server/developerUploads.ts
+lib/game-distribution/uploads/{contracts,policy,service,repository,r2}.ts
+cloudflare/build-dispatcher.ts
+services/build-validator/{main,queue,job,extract,child}.ts
+services/build-validator/{README.md,wrangler.dispatcher.example.jsonc}
+scripts/build-distribution.mjs
+supabase/migrations/20261016000200_game_build_uploads.sql
+tests/game-upload.test.mjs
+tests/game-upload-db.sql
+```
+
+Adaptations : zip.ts partage ses contrôles avec le reader sur disque, storage.ts
+accepte les flux via le même port conditionnel ; le harness PostgreSQL sait tester
+les deux phases ; package/scripts/lockfile, ignores et cette documentation changent.
+La seule dépendance runtime déclarée est aws4fetch 1.0.20, déjà présente auparavant
+dans l'outillage transitif. Aucun changement des packages SDK/Pong ou du game-server.
+La migration phase 1 est intacte. `.distribution/` est généré et ignoré, jamais
+une source/fixture à versionner.
+
+Résultats locaux : 8 tests phase 1, 22 tests phase 2, typecheck, lint ciblé,
+scénarios PostgreSQL sur cluster jetable, build Next Webpack et build OpenNext
+Cloudflare (à partir d'une sortie standalone fraîche) réussis. Le dry-run local
+du dispatcher compile également ; Wrangler a signalé un refus d'écriture de son
+journal hors workspace par le bac à sable, sans échec du bundle ni déploiement.
+Les avertissements OpenNext Windows/middleware sont ceux de l'outillage existant.
+
+Ces validations ne sont pas un upload sur un vrai bucket ni un test de charge
+4/16 GiB. Aucun compte réel, queue cloud, CORS cloud, credential, migration distante
+ou service distant n'a été utilisé/créé/configuré pour la recette du pipeline.
+L'activation future exige ces préparations, un hôte isolé dimensionné,
+supervision/DLQ/GC et une recette réelle. Le pipeline reste volontairement désactivé ;
+aucune version ni fiche publiée.

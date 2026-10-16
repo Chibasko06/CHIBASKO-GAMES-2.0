@@ -1,0 +1,9 @@
+// Example only: not used by the portal's Wrangler configuration. No remote created.
+{
+  "name": "chibasko-build-dispatcher",
+  "main": "../../.distribution/dispatcher.mjs",
+  "compatibility_date": "2026-10-16",
+  "workers_dev": false,
+  "triggers": {"crons": ["* * * * *"]},
+  "queues": {"producers": [{"binding": "BUILD_VALIDATIONS", "queue": "game-build-validations"}]}
+}

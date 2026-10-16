@@ -13,25 +13,7 @@ export async function validateWebBuildZip(input: Uint8Array, target: UploadTarge
   const reader = new ZipReader(new Uint8ArrayReader(bytes), {strictness:'strict', useWebWorkers:false,
     checkCrc32:true, checkOverlappingEntry:true, checkLocalFilename:true})
   try {
-    const entries: FileEntry[] = [], names = new Set<string>(), directories = new Set<string>()
-    let count = 0
-    for await (const entry of reader.getEntriesGenerator()) {
-      if (++count > limits.maxFiles) throw new BuildValidationError('BUILD_FILE_LIMIT')
-      const path = entry.directory ? entry.filename.replace(/\/$/, '') : entry.filename
-      assertArtifactPath(path)
-      const folded = path.toLowerCase(), mode = (entry.unixMode ?? 0) & 0o170000
-      if (entry.encrypted || entry.symlink || entry.diskNumberStart !== 0
-        || (mode && mode !== 0o100000 && mode !== 0o040000)
-        || ![0,8].includes(entry.compressionMethod)) throw new BuildValidationError('UNSUPPORTED_ARCHIVE_ENTRY')
-      if (names.has(folded) || directories.has(folded)) throw new BuildValidationError('DUPLICATE_BUILD_PATH')
-      if (entry.directory) {
-        if (entry.uncompressedSize !== 0) throw new BuildValidationError('INVALID_DIRECTORY_ENTRY')
-        directories.add(folded)
-      } else { names.add(folded); entries.push(entry) }
-      if (entry.uncompressedSize > Math.max(1, entry.compressedSize) * limits.maxCompressionRatio) throw new BuildValidationError('ARCHIVE_RATIO_LIMIT')
-    }
-    checkFileInventory(entries.map(entry => ({path:entry.filename,size:entry.uncompressedSize})), limits)
-    for (const file of names) for (const dir of directories) if (dir.startsWith(file+'/')) throw new BuildValidationError('BUILD_PATH_COLLISION')
+    const entries = await inspectZipEntries(reader,limits)
     const files: BuildFile[] = []; let total = 0
     for (const entry of entries) {
       const chunks: Uint8Array[] = []; let size = 0
@@ -51,4 +33,29 @@ export async function validateWebBuildZip(input: Uint8Array, target: UploadTarge
     // Never leak parser-controlled filenames/messages through an eventual API.
     throw new BuildValidationError('INVALID_OR_UNSAFE_ARCHIVE')
   } finally { await reader.close() }
+}
+
+/** Shared structural checks for in-memory fixtures and seekable large-file jobs. */
+export async function inspectZipEntries(reader: ZipReader<unknown>, limits: BuildLimits, maxDepth = 32) {
+    const entries: FileEntry[] = [], names = new Set<string>(), directories = new Set<string>()
+    let count = 0
+    for await (const entry of reader.getEntriesGenerator()) {
+      if (++count > limits.maxFiles) throw new BuildValidationError('BUILD_FILE_LIMIT')
+      const path = entry.directory ? entry.filename.replace(/\/$/, '') : entry.filename
+      assertArtifactPath(path)
+      if (path.split('/').length > maxDepth) throw new BuildValidationError('BUILD_PATH_DEPTH')
+      const folded = path.toLowerCase(), mode = (entry.unixMode ?? 0) & 0o170000
+      if (entry.encrypted || entry.symlink || entry.diskNumberStart !== 0
+        || (mode && mode !== 0o100000 && mode !== 0o040000)
+        || ![0,8].includes(entry.compressionMethod)) throw new BuildValidationError('UNSUPPORTED_ARCHIVE_ENTRY')
+      if (names.has(folded) || directories.has(folded)) throw new BuildValidationError('DUPLICATE_BUILD_PATH')
+      if (entry.directory) {
+        if (entry.uncompressedSize !== 0) throw new BuildValidationError('INVALID_DIRECTORY_ENTRY')
+        directories.add(folded)
+      } else { names.add(folded); entries.push(entry) }
+      if (entry.uncompressedSize > Math.max(1, entry.compressedSize) * limits.maxCompressionRatio) throw new BuildValidationError('ARCHIVE_RATIO_LIMIT')
+    }
+    checkFileInventory(entries.map(entry => ({path:entry.filename,size:entry.uncompressedSize})), limits)
+    for (const file of names) for (const dir of directories) if (dir.startsWith(file+'/')) throw new BuildValidationError('BUILD_PATH_COLLISION')
+    return entries
 }

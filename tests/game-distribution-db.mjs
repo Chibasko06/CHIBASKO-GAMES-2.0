@@ -26,6 +26,19 @@ try {
   await run('psql',[...base,'-d','postgres','-c','create database chibasko_distribution_test'])
   const args=[...base,'-d','chibasko_distribution_test']
   await run('psql',[...args,'-f',fileURLToPath(new URL('./game-distribution-db.sql',import.meta.url))])
+  if(process.argv.includes('--uploads')) {
+    await run('psql',[...args,'-f',fileURLToPath(new URL('./game-upload-db.sql',import.meta.url))])
+    const finalizers=await Promise.allSettled([1,2].map(()=>run('psql',[...args,'-c',"set role service_role;select public.distribution_begin_finalize('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','77777777-7777-4777-8777-777777777777');select public.distribution_enqueue_upload('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','77777777-7777-4777-8777-777777777777','etag')"])))
+    assert.equal(finalizers.filter(r=>r.status==='fulfilled').length,2)
+    const outbox=await run('psql',[...args,'-Atc',"select count(*) from public.game_build_outbox where upload_id='77777777-7777-4777-8777-777777777777'"])
+    assert.equal(outbox.stdout.trim(),'1')
+    const uploadRace=await Promise.allSettled(['88888888-8888-4888-8888-888888888888','99999999-9999-4999-8999-999999999999'].map(id=>
+      run('psql',[...args,'-c',`set role service_role;select public.distribution_complete('${id}',(select lease_token from public.game_build_uploads where id='${id}'))`])))
+    assert.equal(uploadRace.filter(r=>r.status==='fulfilled').length,2)
+    const counts=await run('psql',[...args,'-Atc',"select (select count(*) from public.game_versions where version='3.0.0')||':'||(select count(*) from public.game_build_uploads where status='completed')||':'||(select count(*) from public.game_build_uploads where error_code='version_conflict')"])
+    assert.equal(counts.stdout.trim(),'1:1:1')
+    console.log('Upload SQL passed: ownership/admin/IDOR/RLS, expiration, idempotence, outbox, lease fencing, revocation, retry and concurrent version uniqueness.')
+  }
   await assert.rejects(run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261016000100_game_distribution_versions.sql',import.meta.url))]))
   const race=await Promise.allSettled([
     run('psql',[...args,'-c',"set role service_role;select public.set_active_game_version('11111111-1111-4111-8111-111111111111','44444444-4444-4444-8444-444444444444')"]),

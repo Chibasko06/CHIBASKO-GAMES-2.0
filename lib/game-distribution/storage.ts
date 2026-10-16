@@ -5,7 +5,7 @@ import type { ArtifactFile } from './types'
 
 /** Private R2-compatible ingestion port, never a game SDK capability. */
 export type ImmutableArtifactBucket = {
-  put(key: string, bytes: Uint8Array, options: {
+  put(key: string, bytes: Uint8Array | ReadableStream<Uint8Array>, options: {
     onlyIf: Headers
     httpMetadata: { contentType: string; contentEncoding?: string; cacheControl: string }
     customMetadata: Record<string,string>
