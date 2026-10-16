@@ -11,10 +11,17 @@ taggées `v0.1.0` et figées par leurs lockfiles :
 - Pong `Chibasko06/Chibasko-Pong` : `07c23b83f6493e03113c43d1f56d21d15831c87b`.
 
 Ce dépôt ne contient plus leurs sources ni de workspace jeu. Les registres
-consomment les exports publics, avec lazy loading client/local. Un accès Git en
-lecture aux deux dépôts est requis avant npm ci ; aucun credential n'est versionné.
-Voir [consommation Pong](docs/pong-extraction.md), [SDK](docs/sdk-extraction.md)
-et [serveur](game-server/README.md), notamment le prérequis d'accès privé Cloudflare/CI.
+consomment encore les exports publics, avec lazy loading client/local.
+
+**Cible désormais retenue : builds Web immuables, jamais les sources des jeux.**
+La [fondation Game Distribution](docs/game-distribution.md) prépare le manifest,
+la validation ZIP, les clés R2 et une migration locale. Elle ne remplace pas encore
+le runtime actuel. Les installations locales Git utilisent les accès du poste ;
+ne pas configurer de PAT, deploy key ou GitHub App pour contourner Cloudflare.
+Le blocage cloud restera présent jusqu'au remplacement des dépendances Git privées
+par le pipeline de builds et une distribution accessible du SDK.
+Les notes [Pong](docs/pong-extraction.md) et [SDK](docs/sdk-extraction.md)
+décrivent l'étape historique d'extraction ; aucun credential n'est versionné.
 
 ## Developpement
 

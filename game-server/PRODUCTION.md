@@ -1,5 +1,12 @@
 # Production Chibasko Games — préparation, aucun déploiement automatique
 
+**Distribution en transition.** Les instructions ci-dessous décrivent le socle
+online actuel, pas une autorisation de déployer. La cible est un contrôle de
+sessions séparé des serveurs gameplay et des builds Web immuables ; voir
+[Game Distribution](../docs/game-distribution.md). Ne pas ajouter de credential
+GitHub pour contourner l'installation cloud des packages privés. Les dépendances
+actuelles restent en place jusqu'au remplacement réel du runtime et du backend.
+
 Architecture : navigateur HTTPS/WSS → Caddy → Node 24 sur 127.0.0.1:2567.
 Une instance, un VPS, systemd. Pas de Redis, Docker ou cluster.
 Toutes les rooms, transitions, réservations et limites sont en mémoire.
@@ -94,9 +101,10 @@ Structure : `/opt/chibasko-games/releases/<sha>` et `current` symlink vers une r
 Les exemples deploy/systemd et deploy/caddy doivent être adaptés et validés.
 Ne jamais installer/compiler comme root. Ne pas copier de .env du poste de travail.
 
-Pour une nouvelle release, depuis un clone de déploiement propre, avec un accès
-Git en lecture aux dépôts privés SDK et Pong déjà configuré sur la machine de build (voir
-[distribution SDK et accès CI](../docs/sdk-extraction.md)) :
+Procédure historique du backend actuel, depuis un clone de déploiement propre :
+elle suppose des accès Git locaux déjà présents et ne doit pas motiver la création
+de nouveaux credentials. Le prochain pipeline devra supprimer cette dépendance
+(voir [plan de migration](../docs/game-distribution.md#16-migration-ordonnée-et-impact-cloudflare)) :
 
 ```sh
 # SHA exact revu et disponible sur GitHub ; jamais un checkout sale en service.

@@ -1,5 +1,9 @@
 # SDK Git externe — consommation plateforme
 
+> Étape historique d'extraction du SDK. La cible est une distribution du SDK
+> accessible sans Git privé et des builds Web pour les jeux, décrite dans
+> [Game Distribution](game-distribution.md). Aucun nouveau credential CI n'est prévu.
+
 ## Source de vérité et versions
 
 Le SDK source appartient au repository **privé**
@@ -83,34 +87,17 @@ Sur Windows, les validations complètes utilisent un build Next Webpack frais av
 sortie standalone puis `build:cloudflare -- --skipNextBuild`. L'option ne réutilise
 pas un ancien build non validé. Aucun script ne publie ni ne déploie.
 
-## CI/Cloudflare : prérequis opérationnel restant
+## CI/Cloudflare : nouvelle décision de distribution
 
-**Un build Cloudflare local réussi ne valide pas l'accès Git privé d'un runner.**
-Celui-ci doit lire les dépôts SDK et Pong avant npm ci, y compris pendant les
-préparations transitives. Le checkout GitHub de la plateforme n'accorde pas
-automatiquement cet accès aux dépendances.
+Un build Cloudflare local réussi ne valide pas l'accès Git privé d'un runner.
+**Ne pas configurer de PAT, deploy key ou GitHub App pour résoudre ce problème.**
+L'ancienne recommandation d'accès Git privé est abandonnée au profit d'une
+distribution SDK accessible sans accès au repository source (registre public et
+bundle JS pour HTML pur, plus tard). Le repository source peut rester privé.
 
-Pour deux dépôts à notre taille : **PAT fine-grained limité aux deux repositories,
-Contents en lecture seule**, expiration/rotation, secret de build distinct par
-environnement. Fournir l'accès via un credential helper HTTPS éphémère ; les URLs
-SSH des lockfiles peuvent nécessiter une réécriture Git SSH→HTTPS non sensible.
-Jamais de token dans une URL, package.json, lockfile, script, log ou variable publique.
-
-Deux deploy keys de lecture constituent une alternative avec deux identités/routage
-SSH. Une GitHub App apporte des jetons courts et une identité indépendante d'un
-compte personnel pour une intégration plus durable ; elle est plus lourde à mettre
-en place aujourd'hui. Ne pas réutiliser une deploy key entre repositories.
-
-Avec Workers Builds, prévoir `SKIP_DEPENDENCY_INSTALL=1`, bootstrap Git sécurisé,
-puis npm ci. Dans une autre CI, fournir le même accès avant l'installation. Retirer
-les credentials temporaires après usage ; ne pas les exposer aux builds non fiables.
-Un NPM_TOKEN de registre ne donne pas accès à une dépendance Git privée.
-
-Références : [PAT GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens),
-[deploy keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys),
-[Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/).
-La comparaison et les contraintes détaillées sont dans [extraction Pong](pong-extraction.md).
-
-Aucun token, clé, secret Cloudflare, configuration CI, remote, commit, push ou
-déploiement n'est créé par cette bascule. L'accès privé du runner reste à préparer
-et tester séparément avant le prochain déploiement.
+Pong sera livré par le même pipeline de builds Web que tout jeu tiers. Son serveur
+gameplay devra également sortir du processus plateforme. Les dépendances Git
+actuelles ne sont retirées qu'après remplacement réel ; le blocage cloud demeure
+explicitement présent jusqu'à cette migration. Voir
+[Game Distribution](game-distribution.md#16-migration-ordonnée-et-impact-cloudflare).
+Aucun credential, configuration CI ou déploiement n'est ajouté.

@@ -1,5 +1,10 @@
 # Chibasko Pong — consommation Git externe
 
+> Étape historique d'extraction du code. La cible de distribution est désormais
+> un build Web immuable, sans dépendance du portail au repo du jeu :
+> [Game Distribution](game-distribution.md). Le package actuel est conservé
+> uniquement jusqu'à son remplacement fonctionnel, sans nouveau credential CI.
+
 ## Source de vérité
 
 Pong appartient au repository privé
@@ -191,35 +196,19 @@ Suppression : tout l'ancien dossier source Pong (40 fichiers suivis). Les regist
 adaptateurs, code du lobby, moteur/manifeste généré et parcours produit n'ont pas
 besoin de modification. Aucun commit, push, publication ou déploiement effectué.
 
-## CI/Cloudflare : accès aux deux dépôts privés
+## CI/Cloudflare : nouvelle décision de distribution
 
-Une installation locale réussit grâce aux identifiants Git du poste. L'intégration
-GitHub qui clone la plateforme ne garantit pas l'accès aux dépendances privées :
+Les installations locales actuelles utilisent les identifiants Git du poste.
+Cela ne prouve pas l'accès d'un runner Cloudflare aux deux dépendances privées.
+La décision remplace l'ancienne recommandation d'authentification Git : **ne créer
+ni PAT, ni deploy key, ni GitHub App pour contourner cet échec**.
 
-- `Chibasko06/chibasko-games-sdk` ;
-- `Chibasko06/Chibasko-Pong`.
+La résolution durable consiste à distribuer le SDK sans Git privé, livrer Pong
+comme build Web et exécuter son serveur gameplay indépendamment du processus
+plateforme. Après validation de ces remplacements, retirer les dépendances Pong
+du web ET du backend. Le simple ajout d'une iframe côté client ne suffit pas.
 
-| Mécanisme | Compromis |
-| --- | --- |
-| Deux deploy keys SSH en lecture | Une clé par repo et routage SSH ; pas de dépendance à un token personnel, mais deux identités à gérer. Une clé ne se réutilise pas entre dépôts. |
-| PAT fine-grained, Contents en lecture, deux repos seulement | Recommandé à notre taille : un accès HTTPS borné, expiration/rotation et secret distinct par environnement. |
-| GitHub App | Identité d'installation et jetons courts, adaptée à une CI plus développée ; mise en place plus lourde aujourd'hui. |
-
-Le PAT reste exclusivement un secret de build. Un credential helper éphémère
-fournit l'accès HTTPS ; une réécriture Git SSH→HTTPS non sensible peut être requise
-par les lockfiles normalisés en SSH. Ne jamais intégrer un token dans une URL,
-package.json, lockfile, script, configuration persistée, log ou variable publique.
-Ne pas donner ces secrets aux builds de contributions non approuvées.
-
-Le bootstrap Git doit précéder npm ci, y compris les préparations transitives
-Pong→SDK. Avec Workers Builds, prévoir `SKIP_DEPENDENCY_INSTALL=1` puis un bootstrap
-contrôlé et npm ci ; avec une autre CI, utiliser son mécanisme équivalent.
-Si SSH est choisi, vérifier les clés d'hôte et conserver les clés privées éphémères
-avec permissions restrictives. Un NPM_TOKEN de registre ne suffit pas pour Git.
-
-Références : [PAT GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens),
-[deploy keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys),
-[image Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/).
-
-Aucun credential, secret Cloudflare, pipeline ou déploiement n'est configuré ici.
-L'accès privé du runner reste un prérequis opérationnel avant tout déploiement.
+Le [plan Game Distribution](game-distribution.md#16-migration-ordonnée-et-impact-cloudflare)
+décrit l'ordre de migration. Le runtime actuel reste en place ; l'échec cloud lié
+aux Git privés n'est pas corrigé par cette fondation. Aucun credential, secret
+Cloudflare, pipeline ni déploiement n'est configuré.

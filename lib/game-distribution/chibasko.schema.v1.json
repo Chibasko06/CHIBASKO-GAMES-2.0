@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:chibaskogames:game-build:1",
+  "title": "Chibasko Games Web Build v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "gameId", "version", "integrationVersion", "capabilities", "client"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "gameId": { "$ref": "#/$defs/id" },
+    "version": { "$ref": "#/$defs/version" },
+    "integrationVersion": { "const": 1 },
+    "capabilities": {
+      "type": "object", "additionalProperties": false, "minProperties": 1,
+      "properties": {
+        "local": { "$ref": "#/$defs/local" },
+        "online": {
+          "type": "object", "additionalProperties": false, "required": ["access", "players"],
+          "properties": {
+            "access": { "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["public", "private"] } },
+            "players": { "$ref": "#/$defs/players" }
+          }
+        }
+      }
+    },
+    "client": {
+      "type": "object", "additionalProperties": false, "required": ["entrypoints"],
+      "properties": {
+        "entrypoints": {
+          "type": "object", "additionalProperties": false, "minProperties": 1,
+          "properties": { "local": { "$ref": "#/$defs/entrypoint" }, "online": { "$ref": "#/$defs/entrypoint" } }
+        },
+        "requirements": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "crossOriginIsolation": { "type": "boolean" } }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "capabilities": { "required": ["local"] } } },
+      "then": { "properties": { "client": { "properties": { "entrypoints": { "required": ["local"] } } } } },
+      "else": { "properties": { "client": { "properties": { "entrypoints": { "not": { "required": ["local"] } } } } } }
+    },
+    {
+      "if": { "properties": { "capabilities": { "required": ["online"] } } },
+      "then": { "properties": { "client": { "properties": { "entrypoints": { "required": ["online"] } } } } },
+      "else": { "properties": { "client": { "properties": { "entrypoints": { "not": { "required": ["online"] } } } } } }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "version": {
+      "type": "string", "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9A-Za-z-]*))*)?$"
+    },
+    "players": {
+      "type": "object", "additionalProperties": false, "required": ["min", "max"],
+      "properties": { "min": { "type": "integer", "minimum": 1, "maximum": 1024 }, "max": { "type": "integer", "minimum": 1, "maximum": 1024 } }
+    },
+    "local": { "type": "object", "additionalProperties": false, "required": ["players"], "properties": { "players": { "$ref": "#/$defs/players" } } },
+    "entrypoint": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\\\%?#:\\u0000-\\u001f\\u007f]+\\.html$" }
+  }
+}
