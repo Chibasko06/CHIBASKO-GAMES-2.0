@@ -23,7 +23,7 @@ export async function runtimeHarness(kind='solo',audience='published',behavior='
   const prefix=gameArtifactKeys(manifest.gameId,versionId,validated.artifactSha256).clientPrefix
   const row={id:versionId,game_id:manifest.gameId,version:manifest.version,schema_version:1,integration_version:1,status:audience==='preview'?'draft':'published',
     manifest,artifact_sha256:validated.artifactSha256,storage_prefix:prefix,delivery_policy:{profile:'web-v1',connectOrigins:[],assetOrigins:[]}}
-  const sessions=new Map(),members=new Set(['owner','editor','admin']),logs=[],calls=[],released=[]
+  const sessions=new Map(),members=new Set(['owner','editor','admin']),logs=[],calls=[],released=[],clock={offset:0,now(){return Date.now()+this.offset}}
   function authorize(args) {
     if(args.p_version!==versionId || args.p_game!==manifest.gameId)throw new UploadError('version_not_found',404)
     if(args.p_audience==='preview') {
@@ -39,18 +39,23 @@ export async function runtimeHarness(kind='solo',audience='published',behavior='
     if(name==='distribution_authorize_launch'){authorize(args);return}
     if(name==='distribution_create_launch') {
       authorize(args)
-      const s={...args,id:randomUUID(),version_id:versionId,generation:randomUUID(),expires_at:new Date(Date.now()+args.p_seconds*1000).toISOString(),safe_context:args.p_context,revoked:false}
+      const s={...args,id:randomUUID(),version_id:versionId,generation:randomUUID(),created_at:clock.now(),expires_at:new Date(clock.now()+args.p_seconds*1000).toISOString(),safe_context:args.p_context,revoked:false}
       sessions.set(args.p_capability_hash,s);return s
     }
     if(name==='distribution_check_launch') {
       const s=sessions.get(args.p_capability_hash)
-      if(!s || s.revoked || Date.parse(s.expires_at)<=Date.now())throw new UploadError('launch_expired',403)
+      if(!s || s.revoked || Date.parse(s.expires_at)<=clock.now())throw new UploadError('launch_expired',403)
       authorize(s);return s
     }
     if(name==='distribution_revoke_launch') {
       const s=[...sessions.values()].find(s=>s.id===args.p_id && s.p_control_hash===args.p_control_hash)
       if(!s)throw new UploadError('launch_expired',403)
       s.revoked=true;released.push(s.id);return
+    }
+    if(name==='distribution_renew_launch') {
+      const s=[...sessions.values()].find(s=>s.id===args.p_id && s.p_control_hash===args.p_control_hash)
+      if(!s || s.revoked || Date.parse(s.expires_at)<=clock.now() || clock.now()>=s.created_at+86400000)throw new UploadError('launch_expired',403)
+      authorize(s);s.expires_at=new Date(Math.min(clock.now()+args.p_seconds*1000,s.created_at+86400000)).toISOString();return structuredClone(s)
     }
     throw new Error(name)
   }}
@@ -67,7 +72,7 @@ export async function runtimeHarness(kind='solo',audience='published',behavior='
   })
   const service=launchService(db,runtimeConfig,async(actor,request)=>{const c=await online(actor,request);return {...c,session:{sessionId:'s_'+randomUUID().replaceAll('-',''),localParticipantIds:[c.participants[0].participantId]}}})
   const request={gameId:manifest.gameId,gameVersionId:versionId,execution:kind==='online'?'online':'local',audience,locale:'fr',...(kind==='online'?{onlineSessionReference:'prepared-session-reference'}:{})}
-  const client={create:(req)=>service.create(req.audience==='preview'||req.execution==='online'?'owner':null,req),release:h=>service.release(h.descriptor.launchId,h.controlToken)}
+  const client={create:(req)=>service.create(req.audience==='preview'||req.execution==='online'?'owner':null,req),renew:h=>service.renew(h.descriptor.launchId,h.controlToken),release:h=>service.release(h.descriptor.launchId,h.controlToken)}
   const gateway=createArtifactGateway(runtimeConfig,{db,storage,log:event=>logs.push(event)})
-  return {row,request,service,client,db,files,sessions,members,logs,calls,released,gateway}
+  return {row,request,service,client,db,files,sessions,members,logs,calls,released,gateway,clock}
 }

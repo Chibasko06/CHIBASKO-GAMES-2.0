@@ -3,7 +3,7 @@ import { UUID } from '../uploads/policy'
 import type { UploadRepository } from '../uploads/contracts'
 import { resolveGameVersion, launchDescriptor, validateGatewayConfiguration } from './resolver'
 import { GatewayError, type GatewayConfiguration } from './contracts'
-import { RUNTIME_POLICY, safeContext, type LaunchHandle, type LaunchRequest, type SafeLaunchContext } from '../../game-runtime/contracts'
+import { RUNTIME_POLICY, safeContext, type LaunchHandle, type LaunchLease, type LaunchRequest, type SafeLaunchContext } from '../../game-runtime/contracts'
 import { parse } from 'tldts'
 
 type Configuration=GatewayConfiguration & {contentBase:string}
@@ -56,6 +56,11 @@ export function launchService(db:UploadRepository,configuration:Configuration,au
     async release(id:string,control:string) {
       if(!UUID.test(id) || !/^[a-f0-9]{64}$/.test(control))throw new GatewayError('launch_expired',403)
       await db.call('distribution_revoke_launch',{p_id:id,p_control_hash:await launchHash(control)})
+    },
+    async renew(id:string,control:string):Promise<LaunchLease> {
+      if(!UUID.test(id) || !/^[a-f0-9]{64}$/.test(control))throw new GatewayError('launch_expired',403)
+      const session=await db.call<LaunchRecord>('distribution_renew_launch',{p_id:id,p_control_hash:await launchHash(control),p_seconds:RUNTIME_POLICY.sessionSeconds})
+      return {launchId:session.id,generation:session.generation,expiresAt:session.expires_at}
     },
   }
 }

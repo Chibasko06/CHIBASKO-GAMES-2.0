@@ -12,7 +12,7 @@
     "test:game-uploads-db": "node tests/game-distribution-db.mjs --uploads",
     "test:game-artifacts": "node --import ./tests/register.mjs --test tests/game-artifact-gateway.test.mjs",
     "test:game-artifacts-db": "node tests/game-distribution-db.mjs --previews",
-    "test:game-runtime": "node --import ./tests/register.mjs --test tests/game-runtime.test.mjs",
+    "test:game-runtime": "node --import ./tests/register.mjs --test tests/game-runtime.test.mjs tests/game-runtime-compat.test.mjs",
     "test:game-runtime-browser": "node --import ./tests/register.mjs --test tests/game-runtime.browser.test.mjs",
     "test:game-runtime-db": "node tests/game-distribution-db.mjs --launches",
     "dev": "next dev",

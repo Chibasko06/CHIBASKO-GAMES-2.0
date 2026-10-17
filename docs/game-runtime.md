@@ -1,4 +1,4 @@
-# GameRuntime — GAME-RUNTIME-1
+# GameRuntime — GAME-RUNTIME-1 / RUNTIME-COMPAT-1
 
 Activation désactivée par défaut : `GAME_RUNTIME_LAUNCHES_ENABLED` côté portail,
 `GAME_ARTIFACT_GATEWAY_ENABLED` côté Worker. Avant toute activation autorisée,
@@ -93,19 +93,108 @@ propre lancement anonyme. Le client HTTP utilise keepalive au nettoyage, sans
 garantie de livraison à la fermeture brutale du navigateur. Expiration + cron couvrent
 les orphelins (y compris une création réussie dont la réponse est perdue).
 
+`PATCH /api/game-launches/{launchId}` : même JSON de contrôle, réservé au portail.
+Retour privé/no-store `{data:{launchId,generation,expiresAt}}`. Aucun nouveau
+hostname, contexte, JWT ou token de contrôle n'est envoyé au jeu. Le renouvellement
+conserve exactement la version, l'origine et la génération. Le backend revalide
+les droits/statuts courants et refuse un lancement déjà expiré ou révoqué.
+
 `distribution_check_launch` revalide l'expiration/révocation et l'état publié, ou
 les droits preview actuels, à chaque asset. Les hashes sont uniques et les tables/RPC
 privés (RLS, service_role seulement). Les clés R2 ne sont jamais dans le descriptor.
 Le gateway partage le port storage de phases 1–3 : streaming, HEAD, Range et MIME.
 
-Policy centrale : descriptor 15 s, iframe load 120 s, handshake 30 s après load/HELLO,
-heartbeat 10 s / réponse 30 s, lease 30 minutes ; émissions compte 60/min et plafond
-global anonyme 600/min, atomiques en DB. Les plafonds sont ajustables côté plateforme.
+Policy centrale : émissions compte 60/min et plafond global anonyme 600/min,
+atomiques en DB. Les plafonds sont ajustables côté plateforme.
 Le plafond global anonyme est un garde-fou de coût, pas un fair-use par joueur :
 ajouter un rate limit edge fiable avant une ouverture publique importante.
-Pas de renouvellement automatique dans V1 : expiration ferme le lancement. Un
-renouvellement de lease autorisé sera nécessaire avant les longues sessions ; il
-pourra conserver origine/génération sans modifier le protocole gameplay.
+
+## Phases et budgets — RUNTIME-COMPAT-1
+
+L'ancien handshake de 30 secondes commençait au load/HELLO et attendait READY.
+Il confondait exécution du SDK et disponibilité des assets. Il est remplacé par :
+
+| Étape | Début / fin | Défaut | Erreur |
+| --- | --- | --- | --- |
+| Descriptor | création HTTP → descriptor validé | 15 s | descriptor_timeout |
+| Document initial | montage iframe → load ou HELLO valide | 120 s | iframe_load_timeout |
+| Attente SDK | load → HELLO | 15 s | hello_timeout |
+| Handshake | HELLO → INIT envoyé immédiatement → PONG ou READY | 5 s | handshake_timeout |
+| Préparation | acquittement d'INIT → READY | 10 min | game_ready_timeout |
+| Vivacité | PING → PONG | ping toutes les 10 s, réponse sous 30 s | bridge_lost |
+
+Un HELLO valide reçu avant load prouve que le document exécute son SDK et annule
+le budget de navigation initiale. load seul ne prouve jamais que le SDK fonctionne.
+HELLO déclenche INIT puis un premier PING ; le PONG corrélé acquitte INIT sans
+nouveau message wire. READY peut lui-même acquitter INIT pour les jeux immédiats.
+Seul READY autorise START. HELLO/INIT/PONG n'affichent jamais « Jeu prêt ».
+L'état UI reste loading / « Chargement du jeu… » pendant la préparation ; la
+connexion du bridge est un état interne.
+
+Les budgets sont centralisés dans `lib/game-runtime/contracts.ts`. Les overrides
+appartiennent uniquement à la plateforme, jamais au manifest développeur. Ils sont
+bornés et validés : descriptor/HELLO/handshake jusqu'à 60 s, document jusqu'à 10 min,
+préparation jusqu'à 30 min, réponse heartbeat jusqu'à 120 s. Le budget de préparation
+est fixe : ni PONG, ni répétition HELLO, ni futur événement de progression ne le
+repoussent. Le heartbeat pendant préparation distingue un moteur vivant d'un bridge
+mort ; un travail synchrone bloquant le thread plus que le budget PONG peut être
+détecté comme un blocage. Les vrais builds moteurs doivent valider ce réglage.
+
+Un premier ping d'acquittement est envoyé même si le portail est masqué ; après
+connexion, le heartbeat est suspendu quand le document parent est caché et reprend
+au retour. Les limites de préparation et de bail restent des limites de temps réel.
+Les restrictions/background freeze des navigateurs ne sont pas contournées.
+
+Le SDK 0.2.0 préparé doit répondre aux PING dès initialized, avant ready. Son ancien
+contrôle d'état les refusait. La correction est faite dans son repository séparé,
+sans copie SDK ici, sans nouvel événement et sans publication. START/STOP restent
+refusés avant ready. Bridge protocolVersion et integrationVersion restent **1**.
+Un ancien tarball 0.2.0 construit avant ce correctif doit être reconstruit ; aucune
+version publique ni tag existant n'est remplacé.
+
+Une progression de chargement pourra ultérieurement être un message télémétrique
+optionnel dédié, validé/borné et ignoré par les anciens hosts, sans changer les
+messages existants. Elle ne devra pas être requise pour le handshake, ni contenir
+des champs libres secrets, ni prolonger automatiquement les budgets. Aucun message
+de progression n'est ajouté dans cette phase.
+
+## Parties longues et assets chargés tardivement
+
+`expiresAt` décrit le **bail d'accès aux artefacts**, pas la durée de la partie
+multijoueur. Le portail renouvelle ce bail de 30 minutes toutes les 5 minutes,
+en loading comme en running, avec la capability de contrôle conservée hors iframe.
+Le SDK ne possède jamais ce contrôle et un PONG ne constitue pas un renouvellement.
+L'API/RPC retourne une nouvelle échéance ; le contrôleur et le bridge mettent leur
+échéance locale à jour sans recharger le jeu. La version et ses objets R2 restent
+immuables. Un asset lazy-loaded après 45 minutes passe par le même gateway et reste
+accessible si le bail est entretenu. Published et preview suivent la même politique.
+
+Il existe un plafond absolu de **24 heures depuis la création**, imposé en DB,
+non repoussé par les renouvellements. Il évite une capability infinie. Ce plafond
+de sécurité appartient à la plateforme, pas au manifest. Une exécution au-delà
+nécessite un nouveau lancement et une stratégie de sauvegarde/reprise du jeu ; le
+runtime ne promet pas une iframe éternelle. Pour un MMO, la session gameplay et sa
+persistance doivent rester indépendantes de ce bail navigateur.
+
+Le RPC sérialise renouvellement/révocation par verrou de ligne, revalide la version
+publiée ou les permissions preview actuelles, refuse toute résurrection et n'étend
+pas au-delà du plafond. La création conserve un bail initial de 30 minutes maximum.
+Les droits sont également vérifiés à chaque requête d'asset. Un retrait de droit ou
+une révocation interdit immédiatement les nouveaux assets ; l'UI le constate au
+renouvellement suivant au plus tard si le navigateur exécute normalement ses timers.
+
+Le renouvellement a un budget HTTP de 15 s et un seul appel en cours. Une panne
+transitoire provoque un retry après 30 s ; l'échéance existante n'est jamais prolongée
+localement sans réponse serveur valide. Une réponse fatale ou l'expiration démonte
+le jeu. Une réponse tardive d'un ancien montage ne peut réactiver sa génération.
+Au retour visible, le portail vérifie son échéance et tente un renouvellement.
+Une page gelée/déchargée au-delà du bail expire proprement : aucun timer navigateur
+ne peut garantir son maintien pendant une suspension arbitraire.
+
+Sans portail actif, sans renouvellement ou après teardown, les assets finissent
+donc par être refusés. DELETE reste best-effort, expiration et cleanup couvrent les
+fermetures brutales. La preview top-level historique avec cookie 15 min reste une
+primitive distincte ; les previews du GameRuntime utilisent ce même bail renouvelable.
 
 ## Iframe et fonctionnalités navigateur
 
@@ -158,9 +247,12 @@ même si elle réutilise le WindowProxy. Retry recrée origine et iframe.
 
 Le portail émet START/STOP ; visibilité cachée suspend START/heartbeat, retour visible
 reprend avec un nouveau ping et contrôle d'expiration. Aucun heartbeat ne prolonge
-la session serveur ni ne représente une autorité de score. Erreurs du jeu affichées
+le bail serveur ni ne représente une autorité de score. Erreurs du jeu affichées
 par une formulation fixe ; aucun HTML/message libre injecté dans le portail.
 Teardown : abort HTTP, retrait iframe, timers et listeners, révocation best-effort.
+Un timeout ou retry détruit le montage précédent. Retry crée toujours une nouvelle
+launch session, une nouvelle origine, une nouvelle génération et un nouveau document.
+Les messages source/origin/generation précédents restent invalides.
 Le parent doit démonter/recréer le runtime quand le compte ou la session online
 change ; le player ne lit pas lui-même AuthProvider. Cette intégration reste à
 brancher lors de PONG-MIGRATION. Un lancement local anonyme n'en dépend pas.
@@ -188,6 +280,8 @@ Les service workers sont désactivés dans le runner pour garantir zéro appel e
 le refus gateway de leurs requêtes est couvert par les tests artifact de phase 3.
 
 Nouvelle migration `20261017000100_game_launch_sessions.sql`, préparée uniquement.
+RUNTIME-COMPAT-1 ajoute `20261017000200_game_launch_renewals.sql` : plafond absolu
+et RPC privé de renouvellement. Les migrations précédentes ne sont pas réécrites.
 Le harness PostgreSQL applique phases 1–4 sur cluster jetable local. Les migrations
 précédentes restent intactes. Aucun compte, DNS, secret, bucket ou domaine configuré.
 Les anciennes dépendances Git SDK/Pong restent présentes, blocage Cloudflare connu.
@@ -263,3 +357,50 @@ Playwright explicite en CI. `npm test` inclut les tests runtime purs ; exécuter
 séparément `npm run test:game-runtime-browser` et `npm run test:game-runtime-db` pour
 la recette navigateur et PostgreSQL. Aucun téléchargement de navigateur ni profil
 personnel n'est requis/utilisé par la recette réalisée avec Chrome déjà installé.
+
+## Bilan RUNTIME-COMPAT-1
+
+Validations : 26 tests runtime/API/compatibilité, 16 scénarios Chrome réels avec
+horloge simulée pour les longues durées, 13 tests gateway et bundle Worker,
+TypeScript, lint ciblé et build Next Webpack. PostgreSQL jetable applique aussi
+la nouvelle migration et teste les droits RPC, la limite absolue, l'expiration,
+les permissions preview et la course renouvellement/révocation. Aucun SQL exécuté
+sur Supabase production. Le SDK séparé passe 17 tests core/client/React et
+10 scénarios navigateur, dont le bridge réel et READY à 90 secondes ; le test
+optionnel de fixture tarball externe est explicitement skipped dans cette recette.
+Son tarball préparatoire a été reconstruit, sans publication.
+
+Les fixtures simulent un chargement applicatif long, pas plusieurs Gio réels.
+Le R2 et l'API backend du test navigateur sont simulés ; les vrais exports
+Unity/Godot, Safari/Firefox, les appareils physiques et les interruptions réseau
+prolongées nécessitent toujours des recettes dédiées. Les tests unitaires couvrent
+la panne transitoire de renouvellement, son timeout, la réponse tardive, une mauvaise
+génération et le teardown. Aucun résultat ne promet une session infinie ou maintenue
+pendant une suspension arbitraire du navigateur.
+
+Fichiers plateforme créés/modifiés pour cette correction :
+
+```text
+app/api/game-launches/[launchId]/route.ts
+components/game-runtime/GameRuntime.tsx
+lib/game-runtime/{contracts,bridge,controller,client}.ts
+lib/game-distribution/gateway/launch.ts
+lib/server/gameLaunches.ts
+supabase/migrations/20261017000200_game_launch_renewals.sql
+package.json
+tests/game-runtime.test.mjs
+tests/game-runtime-compat.test.mjs
+tests/game-runtime.browser.test.mjs
+tests/game-launch-renewal-db.sql
+tests/game-distribution-db.mjs
+tests/helpers/runtime-harness.mjs
+tests/fixtures/runtime-builds/bridge-fixture.js
+docs/game-runtime.md
+docs/sdk-browser-bridge-v1.md
+```
+
+Dans le SDK séparé : `src/client/browser/connection.ts`, `tests/client.test.mjs`,
+`tests/browser.test.mjs`, `README.md`, `CHANGELOG.md`, `docs/sdk-browser-1.md`.
+Le tag v0.1.0 reste inchangé ; aucun nouveau tag. Aucune modification Pong,
+dépendance Git, auth Cloudflare, DNS, secret ou publication. Aucune copie du SDK
+réintroduite dans la plateforme. Aucun commit, push ou déploiement.

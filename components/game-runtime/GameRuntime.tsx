@@ -27,7 +27,7 @@ export default function GameRuntime({gameId,gameVersionId,execution,audience,loc
       <span role="status" aria-live="polite">{busy?'Chargement du jeu…':state.phase==='running'?'Partie en cours':state.phase==='ready'?'Jeu prêt':state.phase==='closed'?'Jeu fermé':''}</span>
     </div>
     {fullscreenError?<p role="status">Le plein écran n’est pas disponible. Tu peux continuer ici.</p>:null}
-    {state.phase==='failed'?<div className={styles.error} role="alert"><p>{state.error==='handshake_timeout'?'Le jeu n’a pas terminé son initialisation.':'Le jeu ne peut pas continuer pour le moment.'}</p><button type="button" onClick={()=>setAttempt(n=>n+1)}>Réessayer</button></div>:null}
+    {state.phase==='failed'?<div className={styles.error} role="alert"><p>{['hello_timeout','handshake_timeout','game_ready_timeout'].includes(state.error ?? '')?'Le jeu n’a pas terminé son initialisation.':'Le jeu ne peut pas continuer pour le moment.'}</p><button type="button" onClick={()=>setAttempt(n=>n+1)}>Réessayer</button></div>:null}
     <div ref={container} className={styles.viewport} aria-busy={busy}/>
   </section>
 }

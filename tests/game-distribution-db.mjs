@@ -49,6 +49,16 @@ try {
   }
   if(process.argv.includes('--launches')) {
     await run('psql',[...args,'-f',fileURLToPath(new URL('./game-launch-db.sql',import.meta.url))])
+    await run('psql',[...args,'-f',fileURLToPath(new URL('./game-launch-renewal-db.sql',import.meta.url))])
+    const controlRace=await Promise.allSettled([
+      run('psql',[...args,'-c',"set role service_role;select public.distribution_renew_launch('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('7',64),1800)"]),
+      run('psql',[...args,'-c',"set role service_role;select public.distribution_revoke_launch('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('7',64))"]),
+    ])
+    assert.equal(controlRace[1].status,'fulfilled')
+    const revoked=await run('psql',[...args,'-Atc',"select count(*) from public.game_launch_sessions where id='cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd' and revoked_at is not null"])
+    assert.equal(revoked.stdout.trim(),'1')
+    await assert.rejects(run('psql',[...args,'-c',"set role service_role;select public.distribution_renew_launch('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('7',64),1800)"]))
+    console.log('Renewal SQL passed: long access, fixed ceiling, private RPC, current permissions, expired/revoked refusal and renew/revoke race.')
     console.log('Launch SQL passed: anonymous published local, private RLS/RPCs, preview ownership/IDOR/revocation, hashed capabilities, bounded lifetime, atomic quotas, idempotent teardown and expiry cleanup.')
   }
   await assert.rejects(run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261016000100_game_distribution_versions.sql',import.meta.url))]))

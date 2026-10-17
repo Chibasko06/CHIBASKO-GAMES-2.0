@@ -32,6 +32,7 @@ export async function gameLaunchRequest(request:Request,id?:string,deps=dependen
     const body=await readJsonObject(request,2048),service=deps.service()
     if(id) {
       if(Object.keys(body).length!==1 || typeof body.controlToken!=='string')throw new GatewayError('invalid_launch_request',400)
+      if(request.method==='PATCH')return Response.json({data:await service.renew(id,body.controlToken)},{headers})
       await service.release(id,body.controlToken)
       return new Response(null,{status:204,headers})
     }

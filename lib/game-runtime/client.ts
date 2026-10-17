@@ -12,5 +12,11 @@ export function httpLaunchClient(getAccessToken?:()=>Promise<string|null>):Launc
     async release(handle) {
       await fetch('/api/game-launches/'+encodeURIComponent(handle.descriptor.launchId),{method:'DELETE',credentials:'omit',keepalive:true,cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({controlToken:handle.controlToken})})
     },
+    async renew(handle,signal) {
+      const response=await fetch('/api/game-launches/'+encodeURIComponent(handle.descriptor.launchId),{method:'PATCH',signal,credentials:'omit',cache:'no-store',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({controlToken:handle.controlToken})})
+      if(!response.ok)throw new RuntimeError(response.status>=400 && response.status<500?'launch_expired':'launch_renewal_unavailable')
+      return (await response.json()).data
+    },
   }
 }

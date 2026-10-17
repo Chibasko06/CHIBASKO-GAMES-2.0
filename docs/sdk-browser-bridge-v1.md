@@ -1,6 +1,6 @@
-# Proposition exacte — Chibasko Game Bridge v1
+# Chibasko Game Bridge v1 — contrat navigateur
 
-À appliquer ultérieurement dans `C:/Users/chiba/ChibaskoGames/chibasko-games-sdk`.
+Implémenté dans le repository séparé `chibasko-games-sdk`, version 0.2.0 préparée.
 Cette spécification décrit le contrat wire testé par le host, pas une copie du SDK.
 Le root/core reste sans React/Next/Colyseus/Supabase/DOM. Le transport navigateur
 est optionnel et exporté par `/client`, sans toucher à la façade réseau existante.
@@ -37,6 +37,9 @@ par crypto.randomUUID à chaque chargement, jamais depuis localStorage.
 sequence entier positif sûr, retransmis exactement ; code regex
 `^[a-z][a-z0-9_]{0,63}$`, aucun texte HTML/stack. PING/PONG servent seulement à détecter
 la perte du bridge, pas au jeu réseau. Pas de résultat/scoring/gameplay sur ce V1.
+RUNTIME-COMPAT-1 : le SDK répond dès INIT, même avant READY. Le premier PONG
+acquitte INIT ; les suivants surveillent la préparation et le gameplay. Aucun
+PONG ne déclenche START ni ne prolonge le budget READY ou le bail des artefacts.
 
 ## Contexte exact
 
@@ -59,11 +62,12 @@ contrôles. Capacité bornée par le manifest côté serveur. Aucun secret, emai
 ticket réseau, roomId, réservation, cookie ou champ libre dans ce V1. Le futur contrat
 de connexion gameplay devra être ajouté explicitement, pas caché dans un objet extra.
 
-## Adaptateur navigateur SDK proposé
+## Adaptateur navigateur SDK 0.2.0
 
-Ajouter types purs `BridgeProtocolVersion`, `BrowserLaunchContext` et messages au
-core ; ajouter `connectPlatform()` dans `/client`, avec un module transport séparé
-qui ne lit window que lors de l'appel. `/react` pourra fournir un hook ensuite.
+Les types purs `BridgeProtocolVersion` et `BrowserLaunchContext` sont dans le core.
+`connectPlatform()` est dans `/client`, avec un module transport interne séparé
+qui ne lit window que lors de l'appel. Les messages wire ne sont pas une API gameplay.
+`/react` conserve son hook optionnel existant.
 
 ```ts
 const platform = await connectPlatform()
@@ -73,7 +77,7 @@ const offStop = platform.onStop(() => { /* pause/input 0 */ })
 platform.ready()                 // ressources du moteur effectivement prêtes
 platform.leave()
 platform.reportError('load_failed')
-platform.dispose()               // retrait listeners/timers, callbacks inactifs
+platform.close()                 // retrait listeners/timers, callbacks inactifs
 ```
 
 `connectPlatform` lit cgLaunch/cgGeneration/cgParent dans le fragment bootstrap,
@@ -81,22 +85,23 @@ valide les UUID et l'origine HTTPS du parent, exige parent !== self et envoie HE
 à ce parent exact. INIT doit vérifier source===parent, origin===cgParent, envelope,
 génération, documentId et schéma context. Le jeu n'est running qu'après START,
 ready reste explicite. Répétitions INIT/START/STOP idempotentes ; messages périmés
-ou après dispose ignorés. PONG géré par le transport, pas par le gameplay.
+ou après close ignorés. PONG géré par le transport, pas par le gameplay.
 
 Ne pas convertir GameClientConnection.send en postMessage de gameplay. Garder ce
 contrat pour les connexions/adaptateurs réseau appropriés ; browser integration
 est une intégration plateforme distincte, toujours dans le même SDK.
-Ajouter timeouts, validation stricte et tests bidirectionnels avec ce host avant
-release. Version de package proposée 0.2.0 expérimentale, integrationVersion reste 1,
+Timeouts, validation stricte et tests bidirectionnels avec ce host sont implémentés.
+Version de package préparée 0.2.0 expérimentale, integrationVersion reste 1,
 bridge protocolVersion vaut 1 : trois versions indépendantes.
 
-Ajouter un build IIFE `chibasko-sdk.js` exposant `window.ChibaskoGames.connectPlatform`
+Le build IIFE `chibasko-games-sdk.js` expose `window.ChibaskoGames.connectPlatform`
 avec la même implémentation, version explicite et hash de distribution. Aucun accès
 Git privé/npm requis pour le jeu HTML. Unity/Godot wrappers appelleront cette API JS ;
 pas de wrappers nécessaires pour prouver le protocole. Fullscreen v1 via UI hôte,
 pointer lock via geste du jeu ; futur openExternalUrl/fullscreen médiés ne sont pas
 des messages V1 acceptés automatiquement.
 
-Fichiers SDK proposés : types core dédiés, `src/client/browser/{protocol,transport}.ts`,
-export `/client`, tests browser/protocole, build IIFE optionnel, README/CHANGELOG.
-Aucune modification de ces fichiers ni publication SDK effectuée par GAME-RUNTIME-1.
+Sources SDK : types purs dédiés, `src/client/browser/{protocol,connection,errors,standalone}.ts`,
+export `/client`, tests browser/protocole, build IIFE, README/CHANGELOG. Les sources
+restent dans le repository SDK séparé. RUNTIME-COMPAT-1 corrige seulement l'acceptation
+des pings en initialized et adapte les tests/docs ; aucune publication SDK.

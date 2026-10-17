@@ -3,7 +3,19 @@ import type { Execution, GameLaunchDescriptor } from '../game-distribution/gatew
 /** Browser wire contract proposal. No game, framework, auth or transport internals. */
 export const BRIDGE_CHANNEL='chibasko.game' as const
 export const BRIDGE_VERSION=1 as const
-export const RUNTIME_POLICY=Object.freeze({descriptorMs:15_000,loadMs:120_000,handshakeMs:30_000,pingMs:10_000,pongMs:30_000,sessionSeconds:1800,maxIssuePerMinute:60,maxAnonymousPerMinute:600})
+export const RUNTIME_POLICY=Object.freeze({descriptorMs:15_000,loadMs:120_000,helloMs:15_000,handshakeMs:5_000,gameReadyMs:600_000,
+  pingMs:10_000,pongMs:30_000,leaseRenewMs:300_000,leaseRetryMs:30_000,leaseRequestMs:15_000,
+  sessionSeconds:1800,maxIssuePerMinute:60,maxAnonymousPerMinute:600})
+export type RuntimePolicy={readonly [Key in keyof typeof RUNTIME_POLICY]:number}
+/** Platform-only configuration, never supplied by a game's manifest or messages. */
+export function runtimePolicy(overrides:Partial<RuntimePolicy>={}) {
+  const policy:RuntimePolicy={...RUNTIME_POLICY,...overrides}
+  const maximums={descriptorMs:60_000,loadMs:600_000,helloMs:60_000,handshakeMs:60_000,gameReadyMs:1_800_000,
+    pingMs:60_000,pongMs:120_000,leaseRenewMs:600_000,leaseRetryMs:60_000,leaseRequestMs:60_000}
+  for(const key of Object.keys(maximums) as (keyof typeof maximums)[])
+    if(!Number.isSafeInteger(policy[key]) || policy[key]<1 || policy[key]>maximums[key])throw new RuntimeError('invalid_runtime_policy')
+  return policy
+}
 export type RuntimePhase='resolving'|'launching'|'loading'|'ready'|'running'|'failed'|'closed'
 export type RuntimeState=Readonly<{phase:RuntimePhase;error?:string}>
 export type LaunchRequest=Readonly<{gameId:string;gameVersionId:string;execution:Execution;audience:'published'|'preview';locale:string;onlineSessionReference?:string}>
@@ -18,7 +30,8 @@ export type RuntimeLaunchDescriptor=GameLaunchDescriptor & Readonly<{
 }>
 /** Portal-only handle. controlToken never reaches iframe/SDK or URL. */
 export type LaunchHandle={descriptor:RuntimeLaunchDescriptor;controlToken:string}
-export type LaunchClient={create(request:LaunchRequest,signal:AbortSignal):Promise<LaunchHandle>;release(handle:LaunchHandle):Promise<void>}
+export type LaunchLease=Readonly<{launchId:string;generation:string;expiresAt:string}>
+export type LaunchClient={create(request:LaunchRequest,signal:AbortSignal):Promise<LaunchHandle>;renew(handle:LaunchHandle,signal:AbortSignal):Promise<LaunchLease>;release(handle:LaunchHandle):Promise<void>}
 export type GameMessageType='GAME_HELLO'|'GAME_READY'|'LEAVE_REQUEST'|'GAME_ERROR'|'GAME_PONG'
 export type BridgeMessage={channel:typeof BRIDGE_CHANNEL;protocolVersion:1;launchId:string;generation:string;type:string;payload:Record<string,unknown>}
 export class RuntimeError extends Error {constructor(readonly code:string){super(code);this.name='RuntimeError'}}
