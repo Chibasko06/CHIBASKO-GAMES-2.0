@@ -1,0 +1,20 @@
+// Non-active example. Choose a separate registrable content domain before enabling.
+{
+  "name": "chibasko-artifact-gateway",
+  "main": "artifact-gateway.ts",
+  "compatibility_date": "2026-10-16",
+  "workers_dev": false,
+  "observability": {"logs": {"enabled": true, "invocation_logs": false}},
+  "triggers": {"crons": ["*/15 * * * *"]},
+  "r2_buckets": [{"binding": "ARTIFACTS", "bucket_name": "validated-game-artifacts-example"}],
+  "vars": {
+    "GAME_ARTIFACT_GATEWAY_ENABLED": "0",
+    "GAME_CONTENT_PUBLIC_BASE": "games-content.example",
+    "GAME_CONTENT_PREVIEW_BASE": "games-content.example",
+    "GAME_CONTENT_BASE_DOMAIN": "games-content.example",
+    "GAME_PORTAL_ORIGINS": "https://chibaskogames.fr,https://www.chibaskogames.fr"
+  }
+  // Future wildcard DNS/TLS/route for *.<content-domain>; v-/p- hosts are distinct.
+  // Two distinct bases are also supported, with corresponding TLS coverage.
+  // No route, bucket or secret is created by this file.
+}

@@ -1,0 +1,19 @@
+// Test game stub, NOT a vendored SDK or a production browser adapter.
+(() => {
+  const hash=new URLSearchParams(location.hash.slice(1)),documentId=crypto.randomUUID(),parentOrigin=hash.get('cgParent')
+  if(!parentOrigin)return
+  const behavior=document.body.dataset.behavior
+  const envelope={channel:'chibasko.game',protocolVersion:1,launchId:hash.get('cgLaunch'),generation:hash.get('cgGeneration')}
+  const send=(type,extra={})=>parent.postMessage({...envelope,type,payload:{documentId,...extra}},parentOrigin)
+  window.fixture={context:null,starts:0,stops:0,send,envelope,documentId}
+  window.addEventListener('message',event=>{
+    if(event.source!==parent || event.origin!==parentOrigin)return
+    const m=event.data
+    if(!m || m.channel!==envelope.channel || m.protocolVersion!==1 || m.launchId!==envelope.launchId || m.generation!==envelope.generation || m.payload.documentId!==documentId)return
+    if(m.type==='PLATFORM_INIT') {window.fixture.context=m.payload.context;if(behavior!=='never-ready')send('GAME_READY')}
+    if(m.type==='GAMEPLAY_START')window.fixture.starts++
+    if(m.type==='GAMEPLAY_STOP')window.fixture.stops++
+    if(m.type==='PLATFORM_PING' && behavior!=='no-pong')send('GAME_PONG',{sequence:m.payload.sequence})
+  })
+  if(behavior!=='no-sdk')send('GAME_HELLO')
+})()

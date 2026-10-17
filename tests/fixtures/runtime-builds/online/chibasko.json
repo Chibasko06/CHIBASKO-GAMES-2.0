@@ -1,0 +1,1 @@
+{"schemaVersion":1,"gameId":"10000000-0000-4000-8000-000000000003","version":"0.1.0","integrationVersion":1,"capabilities":{"online":{"access":["private"],"players":{"min":2,"max":4}}},"client":{"entrypoints":{"online":"index.html"}}}

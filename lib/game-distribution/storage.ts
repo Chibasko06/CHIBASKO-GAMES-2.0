@@ -3,6 +3,14 @@ import { sha256 } from './build'
 import { artifactMedia } from './paths'
 import type { ArtifactFile } from './types'
 
+/** Read side of the same artifact storage boundary. Never exposes a bucket/URL. */
+export type ArtifactMetadata = {size:number;etag:string;sha256:string}
+export type ArtifactRange = {offset:number;length:number}
+export type ArtifactReader = {
+  head(key:string):Promise<ArtifactMetadata|null>
+  get(key:string,metadata:ArtifactMetadata,range?:ArtifactRange):Promise<ReadableStream<Uint8Array>|null>
+}
+
 /** Private R2-compatible ingestion port, never a game SDK capability. */
 export type ImmutableArtifactBucket = {
   put(key: string, bytes: Uint8Array | ReadableStream<Uint8Array>, options: {

@@ -650,11 +650,10 @@ concurrence de création : un draft et un version_conflict. Les tests storage ut
 des adapters mémoire et un transport S3 simulé ; un vrai processus parser enfant
 est exécuté. Les ZIP malveillants sont réellement construits et refusés.
 
-GAME-DISTRIBUTION-3 devra résoudre une version validée privée pour preview,
-autoriser son accès et construire le player/profils CSP. Il pourra lire
-game_versions + les clés/inventaire finaux, sans connaître le staging.
-Aucun preview/player, SDK bridge, portail, CLI, artifact serveur ni migration Pong
-n'est ajouté. Aucune publication automatique ou modification de gameplay.
+La phase 2 prépare les fichiers finaux pour le gateway décrit ci-dessous en phase 3.
+La phase 3 ajoute la preview et les profils CSP, sans player React, SDK bridge,
+portail, CLI, artifact serveur ni migration Pong. Aucune publication automatique
+ou modification de gameplay.
 
 Cloudflare : **blocage existant, destiné à disparaître lors de PONG-MIGRATION +
 SDK distribution**. Les dépendances Git privées restent provisoirement inchangées.
@@ -697,3 +696,289 @@ ou service distant n'a été utilisé/créé/configuré pour la recette du pipel
 L'activation future exige ces préparations, un hôte isolé dimensionné,
 supervision/DLQ/GC et une recette réelle. Le pipeline reste volontairement désactivé ;
 aucune version ni fiche publiée.
+
+## 26. GAME-DISTRIBUTION-3 : Artifact Gateway
+
+Le Worker `cloudflare/artifact-gateway.ts` sert seulement les objets **client**
+d'une version exacte et validée. Le navigateur ne reçoit ni storage_prefix,
+bucket, URL S3, archive originale, inventory.json interne, staging, ni credential.
+Le gateway utilise le côté lecture `ArtifactReader` du port storage existant,
+adapté au binding R2 natif. L'ingestion S3 et la lecture native visent les mêmes
+objets finaux privés ; aucune seconde copie du build pour la preview.
+
+`resolveGameVersion(versionId)` est une primitive serveur : elle charge la
+projection DB minimale, revalide le manifest, ses liens gameId/version/protocole
+et recalcule le préfixe immuable attendu. Un lien incohérent échoue fermé.
+Elle peut résoudre draft/published/archived pour les besoins internes, mais cela
+n'accorde aucun droit de servir : le gateway applique ensuite les droits/statuts.
+Une version publique est exclusivement `published`. Le pointeur active_version_id
+reste résolu par la plateforme avant le lancement ; aucune route `current`.
+
+Le contrat destiné au futur runtime est `GameLaunchDescriptor` : gameId,
+gameVersionId, integrationVersion, execution (local/online), entrypointUrl,
+capabilities et contentOrigin. Ni clé R2, jeton, schéma DB complet ni identité
+Supabase. Le chemin vient du manifest, y compris `play/start.html` ; les entrypoints
+local et online peuvent différer. Ceci n'est pas le bridge SDK.
+
+## 27. Origines, cookies et service workers
+
+Choisir un **site enregistrable distinct** du portail. Un simple sous-domaine
+`games.chibaskogames.fr` resterait same-site et recevrait d'éventuels cookies
+`Domain=chibaskogames.fr`. La configuration refuse ce cas à l'aide de la Public
+Suffix List (`tldts`, suffixes privés compris), plutôt qu'une comparaison naïve
+des deux dernières composantes DNS. Aucun domaine réel n'est créé ici.
+
+Format retenu (domaine d'exemple à remplacer avant activation) :
+
+```text
+https://v-<version UUID sans tirets>.games-content.example/<chemin>
+https://p-<session UUID sans tirets>.games-content.example/<chemin>
+```
+
+Une base commune et un seul wildcard DNS/TLS suffisent pour ces deux familles,
+quel que soit le nombre de jeux. Deux bases distinctes sont aussi configurables.
+Chaque version publique possède sa propre origine ; chaque session de preview
+possède une origine nouvelle et jamais réutilisée. Il n'y a pas de configuration
+DNS par jeu. Storage/localStorage/IndexedDB/cache d'origine ne sont donc pas
+partagés entre jeux, versions ou sessions. Coût : davantage d'origines, stockage
+non transféré automatiquement entre versions et possibles connexions TLS en plus.
+Une éventuelle sauvegarde inter-version relèvera d'une API explicite future.
+
+Les cookies du portail ne sont jamais copiés sur le site de contenu. Le seul
+cookie de preview est `__Host-cg-preview`, Secure, HttpOnly, Path=/, SameSite=Lax,
+Max-Age borné par la session, **sans Domain**. Le préfixe __Host empêche aussi un
+sous-domaine voisin de fabriquer un cookie Domain portant le même nom.
+Les cookies homonymes dupliqués sont refusés. Pas de CORS générique sur les assets.
+
+Service workers : toutes les requêtes portant `Service-Worker` ou
+`Sec-Fetch-Dest: serviceworker` sont refusées (403), sans `Service-Worker-Allowed`.
+`worker-src self blob:` reste permis pour les Web Workers des moteurs : cette
+directive seule ne distingue pas les service workers. La protection combine donc
+le refus au gateway et la séparation des origines, jamais une simple convention
+de chemins. Ne jamais réutiliser un ancien domaine ayant déjà hébergé des jeux
+ou un service worker non contrôlé : celui-ci pourrait intercepter avant le réseau.
+Les hosts `v-`/`p-` ne doivent avoir aucun autre handler ni accès R2 public direct.
+
+## 28. Preview privée : API, ticket, échange
+
+API générique (sans UI obligatoire) :
+
+```http
+POST /api/developer/game-versions/{versionId}/preview
+Authorization: Bearer <session utilisateur, uniquement vers le portail>
+Content-Type: application/json
+
+{"execution":"local"}
+```
+
+Réponse 201 `data` : descriptor de lancement + `preview.method="POST"`,
+`preview.action="https://p-.../_preview/exchange"`, `preview.fields.ticket`,
+`preview.expiresAt` et `preview.ticketExpiresIn=60`. Réponses privées/no-store.
+Le JWT utilisateur n'est jamais transmis au gateway ou au jeu. Comme pour l'API
+d'upload, un Origin fourni doit être celui du portail ; un CLI sans Origin peut
+s'authentifier en Bearer. Pas d'authentification par simple cookie sur cette API.
+
+Séquence :
+
+1. Auth getUser serveur puis autorisation actuelle sur le jeu cible.
+2. Ticket opaque aléatoire 256 bits, valable 60 secondes, lié à version, execution,
+   utilisateur et session/génération. Seul son SHA-256 est stocké.
+3. Le portail soumet un formulaire POST (onglet de preview) vers l'action retournée.
+   Le CLI peut faire le même POST puis utiliser son cookie jar. Le ticket est dans
+   le corps, jamais dans query, fragment ou URL. Aucun échange GET.
+4. Le gateway consomme le ticket une seule fois sous verrou DB, revérifie droits
+   et statut, crée un autre secret opaque et pose son cookie host-only HttpOnly.
+   Seul le hash du cookie est conservé côté DB.
+5. Réponse **303** vers l'entrypoint propre. Le corps POST n'est pas renvoyé au jeu.
+   Un nouvel essai du ticket échoue ; une nouvelle preview reste possible.
+6. Chaque asset vérifie cookie/session, expiration, statut ET permissions actuelles.
+   Une suppression de rôle/membership bloque la prochaine requête non déjà reçue.
+
+Le ticket n'apparaît donc pas dans l'URL, les referers ou les logs du gateway.
+Les outils réseau du propriétaire et un éventuel historique de formulaire peuvent
+conserver le corps POST : expiration courte et consommation unique restent utiles.
+Ne jamais capturer les corps/cookies dans un outil analytics ou un proxy amont.
+
+Cette phase fournit une **preview top-level**. SameSite=Lax n'est pas une promesse
+de fonctionnement dans une iframe cross-site. Avant un player privé intégré,
+choisir/tester CHIPS/cookies partitionnés ou un autre mécanisme dédié, avec les
+restrictions Safari/Firefox/Chrome et une ouverture top-level de secours. Aucun
+affaiblissement de SameSite ni jeton dans chaque asset n'est ajouté ici.
+
+Les requêtes privées avec Origin étranger ou contexte cross-site de sous-ressource
+sont refusées. Seule la navigation top-level est admise ; le framing est en plus
+limité par CSP. La session indépendante peut rester valide après logout du portail
+jusqu'à 15 minutes : elle n'utilise pas la session Supabase. Sa courte durée et la
+revérification des permissions sont explicites ; une révocation immédiate au logout
+pourra être ajoutée au futur orchestrateur. Le build lui-même est du code non fiable :
+une preview autorisée ne constitue pas un DRM empêchant l'auteur/visiteur d'en copier
+ou divulguer les octets reçus.
+
+## 29. Autorisation et tables de phase 3
+
+Migration nouvelle : `20261016000300_game_artifact_previews.sql`, **préparée uniquement**.
+Les migrations 1/2 restent intactes. Aucun compte ne reçoit de nouveau rôle.
+
+- `game_preview_sessions` : génération UUID unique, version, execution, issued_by,
+  hashes ticket/cookie, timestamps de consommation/expiration. Durée 15 minutes,
+  ticket 60 secondes, au plus 30 créations/minute/utilisateur (verrou DB).
+- `game_reviewers` : capacité plateforme de review, sans ownership. Un reviewer
+  peut voir in_review/approved ; owner/editor et admin voient aussi draft.
+- `game_version_delivery_policies` : profil/réseau **approuvés par la plateforme**,
+  séparés du manifest immuable, sans headers arbitraires fournis par le développeur.
+
+Tables privées RLS ; aucun SELECT/INSERT/UPDATE/RPC accessible à anon/authenticated.
+RPC service_role seulement, après identité utilisateur vérifiée pour l'émission.
+Le gateway reçoit uniquement le credential backend configuré dans son environnement,
+jamais dans les réponses/builds ; il ne reçoit pas les JWT utilisateurs.
+Le cron proposé supprime les sessions expirées toutes les 15 minutes ; l'autorisation
+refuse déjà toute session expirée même si le cron est retardé. Index d'expiration.
+Ne pas stocker les sessions dans game_versions, ni leurs secrets bruts en DB.
+
+## 30. HTTP, streaming, MIME et cache
+
+Méthodes GET/HEAD sur les fichiers, POST seulement pour l'échange. Le binding R2
+fait HEAD puis GET conditionnel sur l'ETag de stockage. Le body ReadableStream est
+transmis directement, sans Buffer de l'asset complet. Un changement inattendu entre
+HEAD/GET échoue fermé. HEAD ne lit pas le body ; il renvoie les mêmes métadonnées.
+
+Content-Type déterminé via la table plateforme phase 1, pas celui fourni en upload :
+HTML, JS/mjs, CSS, JSON, WASM, images, audio/vidéo, fonts, binaire/data. `.gz`/`.br`
+gardent le type sous-jacent + Content-Encoding, utile aux exports Web précompressés.
+Le build doit référencer le bon fichier : pas de négociation automatique de variantes.
+ETag public basé sur SHA-256 serveur. `nosniff` sur les réponses et erreurs.
+
+Single byte ranges : 206 pour bornée/ouverte/suffixe, Content-Range/Length exacts ;
+416 (bytes */taille) pour range invalide ou multiple. If-Range avec ETag fort pris
+en charge ; une date ou un ETag différent donne la réponse complète. Les ranges
+comptent les octets de la représentation stockée (y compris gzip/br). HEAD ignore
+Range. Pas de multipart/byteranges dans cette phase, ni Last-Modified inventé.
+
+Cache :
+
+- Preview et toutes erreurs : `private, no-store`, Vary Cookie pour les fichiers.
+- Published assets : `public, max-age=31536000, immutable`.
+- Published HTML : `public, no-cache`, revalidation, afin de vérifier à nouveau le
+  statut avant chaque nouveau lancement ; l'ETag peut produire 304 après autorisation.
+- Le gateway ne met pas les réponses en cache partagé via Cache API dans cette phase.
+  Toute requête qui l'atteint vérifie le statut avant R2/304. Ne pas ajouter une règle
+  Cloudflare « cache everything » qui court-circuiterait ces contrôles.
+
+L'archive d'origine n'est jamais une route de contenu. Les chemins encodés ambigus,
+%2e/%2f/%5c/%25/%00, traversals/backslashes/chemins absolus sont refusés avant résolution.
+Les segments déjà normalisés par le navigateur ne sont pas reconstructibles ; même
+dans ce cas le chemin résultant ne peut sortir du namespace client vérifié.
+Un rollback change active_version_id, jamais les objets. Les assets publics déjà
+téléchargés/cachés ne peuvent pas être révoqués à distance ; archiver bloque les
+nouvelles requêtes atteignant le gateway, pas les copies existantes.
+
+## 31. Profils de sécurité et réseau
+
+Profils versionnés choisis dans la DB par la plateforme, pas auto-approuvés via JSON :
+
+| Profil | Usage |
+| --- | --- |
+| web-v1 | Défaut, WASM autorisé avec wasm-unsafe-eval, Web Workers self/blob |
+| web-isolated-v1 | COEP require-corp + COOP same-origin ; nécessaire si manifest réclame crossOriginIsolation |
+| web-legacy-v1 | JS unsafe-eval permis uniquement après approbation explicite |
+
+Tous : CSP default-src none, self pour les ressources nécessaires, scripts/styles
+inline pour les loaders Web exportés, data/blob limités aux types utiles, pas de
+frame enfant/object/base/form. Sandbox CSP allow-scripts allow-same-origin
+allow-pointer-lock, sans popup, navigation top, forms ou downloads accordés.
+allow-same-origin est ici entre origines de contenu **distinctes** du parent ;
+ce couple serait dangereux sur l'origine du portail.
+frame-ancestors contient uniquement les origines portail configurées, Referrer-Policy
+no-referrer, CORP same-origin, COOP same-origin et Origin-Agent-Cluster ?1.
+Permissions-Policy refuse caméra/micro/géolocalisation/paiement/USB ; fullscreen,
+audio et gamepad restent possibles sur self, sous conditions navigateur/gesture et
+permissions de l'iframe hôte future. Aucun X-Frame-Options SAMEORIGIN contradictoire.
+
+Le défaut interdit les origines réseau externes. connectOrigins/assetOrigins sont
+des listes canoniques HTTPS/WSS approuvées (32 max), sans wildcards, userinfo, IP ou
+localhost. Aucun header CSP brut n'est accepté. Ce contrôle CSP est une défense
+navigateur sur les fetch/WebSocket/ressources ; il ne prétend pas rendre du code
+tiers fiable ou empêcher toute exfiltration/navigation. L'iframe/orchestrateur
+final devra compléter les permissions et restrictions de navigation.
+Un script externe approuvé est aussi du code exécutable : limiter ces approbations.
+
+SharedArrayBuffer/Unity/Godot multithread en iframe nécessiteront aussi les bons
+headers et permissions du parent, plus CORS/CORP pour les ressources concernées.
+Ces prérequis sont préparés, sans prétendre avoir testé de vrais exports moteurs
+ou tous les navigateurs. Les profils devront évoluer à partir de ces recettes.
+
+## 32. Erreurs, observabilité, activation et tests
+
+Codes stables : unauthorized, version_not_found, version_not_previewable,
+preview_forbidden, preview_expired, preview_replayed, unsupported_execution,
+quota_exceeded, artifact_not_found, invalid_artifact_path, invalid_range,
+service_worker_forbidden, unsupported_method, storage_error et service_unavailable.
+Une incohérence serveur/policy échoue avec 503, jamais avec SQL, stack ou clé R2.
+Les journaux structurés contiennent seulement requestId, gameId, gameVersionId,
+path normalisé et statut HTTP. Ils excluent URL/query brute, session ID, headers,
+corps, tickets et cookies. La configuration d'exemple désactive les invocation logs
+automatiques ; vérifier aussi la journalisation amont/CDN avant activation.
+
+`cloudflare/wrangler.artifacts.example.jsonc` est **non actif** : aucune route DNS,
+TLS, bucket, migration distante, credential ou déploiement n'est créé. Bind ARTIFACTS
+uniquement au bucket final privé (pas de binding staging), puis configurer côté
+backend SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY existants sans les versionner.
+Configurer les mêmes GAME_CONTENT_PUBLIC_BASE, GAME_CONTENT_PREVIEW_BASE et
+GAME_PORTAL_ORIGINS dans Worker et portail. Les flags GAME_ARTIFACT_GATEWAY_ENABLED
+et GAME_ARTIFACT_PREVIEWS_ENABLED restent désactivés sans activation explicite.
+
+Tests : `npm run test:game-distribution`, `npm run test:game-uploads`,
+`npm run test:game-artifacts`, `npm run test:game-artifacts-db`, TypeScript et lint
+ciblé. Le dernier lance les trois migrations dans un PostgreSQL jetable local,
+avec une vraie course entre deux échanges de ticket : un seul succès.
+Le fake R2 teste le même port lecture et les flux/ranges ; Pong, solo avec
+play/start.html et variante online-only 4 joueurs passent sans branche par gameId.
+Le bundle Worker est compilé pour browser, sans Next/React/SDK/Pong/Node.
+
+Fichiers phase 3 :
+
+```text
+lib/game-distribution/gateway/{contracts,resolver,preview,http,headers,gateway}.ts
+lib/server/developerPreviews.ts
+app/api/developer/game-versions/[versionId]/preview/route.ts
+cloudflare/{artifact-reader,artifact-gateway}.ts
+cloudflare/wrangler.artifacts.example.jsonc
+supabase/migrations/20261016000300_game_artifact_previews.sql
+tests/game-artifact-gateway.test.mjs
+tests/game-artifact-db.sql
+```
+
+Adaptations : storage.ts (lecture), uploads/repository.ts (codes stables), scripts
+de build/test et harness DB, package.json/lockfile (tldts déjà transitif, désormais
+runtime explicite), cette documentation. Aucune modification gameplay/game-server.
+Avant GAME-RUNTIME-1 : valider le domaine réel et wildcard TLS, recettes moteurs,
+politique réseau/review et droits opérationnels, preview iframe/cookies, puis
+orchestration iframe/SDK bridge et intégration COOP/COEP côté parent.
+Le blocage Cloudflare Git privé demeure une dette existante, à supprimer lors de
+SDK distribution/PONG-MIGRATION. Aucun accès Git privé supplémentaire n'est configuré.
+
+Résultat local phase 3 : 8 tests phase 1 + 22 tests phase 2 + 13 tests gateway,
+scénarios SQL des trois phases avec concurrence réelle, TypeScript, lint ciblé,
+build Next Webpack, bundle Worker browser et git diff --check réussis. Scan des
+fichiers modifiés sans signature de credential. Les tests n'utilisent ni vrai R2,
+ni domaine/TLS public, ni session navigateur réelle, ni export Unity/Godot réel.
+Ces recettes opérationnelles restent nécessaires avant activation ; la configuration
+est volontairement désactivée. Aucun commit, push, déploiement ou migration production.
+
+## 33. GAME-RUNTIME-1 : lancement iframe sans cookies tiers
+
+Le player générique et les launch sessions sont décrits dans [game-runtime.md](game-runtime.md).
+Le player ne réutilise pas les sessions cookie top-level de phase 3. Il crée un host
+éphémère `l-<capability>` et le gateway résout son hash vers une launch session
+autorisée, puis vers les mêmes objets R2. Aucun cookie requis sur ce chemin,
+preview/published et local/online utilisant le même player. Le vieux parcours Pong
+reste branché jusqu'à sa migration.
+
+Important : des origines différentes sous une base ordinaire n'interdisent pas
+à un build tiers de poser un cookie Domain partagé. Pour l'isolation complète demandée,
+le nouveau chemin de lancement exige une base dédiée reconnue comme suffixe PRIVATE
+dans la PSL, vérifiée aussi dans les navigateurs supportés avant activation. Aucun
+domaine n'est choisi ou configuré par cette phase ; l'exemple demeure désactivé.
+Les profils de phase 3 et son preview top-level sont conservés, sans devenir un
+prérequis cookie du futur player. Migration supplémentaire préparée uniquement :
+`20261017000100_game_launch_sessions.sql`.

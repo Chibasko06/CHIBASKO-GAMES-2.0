@@ -26,7 +26,7 @@ try {
   await run('psql',[...base,'-d','postgres','-c','create database chibasko_distribution_test'])
   const args=[...base,'-d','chibasko_distribution_test']
   await run('psql',[...args,'-f',fileURLToPath(new URL('./game-distribution-db.sql',import.meta.url))])
-  if(process.argv.includes('--uploads')) {
+  if(process.argv.includes('--uploads') || process.argv.includes('--previews') || process.argv.includes('--launches')) {
     await run('psql',[...args,'-f',fileURLToPath(new URL('./game-upload-db.sql',import.meta.url))])
     const finalizers=await Promise.allSettled([1,2].map(()=>run('psql',[...args,'-c',"set role service_role;select public.distribution_begin_finalize('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','77777777-7777-4777-8777-777777777777');select public.distribution_enqueue_upload('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','77777777-7777-4777-8777-777777777777','etag')"])))
     assert.equal(finalizers.filter(r=>r.status==='fulfilled').length,2)
@@ -38,6 +38,18 @@ try {
     const counts=await run('psql',[...args,'-Atc',"select (select count(*) from public.game_versions where version='3.0.0')||':'||(select count(*) from public.game_build_uploads where status='completed')||':'||(select count(*) from public.game_build_uploads where error_code='version_conflict')"])
     assert.equal(counts.stdout.trim(),'1:1:1')
     console.log('Upload SQL passed: ownership/admin/IDOR/RLS, expiration, idempotence, outbox, lease fencing, revocation, retry and concurrent version uniqueness.')
+  }
+  if(process.argv.includes('--previews') || process.argv.includes('--launches')) {
+    await run('psql',[...args,'-f',fileURLToPath(new URL('./game-artifact-db.sql',import.meta.url))])
+    const exchanges=await Promise.allSettled(['2','3'].map(hash=>run('psql',[...args,'-c',`set role service_role;select public.distribution_exchange_preview('fafafafa-fafa-4afa-8afa-fafafafafafa',repeat('1',64),repeat('${hash}',64))`])))
+    assert.equal(exchanges.filter(result=>result.status==='fulfilled').length,1)
+    const consumed=await run('psql',[...args,'-Atc',"select count(*) from public.game_preview_sessions where id='fafafafa-fafa-4afa-8afa-fafafafafafa' and consumed_at is not null and cookie_hash is not null"])
+    assert.equal(consumed.stdout.trim(),'1')
+    console.log('Preview SQL passed: private RLS/RPCs, owner/editor/admin/reviewer, IDOR, expiry, current permission revocation, approved policies, cleanup and concurrent one-time exchange.')
+  }
+  if(process.argv.includes('--launches')) {
+    await run('psql',[...args,'-f',fileURLToPath(new URL('./game-launch-db.sql',import.meta.url))])
+    console.log('Launch SQL passed: anonymous published local, private RLS/RPCs, preview ownership/IDOR/revocation, hashed capabilities, bounded lifetime, atomic quotas, idempotent teardown and expiry cleanup.')
   }
   await assert.rejects(run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261016000100_game_distribution_versions.sql',import.meta.url))]))
   const race=await Promise.allSettled([

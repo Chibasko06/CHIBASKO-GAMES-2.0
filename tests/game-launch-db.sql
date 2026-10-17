@@ -1,0 +1,43 @@
+\set ON_ERROR_STOP on
+do $$ begin if current_database()<>'chibasko_distribution_test' then raise exception 'Disposable database required'; end if; end $$;
+\ir ../supabase/migrations/20261017000100_game_launch_sessions.sql
+set role anon;
+select public.distribution_expect_failure('select * from public.game_launch_sessions');
+select public.distribution_expect_failure('select public.distribution_check_launch(repeat(''a'',64))');
+reset role;
+set role authenticated;
+select public.distribution_expect_failure('select * from public.game_launch_sessions');
+select public.distribution_expect_failure('select public.distribution_revoke_launch(gen_random_uuid(),repeat(''a'',64))');
+reset role;
+set role service_role;
+do $$ declare s jsonb; context jsonb; v uuid:='abababab-abab-4bab-8bab-abababababab'; begin
+ context:=jsonb_build_object('gameId','11111111-1111-4111-8111-111111111111','gameVersionId','33333333-3333-4333-8333-333333333333','execution','local','locale','fr','participants','[]'::jsonb);
+ s:=public.distribution_create_launch(null,'11111111-1111-4111-8111-111111111111','33333333-3333-4333-8333-333333333333','published','local',repeat('a',64),repeat('b',64),context,1800,60,600);
+ if s ? 'capability_hash' or s ? 'control_hash' then raise exception 'Capability hashes leaked in descriptor'; end if;
+ perform public.distribution_check_launch(repeat('a',64));
+ perform public.artifact_expect_code(format('select public.distribution_create_launch(null,%L,%L,''published'',''local'',%L,%L,%L,1800,60,1)','11111111-1111-4111-8111-111111111111','33333333-3333-4333-8333-333333333333',repeat('c',64),repeat('d',64),context),'quota_exceeded');
+ perform public.artifact_expect_code(format('select public.distribution_revoke_launch(%L,%L)',s->>'id',repeat('0',64)),'launch_expired');
+ perform public.distribution_revoke_launch((s->>'id')::uuid,repeat('b',64));
+ perform public.distribution_revoke_launch((s->>'id')::uuid,repeat('b',64));
+ perform public.artifact_expect_code(format('select public.distribution_check_launch(%L)',repeat('a',64)),'launch_expired');
+ perform public.artifact_expect_code(format('select public.distribution_authorize_launch(null,%L,%L,''preview'',''local'')','22222222-2222-4222-8222-222222222222',v),'unauthorized');
+ perform public.artifact_expect_code(format('select public.distribution_authorize_launch(%L,%L,%L,''preview'',''local'')','cccccccc-cccc-4ccc-8ccc-cccccccccccc','22222222-2222-4222-8222-222222222222',v),'preview_forbidden');
+ perform public.artifact_expect_code(format('select public.distribution_authorize_launch(%L,%L,%L,''preview'',''local'')','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','11111111-1111-4111-8111-111111111111',v),'version_not_found');
+ perform public.artifact_expect_code(format('select public.distribution_authorize_launch(null,%L,%L,''published'',''local'')','22222222-2222-4222-8222-222222222222',v),'version_not_found');
+ context:=jsonb_build_object('gameId','22222222-2222-4222-8222-222222222222','gameVersionId',v::text,'execution','local','locale','fr','participants','[]'::jsonb);
+ perform public.distribution_authorize_launch('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','22222222-2222-4222-8222-222222222222',v,'preview','local');
+ perform public.distribution_authorize_launch('dddddddd-dddd-4ddd-8ddd-dddddddddddd','22222222-2222-4222-8222-222222222222',v,'preview','local');
+ perform public.artifact_expect_code(format('select public.distribution_authorize_launch(%L,%L,%L,''preview'',''local'')','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','22222222-2222-4222-8222-222222222222',v),'preview_forbidden');
+ update public.game_versions set status='in_review' where id=v;
+ perform public.distribution_authorize_launch('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','22222222-2222-4222-8222-222222222222',v,'preview','local');
+ s:=public.distribution_create_launch('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','22222222-2222-4222-8222-222222222222',v,'preview','local',repeat('c',64),repeat('d',64),context,900,60,600);
+ delete from public.game_developer_members where user_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ perform public.artifact_expect_code(format('select public.distribution_check_launch(%L)',repeat('c',64)),'preview_forbidden');
+ insert into public.game_developer_members values('22222222-2222-4222-8222-222222222222','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','owner');
+ perform public.distribution_check_launch(repeat('c',64));
+ update public.game_launch_sessions set created_at=now()-interval '901 seconds',expires_at=now()-interval '1 second' where id=(s->>'id')::uuid;
+ perform public.artifact_expect_code(format('select public.distribution_check_launch(%L)',repeat('c',64)),'launch_expired');
+ if public.distribution_cleanup_launches()<>1 then raise exception 'Launch expiry cleanup failed'; end if;
+ if (select count(*) from information_schema.columns where table_schema='public' and table_name='game_launch_sessions' and column_name in ('capability','hostname','control_token'))<>0 then raise exception 'Plaintext capability storage'; end if;
+end $$;
+reset role;
