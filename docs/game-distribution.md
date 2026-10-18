@@ -795,7 +795,7 @@ Séquence :
    Une suppression de rôle/membership bloque la prochaine requête non déjà reçue.
 
 Le ticket n'apparaît donc pas dans l'URL, les referers ou les logs du gateway.
-Les outils réseau du propriétaire et un éventuel historique de formulaire peuvent
+Les outils réseau du navigateur et un éventuel historique de formulaire peuvent
 conserver le corps POST : expiration courte et consommation unique restent utiles.
 Ne jamais capturer les corps/cookies dans un outil analytics ou un proxy amont.
 
@@ -975,7 +975,7 @@ preview/published et local/online utilisant le même player. Le vieux parcours P
 reste branché jusqu'à sa migration.
 
 Important : des origines différentes sous une base ordinaire n'interdisent pas
-à un build tiers de poser un cookie Domain partagé. Pour l'isolation complète demandée,
+à un build tiers de poser un cookie Domain partagé. Pour assurer l'isolation entre jeux et lancements,
 le nouveau chemin de lancement exige une base dédiée reconnue comme suffixe PRIVATE
 dans la PSL, vérifiée aussi dans les navigateurs supportés avant activation. Aucun
 domaine n'est choisi ou configuré par cette phase ; l'exemple demeure désactivé.

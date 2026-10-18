@@ -2,16 +2,16 @@
 
 ## Production audit
 
-The user supplied a production schema snapshot on 2026-10-08: 16 columns,
+The production schema snapshot dated 2026-10-08 contains 16 columns,
 `game_url text NOT NULL` without a default; 81 published games, zero NULL,
 blank or non-HTTP(S) URLs. Existing constraints cover the primary key, unique
 slug, nonblank title/slug and nonnegative counters. Foreign keys from categories,
 favorites, reactions, reviews and history reference `games.id` with cascading
 deletes. None of those keys or rows is changed by this migration.
 
-The supplied policy allows SELECT of published games. Grants shown for anon and
+The audited policy allows SELECT of published games. Grants shown for anon and
 authenticated do not override RLS. The separate RLS enabled/forced result and
-trigger/dependency result were not supplied. The migration fails before changing
+trigger/dependency result are absent from the snapshot. The migration fails before changing
 anything if RLS is disabled or table-level catalogue read/backend write grants
 are absent (column-only grants would not cover newly added columns); confirm triggers and dependencies before production
 application. The historical `sql/tables.sql` is context, not a migration to rerun.
@@ -34,8 +34,8 @@ does not embed a second list of games or authoritative network capacities.
 ## Registry projection
 
 Run `npm run generate:game-manifest` after changing the server registry, then
-`npm run check:game-manifest`. Commit the generated JSON with the registry change
-when authorized. The root test suite checks freshness and rejects stale output.
+`npm run check:game-manifest`. Keep the generated JSON and registry change in the
+same commit. The root test suite checks freshness and rejects stale output.
 Generation uses Node's native TypeScript stripping (Node 24 recommended); it reads
 the existing pure registry module, without installing or importing Colyseus.
 Next.js imports only the JSON and application helpers, never server modules.

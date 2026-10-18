@@ -64,7 +64,7 @@ Les tests interceptent localement des hosts sous github.io (suffixe privé connu
 sans faire de requête vers GitHub ni le considérer comme domaine de déploiement.
 L'alternative sans PSL serait de renoncer à la garantie d'isolation cookies, ou de
 reconcevoir un sandbox à origine opaque avec ses contraintes de messaging/stockage.
-Cette phase ne prétend pas qu'un wildcard ordinaire suffit.
+Un wildcard ordinaire ne garantit pas cette isolation des cookies.
 
 Références : [PSL](https://publicsuffix.org/learn/index.html),
 [critères de suffixe privé](https://github.com/publicsuffix/list/wiki/Guidelines),
@@ -341,8 +341,8 @@ docs/sdk-browser-bridge-v1.md
 
 Adaptations : gateway/{contracts,gateway,resolver}.ts, uploads/repository.ts,
 cloudflare/artifact-gateway.ts et configuration d'exemple non active, package.json /
-lockfile, harness DB et docs/game-distribution.md. Les modifications de phase 3 déjà
-présentes au début sont conservées. Aucun fichier SDK/Pong ni source gameplay changé.
+lockfile, harness DB et docs/game-distribution.md. Les adaptations de distribution
+de phase 3 sont conservées. Aucun fichier SDK/Pong ni source gameplay changé.
 
 Recette réalisée : Chrome headless 155.0.8059.80, 11 scénarios navigateur réels,
 12 tests runtime/API/bridge, 8 tests distribution + 22 upload + 13 gateway : 66 tests.

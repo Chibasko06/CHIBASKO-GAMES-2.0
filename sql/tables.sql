@@ -18,7 +18,7 @@ create table public.profiles (
   -- Stocke le pseudo unique visible sur le site.
   username text unique not null,
 
-  -- Stocke le nom affiché si tu veux différencier pseudo et nom public.
+  -- Nom public facultatif, distinct du pseudo unique.
   display_name text,
 
   -- Stocke l'URL de l'avatar du joueur.
