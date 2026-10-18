@@ -1,0 +1,27 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "chibasko-game-artifact-gateway",
+  "main": "artifact-gateway.ts",
+  "compatibility_date": "2026-10-16",
+  "workers_dev": false,
+  "preview_urls": false,
+  "keep_vars": true,
+  "routes": [
+    { "pattern": "*.chibaskogames-play.fr/*", "zone_name": "chibaskogames-play.fr" }
+  ],
+  "r2_buckets": [
+    { "binding": "ARTIFACTS", "bucket_name": "chibasko-game-artifacts" }
+  ],
+  "observability": {
+    "logs": { "enabled": true, "invocation_logs": false },
+    "traces": { "enabled": false }
+  },
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    "GAME_ARTIFACT_GATEWAY_ENABLED": "1",
+    "GAME_CONTENT_PUBLIC_BASE": "chibaskogames-play.fr",
+    "GAME_CONTENT_PREVIEW_BASE": "chibaskogames-play.fr",
+    "GAME_CONTENT_BASE_DOMAIN": "chibaskogames-play.fr",
+    "GAME_PORTAL_ORIGINS": "https://chibaskogames.fr,https://www.chibaskogames.fr"
+  }
+}

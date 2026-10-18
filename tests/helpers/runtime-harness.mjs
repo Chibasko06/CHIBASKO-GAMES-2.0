@@ -8,7 +8,7 @@ import {UploadError} from '../../lib/game-distribution/uploads/policy.ts'
 export const runtimeConfig={publicBase:'github.io',previewBase:'github.io',contentBase:'github.io',portalOrigins:['https://portal.test']}
 // github.io is a real PSL boundary used ONLY by intercepted browser fixtures.
 // No request goes to GitHub; every browser request is fulfilled locally by tests.
-export async function runtimeHarness(kind='solo',audience='published',behavior='normal') {
+export async function runtimeHarness(kind='solo',audience='published',behavior='normal',configuration=runtimeConfig) {
   const root=new URL('../fixtures/runtime-builds/'+kind+'/',import.meta.url),manifest=JSON.parse(await readFile(new URL('chibasko.json',root),'utf8'))
   const versionId=randomUUID(),files=new Map()
   files.set('chibasko.json',new TextEncoder().encode(JSON.stringify(manifest)))
@@ -70,9 +70,9 @@ export async function runtimeHarness(kind='solo',audience='published',behavior='
     participants:[{participantId:'p_'+randomUUID().replaceAll('-',''),username:'Player A'},{participantId:'p_'+randomUUID().replaceAll('-',''),username:'Player B'}],
     // Assigned below after participants exist; never a transport ID or Auth UUID.
   })
-  const service=launchService(db,runtimeConfig,async(actor,request)=>{const c=await online(actor,request);return {...c,session:{sessionId:'s_'+randomUUID().replaceAll('-',''),localParticipantIds:[c.participants[0].participantId]}}})
+  const service=launchService(db,configuration,async(actor,request)=>{const c=await online(actor,request);return {...c,session:{sessionId:'s_'+randomUUID().replaceAll('-',''),localParticipantIds:[c.participants[0].participantId]}}})
   const request={gameId:manifest.gameId,gameVersionId:versionId,execution:kind==='online'?'online':'local',audience,locale:'fr',...(kind==='online'?{onlineSessionReference:'prepared-session-reference'}:{})}
   const client={create:(req)=>service.create(req.audience==='preview'||req.execution==='online'?'owner':null,req),renew:h=>service.renew(h.descriptor.launchId,h.controlToken),release:h=>service.release(h.descriptor.launchId,h.controlToken)}
-  const gateway=createArtifactGateway(runtimeConfig,{db,storage,log:event=>logs.push(event)})
+  const gateway=createArtifactGateway(configuration,{db,storage,log:event=>logs.push(event)})
   return {row,request,service,client,db,files,sessions,members,logs,calls,released,gateway,clock}
 }

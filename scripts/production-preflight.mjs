@@ -42,8 +42,8 @@ export function environmentChecks(component, env) {
   }
   if (shared.every(name => environments[component].includes(name))) {
     const base = env.GAME_CONTENT_BASE_DOMAIN ?? ''
-    const suffix = parse('l-' + 'a'.repeat(48) + '.' + base, { allowPrivateDomains: true })
-    add('content_private_psl_boundary', base.length <= 202 && suffix.isPrivate && suffix.publicSuffix === base)
+    const suffix = parse(base, { allowPrivateDomains: true })
+    add('content_registrable_boundary', base.length <= 202 && (suffix.domain === base || (suffix.isPrivate && suffix.publicSuffix === base)))
     let origins = []
     try {
       origins = (env.GAME_PORTAL_ORIGINS ?? '').split(',').map(value => new URL(value.trim()))

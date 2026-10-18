@@ -7,7 +7,7 @@ type Environment={GAME_ARTIFACT_GATEWAY_ENABLED?:string;ARTIFACTS:ArtifactBucket
 const worker={
   async fetch(request:Request,env:Environment) {
     try {
-      if(env.GAME_ARTIFACT_GATEWAY_ENABLED!=='1')throw new Error()
+      if(env.GAME_ARTIFACT_GATEWAY_ENABLED!=='1' || !env.GAME_CONTENT_BASE_DOMAIN)throw new Error()
       return await createArtifactGateway({publicBase:env.GAME_CONTENT_PUBLIC_BASE,previewBase:env.GAME_CONTENT_PREVIEW_BASE,contentBase:env.GAME_CONTENT_BASE_DOMAIN,
         portalOrigins:env.GAME_PORTAL_ORIGINS.split(',').map(s=>s.trim())},
       {db:uploadRepository(env.SUPABASE_URL,env.SUPABASE_SERVICE_ROLE_KEY),storage:artifactReader(env.ARTIFACTS),log:event=>console.log(JSON.stringify(event))})(request)

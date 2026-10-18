@@ -15,6 +15,8 @@ type Dependencies={db:UploadRepository;storage:ArtifactReader;log?:(event:Gatewa
 function hostIdentity(host:string,config:GatewayConfiguration) {
   const launch=new RegExp('^l-([a-f0-9]{48})\\.'+(config.contentBase ?? '').replaceAll('.','\\.')+'$').exec(host)
   if(config.contentBase && launch)return {kind:'launch' as const,id:launch[1]}
+  // Launch delivery has no cookie-based preview or public version-host fallback.
+  if(config.contentBase)throw new GatewayError('version_not_found',404)
   for(const kind of ['public','preview'] as const) {
     const base=kind==='public'?config.publicBase:config.previewBase,prefix=kind==='public'?'v-':'p-'
     if(!host.endsWith('.'+base))continue
@@ -119,6 +121,12 @@ export function createArtifactGateway(configuration:GatewayConfiguration,deps:De
     }
     return finish(response)
     function finish(result:Response) {
+      if(config.contentBase) {
+        result.headers.delete('Set-Cookie')
+        result.headers.set('Cache-Control','private, no-store')
+        result.headers.set('CDN-Cache-Control','no-store')
+        result.headers.set('Cloudflare-CDN-Cache-Control','no-store')
+      }
       if(request.method==='HEAD' && result.body) {void result.body.cancel();result=new Response(null,{status:result.status,headers:result.headers})}
       result.headers.set('X-Request-Id',requestId)
       // An arbitrary requested path can itself contain a capability; only its digest is logged.

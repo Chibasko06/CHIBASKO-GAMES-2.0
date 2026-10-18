@@ -15,14 +15,16 @@ test('missing environment fails without printing secret values', () => {
   assert.equal(JSON.stringify(checks).includes('fixture-not-a-credential'), false)
   assert.throws(() => environmentChecks('unknown', {}), /unknown_component/)
 })
-test('a PRIVATE suffix is required and portal/content sites must be separate', () => {
+test('registrable content sites work without PRIVATE PSL and remain separate from the portal', () => {
   const env = Object.fromEntries(environments.gateway.map(name => [name, 'fixture']))
   Object.assign(env, { SUPABASE_URL: 'https://database.example', GAME_CONTENT_BASE_DOMAIN: 'github.io',
     GAME_CONTENT_PUBLIC_BASE: 'github.io', GAME_CONTENT_PREVIEW_BASE: 'github.io', GAME_PORTAL_ORIGINS: 'https://portal.example', GAME_ARTIFACT_GATEWAY_ENABLED: '0' })
   // Known PSL entry used only as parser input. No request or deployment to this domain.
   assert.equal(environmentChecks('gateway', env).every(check => check.ok), true)
-  env.GAME_CONTENT_BASE_DOMAIN = 'content.example'
-  assert.equal(environmentChecks('gateway', env).find(check => check.check === 'content_private_psl_boundary').ok, false)
+  env.GAME_CONTENT_BASE_DOMAIN = 'chibaskogames-play.fr'
+  assert.equal(environmentChecks('gateway', env).every(check => check.ok), true)
+  env.GAME_CONTENT_BASE_DOMAIN = 'sub.chibaskogames-play.fr'
+  assert.equal(environmentChecks('gateway', env).find(check => check.check === 'content_registrable_boundary').ok, false)
   env.GAME_CONTENT_BASE_DOMAIN = 'github.io'
   env.GAME_PORTAL_ORIGINS = 'https://other.github.io'
   assert.equal(environmentChecks('gateway', env).find(check => check.check === 'GAME_CONTENT_BASE_DOMAIN:separate_site').ok, false)

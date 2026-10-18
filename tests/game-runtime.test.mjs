@@ -9,6 +9,39 @@ import {createGameBridge} from '../lib/game-runtime/bridge.ts'
 import {mountGameRuntime,validateLaunchHandle,IFRAME_SANDBOX} from '../lib/game-runtime/controller.ts'
 import {safeContext,validGameMessage} from '../lib/game-runtime/contracts.ts'
 
+test('non-PSL launch delivery ignores cookies, rejects other hosts and never caches authorization',async()=>{
+  const base='chibaskogames-play.fr',configuration={publicBase:base,previewBase:base,contentBase:base,portalOrigins:['https://chibaskogames.fr']}
+  const h=await runtimeHarness('solo','preview','normal',configuration)
+  const a=await h.client.create(h.request),b=await h.client.create(h.request)
+  const cookie='__Host-cg-preview=forged; shared_auth=fixture; session=fixture'
+  for(const headers of [{},{Cookie:cookie}]) {
+    const response=await h.gateway(new Request(a.descriptor.entrypointUrl,{headers}))
+    assert.equal(response.status,200)
+    assert.equal(response.headers.get('set-cookie'),null)
+    assert.equal(response.headers.get('cache-control'),'private, no-store')
+    assert.equal(response.headers.get('cloudflare-cdn-cache-control'),'no-store')
+    assert.equal(response.headers.get('origin-agent-cluster'),'?1')
+    assert.equal(response.headers.get('cross-origin-resource-policy'),'same-origin')
+    assert.match(response.headers.get('content-security-policy'),/sandbox allow-scripts allow-same-origin allow-pointer-lock/)
+    await response.body.cancel()
+  }
+  for(const host of [base,'v-'+'a'.repeat(32)+'.'+base,'p-'+'a'.repeat(32)+'.'+base,'l-'+'a'.repeat(47)+'.'+base,'l-'+'a'.repeat(48)+'.evil.'+base]) {
+    const response=await h.gateway(new Request('https://'+host+'/_preview/exchange',{method:'POST',headers:{Cookie:cookie}}))
+    assert.equal(response.status,404);assert.equal(response.headers.get('set-cookie'),null)
+  }
+  for(const path of ['artifact.zip','inventory.json','staging/source.zip']) {
+    const response=await h.gateway(new Request(a.descriptor.contentOrigin+'/'+path,{headers:{Cookie:cookie}}))
+    assert.notEqual(response.status,200);assert.equal(response.headers.get('set-cookie'),null)
+  }
+  assert.equal((await h.gateway(new Request(a.descriptor.contentOrigin+'/sw.js',{headers:{'Service-Worker':'script'}}))).status,403)
+  await h.client.release(a)
+  assert.equal((await h.gateway(new Request(a.descriptor.entrypointUrl,{headers:{Cookie:cookie}}))).status,403)
+  const response=await h.gateway(new Request(b.descriptor.entrypointUrl,{headers:{Cookie:cookie}}))
+  assert.equal(response.status,200);await response.body.cancel()
+  assert.ok(!h.calls.some(call=>JSON.stringify(call).includes(cookie)))
+  assert.doesNotMatch(JSON.stringify(a.descriptor.context),/service_role|email|supabase|storage_prefix|jwt/i)
+})
+
 for(const kind of ['pong-like','solo','online'])for(const audience of ['published','preview'])test(kind+' / '+audience+' uses cookie-free isolated immutable artifacts and safe descriptors',async()=>{
   const h=await runtimeHarness(kind,audience),a=await h.client.create(h.request),b=await h.client.create(h.request)
   assert.notEqual(a.descriptor.contentOrigin,b.descriptor.contentOrigin)
@@ -21,7 +54,7 @@ for(const kind of ['pong-like','solo','online'])for(const audience of ['publishe
   await h.client.release(a);assert.equal((await h.gateway(new Request(a.descriptor.entrypointUrl))).status,403)
   assert.doesNotMatch(JSON.stringify(h.logs),new RegExp(new URL(a.descriptor.contentOrigin).hostname+'|'+a.controlToken))
 })
-test('authorization, IDOR, expiry, permission revocation, no caller-injected online identity and PSL fail-closed',async()=>{
+test('authorization, IDOR, expiry, permission revocation, no caller-injected online identity and separate content site',async()=>{
   const h=await runtimeHarness('solo','preview')
   await assert.rejects(h.service.create(null,h.request),/unauthorized/)
   await assert.rejects(h.service.create('stranger',h.request),/preview_forbidden/)
@@ -33,7 +66,8 @@ test('authorization, IDOR, expiry, permission revocation, no caller-injected onl
   const online=await runtimeHarness('online')
   await assert.rejects(launchService(online.db,runtimeConfig).create('owner',online.request),/online_session_required/)
   await assert.rejects(launchService(online.db,runtimeConfig,async()=>({gameId:'wrong',email:'private'})).create('owner',online.request),/invalid_launch_context/)
-  assert.throws(()=>validateLaunchConfiguration({...runtimeConfig,contentBase:'games-content.example'}),/content_cookie_boundary_required/)
+  assert.doesNotThrow(()=>validateLaunchConfiguration({...runtimeConfig,contentBase:'games-content.example'}))
+  assert.throws(()=>validateLaunchConfiguration({...runtimeConfig,contentBase:'portal.test'}),/invalid_gateway_configuration/)
   assert.equal(safeContext({gameId:h.request.gameId,gameVersionId:h.request.gameVersionId,execution:'local',locale:'fr',participants:[],email:'private'}),false)
 })
 test('launch API accepts anonymous published local, refuses injected fields/foreign origin and revokes with portal control only',async()=>{

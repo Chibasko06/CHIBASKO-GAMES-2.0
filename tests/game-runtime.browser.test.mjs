@@ -14,6 +14,34 @@ before(async()=>{
   console.log('Real browser:',browser.version(),'; third-party-cookie blocking flag enabled; all HTTPS routes intercepted locally.')
 })
 after(async()=>{await browser?.close()})
+test('non-PSL sibling cookies cannot authorize a revoked launch; origins retain separate storage',async()=>{
+  const base='chibaskogames-play.fr',h=await runtimeHarness('solo','preview','normal',{
+    publicBase:base,previewBase:base,contentBase:base,portalOrigins:['https://portal.test']})
+  const a=await h.client.create(h.request),b=await h.client.create(h.request)
+  const context=await browser.newContext(),cookies=[]
+  try {
+    await context.route('**/*',async route=>{
+      const request=route.request(),headers=await request.allHeaders()
+      cookies.push(headers.cookie ?? '')
+      const response=await h.gateway(new Request(request.url(),{method:request.method(),headers}))
+      assert.equal(response.headers.get('set-cookie'),null)
+      await route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())})
+    })
+    const page=await context.newPage()
+    await page.goto(a.descriptor.entrypointUrl)
+    await page.evaluate(()=>{
+      document.cookie='shared_fixture=yes; Domain=chibaskogames-play.fr; Path=/; Secure; SameSite=Lax'
+      localStorage.setItem('private_launch','A')
+    })
+    await page.goto(b.descriptor.entrypointUrl)
+    assert.match(await page.evaluate(()=>document.cookie),/shared_fixture=yes/)
+    assert.equal(await page.evaluate(()=>localStorage.getItem('private_launch')),null)
+    await h.client.release(a)
+    const response=await page.goto(a.descriptor.entrypointUrl)
+    assert.equal(response.status(),403)
+    assert.ok(cookies.some(cookie=>cookie.includes('shared_fixture=yes')))
+  }finally{await context.close()}
+})
 async function setup(kind='solo',audience='published',behavior='normal',viewport={width:1366,height:768},clock=false) {
   const h=await runtimeHarness(kind,audience,behavior),context=await browser.newContext({viewport,serviceWorkers:'block'}),requests=[]
   await context.addCookies([{name:'portal-auth-fixture',value:'not-a-real-session',domain:'portal.test',path:'/',secure:true,sameSite:'None'}])

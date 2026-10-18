@@ -22,7 +22,7 @@ Les références des composants restent [game-distribution.md](game-distribution
 - schéma distant et registre des migrations rapprochés des fichiers versionnés ;
   sauvegarde restaurée avec succès dans une base distincte ;
 - UUID officiel du catalogue identifié sans ambiguïté ;
-- domaine de contenu choisi, exclusivement dédié, frontière PRIVATE PSL acceptée,
+- domaine de contenu enregistrable distinct choisi, exclusivement dédié,
   intégrée à `tldts` et présente dans les navigateurs supportés ;
 - recette Linux/Docker, vraie API R2 multipart et vraie Queue pull validées en staging ;
 - rapport de sécurité npm réévalué et exposition des alertes high levée ou
@@ -266,6 +266,11 @@ Ne pas annoncer des builds de plusieurs GiB validés sur la seule base des fixtu
 
 ## 7. Gateway, domaine et PSL
 
+La préparation du Worker existant `chibasko-game-artifact-gateway` pour le domaine
+`chibaskogames-play.fr` est décrite dans [Artifact Gateway production](artifact-gateway-production.md).
+Sa configuration dédiée utilise une autorisation par hostname sans cookie et porte
+le flag d'activation à `1`, sans déploiement effectué. PRIVATE PSL est désormais facultative.
+
 Worker dédié `cloudflare/artifact-gateway.ts`, binding R2 **`ARTIFACTS`** vers le
 bucket final, RPC Supabase via `SUPABASE_URL` et secret service_role. Configuration :
 `GAME_CONTENT_PUBLIC_BASE`, `GAME_CONTENT_PREVIEW_BASE`, `GAME_CONTENT_BASE_DOMAIN`,
@@ -279,33 +284,17 @@ routage, **pas une variable lue par le code**. Les bases public/preview peuvent
 coïncider avec la base de lancement pour un seul wildcard ; pas de sous-niveaux
 non couverts par le certificat wildcard. Aucun domaine acheté n'est supposé.
 
-La base doit être un suffixe **PRIVATE PSL**, afin que chaque lancement soit un site
-distinct et ne puisse poser un cookie parent partagé. Procédure future : vérifier
-possession/usage du domaine, préparer les preuves demandées et déposer une demande
-suivant les [règles PSL](https://publicsuffix.org/submit/), attendre décision,
-intégration upstream, mise à jour lockée de `tldts`, puis propagation réelle dans
-les navigateurs supportés. L'acceptation n'est pas garantie, notamment pour un
-service expérimental. Définir une matrice de versions navigateur supportées et
-prouver par un test cookie Domain que la frontière est appliquée ; la PSL serveur
-ne change pas celle du navigateur.
+La PRIVATE PSL est un durcissement facultatif. La production utilise un domaine
+enregistrable distinct du portail et une capability aléatoire par hostname de launch.
+Les cookies parent-domain peuvent être partagés entre jeux, mais n'autorisent aucun
+accès : le Worker les ignore, ne crée aucun cookie et ne sert que les hosts l-.
+Les previews passent par les launches autorisées. Les réponses sont no-store,
+la sandbox et les protections par origine restent obligatoires. Les limites exactes
+de cette isolation sont décrites dans la procédure dédiée.
 
-Staging exige lui aussi une base qui satisfait ce contrôle. Avec une entrée PSL
-exacte pour la base production, ajouter simplement `staging.` devant cette base
-**ne suffit pas** : le suffixe reconnu ne correspondrait plus à la configuration.
-Prévoir deux bases reconnues séparément, ou une entrée PRIVATE wildcard couvrant
-les bases d'environnement, seulement si elle est acceptée et effectivement reconnue.
-Chaque environnement garde son propre wildcard DNS/TLS/routage vers sa DB/bucket.
-Ne pas utiliser la même base l- avec deux gateways/DB sans mécanisme de routage
-prévu, et ne pas partager la production pour simuler un staging. Tant que la
-frontière staging manque, seule la recette locale/DB/storage est possible ; la
-recette staging complète reste bloquée.
-
-**Avant cette acceptation :** build, DB, stockage, validation statique et tests locaux
-restent possibles ; les lancements runtime de production restent bloqués
-`content_cookie_boundary_required`. Ni un wildcard DNS/TLS seul ni un flag manuel
-ne satisfait cette garantie. Ne pas utiliser un domaine tiers de fixture comme
-infrastructure. Si PSL refuse, une révision d'architecture est nécessaire avant
-activation, pas un contournement dans la configuration.
+Staging conserve un domaine enregistrable distinct, sa propre DB, ses buckets et
+son wildcard DNS/TLS/routage. Ne pas partager une base de launch entre gateways/DB
+sans routage prévu. Aucun domaine tiers de fixture ne sert d'infrastructure réelle.
 
 Format : `https://l-<48 hex aléatoires>.<GAME_CONTENT_BASE_DOMAIN>/<entrypoint>`.
 192 bits de capability, hash SHA-256 en DB, aucun identifiant humain/game/Auth.
@@ -351,7 +340,7 @@ réutilise ni credentials, ni bucket, ni Queue, ni base de production.
 | `GAME_ARTIFACT_PREVIEWS_ENABLED` | Portail, flag | Preview top-level cookie uniquement ; facultatif, ne remplace pas runtime preview |
 | `GAME_RUNTIME_LAUNCHES_ENABLED` | Portail, flag | Lanceur et exchange online ; `1` après gateway/domaine/DB/API prêtes |
 | `GAME_ARTIFACT_GATEWAY_ENABLED` | Gateway, flag | `0` avant ressources et domaine ; `1` avant les premiers launches |
-| `GAME_CONTENT_BASE_DOMAIN` | Portail/gateway, public | Base PRIVATE PSL validée ; S/P runtime requis |
+| `GAME_CONTENT_BASE_DOMAIN` | Portail/gateway, public | Domaine enregistrable distinct du portail ; PRIVATE PSL facultative ; S/P runtime requis |
 | `GAME_CONTENT_PUBLIC_BASE` | Portail/gateway, public | Base des hosts v- ; S/P requis |
 | `GAME_CONTENT_PREVIEW_BASE` | Portail/gateway, public | Base des hosts p- ; S/P requis |
 | `GAME_PORTAL_ORIGINS` | Portail/gateway, public | Liste d'origines HTTPS exactes, séparées par virgules ; S/P requis |
@@ -598,7 +587,7 @@ via une ancienne route ni un script qui écrit directement une game_version.
 
 1. Nouvelle cible parallèle, bonnes env et bindings, catalogue Pong masqué sur la
    base cible ; tous flags nouveaux à `0`. Les assets/auth existants restent fonctionnels.
-2. Gateway prêt et domaine/PSL/TLS validés → flag gateway `1`.
+2. Gateway prêt, domaine/TLS et autorisation sans cookie validés → flag gateway `1`.
 3. DB + R2 + outbox + Queue + validateur + CORS prêts → uploads `1`.
 4. API d'exchange/roster/lifecycle joignable, origin checks validés et gateway prêt →
    launches `1`, uniquement trafic de recette. Cette variable protège aussi l'exchange

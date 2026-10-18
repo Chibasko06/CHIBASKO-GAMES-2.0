@@ -13,10 +13,9 @@ export type OnlineLaunchAuthorizer=(actor:string,request:LaunchRequest)=>Promise
 function randomHex(bytes:number){return [...crypto.getRandomValues(new Uint8Array(bytes))].map(b=>b.toString(16).padStart(2,'0')).join('')}
 export async function launchHash(value:string){return sha256(new TextEncoder().encode(value))}
 export function validateLaunchConfiguration(config:Configuration) {
-  // The base itself is a PRIVATE public suffix: registrable sites start at l-... .
-  // A plain dedicated registrable domain would still allow sibling Domain cookies.
-  const suffix=parse('l-'+ 'a'.repeat(48)+'.'+config.contentBase,{allowPrivateDomains:true})
-  if(suffix.publicSuffix!==config.contentBase || !suffix.isPrivate)throw new GatewayError('content_cookie_boundary_required',503)
+  // Launch authorization uses a random host capability, never same-site cookies.
+  const suffix=parse(config.contentBase,{allowPrivateDomains:true})
+  if(suffix.domain!==config.contentBase && !(suffix.isPrivate && suffix.publicSuffix===config.contentBase))throw new GatewayError('invalid_gateway_configuration',503)
   validateGatewayConfiguration({...config,publicBase:'l-'+ 'a'.repeat(48)+'.'+config.contentBase,previewBase:'l-'+ 'a'.repeat(48)+'.'+config.contentBase})
   // l- + 48 hex characters + base must fit a DNS hostname (253 characters).
   if(config.contentBase.length>202)throw new GatewayError('invalid_gateway_configuration',503)

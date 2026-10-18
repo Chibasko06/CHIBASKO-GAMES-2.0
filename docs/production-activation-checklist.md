@@ -49,7 +49,7 @@ ticket, cookie, credential, JWT, URL signée ou capture réseau brute.
 12. [ ] **Préparer le domaine et gateway** : domaine exclusivement contenu, PSL effective,
     wildcard DNS/TLS/route, binding `ARTIFACTS`, DB et portal origins, aucun logging de
     hostname capability. Tester TLS wildcard réel, MIME, HEAD/Range, staging/archive
-    interdits, preview privée et service worker refusé. Gateway flag reste 0 avant recette.
+    interdits, preview privée et service worker refusé. Le flag Gateway production est préparé à 1, sans déploiement effectué.
 13. [ ] **Préparer le portail parallèle** depuis la release finale, sans trafic joueur,
     config/bindings/secrets propres à son origine ; catalogue Pong masqué, flags à 0.
     Ne pas déployer le fichier Wrangler canonique sur une cible dite preview par erreur.
