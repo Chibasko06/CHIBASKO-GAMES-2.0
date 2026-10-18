@@ -1,5 +1,4 @@
 import type { TablesInsert } from '@/types/database'
-import { getMultiplayerDefinition } from '@/lib/multiplayer/catalogue'
 
 export class CatalogueValidationError extends Error {}
 const allowed = new Set(['title', 'slug', 'game_url', 'multiplayer_game_id', 'game_type', 'is_beta',
@@ -32,7 +31,7 @@ export function validateGameCatalogue(input: unknown) {
   } else {
     if (gameUrl !== null) fail('Un jeu multijoueur Chibasko Games ne doit pas avoir d’URL classique.')
     if (!multiplayerId) fail('Choisis un jeu multijoueur Chibasko Games.')
-    if (!getMultiplayerDefinition(multiplayerId)) fail('Ce Game ID n’est pas disponible.')
+    if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(multiplayerId)) fail('Identifiant catalogue invalide.')
   }
   if (body.is_published !== undefined && typeof body.is_published !== 'boolean') fail('Publication invalide.')
   if (body.is_beta !== undefined && typeof body.is_beta !== 'boolean') fail('Bêta invalide.')

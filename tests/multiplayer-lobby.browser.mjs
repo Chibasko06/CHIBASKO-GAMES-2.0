@@ -9,7 +9,7 @@ export async function runLobbyBrowser({A,B,actors,game,query}) {
   build.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}))
   build.onResolve({filter:/^next\/navigation$/},()=>({path:'navigation',namespace:'fixture'}))
   build.onResolve({filter:/^@\/components\/game-runtime\/GameRuntime$/},()=>({path:'runtime',namespace:'fixture'}))
-  build.onResolve({filter:/^\.\/MultiplayerEntry$/},()=>({path:'entry',namespace:'fixture'}))
+  build.onResolve({filter:/^\.\/MultiplayerAccess$/},()=>({path:'entry',namespace:'fixture'}))
   build.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'js',contents:args.path==='auth'?`export function useAuth(){const actor=sessionStorage.getItem('fixtureActor');return {session:{user:{id:actor},access_token:actor},loading:false}}`:
    args.path==='navigation'?`export function useRouter(){return {push(path){location.href=path}}}`:
    args.path==='runtime'?`import React from 'react';export default function Runtime(p){return React.createElement('p',{'data-testid':'runtime'},p.onlineSessionReference)}`:

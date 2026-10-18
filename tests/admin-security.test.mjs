@@ -78,14 +78,14 @@ test('admin status distinguishes missing session, revoked role and backend failu
   assert.equal(failed.status,503);assert.deepEqual(await failed.json(),{isAdmin:false})
 })
 
-test('admin creates, edits and publishes through real guard; unknown fields/IDs and SQL errors stay private',async t=>{
+test('admin creates, edits and publishes through real guard; unsafe identifiers, unknown fields and SQL errors stay private',async t=>{
   const{POST}=await import('../app/api/admin/games/route.ts'),{PATCH}=await import('../app/api/admin/games/[id]/route.ts')
   assert.equal((await POST(request('admin','POST'))).status,200)
   const multi={title:'Fixture',slug:'fixture',game_type:'multiplayer_chibasko',game_url:null,multiplayer_game_id:'chibasko-pong',is_published:true,is_beta:true}
   const req=body=>new NextRequest('https://site.example/api/admin/games/fixture',{method:'PATCH',headers:{Authorization:'Bearer '+token('admin'),'Content-Type':'application/json'},body:JSON.stringify(body)})
   assert.equal((await PATCH(req(multi),{params:Promise.resolve({id:'fixture'})})).status,200)
   const before=calls.length
-  for(const change of [{multiplayer_game_id:'evil-game'},{roomType:'evil'},{game_url:'https://evil.example'}])assert.equal((await PATCH(req({...multi,...change}),{params:Promise.resolve({id:'fixture'})})).status,400)
+  for(const change of [{multiplayer_game_id:'../engine'},{roomType:'evil'},{game_url:'https://evil.example'}])assert.equal((await PATCH(req({...multi,...change}),{params:Promise.resolve({id:'fixture'})})).status,400)
   assert.equal(calls.length,before)
   t.mock.method(privileged,'from',()=>({insert(){return this},select(){return this},async single(){return {data:null,error:{code:'XX000',message:'private SQL detail'}}}}))
   const failed=await POST(request('admin','POST'))

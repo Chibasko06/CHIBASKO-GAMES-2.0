@@ -5,7 +5,6 @@ import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import ClientEnhancements from '@/components/ClientEnhancements'
 import Footer from '@/components/Footer'
-import { MultiplayerProvider } from '@/components/multiplayer/MultiplayerProvider'
 import { siteConfig } from '@/lib/seo'
 
 
@@ -118,14 +117,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         <AuthProvider>
-          <MultiplayerProvider>
             <ClientEnhancements />
             <Navbar />
             <main className="mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">
               {children}
             </main>
             <Footer />
-          </MultiplayerProvider>
         </AuthProvider>
       </body>
     </html>

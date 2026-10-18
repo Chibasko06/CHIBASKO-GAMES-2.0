@@ -1,9 +1,10 @@
+import type { GameCapabilities } from '@chibaskogames/sdk'
 import type { GameType } from '@/lib/multiplayer/catalogue'
 export { isClassicGame, isChibaskoMultiplayerGame } from '@/lib/multiplayer/catalogue'
 import { Tables } from '@/types/database'
 import { supabase } from '../supabaseClient'
 
-export type Game = Tables<'games'>
+export type Game = Tables<'games'> & {runtime_capabilities?: GameCapabilities}
 export type Category = Tables<'categories'>
 
 type GameCategoryRow = {
@@ -111,8 +112,11 @@ export async function getGamesCatalog(type?: GameType) {
     categoriesByGameId.set(link.game_id, current)
   }
 
+  const { data: runtimes } = await supabase.rpc('get_published_game_runtimes' as never)
+  const byGame=new Map(((runtimes??[]) as {game_id:string;version_id:string;capabilities:GameCapabilities}[]).map(row=>[row.game_id,row]))
   const catalog = (games ?? []).map((game) => ({
     ...withFallbackThumbnail(game),
+    runtime_capabilities: byGame.get(game.id)?.version_id===game.active_version_id ? byGame.get(game.id)?.capabilities : undefined,
     categories: categoriesByGameId.get(game.id) ?? [],
   }))
 

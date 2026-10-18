@@ -1,12 +1,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { GameBadges, type GameBadgeData } from './GameBadges'
-import { getMultiplayerDefinition } from '@/lib/multiplayer/catalogue'
 import { gameLaunchOptions } from '@/lib/multiplayer/gameLaunchOptions'
 
 export default function MultiplayerGamePanel({ game }: { game: GameBadgeData & { title: string; slug: string; thumbnail_url: string | null } }) {
-  const definition = game.multiplayer_game_id ? getMultiplayerDefinition(game.multiplayer_game_id) : undefined
-  const options = gameLaunchOptions(definition?.capabilities)
+  const options = gameLaunchOptions(game.runtime_capabilities)
   return <section aria-label="Modes de jeu" className="overflow-hidden rounded-[24px] border border-cyan-900/50 bg-zinc-950">
     <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {game.thumbnail_url && <div className="relative min-h-52 md:min-h-80"><Image src={game.thumbnail_url} alt={game.title} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" /></div>}

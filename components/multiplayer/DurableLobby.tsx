@@ -6,7 +6,7 @@ import GameRuntime from '@/components/game-runtime/GameRuntime'
 import { httpLaunchClient } from '@/lib/game-runtime/client'
 import { lobbyClient } from '@/lib/multiplayer-lobby/client'
 import { LOBBY_UI_POLICY, type DirectoryLobby, type LobbySnapshot, type LobbyAccess } from '@/lib/multiplayer-lobby/contracts'
-import { multiplayerButton, AuthInvitation } from './MultiplayerEntry'
+import { multiplayerButton, AuthInvitation } from './MultiplayerAccess'
 
 type Props={gameId:string;slug:string;access:LobbyAccess;lobbyId?:string}
 export default function DurableLobby(props:Props) {

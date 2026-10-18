@@ -48,7 +48,7 @@ registerHooks({
       'product:supabase': `export const supabase = {
         auth:{signOut:async()=>{},getSession:async()=>globalThis.__productGetSession ? globalThis.__productGetSession() : ({data:{session:globalThis.__productSession ?? null}}),onAuthStateChange:cb=>globalThis.__productSubscribe ? globalThis.__productSubscribe(cb) : ({data:{subscription:{unsubscribe(){}}}}),signInWithPassword:async()=>({data:{session:{user:{id:'A'}}},error:null}),signUp:async input=>{globalThis.__productSignUp=input;return {data:{session:globalThis.__productSession ?? null},error:null}},signInWithOAuth:async input=>{globalThis.__productOAuth=input;return {error:null}}},
         from(table) { const filters=[]; const chain={select(){return chain},eq(key,value){filters.push([key,value]);return chain},order(){return chain},abortSignal(){return chain},maybeSingle:async()=>({data:null}),then(resolve){const data=table==='games' ? (globalThis.__productRows ?? []).filter(row=>filters.every(([key,value])=>row[key]===value)) : [];return Promise.resolve({data,error:null}).then(resolve)}};return chain },
-        rpc:async()=>({data:[],error:null})
+        rpc:async name=>({data:name==='get_published_game_runtimes'?(globalThis.__productRuntimes??[]):[],error:null})
       }; export async function restoreBrowserSession(){return globalThis.__productRestore ? globalThis.__productRestore() : (await supabase.auth.getSession()).data.session}`,
     }
     if (url === 'server-only') return { format:'module', source:'', shortCircuit:true }

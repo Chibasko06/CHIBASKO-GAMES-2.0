@@ -1,5 +1,10 @@
 # Online sessions
 
+> État après PONG-MIGRATION-1 : le portail ne contient plus de package jeu,
+> player source ni serveur gameplay. Les sections de bilan des phases antérieures
+> décrivent leur état historique. Le parcours courant et les prérequis production
+> sont documentés dans [pong-migration.md](pong-migration.md).
+
 Le control plane gère l'identité, le lobby, la sélection du deployment et la
 composition de session. Le data plane relie directement le jeu à son serveur.
 Le même contrat s'applique aux jeux officiels, tiers, self-hosted et Chibasko-hosted.

@@ -1,21 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { validateGameCatalogue } from '../lib/server/gameCatalogueValidation.ts'
-import { changeGameFormType, gameFormPayload, getMultiplayerDefinition, multiplayerCapacityLabel, isClassicGame, isChibaskoMultiplayerGame } from '../lib/multiplayer/catalogue.ts'
-import { checkManifest, generateManifest, assertManifestCurrent } from '../scripts/generate-game-manifest.mjs'
+import { changeGameFormType, gameFormPayload, multiplayerCapacityLabel, isClassicGame, isChibaskoMultiplayerGame } from '../lib/multiplayer/catalogue.ts'
 import { POST } from '../app/api/admin/games/route.ts'
 import { PATCH } from '../app/api/admin/games/[id]/route.ts'
 
 const classic = { title: 'Test', slug: 'test', game_url: 'https://example.com/game', category_ids: [] }
 const multi = { ...classic, game_type: 'multiplayer_chibasko', game_url: null, multiplayer_game_id: 'chibasko-pong', is_beta: true }
-test('manifest matches registry, exposes public capabilities and detects stale content', async () => {
-  await checkManifest()
-  const definition = { minPlayers: 2, maxPlayers: 2, capabilities: { online: { access: ['public', 'private'], players: { min: 2, max: 2 } }, local: { players: { min: 2, max: 2 } } } }; assert.deepEqual(JSON.parse(generateManifest()), { 'chibasko-pong': definition })
-  assert.throws(() => assertManifestCurrent(generateManifest(new Map())), /stale/)
-  assert.deepEqual(getMultiplayerDefinition('chibasko-pong'), definition)
-  assert.equal(getMultiplayerDefinition('toString'), undefined)
-  assert.equal(multiplayerCapacityLabel('chibasko-pong'), '2 joueurs')
-})
+test('capacity labels consume version capabilities, without a source registry',()=>{assert.equal(multiplayerCapacityLabel({online:{access:['public'],players:{min:4,max:128}}}),'4–128 joueurs');assert.equal(multiplayerCapacityLabel(undefined),'Indisponible')})
+
 test('classic defaults and URL validation; multiplayer identity is conditional', () => {
   const { payload } = validateGameCatalogue(classic)
   assert.equal(payload.game_type, 'classic')
@@ -27,13 +20,13 @@ test('classic defaults and URL validation; multiplayer identity is conditional',
   }
   assert.throws(() => validateGameCatalogue({ ...classic, multiplayer_game_id: 'chibasko-pong' }))
 })
-test('known multiplayer accepted, unpublished by default; beta retained; invalid inputs refused', () => {
+test('catalogue identifier accepted independently of source, unpublished by default; beta retained; invalid inputs refused', () => {
   const { payload } = validateGameCatalogue(multi)
   assert.ok(isChibaskoMultiplayerGame(payload))
   assert.equal(payload.is_published, false)
   assert.equal(payload.is_beta, true)
   for (const changes of [
-    { multiplayer_game_id: null }, { multiplayer_game_id: '' }, { multiplayer_game_id: 'unknown' },
+    { multiplayer_game_id: null }, { multiplayer_game_id: '' }, { multiplayer_game_id: '../engine' },
     { game_url: 'https://example.com' }, { game_type: 'external' },
     { is_beta: 'false' }, { is_published: 'true' }, { category_ids: ['invalid'] },
   ]) assert.throws(() => validateGameCatalogue({ ...multi, ...changes }))

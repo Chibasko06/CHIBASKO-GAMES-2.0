@@ -146,7 +146,7 @@ export default async function GamePage({
         </div>
       </div>
 
-      {game.active_version_id ? <ArtifactOnlineLinks gameId={game.id} versionId={game.active_version_id} slug={game.slug} /> : isClassicGame(game) ? (
+      {game.active_version_id ? <ArtifactOnlineLinks capabilities={game.runtime_capabilities} slug={game.slug} /> : isClassicGame(game) ? (
         <GameViewport
           gameId={game.id}
           gameUrl={game.game_url}

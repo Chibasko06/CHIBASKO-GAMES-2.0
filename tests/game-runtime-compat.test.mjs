@@ -9,6 +9,12 @@ import {mountGameRuntime} from '../lib/game-runtime/controller.ts'
 import {runtimePolicy} from '../lib/game-runtime/contracts.ts'
 import {gameLaunchRequest} from '../lib/server/gameLaunches.ts'
 
+async function waitFor(predicate){
+  const deadline=performance.now()+5000
+  while(!predicate() && performance.now()<deadline)await flush()
+  assert.ok(predicate(),'Expected asynchronous fixture operation to settle')
+}
+
 async function peer(t,policy={}) {
   const h=await runtimeHarness(),{descriptor}=await h.client.create(h.request),dom=new JSDOM('',{url:'https://portal.test',pretendToBeVisual:true})
   const sent=[],phases=[],failures=[],documentId=randomUUID();let autoPong=true,hidden=false
@@ -67,7 +73,7 @@ async function mounted(t,audience='published',adapt=client=>client,policy={}) {
   t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.now()})
   const runtime=mountGameRuntime({container:dom.window.document.querySelector('div'),request:h.request,client,onState:s=>states.push(s),onLeave(){},policy})
   t.after(()=>{runtime.dispose();dom.window.close()})
-  for(let i=0;i<40 && !dom.window.document.querySelector('iframe');i++)await flush()
+  await waitFor(()=>!!dom.window.document.querySelector('iframe'))
   const frame=dom.window.document.querySelector('iframe');assert.ok(frame)
   const url=new URL(frame.src),hash=new URLSearchParams(url.hash.slice(1)),documentId=randomUUID()
   const emit=(type,payload={})=>dom.window.dispatchEvent(new dom.window.MessageEvent('message',{source:frame.contentWindow,origin:url.origin,data:{channel:'chibasko.game',protocolVersion:1,launchId:hash.get('cgLaunch'),generation:hash.get('cgGeneration'),type,payload:{documentId,...payload}}}))
@@ -77,7 +83,8 @@ async function mounted(t,audience='published',adapt=client=>client,policy={}) {
 }
 for(const audience of ['published','preview'])test('45-minute '+audience+' session renews the same origin and still streams lazy assets',async t=>{
   const {h,dom,states,runtime,frame,url,revoked}=await mounted(t,audience)
-  for(let i=0;i<9;i++){t.mock.timers.tick(300_000);await flush();await flush()}
+  // WebCrypto runs outside fake timers; finish each renewal before advancing again.
+  for(let i=0;i<9;i++){t.mock.timers.tick(300_000);await waitFor(()=>h.calls.filter(c=>c==='distribution_renew_launch').length>=i+1);await flush()}
   assert.equal(states.at(-1).phase,'running');assert.equal(dom.window.document.querySelector('iframe'),frame)
   assert.equal(h.sessions.size,1);assert.ok(h.calls.filter(c=>c==='distribution_renew_launch').length>=9)
   const asset=await h.gateway(new Request(url.origin+'/asset.data'));assert.equal(asset.status,200);assert.deepEqual([...new Uint8Array(await asset.arrayBuffer())],[1,2,3,4])

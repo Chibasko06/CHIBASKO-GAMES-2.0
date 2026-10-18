@@ -1,117 +1,17 @@
-import { test } from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile, realpath, lstat } from 'node:fs/promises'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
-import { defineGame, INTEGRATION_VERSION } from '@chibaskogames/sdk'
-import { checkGameBoundaries, allowedGameImport, imports } from '../scripts/check-game-boundaries.mjs'
-import { createGameClientConnection } from '../lib/multiplayer/gameClientModule.ts'
-import { readGameSession } from '../lib/multiplayer/gameSessionMetadata.ts'
-
-const definition = { id: 'test-game', integrationVersion: 1, capabilities: { online: { access: ['private'], players: { min: 2, max: 4 } } } }
-export const envelope = () => ({ session: { id: 'opaque-session', gameId: 'test-game', integrationVersion: 1, execution: 'online' },
-  participants: [{ participantId: 'participant-A', username: 'Alice', avatarUrl: null }, { participantId: 'participant-B', username: 'Bob', avatarUrl: null }],
-  localParticipantIds: ['participant-A'], connectedParticipantIds: ['participant-A'], availability: 'preparing' })
-
-test('platform and game-server install the same exact public npm SDK release without a local link', async () => {
-  const consumed = []
-  for (const directory of ['.', 'game-server']) {
-    const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
-    const lock = JSON.parse(await readFile(resolve(directory, 'package-lock.json'), 'utf8'))
-    const sdk = lock.packages['node_modules/@chibaskogames/sdk']
-    const specifier = manifest.dependencies['@chibaskogames/sdk']
-    assert.equal(specifier, '0.3.0')
-    assert.equal(lock.packages[''].dependencies['@chibaskogames/sdk'], specifier)
-    assert.equal(sdk.link, undefined)
-    assert.equal(sdk.resolved, 'https://registry.npmjs.org/@chibaskogames/sdk/-/sdk-0.3.0.tgz')
-    const installed = resolve(directory, 'node_modules/@chibaskogames/sdk')
-    assert.equal(await realpath(installed), installed)
-    assert.equal(JSON.parse(await readFile(resolve(installed, 'package.json'), 'utf8')).version, sdk.version)
-    consumed.push({ specifier, version: sdk.version, resolved: sdk.resolved })
-  }
-  assert.deepEqual(consumed[0], consumed[1])
+import {readFile,realpath} from 'node:fs/promises'
+import {resolve} from 'node:path'
+import {INTEGRATION_VERSION,defineGame} from '@chibaskogames/sdk'
+import {checkGameBoundaries,platformImportAllowed} from '../scripts/check-game-boundaries.mjs'
+test('platform installs exact public SDK with no game package or local link',async()=>{
+ const pkg=JSON.parse(await readFile('package.json')),lock=JSON.parse(await readFile('package-lock.json'))
+ assert.equal(pkg.dependencies['@chibaskogames/sdk'],'0.3.0');assert.equal(lock.packages['node_modules/@chibaskogames/sdk'].version,'0.3.0')
+ assert.equal(await realpath('node_modules/@chibaskogames/sdk'),resolve('node_modules/@chibaskogames/sdk'))
+ assert.equal(INTEGRATION_VERSION,1);assert.equal(defineGame({id:'fixture-game',integrationVersion:1,capabilities:{local:{players:{min:1,max:1}}}}).integrationVersion,1)
 })
-
-test('web and game-server consume the same Git Pong release, public exports and their deduplicated host SDK', async () => {
-  const releases = []
-  for (const directory of ['.', 'game-server']) {
-    const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
-    const lock = JSON.parse(await readFile(resolve(directory, 'package-lock.json'), 'utf8'))
-    const name = '@chibaskogames/chibasko-pong', installed = resolve(directory, 'node_modules', name)
-    assert.equal(manifest.dependencies[name], 'git+https://github.com/Chibasko06/Chibasko-Pong.git#v0.1.0')
-    assert.equal(manifest.workspaces, undefined)
-    const release = lock.packages['node_modules/' + name]
-    assert.equal(release.version, '0.1.0'); assert.equal(release.link, undefined)
-    assert.match(release.resolved, /^git\+(?:https:\/\/github\.com|ssh:\/\/git@github\.com)\/Chibasko06\/Chibasko-Pong\.git#07c23b83f6493e03113c43d1f56d21d15831c87b$/)
-    assert.equal(Object.keys(lock.packages).some(key => /^(?:\.\.\/)?games\//.test(key)), false)
-    assert.equal((await lstat(installed)).isSymbolicLink(), false)
-    assert.equal(await realpath(installed), installed)
-    const metadata = JSON.parse(await readFile(resolve(installed, 'package.json'), 'utf8'))
-    assert.equal(metadata.peerDependencies['@chibaskogames/sdk'], '0.1.0')
-    assert.equal(manifest.overrides[name]['@chibaskogames/sdk'], '$@chibaskogames/sdk')
-    const fromGame = createRequire(resolve(installed, 'dist/server/index.js'))
-    assert.equal(await realpath(fromGame.resolve('@chibaskogames/sdk')), await realpath(resolve(directory, 'node_modules/@chibaskogames/sdk/dist/index.js')))
-    assert.deepEqual(Object.keys(metadata.exports).sort(), ['.','./client','./local','./server','./shared'].sort())
-    releases.push(release.resolved)
-  }
-  assert.equal(releases[0], releases[1])
-})
-
-test('pure SDK explicitly declares capabilities/version; local can differ without enabling a runtime', () => {
-  assert.equal(INTEGRATION_VERSION, 1)
-  const game = defineGame(definition)
-  assert.deepEqual(game.capabilities.online.access, ['private']); assert.equal(game.capabilities.local, undefined)
-  assert.ok(Object.isFrozen(game.capabilities.online.players))
-  const future = defineGame({ ...definition, capabilities: { ...definition.capabilities, local: { players: { min: 2, max: 2 } } } })
-  assert.equal(future.capabilities.local.players.max, 2)
-  for (const d of [{ ...definition, integrationVersion: 2 }, { ...definition, capabilities: {} },
-    { ...definition, capabilities: { online: { ...definition.capabilities.online, access: [] } } },
-    { ...definition, capabilities: { local: { players: { min: 3, max: 2 } } } }]) assert.throws(() => defineGame(d))
-})
-
-test('SDK session metadata is independent of gameplay/transport, closed to private fields and incompatible versions', () => {
-  const value = envelope(), snapshot = readGameSession(value, 'test-game')
-  assert.ok(snapshot); assert.ok(Object.isFrozen(snapshot.participants[0]))
-  for (const changed of [
-    { ...value, session: { ...value.session, integrationVersion: 2 } },
-    { ...value, session: { ...value.session, roomId: 'secret' } },
-    { ...value, participants: [{ ...value.participants[0], email: 'secret' }] },
-    { ...value, localParticipantIds: ['not-a-member'] },
-    { ...value, connectedParticipantIds: ['participant-A', 'participant-A'] },
-    { ...value, auth: 'secret' },
-  ]) assert.equal(readGameSession(changed, 'test-game'), null)
-  assert.equal(readGameSession(value, 'other'), null)
-})
-
-test('SDK facade follows participant/session metadata, invalidates once and never exposes transport', () => {
-  let metadata = readGameSession(envelope(), 'test-game'), state = { question: 'Different game' }, sent = [], notified = 0
-  const owner = createGameClientConnection({ getSession: () => metadata, getState: () => state, send: (...args) => sent.push(args) })
-  const c = owner.connection, off = c.subscribe(() => notified++)
-  assert.equal(c.localPlayerId, 'participant-A'); assert.equal(c.getSession().participants.length, 2)
-  metadata = readGameSession({ ...envelope(), availability: 'ready' }, 'test-game'); state = { question: 'Next' }
-  owner.changed(); assert.equal(notified, 1); assert.equal(c.getSession().availability, 'ready')
-  c.send('answer', 1); off(); owner.dispose(); owner.dispose()
-  c.send('late', 2); assert.deepEqual(sent, [['answer', 1]])
-  assert.equal(c.getSession(), null); assert.equal(c.localPlayerId, ''); assert.equal(c.getState(), null)
-  assert.doesNotMatch(Object.keys(c).join(' '), /auth|token|room|endpoint|leave|dispose/i)
-})
-
-test('game boundaries reject platform imports, SDK internals and computed module loading', async () => {
-  await checkGameBoundaries()
-  const root = resolve('games/test-game'), file = resolve(root, 'client/Game.tsx')
-  for (const spec of ['@/app/admin', '@/lib/auth', '@/lib/supabaseClient', '../../../lib/auth',
-    '@chibaskogames/sdk/src/private', '@colyseus/core']) assert.equal(allowedGameImport(file, spec, root), false)
-  for (const spec of ['../shared/engine', '@chibaskogames/sdk', '@chibaskogames/sdk/client']) assert.equal(allowedGameImport(file, spec, root), true)
-  for (const spec of ['next/image', '@colyseus/schema', 'react-dom', '@chibaskogames/pong-engine', '@chibaskogames/sdk/server','../server/Room']) assert.equal(allowedGameImport(file, spec, root), false)
-  assert.equal(allowedGameImport(resolve(root,'server/State.ts'),'@colyseus/schema',root),true)
-  const pong=resolve('node_modules/@chibaskogames/chibasko-pong')
-  assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/shared',pong),true)
-  assert.equal(allowedGameImport(resolve(pong,'client/Game.tsx'),'@chibaskogames/chibasko-pong/server',pong),false)
-  assert.deepEqual(imports('const x = import(path);'), ['<non-literal import>'])
-  for (const entry of ['@chibaskogames/sdk','@chibaskogames/sdk/client','@chibaskogames/sdk/server']) {
-    const url = import.meta.resolve(entry)
-    for (const path of [url, url.replace(/\.js$/, '.d.ts')]) {
-      assert.doesNotMatch(await readFile(new URL(path),'utf8'), /from ['"](react|next|@colyseus|@supabase|node:)/)
-    }
-  }
+test('boundaries reject any Chibasko Games gameplay package and unapproved runtime dependency',async()=>{
+ for(const name of ['@chibaskogames/chibasko-pong/client','@chibaskogames/arbitrary-game','third-party-game','../../games/foo/engine','../game-server/room','<computed>'])assert.equal(platformImportAllowed(name),false,name)
+ for(const name of ['@chibaskogames/sdk','@chibaskogames/sdk/client','@chibaskogames/sdk/server','react','@/lib/game-runtime/controller'])assert.equal(platformImportAllowed(name),true,name)
+ await checkGameBoundaries()
 })

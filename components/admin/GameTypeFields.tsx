@@ -1,5 +1,5 @@
 'use client'
-import { multiplayerGames, multiplayerCapacityLabel, type GameType } from '@/lib/multiplayer/catalogue'
+import { type GameType } from '@/lib/multiplayer/catalogue'
 
 export default function GameTypeFields({ type, gameUrl, gameId, onType, onUrl, onGameId }: {
   type: GameType; gameUrl: string; gameId: string
@@ -19,12 +19,9 @@ export default function GameTypeFields({ type, gameUrl, gameId, onType, onUrl, o
     </label> : <div className="space-y-3">
       <p className="text-sm text-zinc-300">Ce jeu est chargé directement par Chibasko Games. Aucune URL de jeu n’est nécessaire.</p>
       <label className="block space-y-2"><span className="text-sm">Multiplayer Game ID <span className="text-zinc-400">(obligatoire)</span></span>
-        <select required value={gameId} onChange={e => onGameId(e.target.value)} className="block w-full rounded-xl border border-zinc-700 bg-black p-3 focus:border-cyan-400 focus:outline-none">
-          <option value="">Choisir un jeu multijoueur</option>
-          {multiplayerGames.map(game => <option key={game.gameId} value={game.gameId}>{game.label} — {game.gameId}</option>)}
-        </select>
+        <input required value={gameId} onChange={e=>onGameId(e.target.value)} className="block w-full rounded-xl border border-zinc-700 bg-black p-3" />
       </label>
-      <p className="text-sm text-cyan-200"><output>Capacité : {multiplayerCapacityLabel(gameId)}</output><span className="block text-xs text-zinc-400">Lecture seule · définition du registre serveur</span></p>
+      <p className="text-sm text-zinc-400">Les modes et capacités proviennent de la version active validée. Cet identifiant catalogue ne sélectionne aucun code de jeu.</p>
     </div>}
   </fieldset>
 }

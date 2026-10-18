@@ -1,4 +1,3 @@
-import manifest from './gameManifest.generated.json' with { type: 'json' }
 import type { Tables } from '@/types/database'
 import type { GameCapabilities } from '@chibaskogames/sdk'
 
@@ -11,18 +10,9 @@ export function isClassicGame(game: Tables<'games'>): game is ClassicGame {
 export function isChibaskoMultiplayerGame(game: Tables<'games'>): game is ChibaskoMultiplayerGame {
   return game.game_type === 'multiplayer_chibasko' && game.game_url === null && typeof game.multiplayer_game_id === 'string'
 }
-export function getMultiplayerDefinition(id: string) {
-  // Generated from validated SDK definitions; JSON widens string literals to string[].
-  const definitions = manifest as Readonly<Record<string, { minPlayers: number; maxPlayers: number; capabilities: GameCapabilities }>>
-  return Object.hasOwn(definitions, id) ? definitions[id] : undefined
-}
-export const multiplayerGames = Object.entries(manifest).map(([gameId, capacity]) => ({
-  gameId, ...capacity, label: gameId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-}))
-export function multiplayerCapacityLabel(id: string) {
-  const definition = getMultiplayerDefinition(id)
-  if (!definition) return 'Choisis un jeu'
-  return `${definition.minPlayers === definition.maxPlayers ? definition.minPlayers : `${definition.minPlayers}–${definition.maxPlayers}`} joueurs`
+export function multiplayerCapacityLabel(capabilities: GameCapabilities | undefined) {
+  const players=capabilities?.online?.players
+  return players ? `${players.min===players.max?players.min:`${players.min}–${players.max}`} joueurs` : 'Indisponible'
 }
 
 // Switching launch mode clears incompatible fields, not the game or its relations.

@@ -1,31 +1,28 @@
 # Chibasko Games
 
-Site de jeux navigateur : Next.js 16, React, TypeScript, Supabase Auth/PostgreSQL/Storage et Resend. Pour le socle multijoueur et le build Cloudflare local actuels, voir les packages ci-dessous et la documentation serveur ; les notes Phase 0 plus bas conservent l'historique initial.
+Site de jeux navigateur : Next.js 16, React, TypeScript, Supabase et Resend.
 
-## Packages multijoueurs externes
+## Distribution des jeux
 
-Le web et le game-server installent le SDK public npm exact `@chibaskogames/sdk@0.3.0`.
-Pong reste la dépendance Git legacy `Chibasko06/Chibasko-Pong`, tag `v0.1.0`,
-SHA `07c23b83f6493e03113c43d1f56d21d15831c87b`, jusqu’à PONG-MIGRATION.
-Le peer historique SDK de Pong est remplacé par le SDK de l’hôte via un override
-limité à ce package. Son prepare Git conserve ses anciennes devDependencies.
+Le portail installe le SDK public npm exact `@chibaskogames/sdk@0.3.0`.
+Il n'installe aucun package de jeu et n'importe aucun moteur, player ou serveur
+gameplay. Les jeux intégrés utilisent des builds Web immuables dans R2, servis
+par Artifact Gateway puis chargés dans le GameRuntime générique isolé.
 
-Le [control plane multijoueur durable](docs/multiplayer-sessions.md) utilise
-PostgreSQL pour les salons, places, readiness, rounds et replays des builds Web.
-Les migrations restent préparées, sans application automatique en production.
+Le control plane multijoueur PostgreSQL gère les salons public/privé, le roster,
+la readiness et les rounds. Les serveurs gameplay sont des deployments séparés.
+Chibasko Pong produit son build et son serveur dans son propre dépôt ; le dossier
+serveur historique de ce portail et les registres de code jeu sont supprimés.
 
-Ce dépôt ne contient plus leurs sources ni de workspace jeu. Les registres
-consomment encore les exports publics, avec lazy loading client/local.
+L'installation ne demande aucun accès GitHub privé. Aucune authentification Git
+n'est nécessaire pour construire le portail. L'activation production reste une
+étape d'infrastructure distincte : migrations ordonnées, domaine de contenu isolé,
+gateway/queue/R2, version publiée et deployment compatible doivent être prêts
+avant la mise en ligne de ce parcours. Aucun fallback vers l'ancien player.
 
-**Cible désormais retenue : builds Web immuables, jamais les sources des jeux.**
-La [fondation Game Distribution](docs/game-distribution.md) prépare le manifest,
-la validation ZIP, les clés R2 et une migration locale. Elle ne remplace pas encore
-le runtime actuel. Les installations locales Git utilisent les accès du poste ;
-ne pas configurer de PAT, deploy key ou GitHub App pour contourner Cloudflare.
-Le blocage cloud restera présent jusqu'au remplacement des dépendances Git privées
-par le pipeline de builds ; le SDK direct provient déjà du registre public.
-Les notes [Pong](docs/pong-extraction.md) et [SDK](docs/sdk-extraction.md)
-décrivent l'étape historique d'extraction ; aucun credential n'est versionné.
+Voir [PONG-MIGRATION-1](docs/pong-migration.md),
+[GameRuntime](docs/game-runtime.md), [Distribution](docs/game-distribution.md)
+et [Control plane multijoueur](docs/multiplayer-sessions.md).
 
 ## Developpement
 

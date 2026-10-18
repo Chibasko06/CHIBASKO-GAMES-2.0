@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const server = process.argv.includes('--server')
-const consumer = server ? join(root, 'game-server') : root
+const consumer = root
 const installed = await realpath(join(consumer, 'node_modules/@chibaskogames/sdk'))
 const metadata = JSON.parse(await readFile(join(installed, 'package.json'), 'utf8'))
 const manifest = JSON.parse(await readFile(join(consumer, 'package.json'), 'utf8'))

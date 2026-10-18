@@ -1,5 +1,10 @@
 # GameRuntime — GAME-RUNTIME-1 / RUNTIME-COMPAT-1
 
+> État après PONG-MIGRATION-1 : le portail ne contient plus de package jeu,
+> player source ni serveur gameplay. Les sections de bilan des phases antérieures
+> décrivent leur état historique. Le parcours courant et les prérequis production
+> sont documentés dans [pong-migration.md](pong-migration.md).
+
 Activation désactivée par défaut : `GAME_RUNTIME_LAUNCHES_ENABLED` côté portail,
 `GAME_ARTIFACT_GATEWAY_ENABLED` côté Worker. Avant toute activation autorisée,
 configurer `GAME_CONTENT_BASE_DOMAIN` (frontière PSL), les bases public/preview
