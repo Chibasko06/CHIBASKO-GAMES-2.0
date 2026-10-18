@@ -4,11 +4,15 @@ Site de jeux navigateur : Next.js 16, React, TypeScript, Supabase Auth/PostgreSQ
 
 ## Packages multijoueurs externes
 
-Le web et le game-server installent deux dépendances Git privées, toutes deux
-taggées `v0.1.0` et figées par leurs lockfiles :
+Le web et le game-server installent le SDK public npm exact `@chibaskogames/sdk@0.3.0`.
+Pong reste la dépendance Git legacy `Chibasko06/Chibasko-Pong`, tag `v0.1.0`,
+SHA `07c23b83f6493e03113c43d1f56d21d15831c87b`, jusqu’à PONG-MIGRATION.
+Le peer historique SDK de Pong est remplacé par le SDK de l’hôte via un override
+limité à ce package. Son prepare Git conserve ses anciennes devDependencies.
 
-- SDK `Chibasko06/chibasko-games-sdk` : `7bc73cc335e7dbd52b411a751fcc689969c5a5d4`.
-- Pong `Chibasko06/Chibasko-Pong` : `07c23b83f6493e03113c43d1f56d21d15831c87b`.
+Le [control plane multijoueur durable](docs/multiplayer-sessions.md) utilise
+PostgreSQL pour les salons, places, readiness, rounds et replays des builds Web.
+Les migrations restent préparées, sans application automatique en production.
 
 Ce dépôt ne contient plus leurs sources ni de workspace jeu. Les registres
 consomment encore les exports publics, avec lazy loading client/local.
@@ -19,7 +23,7 @@ la validation ZIP, les clés R2 et une migration locale. Elle ne remplace pas en
 le runtime actuel. Les installations locales Git utilisent les accès du poste ;
 ne pas configurer de PAT, deploy key ou GitHub App pour contourner Cloudflare.
 Le blocage cloud restera présent jusqu'au remplacement des dépendances Git privées
-par le pipeline de builds et une distribution accessible du SDK.
+par le pipeline de builds ; le SDK direct provient déjà du registre public.
 Les notes [Pong](docs/pong-extraction.md) et [SDK](docs/sdk-extraction.md)
 décrivent l'étape historique d'extraction ; aucun credential n'est versionné.
 

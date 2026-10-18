@@ -15,9 +15,10 @@ assert.equal(metadata.name, '@chibaskogames/sdk')
 assert.equal(dependency.link, undefined, 'SDK must be an installed package, not a local link')
 assert.equal(metadata.version, dependency.version)
 assert.equal(lock.packages[''].dependencies['@chibaskogames/sdk'], manifest.dependencies['@chibaskogames/sdk'])
-assert.match(dependency.resolved, /^git\+(?:https:\/\/github\.com|ssh:\/\/git@github\.com)\/Chibasko06\/chibasko-games-sdk\.git#[a-f0-9]{40}$/)
-// Historical command name retained for callers. Git prepare supplies the build;
-// the platform verifies installed exports and never compiles SDK source.
+assert.equal(metadata.version, '0.3.0')
+assert.equal(manifest.dependencies['@chibaskogames/sdk'], '0.3.0')
+assert.equal(dependency.resolved, 'https://registry.npmjs.org/@chibaskogames/sdk/-/sdk-0.3.0.tgz')
+// Historical command name: verify the installed public distribution without rebuilding it.
 for (const entry of ['.', './client', './server', ...(server ? [] : ['./react'])]) {
   for (const condition of ['types', 'default']) {
     const path = resolve(installed, metadata.exports[entry][condition])
@@ -25,4 +26,4 @@ for (const entry of ['.', './client', './server', ...(server ? [] : ['./react'])
     await readFile(path)
   }
 }
-console.log('Using installed SDK ' + metadata.version + ' at ' + dependency.resolved.split('#')[1] + ' (Git package).')
+console.log('Using public npm SDK ' + metadata.version + '.')

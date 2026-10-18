@@ -305,6 +305,7 @@ export type Database = {
           created_at: string
           description: string | null
           developer_name: string | null
+          active_version_id?: string | null
           game_url: string | null
           game_type: 'classic' | 'multiplayer_chibasko'
           multiplayer_game_id: string | null
@@ -326,6 +327,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           developer_name?: string | null
+          active_version_id?: string | null
           game_url?: string | null
           game_type?: 'classic' | 'multiplayer_chibasko'
           multiplayer_game_id?: string | null
@@ -347,6 +349,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           developer_name?: string | null
+          active_version_id?: string | null
           game_url?: string | null
           game_type?: 'classic' | 'multiplayer_chibasko'
           multiplayer_game_id?: string | null

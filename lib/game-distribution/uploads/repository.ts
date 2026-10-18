@@ -1,7 +1,7 @@
 import { UploadError } from './policy'
 import type { UploadRepository } from './contracts'
 
-const statuses: Record<string,number> = {unauthorized:401,forbidden:403,game_not_found:404,upload_not_found:404,
+const statuses: Record<string,number> = {lobby_not_found:404,lobby_expired:410,lobby_full:409,not_ready:409,request_conflict:409,version_unavailable:409,deployment_unavailable:409,game_not_available:404,unsupported_access:400,rate_limited:429,invalid_request:400,unauthorized:401,forbidden:403,game_not_found:404,upload_not_found:404,
   upload_expired:410,invalid_state:409,version_conflict:409,idempotency_conflict:409,quota_exceeded:429,lease_lost:409,validation_failed:422,
   version_not_found:404,version_not_previewable:409,preview_forbidden:403,preview_expired:403,preview_replayed:409,unsupported_execution:400,
   launch_expired:403,invalid_launch_request:400,online_session_required:409,online_session_unavailable:409,invalid_online_roster:400,invalid_deployment:409,ticket_replayed:409,invalid_credential:401}

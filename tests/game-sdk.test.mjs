@@ -13,17 +13,17 @@ export const envelope = () => ({ session: { id: 'opaque-session', gameId: 'test-
   participants: [{ participantId: 'participant-A', username: 'Alice', avatarUrl: null }, { participantId: 'participant-B', username: 'Bob', avatarUrl: null }],
   localParticipantIds: ['participant-A'], connectedParticipantIds: ['participant-A'], availability: 'preparing' })
 
-test('platform and game-server install the same immutable Git SDK release without a local link', async () => {
+test('platform and game-server install the same exact public npm SDK release without a local link', async () => {
   const consumed = []
   for (const directory of ['.', 'game-server']) {
     const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
     const lock = JSON.parse(await readFile(resolve(directory, 'package-lock.json'), 'utf8'))
     const sdk = lock.packages['node_modules/@chibaskogames/sdk']
     const specifier = manifest.dependencies['@chibaskogames/sdk']
-    assert.match(specifier, /^git\+https:\/\/github\.com\/Chibasko06\/chibasko-games-sdk\.git#v\d+\.\d+\.\d+$/)
+    assert.equal(specifier, '0.3.0')
     assert.equal(lock.packages[''].dependencies['@chibaskogames/sdk'], specifier)
     assert.equal(sdk.link, undefined)
-    assert.match(sdk.resolved, /^git\+(?:https:\/\/github\.com|ssh:\/\/git@github\.com)\/Chibasko06\/chibasko-games-sdk\.git#[a-f0-9]{40}$/)
+    assert.equal(sdk.resolved, 'https://registry.npmjs.org/@chibaskogames/sdk/-/sdk-0.3.0.tgz')
     const installed = resolve(directory, 'node_modules/@chibaskogames/sdk')
     assert.equal(await realpath(installed), installed)
     assert.equal(JSON.parse(await readFile(resolve(installed, 'package.json'), 'utf8')).version, sdk.version)
@@ -47,7 +47,8 @@ test('web and game-server consume the same Git Pong release, public exports and 
     assert.equal((await lstat(installed)).isSymbolicLink(), false)
     assert.equal(await realpath(installed), installed)
     const metadata = JSON.parse(await readFile(resolve(installed, 'package.json'), 'utf8'))
-    assert.equal(metadata.peerDependencies['@chibaskogames/sdk'], lock.packages['node_modules/@chibaskogames/sdk'].version)
+    assert.equal(metadata.peerDependencies['@chibaskogames/sdk'], '0.1.0')
+    assert.equal(manifest.overrides[name]['@chibaskogames/sdk'], '$@chibaskogames/sdk')
     const fromGame = createRequire(resolve(installed, 'dist/server/index.js'))
     assert.equal(await realpath(fromGame.resolve('@chibaskogames/sdk')), await realpath(resolve(directory, 'node_modules/@chibaskogames/sdk/dist/index.js')))
     assert.deepEqual(Object.keys(metadata.exports).sort(), ['.','./client','./local','./server','./shared'].sort())

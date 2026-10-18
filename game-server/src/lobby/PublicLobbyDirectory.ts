@@ -1,7 +1,7 @@
 export type LobbyVisibility = 'public' | 'private'
 export type PublicLobbySummary = { code: string; gameId: string; host: { username: string; avatarUrl: string | null }; currentPlayers: number; maxPlayers: number }
 
-// Single-process, ephemeral snapshots only. No Room references, identities or seats.
+// Legacy package player only. Artifact games use the durable multiplayer API.
 export class PublicLobbyDirectory {
   private entries = new Map<string, { summary: PublicLobbySummary; until: number }>()
   update(code: string, summary: PublicLobbySummary | null, until = 0) {

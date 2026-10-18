@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 const exec = promisify(execFile)
 const bin = process.env.CATALOGUE_TEST_PG_BIN ?? (process.platform==='win32'?'C:/Program Files/PostgreSQL/18/bin':'')
 const tool = name => bin?join(bin,name+(process.platform==='win32'?'.exe':'')):name
+const multiplayer=process.argv.includes('--multiplayer');if(multiplayer)process.argv.push('--online');
 const online=process.argv.includes('--online');if(online)process.argv.push('--launches')
 const directory = await mkdtemp(join(tmpdir(),'chibasko-distribution-db-')), data=join(directory,'data')
 const socket=createServer();await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));const port=socket.address().port;await new Promise(resolve=>socket.close(resolve))
@@ -75,6 +76,12 @@ try {
     assert.equal(same[0].stdout,same[1].stdout)
     await run('psql',[...args,'-c',"set role service_role;select public.distribution_cleanup_online()"])
     console.log('Online SQL passed: RLS, FK/version/roster, opaque identity, START-only tickets, credential rotation/revocation, expiry, deployment/session/participant revocation, retry/replay and concurrent exchanges.')
+  }
+  if(multiplayer){
+    await run('psql',[...args,'-f',fileURLToPath(new URL('./multiplayer-lobby-db.sql',import.meta.url))])
+    await import('./register.mjs')
+    const {runMultiplayerTests}=await import('./multiplayer-db-runner.mjs')
+    await runMultiplayerTests(async sql=>(await run('psql',[...args,'-qAtc',sql])).stdout.trim())
   }
   await assert.rejects(run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261016000100_game_distribution_versions.sql',import.meta.url))]))
   const race=await Promise.allSettled([

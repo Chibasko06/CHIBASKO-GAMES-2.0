@@ -1,8 +1,26 @@
-# SDK Git externe — consommation plateforme
+# SDK public npm — consommation plateforme
 
-> Étape historique d'extraction du SDK. La cible est une distribution du SDK
-> accessible sans Git privé et des builds Web pour les jeux, décrite dans
-> [Game Distribution](game-distribution.md). Aucun nouveau credential CI n'est prévu.
+## État courant
+
+Le web et le game-server consomment exactement `@chibaskogames/sdk@0.3.0` depuis
+`https://registry.npmjs.org`. Les lockfiles contiennent l’intégrité npm et aucune
+référence Git SDK. Le repository source reste privé, sans obligation d’accès pour
+le consommateur. integrationVersion reste 1 ; Bridge v2 et les contrats v1
+historiques sont conservés.
+
+Le Pong Git legacy déclare encore le peer `0.1.0`. Un override npm ciblé fournit
+le SDK `0.3.0` de l’hôte, protégé par les tests d’intégration. Son prepare immuable
+conserve une devDependency Git SDK dans son propre dépôt : ce chemin transitif
+disparaîtra avec le package Pong lors de PONG-MIGRATION.
+
+`build:sdk` vérifie la distribution installée ; il ne compile aucune source SDK.
+`test:sdk-platform` et `test:sdk-extraction` vérifient cette distribution publique.
+Aucun credential Git SDK n’est ajouté à la plateforme ou à Cloudflare.
+
+## Historique d’extraction 0.1.0
+
+Les sections ci-dessous décrivent la validation Git initiale, remplacée pour les
+dépendances directes par le registre npm. Les tags historiques restent immuables.
 
 ## Source de vérité et versions
 

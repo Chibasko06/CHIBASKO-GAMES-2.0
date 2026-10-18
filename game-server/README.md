@@ -1,13 +1,10 @@
 # Serveur multijoueur Chibasko Games
 
 Processus Node 24 / TypeScript strict autonome, hors build Next.js/Cloudflare.
-Le SDK `@chibaskogames/sdk` vient du repository Git privé
-`Chibasko06/chibasko-games-sdk`, tag `v0.1.0`, commit
-`7bc73cc335e7dbd52b411a751fcc689969c5a5d4` figé dans le lockfile.
-Son installation produit son dist via prepare ; les précommandes build/test/dev
-vérifient ses exports installés. Aucun dossier source SDK frère n'est nécessaire.
-Un accès Git en lecture au repository SDK est requis pendant npm ci, pas au runtime.
-Aucun build Next.js n'est nécessaire côté VPS. Voir [bascule SDK et CI](../docs/sdk-extraction.md).
+Le SDK `@chibaskogames/sdk` est installé depuis npm en version exacte `0.3.0`.
+Les précommandes vérifient ses exports compilés ; aucune source SDK frère ni
+credential Git SDK n’est nécessaire pour cette dépendance directe.
+Voir [SDK](../docs/sdk-extraction.md) et [control plane durable](../docs/multiplayer-sessions.md).
 Pong vient du repository privé `Chibasko06/Chibasko-Pong`, tag `v0.1.0`, commit
 `07c23b83f6493e03113c43d1f56d21d15831c87b`, figé dans le lockfile. Il est consommé
 uniquement via ses exports publics compilés. Les précommandes vérifient le package
@@ -18,7 +15,7 @@ Online reste autoritaire : seul le serveur applique ce moteur aux inputs réseau
 Le mode local navigateur utilise la même source, sans accès à l'admission ni
 au coordinateur ; ses résultats ne sont ni envoyés ni persistés.
 Une instance Colyseus 0.18, sans Redis ni Docker. Web et game-server restent deux
-installations npm indépendantes, au même SDK/Pong Git, sans workspace de jeu local.
+installations npm indépendantes, au même SDK npm/Pong Git, sans workspace de jeu local.
 
 ## Développement
 
@@ -30,7 +27,7 @@ activer les jeux connus ; une valeur vide les désactive.
 Depuis la racine, dans deux terminaux séparés :
 
 ```sh
-npm ci # racine : SDK et Pong Git privés, accès lecture aux deux repos requis
+npm ci # SDK npm public ; Pong Git legacy et son prepare nécessitent encore les accès locaux
 npm --prefix game-server ci
 npm --prefix game-server run dev
 ```

@@ -1,4 +1,5 @@
 import MultiplayerGamePanel from '@/components/multiplayer/MultiplayerGamePanel'
+import ArtifactOnlineLinks from '@/components/multiplayer/ArtifactOnlineLinks'
 import GameReactions from '@/components/GameReactions'
 import { isClassicGame } from '@/lib/multiplayer/catalogue'
 import type { Metadata } from 'next'
@@ -145,7 +146,7 @@ export default async function GamePage({
         </div>
       </div>
 
-      {isClassicGame(game) ? (
+      {game.active_version_id ? <ArtifactOnlineLinks gameId={game.id} versionId={game.active_version_id} slug={game.slug} /> : isClassicGame(game) ? (
         <GameViewport
           gameId={game.id}
           gameUrl={game.game_url}

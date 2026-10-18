@@ -21,7 +21,7 @@ function run(cwd, command, args, capture = false) {
   return result.stdout
 }
 const npmRun = (cwd, args, capture = false) => run(cwd, process.execPath, [npm, ...args], capture)
-// Reuse only the installed Git distribution. Source builds and SDK unit tests
+// Reuse only the installed public npm distribution. Source builds and SDK unit tests
 // live in chibasko-games-sdk, not in the platform repository.
 const installed = await realpath(join(repository, 'node_modules/@chibaskogames/sdk'))
 await cp(installed, sdk, { recursive: true, filter: path => !['node_modules', '.git'].includes(path.split(/[\\/]/).at(-1)) })
@@ -83,6 +83,6 @@ run(consumer, process.execPath, ['react-smoke.mjs'])
 run(consumer, process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.json'])
 
 const report = { sdk, consumer, artifact, integrity: packed.integrity, files: expected,
-  result: 'Installed Git SDK repacked and consumed outside repository; four entrypoints/type contracts; no React needed by non-React entries; sensitive content scan passed. Pong owns its separate package tests.' }
+  result: 'Installed public npm SDK repacked and consumed outside repository; four entrypoints/type contracts; no React needed by non-React entries; sensitive content scan passed. Pong owns its separate package tests.' }
 await writeFile(join(scratch, 'report.json'), JSON.stringify(report, null, 2))
 console.log('SDK extraction proof OK. Evidence retained outside repository:', join(scratch, 'report.json'))

@@ -47,11 +47,13 @@
     "pretest:product": "npm run build:sdk && npm run build:pong",
     "test:online-session": "node --import ./tests/register.mjs --test tests/online-session.test.mjs",
     "test:online-session-db": "node tests/game-distribution-db.mjs --online",
-    "test:online-session-browser": "node --test tests/online-session.browser.test.mjs"
+    "test:online-session-browser": "node --test tests/online-session.browser.test.mjs",
+    "test:multiplayer": "node --import ./tests/register.mjs --test tests/multiplayer-lobbies.test.mjs",
+    "test:multiplayer-db": "node tests/game-distribution-db.mjs --multiplayer"
   },
   "dependencies": {
     "@chibaskogames/chibasko-pong": "git+https://github.com/Chibasko06/Chibasko-Pong.git#v0.1.0",
-    "@chibaskogames/sdk": "git+https://github.com/Chibasko06/chibasko-games-sdk.git#v0.1.0",
+    "@chibaskogames/sdk": "0.3.0",
     "@colyseus/sdk": "0.18.5",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "^2.104.0",
@@ -81,5 +83,10 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "4.148.0"
+  },
+  "overrides": {
+    "@chibaskogames/chibasko-pong": {
+      "@chibaskogames/sdk": "$@chibaskogames/sdk"
+    }
   }
 }

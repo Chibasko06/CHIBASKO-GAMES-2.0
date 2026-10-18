@@ -418,3 +418,13 @@ indépendants de l'admission gameplay et de sa durée de trois minutes.
 
 Voir `online-sessions.md` et `sdk-browser-bridge-v2.md` pour les ressources,
 l'exchange serveur-à-serveur, les permissions, le retry borné et PONG-MIGRATION.
+
+
+## MULTIPLAYER-SESSION-1
+
+Le lobby durable fige gameVersionId dès sa création. Son START transactionnel
+crée une nouvelle online session et les participants opaques, sans ticket.
+Le runtime reçoit seulement cette version et `onlineSessionReference` ;
+OnlineLaunchAuthorizer vérifie le membre authentifié. Le ticket gameplay frais
+reste généré au START v2 après READY. Les transports public/privé, le polling du
+salon et le gameplay restent indépendants. Voir [multiplayer-sessions.md](multiplayer-sessions.md).

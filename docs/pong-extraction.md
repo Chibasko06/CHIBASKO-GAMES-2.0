@@ -1,5 +1,17 @@
 # Chibasko Pong — consommation Git externe
 
+## État MULTIPLAYER-SESSION-1
+
+Le package Git legacy reste figé à v0.1.0 ; aucun fichier du dépôt Pong n’est
+modifié. Les hôtes consomment désormais le SDK npm public exact 0.3.0, dédupliqué
+sous Pong avec un override de son peer historique 0.1.0. Le prepare du tag Pong
+conserve sa devDependency SDK Git privée. La suppression de ce chemin transitif
+requiert le retrait du package lors de PONG-MIGRATION.
+
+Les nouvelles versions Web utilisent le [control plane durable](multiplayer-sessions.md).
+Les sections suivantes conservent la preuve historique d’extraction du package.
+
+
 > Étape historique d'extraction du code. La cible de distribution est désormais
 > un build Web immuable, sans dépendance du portail au repo du jeu :
 > [Game Distribution](game-distribution.md). Le package actuel est conservé
