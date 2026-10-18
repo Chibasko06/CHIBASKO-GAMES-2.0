@@ -23,7 +23,7 @@ export async function runtimeHarness(kind='solo',audience='published',behavior='
   const prefix=gameArtifactKeys(manifest.gameId,versionId,validated.artifactSha256).clientPrefix
   const row={id:versionId,game_id:manifest.gameId,version:manifest.version,schema_version:1,integration_version:1,status:audience==='preview'?'draft':'published',
     manifest,artifact_sha256:validated.artifactSha256,storage_prefix:prefix,delivery_policy:{profile:'web-v1',connectOrigins:[],assetOrigins:[]}}
-  const sessions=new Map(),members=new Set(['owner','editor','admin']),logs=[],calls=[],released=[],clock={offset:0,now(){return Date.now()+this.offset}}
+  const sessions=new Map(),members=new Set(['owner','editor','admin']),logs=[],calls=[],released=[],clock={offset:0,fixed:undefined,now(){return (this.fixed ?? Date.now())+this.offset}}
   function authorize(args) {
     if(args.p_version!==versionId || args.p_game!==manifest.gameId)throw new UploadError('version_not_found',404)
     if(args.p_audience==='preview') {

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 const exec = promisify(execFile)
 const bin = process.env.CATALOGUE_TEST_PG_BIN ?? (process.platform==='win32'?'C:/Program Files/PostgreSQL/18/bin':'')
 const tool = name => bin?join(bin,name+(process.platform==='win32'?'.exe':'')):name
+const online=process.argv.includes('--online');if(online)process.argv.push('--launches')
 const directory = await mkdtemp(join(tmpdir(),'chibasko-distribution-db-')), data=join(directory,'data')
 const socket=createServer();await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));const port=socket.address().port;await new Promise(resolve=>socket.close(resolve))
 const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.toUpperCase().startsWith('PG')))
@@ -60,6 +61,20 @@ try {
     await assert.rejects(run('psql',[...args,'-c',"set role service_role;select public.distribution_renew_launch('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',repeat('7',64),1800)"]))
     console.log('Renewal SQL passed: long access, fixed ceiling, private RPC, current permissions, expired/revoked refusal and renew/revoke race.')
     console.log('Launch SQL passed: anonymous published local, private RLS/RPCs, preview ownership/IDOR/revocation, hashed capabilities, bounded lifetime, atomic quotas, idempotent teardown and expiry cleanup.')
+  }
+  if(online){
+    await run('psql',[...args,'-f',fileURLToPath(new URL('./online-session-db.sql',import.meta.url))])
+    const query=id=>`set role service_role;select public.distribution_exchange_connection_ticket(repeat('a',64),repeat('5',64),'${id}')`
+    const first='21212121-2121-4121-8121-212121212121',second='22222222-2222-4222-8222-222222222222'
+    const races=await Promise.all([first,second].map(id=>run('psql',[...args,'-Atc',query(id)])))
+    assert.equal(races.filter(r=>r.stdout.includes('"data"')).length,1)
+    assert.equal(races.filter(r=>r.stdout.includes('ticket_replayed')).length,1)
+    await run('psql',[...args,'-c',"delete from public.game_connection_tickets;set role service_role;select public.online_test_ticket('6')"])
+    const same=await Promise.all([1,2].map(()=>run('psql',[...args,'-Atc',query(first).replace("repeat('5'","repeat('6'" )])))
+    assert.equal(same.filter(r=>r.stdout.includes('"data"')).length,2)
+    assert.equal(same[0].stdout,same[1].stdout)
+    await run('psql',[...args,'-c',"set role service_role;select public.distribution_cleanup_online()"])
+    console.log('Online SQL passed: RLS, FK/version/roster, opaque identity, START-only tickets, credential rotation/revocation, expiry, deployment/session/participant revocation, retry/replay and concurrent exchanges.')
   }
   await assert.rejects(run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261016000100_game_distribution_versions.sql',import.meta.url))]))
   const race=await Promise.allSettled([

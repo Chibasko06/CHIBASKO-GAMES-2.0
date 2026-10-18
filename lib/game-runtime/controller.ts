@@ -8,7 +8,7 @@ export function validateLaunchHandle(value:unknown,request:LaunchRequest,parentO
   const h=value as LaunchHandle,d=h.descriptor
   const keys=['gameId','gameVersionId','integrationVersion','execution','entrypointUrl','capabilities','contentOrigin','launchId','generation','expiresAt','bridgeVersion','iframeProfile','context']
   if(!objectWithKeys(d,keys) || d.gameId!==request.gameId || d.gameVersionId!==request.gameVersionId || d.execution!==request.execution
-    || d.bridgeVersion!==1 || d.integrationVersion!==1 || !/^[a-f0-9-]{36}$/.test(d.launchId) || !/^[a-f0-9-]{36}$/.test(d.generation)
+    || ![1,2].includes(d.bridgeVersion) || d.integrationVersion!==1 || !/^[a-f0-9-]{36}$/.test(d.launchId) || !/^[a-f0-9-]{36}$/.test(d.generation)
     || !['web-v1','web-isolated-v1','web-legacy-v1'].includes(d.iframeProfile) || !safeContext(d.context)
     || d.context.gameId!==d.gameId || d.context.gameVersionId!==d.gameVersionId || d.context.execution!==d.execution)throw new RuntimeError('invalid_descriptor')
   const parent=new URL(parentOrigin),url=new URL(d.entrypointUrl),origin=new URL(d.contentOrigin)
@@ -72,6 +72,7 @@ export function mountGameRuntime(options:Options) {
     iframe.addEventListener('load',loaded)
     iframe.addEventListener('error',iframeError)
     bridge=createGameBridge({host,source:()=>iframe?.contentWindow ?? null,descriptor:d,policy,
+      getStartContext:async()=>{if(!handle || !client.start)throw new RuntimeError('online_session_unavailable');return client.start(handle,abort.signal)},
       onDocument:()=>clearTimeout(loadTimer),onPhase:phase=>{state(phase)},onFailure:fail,onLeave:close})
     loadTimer=setTimeout(()=>fail('iframe_load_timeout'),policy.loadMs)
     armLease(d.expiresAt);scheduleRenew();host.document.addEventListener('visibilitychange',visibility)

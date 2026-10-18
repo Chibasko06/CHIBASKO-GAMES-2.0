@@ -52,7 +52,7 @@ test('bridge validates source/origin/schema/version/generation, orders handshake
   t.after(()=>{bridge.dispose();dom.window.close()})
   const hello={channel:'chibasko.game',protocolVersion:1,launchId:descriptor.launchId,generation:descriptor.generation,type:'GAME_HELLO',payload:{documentId:doc}}
   const emit=(data=hello,origin=descriptor.contentOrigin,src=source)=>host.dispatchEvent(new host.MessageEvent('message',{data,origin,source:src}))
-  emit(hello,'https://evil.test');emit(hello,descriptor.contentOrigin,{});emit({...hello,protocolVersion:2});emit({...hello,generation:randomUUID()});emit({...hello,extra:'unexpected'})
+  emit(hello,'https://evil.test');emit(hello,descriptor.contentOrigin,{});emit({...hello,protocolVersion:3});emit({...hello,generation:randomUUID()});emit({...hello,extra:'unexpected'})
   assert.equal(sent.length,0)
   emit();emit();assert.equal(sent.length,2);assert.equal(sent[0].data.type,'PLATFORM_INIT');assert.equal(sent[1].data.type,'PLATFORM_PING');assert.equal(sent[0].origin,descriptor.contentOrigin)
   emit({...hello,type:'GAME_READY'});emit({...hello,type:'GAME_READY'});assert.deepEqual(phases,['ready','running'])

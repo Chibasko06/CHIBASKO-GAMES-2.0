@@ -4,7 +4,7 @@ import type { UploadRepository } from './contracts'
 const statuses: Record<string,number> = {unauthorized:401,forbidden:403,game_not_found:404,upload_not_found:404,
   upload_expired:410,invalid_state:409,version_conflict:409,idempotency_conflict:409,quota_exceeded:429,lease_lost:409,validation_failed:422,
   version_not_found:404,version_not_previewable:409,preview_forbidden:403,preview_expired:403,preview_replayed:409,unsupported_execution:400,
-  launch_expired:403,invalid_launch_request:400,online_session_required:409}
+  launch_expired:403,invalid_launch_request:400,online_session_required:409,online_session_unavailable:409,invalid_online_roster:400,invalid_deployment:409,ticket_replayed:409,invalid_credential:401}
 /** Backend-only capability. Never returned to a game/client. */
 export function uploadRepository(url: string, serviceKey: string, fetcher: typeof fetch = fetch): UploadRepository {
   if (!url || !serviceKey || serviceKey.startsWith('sb_publishable_')) throw new UploadError('service_unavailable',503)

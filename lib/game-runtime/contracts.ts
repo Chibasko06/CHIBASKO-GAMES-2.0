@@ -1,8 +1,9 @@
+import type { GameStartContext } from '../online-session/contracts'
 import type { Execution, GameLaunchDescriptor } from '../game-distribution/gateway/contracts'
 
 /** Browser wire contract proposal. No game, framework, auth or transport internals. */
 export const BRIDGE_CHANNEL='chibasko.game' as const
-export const BRIDGE_VERSION=1 as const
+export const BRIDGE_VERSION=2 as const
 export const RUNTIME_POLICY=Object.freeze({descriptorMs:15_000,loadMs:120_000,helloMs:15_000,handshakeMs:5_000,gameReadyMs:600_000,
   pingMs:10_000,pongMs:30_000,leaseRenewMs:300_000,leaseRetryMs:30_000,leaseRequestMs:15_000,
   sessionSeconds:1800,maxIssuePerMinute:60,maxAnonymousPerMinute:600})
@@ -25,15 +26,15 @@ export type SafeLaunchContext=Readonly<{
   session?:Readonly<{sessionId:string;localParticipantIds:readonly string[]}>
 }>
 export type RuntimeLaunchDescriptor=GameLaunchDescriptor & Readonly<{
-  launchId:string;generation:string;expiresAt:string;bridgeVersion:1
+  launchId:string;generation:string;expiresAt:string;bridgeVersion:1|2
   iframeProfile:'web-v1'|'web-isolated-v1'|'web-legacy-v1';context:SafeLaunchContext
 }>
 /** Portal-only handle. controlToken never reaches iframe/SDK or URL. */
 export type LaunchHandle={descriptor:RuntimeLaunchDescriptor;controlToken:string}
 export type LaunchLease=Readonly<{launchId:string;generation:string;expiresAt:string}>
-export type LaunchClient={create(request:LaunchRequest,signal:AbortSignal):Promise<LaunchHandle>;renew(handle:LaunchHandle,signal:AbortSignal):Promise<LaunchLease>;release(handle:LaunchHandle):Promise<void>}
+export type LaunchClient={start?(handle:LaunchHandle,signal:AbortSignal):Promise<GameStartContext>;create(request:LaunchRequest,signal:AbortSignal):Promise<LaunchHandle>;renew(handle:LaunchHandle,signal:AbortSignal):Promise<LaunchLease>;release(handle:LaunchHandle):Promise<void>}
 export type GameMessageType='GAME_HELLO'|'GAME_READY'|'LEAVE_REQUEST'|'GAME_ERROR'|'GAME_PONG'
-export type BridgeMessage={channel:typeof BRIDGE_CHANNEL;protocolVersion:1;launchId:string;generation:string;type:string;payload:Record<string,unknown>}
+export type BridgeMessage={channel:typeof BRIDGE_CHANNEL;protocolVersion:1|2;launchId:string;generation:string;type:string;payload:Record<string,unknown>}
 export class RuntimeError extends Error {constructor(readonly code:string){super(code);this.name='RuntimeError'}}
 
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -44,7 +45,7 @@ export function safeContext(value:unknown):value is SafeLaunchContext {
   if(!value || typeof value!=='object')return false
   const c=value as SafeLaunchContext,keys=['gameId','gameVersionId','execution','locale','participants',...(Object.hasOwn(c,'session')?['session']:[])]
   if(!objectWithKeys(c,keys) || !uuid.test(c.gameId) || !uuid.test(c.gameVersionId) || !['local','online'].includes(c.execution)
-    || typeof c.locale!=='string' || !/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/.test(c.locale) || !Array.isArray(c.participants) || c.participants.length>64)return false
+    || typeof c.locale!=='string' || !/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/.test(c.locale) || !Array.isArray(c.participants) || c.participants.length>4096)return false
   const ids=new Set<string>()
   for(const p of c.participants){if(!objectWithKeys(p,['participantId','username']) || typeof p.participantId!=='string' || !/^p_[a-f0-9]{32,64}$/.test(p.participantId)
     || typeof p.username!=='string' || p.username.length<1 || p.username.length>80 || /[\u0000-\u001f\u007f]/.test(p.username) || ids.has(p.participantId))return false;ids.add(p.participantId)}
@@ -56,7 +57,7 @@ export function safeContext(value:unknown):value is SafeLaunchContext {
 }
 export function validGameMessage(data:unknown):data is BridgeMessage {
   if(!objectWithKeys(data,['channel','protocolVersion','launchId','generation','type','payload']) || data.channel!==BRIDGE_CHANNEL
-    || data.protocolVersion!==1 || typeof data.launchId!=='string' || !uuid.test(data.launchId) || typeof data.generation!=='string' || !uuid.test(data.generation))return false
+    || (data.protocolVersion!==1 && data.protocolVersion!==2) || typeof data.launchId!=='string' || !uuid.test(data.launchId) || typeof data.generation!=='string' || !uuid.test(data.generation))return false
   const keys=data.type==='GAME_ERROR'?['documentId','code']:data.type==='GAME_PONG'?['documentId','sequence']:['documentId']
   if(!['GAME_HELLO','GAME_READY','LEAVE_REQUEST','GAME_ERROR','GAME_PONG'].includes(String(data.type)) || !objectWithKeys(data.payload,keys)
     || typeof data.payload.documentId!=='string' || !uuid.test(data.payload.documentId))return false

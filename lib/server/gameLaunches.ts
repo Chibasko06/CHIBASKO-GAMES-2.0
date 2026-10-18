@@ -1,4 +1,6 @@
 import 'server-only'
+import { onlineSessionService } from '../online-session/service'
+import { OnlineSessionError } from '../online-session/contracts'
 import { createUserAuthClient } from './adminAuthorization'
 import { adminOriginAllowed } from './adminRequest'
 import { readJsonObject, InputError } from './inputValidation'
@@ -20,9 +22,10 @@ const dependencies:Dependencies={
   },
   service() {
     if(process.env.GAME_RUNTIME_LAUNCHES_ENABLED!=='1')throw new GatewayError('service_unavailable',503)
-    return launchService(uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''),{
+    const db=uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',process.env.SUPABASE_SERVICE_ROLE_KEY ?? '')
+    return launchService(db,{
       publicBase:process.env.GAME_CONTENT_PUBLIC_BASE ?? '',previewBase:process.env.GAME_CONTENT_PREVIEW_BASE ?? '',contentBase:process.env.GAME_CONTENT_BASE_DOMAIN ?? '',
-      portalOrigins:(process.env.GAME_PORTAL_ORIGINS ?? '').split(',').map(s=>s.trim()).filter(Boolean)})
+      portalOrigins:(process.env.GAME_PORTAL_ORIGINS ?? '').split(',').map(s=>s.trim()).filter(Boolean)},onlineSessionService(db).authorize)
   },
 }
 export async function gameLaunchRequest(request:Request,id?:string,deps=dependencies) {
@@ -42,7 +45,7 @@ export async function gameLaunchRequest(request:Request,id?:string,deps=dependen
       || (body.onlineSessionReference!==undefined && (typeof body.onlineSessionReference!=='string' || !/^[A-Za-z0-9_-]{8,128}$/.test(body.onlineSessionReference))))throw new GatewayError('invalid_launch_request',400)
     return Response.json({data:await service.create(await deps.actor(request),body as LaunchRequest)},{status:201,headers})
   }catch(error) {
-    const safe=error instanceof GatewayError || error instanceof UploadError?error:error instanceof InputError?new GatewayError('invalid_launch_request',error.status):new GatewayError('service_unavailable',503)
+    const safe=error instanceof GatewayError || error instanceof UploadError || error instanceof OnlineSessionError?error:error instanceof InputError?new GatewayError('invalid_launch_request',error.status):new GatewayError('service_unavailable',503)
     return Response.json({error:{code:safe.code}},{status:safe.status,headers})
   }
 }

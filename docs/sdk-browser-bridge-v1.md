@@ -105,3 +105,9 @@ Sources SDK : types purs dédiés, `src/client/browser/{protocol,connection,erro
 export `/client`, tests browser/protocole, build IIFE, README/CHANGELOG. Les sources
 restent dans le repository SDK séparé. RUNTIME-COMPAT-1 corrige seulement l'acceptation
 des pings en initialized et adapte les tests/docs ; aucune publication SDK.
+
+
+## Coexistence v2
+
+Cette spécification reste inchangée pour SDK 0.2.0 publié. Le host accepte aussi
+v2, documenté dans `sdk-browser-bridge-v2.md`, sans ajouter de champ au START v1.

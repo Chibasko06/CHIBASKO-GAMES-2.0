@@ -404,3 +404,17 @@ Dans le SDK séparé : `src/client/browser/connection.ts`, `tests/client.test.mj
 Le tag v0.1.0 reste inchangé ; aucun nouveau tag. Aucune modification Pong,
 dépendance Git, auth Cloudflare, DNS, secret ou publication. Aucune copie du SDK
 réintroduite dans la plateforme. Aucun commit, push ou déploiement.
+
+
+## ONLINE-SESSION-1
+
+Le runtime négocie Bridge v1/v2 au premier HELLO. v1/SDK 0.2.0 conserve son START
+sans payload supplémentaire. v2/SDK 0.3.0 ajoute un contexte START local/online.
+INIT reste sans ticket ; READY déclenche la résolution backend d'un ticket frais.
+Le provider START est single-flight, borné, et invalidé au teardown. STOP/START
+reprend le même contexte ; aucune réadmission automatique après un changement de
+visibilité. Les phases de chargement et le renouvellement des artefacts restent
+indépendants de l'admission gameplay et de sa durée de trois minutes.
+
+Voir `online-sessions.md` et `sdk-browser-bridge-v2.md` pour les ressources,
+l'exchange serveur-à-serveur, les permissions, le retry borné et PONG-MIGRATION.

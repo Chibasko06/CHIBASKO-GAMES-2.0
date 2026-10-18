@@ -47,7 +47,7 @@ export function launchService(db:UploadRepository,configuration:Configuration,au
         p_context:context,p_seconds:RUNTIME_POLICY.sessionSeconds,p_actor_limit:RUNTIME_POLICY.maxIssuePerMinute,p_anonymous_limit:RUNTIME_POLICY.maxAnonymousPerMinute})
       const origin=`https://l-${capability}.${config.contentBase}`
       return {descriptor:{...launchDescriptor(version,request.execution,origin),launchId:session.id,generation:session.generation,
-        expiresAt:session.expires_at,bridgeVersion:1,iframeProfile:version.policy.profile,context},controlToken:control}
+        expiresAt:session.expires_at,bridgeVersion:2,iframeProfile:version.policy.profile,context},controlToken:control}
     },
     async authorize(capability:string) {
       if(!/^[a-f0-9]{48}$/.test(capability))throw new GatewayError('launch_expired',403)

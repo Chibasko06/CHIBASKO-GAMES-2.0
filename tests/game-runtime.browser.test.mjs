@@ -35,7 +35,9 @@ async function setup(kind='solo',audience='published',behavior='normal',viewport
     if(!response)return route.fulfill({status:404,body:''})
     await route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())})
   })
-  const page=await context.newPage();if(clock)await page.clock.install();await page.goto('https://portal.test/');await page.waitForFunction(()=>!!window.runtimeFixture)
+  const page=await context.newPage();if(clock){await page.clock.install();h.clock.fixed=Date.now()}
+  // Server and browser virtual time must not diverge with the host test's wall time.
+  await page.goto('https://portal.test/');await page.waitForFunction(()=>!!window.runtimeFixture)
   await page.evaluate(request=>window.runtimeFixture.open(request),h.request)
   return {h,context,page,requests,async running(){await page.locator('[data-phase="running"]').waitFor();return page.frames().find(f=>new URL(f.url()).hostname.startsWith('l-'))}}
 }
