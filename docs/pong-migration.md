@@ -60,6 +60,11 @@ avant début = annulation ; le groupe peut rejouer avec une nouvelle session.
 
 ## Configuration et activation production
 
+Le runbook opérationnel courant est [production-activation.md](production-activation.md)
+avec sa [checklist](production-activation-checklist.md). Il précise les contrôles
+de drift, la frontière PSL, la préactivation sur une cible parallèle et le rollback
+du premier artefact ; les étapes ci-dessous résument seulement les dépendances.
+
 1. Sauvegarder/auditer le schéma cible et appliquer uniquement les migrations
    manquantes dans l'ordre : distribution versions/uploads/previews, launch
    sessions/renewals, online sessions, multiplayer lobbies, puis

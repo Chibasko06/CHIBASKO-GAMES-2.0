@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -82,6 +82,12 @@ try {
     await run('psql',[...args,'-f',fileURLToPath(new URL('./multiplayer-lobby-db.sql',import.meta.url))])
     await run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261018000300_artifact_catalogue_and_server_roster.sql',import.meta.url))])
     await run('psql',[...args,'-f',fileURLToPath(new URL('./game-server-session-db.sql',import.meta.url))])
+    if(process.argv.includes('--production-preflight')) {
+      const report=await run('psql',[...args,'-f',fileURLToPath(new URL('../docs/sql/production-preflight.sql',import.meta.url))])
+      assert.match(report.stdout,/read_only/)
+      assert.match(report.stdout,/game_launch_lifetime_bounds/)
+      console.log('Production preflight SQL executed in a read-only transaction against the disposable migrated schema.')
+    }
     await import('./register.mjs')
     const {runMultiplayerTests}=await import('./multiplayer-db-runner.mjs')
     const query=async sql=>(await run('psql',[...args,'-qAtc',sql])).stdout.trim()
@@ -96,5 +102,29 @@ try {
   assert.equal(race.filter(value=>value.status==='fulfilled').length,1)
   const check=await run('psql',[...args,'-Atc',"select count(*) from public.games g join public.game_versions v on v.id=g.active_version_id where v.game_id<>g.id or v.status<>'published'"])
   assert.equal(check.stdout.trim(),'0')
+  if(multiplayer && process.argv.includes('--production-preflight')) {
+    const manual=await readFile(new URL('../docs/production-activation.md',import.meta.url),'utf8')
+    const template=manual.match(/```sql\n(\\set ON_ERROR_STOP on[\s\S]*?)\n```/)?.[1]
+    assert.ok(template,'Publication template missing')
+    const publication=join(directory,'publish-template.sql')
+    await writeFile(publication,'set role service_role;\n'+template+'\n')
+    const game='11111111-1111-4111-8111-111111111111',version='cececece-cece-4ece-8ece-cececececece'
+    await run('psql',[...args,'-c',`set role service_role;
+      insert into public.game_versions(id,game_id,version,schema_version,integration_version,manifest,artifact_sha256,artifact_size,file_count)
+      select '${version}',game_id,'99.0.0-preflight',schema_version,integration_version,
+      jsonb_set(manifest,'{version}','"99.0.0-preflight"'),artifact_sha256,artifact_size,file_count
+      from public.game_versions where id='33333333-3333-4333-8333-333333333333';
+      update public.game_versions set status='in_review' where id='${version}';
+      update public.game_versions set status='approved' where id='${version}';`])
+    const publish=buildVersion=>run('psql',[...args,'-v',`game_id=${game}`,'-v',`version_id=${version}`,'-v',`game_version=${buildVersion}`,'-f',publication])
+    await assert.rejects(publish('wrong-version'),error=>error.code===3)
+    const unchanged=await run('psql',[...args,'-Atc',`select status from public.game_versions where id='${version}'`])
+    assert.equal(unchanged.stdout.trim(),'approved')
+    await publish('99.0.0-preflight')
+    const activated=await run('psql',[...args,'-Atc',`select v.status from public.games g join public.game_versions v on v.id=g.active_version_id where g.id='${game}' and v.id='${version}'`])
+    assert.equal(activated.stdout.trim(),'published')
+    await assert.rejects(publish('99.0.0-preflight'),error=>error.code===3)
+    console.log('Runbook publication SQL passed: exact game/version/state assertions, atomic publish/pointer and repeat refusal, disposable data only.')
+  }
   console.log('Disposable SQL passed: preserved catalogue, private RLS, immutable payload, lifecycle, same-game active pointer, rollback, archive/activation race and reapplication refusal.')
 } finally { if(started)await run('pg_ctl',['-D',data,'-m','fast','-w','stop']) }

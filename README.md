@@ -24,6 +24,12 @@ Voir [PONG-MIGRATION-1](docs/pong-migration.md),
 [GameRuntime](docs/game-runtime.md), [Distribution](docs/game-distribution.md)
 et [Control plane multijoueur](docs/multiplayer-sessions.md).
 
+Le [plan d'activation production](docs/production-activation.md) fixe l'ordre des
+migrations et ressources, les prérequis du domaine/PSL, les contrôles de sécurité
+et le rollback. La [checklist](docs/production-activation-checklist.md) reste à
+exécuter pendant une activation distincte ; aucune infrastructure n'est activée
+par les builds ou le préflight local.
+
 ## Developpement
 
 ```sh
