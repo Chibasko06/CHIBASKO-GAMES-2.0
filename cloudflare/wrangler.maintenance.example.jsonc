@@ -1,0 +1,10 @@
+// Inactive template: no route, resource or schedule is installed by building it.
+{
+  "name": "chibasko-session-maintenance-example",
+  "main": "../.distribution/session-maintenance.mjs",
+  "compatibility_date": "2026-10-18",
+  "workers_dev": false,
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "observability": { "logs": { "enabled": true, "invocation_logs": false } },
+  "vars": { "GAME_SESSION_MAINTENANCE_ENABLED": "0" }
+}

@@ -8,8 +8,9 @@ import { launchService } from './launch'
 import { artifactRequestPath, parseByteRange, previewCookieValue } from './http'
 import { gameSecurityHeaders } from './headers'
 import { GatewayError, PREVIEW_COOKIE, type GatewayConfiguration } from './contracts'
+import { sha256 } from '../build'
 
-type GatewayEvent={event:'artifact_request';requestId:string;gameId?:string;gameVersionId?:string;path?:string;status:number}
+type GatewayEvent={event:'artifact_request';requestId:string;gameId?:string;gameVersionId?:string;pathSha256?:string;status:number}
 type Dependencies={db:UploadRepository;storage:ArtifactReader;log?:(event:GatewayEvent)=>void}
 function hostIdentity(host:string,config:GatewayConfiguration) {
   const launch=new RegExp('^l-([a-f0-9]{48})\\.'+(config.contentBase ?? '').replaceAll('.','\\.')+'$').exec(host)
@@ -50,7 +51,7 @@ export function createArtifactGateway(configuration:GatewayConfiguration,deps:De
   const config=validateGatewayConfiguration(configuration),previews=previewService(deps.db,config)
   const launches=config.contentBase?launchService(deps.db,{...config,contentBase:config.contentBase}):null
   return async function serve(request:Request):Promise<Response> {
-    const requestId=crypto.randomUUID();let gameId:string|undefined,versionId:string|undefined,path:string|undefined,response:Response
+    const requestId=crypto.randomUUID();let gameId:string|undefined,versionId:string|undefined,path:string|undefined,pathSha256:string|undefined,response:Response
     try {
       const url=new URL(request.url)
       if(url.protocol!=='https:' || url.port || url.username || url.password)throw new GatewayError('version_not_found',404)
@@ -73,6 +74,7 @@ export function createArtifactGateway(configuration:GatewayConfiguration,deps:De
       } else {
         if(!['GET','HEAD'].includes(request.method))throw new GatewayError('unsupported_method',405)
         path=artifactRequestPath(request.url)
+        pathSha256=await sha256(new TextEncoder().encode(path))
         if(identity.kind==='preview') {
           if(!previewFetchAllowed(request,url.origin,config.portalOrigins))throw new GatewayError('preview_forbidden',403)
           const session=await previews.authorize(identity.id,previewCookieValue(request.headers.get('cookie'),PREVIEW_COOKIE))
@@ -119,8 +121,8 @@ export function createArtifactGateway(configuration:GatewayConfiguration,deps:De
     function finish(result:Response) {
       if(request.method==='HEAD' && result.body) {void result.body.cancel();result=new Response(null,{status:result.status,headers:result.headers})}
       result.headers.set('X-Request-Id',requestId)
-      // Deliberately exclude raw URL/query, session ID, cookies, headers and body.
-      try{deps.log?.({event:'artifact_request',requestId,...(gameId?{gameId}:{}),...(versionId?{gameVersionId:versionId}:{}),...(path?{path}:{}),status:result.status})}catch{}
+      // An arbitrary requested path can itself contain a capability; only its digest is logged.
+      try{deps.log?.({event:'artifact_request',requestId,...(gameId?{gameId}:{}),...(versionId?{gameVersionId:versionId}:{}),...(pathSha256?{pathSha256}:{}),status:result.status})}catch{}
       return result
     }
   }

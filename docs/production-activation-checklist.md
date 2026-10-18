@@ -2,6 +2,9 @@
 
 Procédure à exécuter lors d'une phase d'activation distincte. **Toutes les cases
 restent ouvertes dans PREP.** Un contrôle local ne coche pas une ressource distante.
+La [matrice GO-LIVE-GATES-1](production-go-gates.md) ajoute les preuves récentes
+(UUID, audit runtime, maintenance). Le lot contient désormais une migration 9 de
+cleanup après les huit migrations initiales ; aucune n'est appliquée à distance ici.
 Le [runbook](production-activation.md) décrit les paramètres et arrêts obligatoires.
 
 Journal à conserver hors secrets : release SHA, lockfile SHA, images/digests,
@@ -28,7 +31,7 @@ ticket, cookie, credential, JWT, URL signée ou capture réseau brute.
 6. [ ] **Préflight DB read-only** : `psql -X -v ON_ERROR_STOP=1 -f docs/sql/production-preflight.sql`.
    Comparer objets/signatures/grants/checks au lot ; résoudre tout drift avant DDL.
 7. [ ] **Appliquer le suffixe manquant des migrations**, une par une dans cet ordre :
-   versions → uploads → previews → launches → renewals → online → lobbies → projection/roster.
+   versions → uploads → previews → launches → renewals → online → lobbies → projection/roster → maintenance.
    Stop immédiat sur erreur ; pas de reset ni push historique global. Refaire l'inventaire,
    vérifier RLS/table+colonne/RPC/trigger/FK/index et cache PostgREST.
 8. [ ] **Récupérer PONG_GAME_ID** par la requête du runbook ; exactement une ligne officielle.

@@ -1,0 +1,4 @@
+{
+  "local": {"players": {"min": 2, "max": 2}},
+  "online": {"access": ["public", "private"], "players": {"min": 2, "max": 2}}
+}

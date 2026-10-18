@@ -1,6 +1,9 @@
 # Activation production — PRODUCTION-ACTIVATION-1 PREP
 
 État du plan : préparation locale, aucune activation distante effectuée.
+Depuis GO-LIVE-GATES-1, consulter la [matrice de gates](production-go-gates.md) :
+UUID officiel Pong récupéré en GET, npm runtime corrigé, maintenance partagée
+préparée dans une neuvième migration. Les ressources distantes restent inactives.
 L'architecture technique est celle de production ; staging utilise les mêmes
 composants, avec des ressources et identités séparées. Une compilation réussie
 ne valide ni les ressources distantes ni leur configuration.
@@ -52,7 +55,8 @@ Public/privé concerne le lobby ; le chemin gameplay et l'admission sont identiq
 
 ## 3. Base de données : préflight, ordre, drift
 
-Les huit fichiers ci-dessous constituent le lot préparé. Leur SHA-256 est émis
+Les huit migrations initiales et la maintenance ajoutée constituent le lot préparé.
+Leur SHA-256 est émis
 par `node scripts/production-preflight.mjs`. Archiver ce relevé avec le journal
 de release, sans y joindre d'environnement ou de secret.
 
@@ -66,6 +70,7 @@ de release, sans y joindre d'environnement ou de secret.
 | 6. `20261018000100_online_sessions.sql` | Deployments/compatibilités, sessions/participants, credentials, tickets, exchange limits ; RPC prepare/context/ticket/exchange/revoke/cleanup. Dépend de launch et versions. Remplace **par son nom** `game_launch_sessions_safe_context_check` par limite 1 MiB. | Désactiver nouveaux départs, laisser finir les connexions établies ; fermer/révoquer explicitement si incident. Conserver historique/roster et hashes. Une credential révoquée n'est pas réactivée pour contourner un incident. |
 | 7. `20261018000200_multiplayer_lobbies.sql` | Policies, lobbies, members, rounds, API limits, pin trigger et RPC publiques/privées via serveur ; dépend de 6 + `profiles(id,username)` et catalogue publié. Remplace `distribution_cleanup_online` pour préserver les FK des rounds. | Fermer/drainer les lobbies, conserver rounds/sessions. Ne pas restaurer l'ancien cleanup online : il pourrait tenter de supprimer des sessions encore référencées. Aucun annuaire mémoire de secours. |
 | 8. `20261018000300_artifact_catalogue_and_server_roster.sql` | Aucune table. Projection `get_published_game_runtimes()` et RPC serveur `distribution_server_session(text,text)`. Dépend de 1/6/7. Projection catalogue EXECUTE anon/auth/service ; roster strictement service. | Conserver tant que le nouveau portail/serveur fonctionne. Retirer ces deux RPC uniquement après rollback du consommateur ; retrait de la projection rendrait les parcours indisponibles. |
+| 9. `20261018000400_control_plane_maintenance.sql` | Wrapper service-only `distribution_cleanup_sessions()` ; lock transactionnel partagé, cleanup lobby puis online. Dépend de 7/8, aucune donnée créée. | Arrêter le scheduler avant retrait éventuel ; garder les fonctions antérieures et données. Aucune suppression automatique. |
 
 Le détail des objets est dans [production-migrations.md](production-migrations.md).
 Les migrations sont transactionnelles mais **le lot entier ne l'est pas** : après
@@ -131,8 +136,9 @@ nécessite un incident déclaré avec fenêtre de perte de données connue.
 
 ## 4. Identité et build Pong
 
-Aucun UUID officiel fiable n'est présent dans les sources versionnées. À exécuter
-en lecture seule sur le catalogue officiel :
+L'UUID officiel a été récupéré en lecture GET pendant GO-LIVE-GATES-1 :
+`c4245041-271b-4b10-a133-89a3fa8c2119`. Le relevé et les contrôles d'unicité/type
+sont dans la matrice. Nouvelle vérification en lecture seule avant activation :
 
 ```sql
 begin transaction read only;
@@ -630,12 +636,13 @@ cron gateway 15 min, variables et secrets inventoriés. Les `name`/routes de
 pas être exécuté pendant PREP. Le script retire les fallbacks `.env` privés d'OpenNext ;
 les bindings runtime restent indispensables.
 
-### Nettoyage partagé manquant à raccorder
+### Nettoyage partagé à activer
 
 Les RPC `distribution_cleanup_multiplayer()` et `distribution_cleanup_online()`
-existent, mais aucun scheduler production de ces deux opérations n'est câblé dans
-le dépôt. Préparer une tâche partagée backend, par exemple planifiée toutes les
-5 min, qui appelle **lobby puis online**, avec service-role, timeout, retry et alerte.
+sont maintenant regroupées par `distribution_cleanup_sessions()` (migration 9),
+avec verrou transactionnel multi-instance. Le Worker session-maintenance et son
+exemple de configuration désactivé sont préparés ; aucun cron distant n'est créé.
+Prévoir son activation toutes les 5 min, service-role séparée par environnement et alerte.
 Ne pas confondre avec le cron gateway (preview/launch seulement), le cleanup upload
 du Node validator ou un timer local Next.js. Le choix exact du scheduler et sa recette
 doivent être terminés avant ouverture. Le cleanup clôt les lobbies expirés, conserve
@@ -682,7 +689,7 @@ Avant ouverture, alertes mesurables et responsables d'exploitation définis :
 | --- | --- |
 | Upload/outbox | failed/expired, âge queued/validating, leases, tentatives, dispatch failures ; uploadId/gameId/versionId, jamais URL signée |
 | Validator | codes d'échec, durée/tailles, disque/RAM, redelivery/DLQ, échec cleanup, restart ; pas d'archive/manifest complet dans logs |
-| Gateway | taux 2xx/4xx/5xx, storage_error, Range/HEAD, latency ; requestId/versionId/path normalisé, pas de hostname capability ni cookies |
+| Gateway | taux 2xx/4xx/5xx, storage_error, Range/HEAD, latency ; requestId/versionId/pathSha256, pas de chemin brut, hostname capability ni cookies |
 | Runtime | descriptor/handshake/ready timeouts, renew/revoke failures, stale generation ; aucune URL/controlToken/context intégral |
 | Exchange/lobby | erreurs par code, rate limits, session/deployment opaques, conflits START/replay, cleanup ; aucun ticket/credential/JWT |
 | Pong | health, nombre de rooms actives, admissions/forfaits, delivery lifecycle, crash/restart, CPU/RAM ; pas de bodies/headers/query réservation |
@@ -713,7 +720,7 @@ git diff --check
 
 Le script preflight ne fait ni réseau, ni subprocess, ni écriture. Il vérifie les
 dépendances registre, l'ordre/transactions/SHA des migrations. Option
-`--component=portal|gateway|dispatcher|validator` : contrôle présence/forme des
+`--component=portal|gateway|dispatcher|validator|maintenance` : contrôle présence/forme des
 variables **déjà injectées**, jamais leur valeur dans la sortie. Aucun `.env` chargé
 automatiquement ; pas de test de credential, de binding distant ou de permission.
 Un succès local ne valide pas l'activation ; `remoteReadiness`/`bindingReadiness`

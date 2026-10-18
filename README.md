@@ -30,6 +30,11 @@ et le rollback. La [checklist](docs/production-activation-checklist.md) reste à
 exécuter pendant une activation distincte ; aucune infrastructure n'est activée
 par les builds ou le préflight local.
 
+La [matrice GO-LIVE](docs/production-go-gates.md) consigne les preuves locales,
+les gates externes, le contrôle de drift read-only et les opérations restant à
+exécuter. `npm run test:go-live` et `npm run test:go-live-db` vérifient l'outillage
+et la maintenance partagée sans connexion production.
+
 ## Developpement
 
 ```sh

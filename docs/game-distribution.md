@@ -920,7 +920,7 @@ quota_exceeded, artifact_not_found, invalid_artifact_path, invalid_range,
 service_worker_forbidden, unsupported_method, storage_error et service_unavailable.
 Une incohérence serveur/policy échoue avec 503, jamais avec SQL, stack ou clé R2.
 Les journaux structurés contiennent seulement requestId, gameId, gameVersionId,
-path normalisé et statut HTTP. Ils excluent URL/query brute, session ID, headers,
+empreinte SHA-256 du path normalisé et statut HTTP. Ils excluent path/URL/query bruts, session ID, headers,
 corps, tickets et cookies. La configuration d'exemple désactive les invocation logs
 automatiques ; vérifier aussi la journalisation amont/CDN avant activation.
 

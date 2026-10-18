@@ -211,6 +211,16 @@ SHA-256 : `6d40806e8e0cf1feeb266f2dacbbab8d8439211e47d02f85a9f8033bae7f8ae1`.
 - `public.get_published_game_runtimes()`
 - `public.distribution_server_session(p_credential_hash text,p_session text)`
 
+## 20261018000400_control_plane_maintenance.sql
+
+Ajout GO-LIVE-GATES-1, après les huit fichiers initiaux inchangés.
+SHA-256 : `e309e11187b34fb3943692f0efd14768e82c043e99674a2560c5886a67e1fb2d`.
+
+- Fonction `public.distribution_cleanup_sessions()` ; aucune table/index/donnée créée.
+- Dépend de `distribution_cleanup_multiplayer()` puis `distribution_cleanup_online()`.
+- Advisory lock transactionnel partagé, service_role uniquement, doublons sans travail.
+- Worker session-maintenance préparé, exemple Cron désactivé ; aucune application distante.
+
 ## Points transverses à vérifier
 
 - Indexes de PK/UNIQUE générés par PostgreSQL en plus des indexes explicites ci-dessus ; tous les CHECK et FK doivent être validés.

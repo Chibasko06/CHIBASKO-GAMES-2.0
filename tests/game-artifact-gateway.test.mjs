@@ -183,6 +183,10 @@ test('security profiles deny external network by default, constrain framing and 
 test('request logs and failures expose neither grants/cookies nor private R2/DB metadata',async()=>{
   const h=await harness(),x=await exchange(h)
   await h.gateway(request(x.origin,'missing.js?secret=do-not-log',{headers:{Cookie:x.cookie}}))
+  const sensitivePath='assets/'+x.issued.preview.fields.ticket+'.js'
+  await h.gateway(request(x.origin,sensitivePath,{headers:{Cookie:x.cookie}}))
+  assert.equal(h.logs.at(-1).pathSha256,await sha256(encoder.encode(sensitivePath)))
+  assert.ok(!Object.hasOwn(h.logs.at(-1),'path'))
   const logs=JSON.stringify(h.logs)
   assert.doesNotMatch(logs,/do-not-log|staging|source.zip|ticket|cookie|authorization/i);assert.ok(!logs.includes(x.issued.preview.fields.ticket));assert.ok(!logs.includes(x.cookie))
   const broken=createArtifactGateway(config,{db:h.db,storage:{async head(){throw new Error('private-bucket/staging/key')},async get(){throw new Error()}}})

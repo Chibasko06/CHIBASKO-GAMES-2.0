@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { parse, getDomain } from 'tldts'
+import { readJson } from './read-json.mjs'
 
 export const migrations = Object.freeze([
   '20261016000100_game_distribution_versions.sql',
@@ -13,6 +14,7 @@ export const migrations = Object.freeze([
   '20261018000100_online_sessions.sql',
   '20261018000200_multiplayer_lobbies.sql',
   '20261018000300_artifact_catalogue_and_server_roster.sql',
+  '20261018000400_control_plane_maintenance.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']
@@ -24,6 +26,7 @@ export const environments = Object.freeze({
     'GAME_DISTRIBUTION_UPLOADS_ENABLED', 'GAME_ARTIFACT_PREVIEWS_ENABLED', 'GAME_RUNTIME_LAUNCHES_ENABLED', ...shared, ...r2],
   gateway: [...database, ...shared, 'GAME_ARTIFACT_GATEWAY_ENABLED'],
   dispatcher: database,
+  maintenance: [...database, 'GAME_SESSION_MAINTENANCE_ENABLED'],
   validator: [...database, ...r2, 'GAME_BUILDS_ARTIFACTS_BUCKET', 'GAME_BUILDS_QUEUE_ID', 'GAME_BUILDS_QUEUE_TOKEN'],
 })
 
@@ -88,13 +91,23 @@ export async function localChecks(root) {
 
 export async function main(args = process.argv.slice(2)) {
   if (args.includes('--help')) {
-    console.log('node scripts/production-preflight.mjs [--component=portal|gateway|dispatcher|validator]\nRead-only local checks. Optional component checks inspect inherited environment names/shape; values are never printed. No network, subprocess, file writes or resource activation. Remote readiness is NOT checked.')
+    console.log('node scripts/production-preflight.mjs [--component=portal|gateway|dispatcher|validator|maintenance] [--audit-report=PATH]\nRead-only local checks. Audit evidence must match the current lockfile. Environment values are never printed. No network, subprocess, file writes or resource activation. Remote readiness is NOT checked.')
     return
   }
-  if (args.length > 1 || args.some(value => !/^--component=(portal|gateway|dispatcher|validator)$/.test(value))) throw new Error('invalid_arguments')
+  if (args.some(value => !/^--component=(portal|gateway|dispatcher|validator|maintenance)$/.test(value) && !/^--audit-report=.+$/.test(value))
+    || new Set(args.map(value=>value.split('=')[0])).size!==args.length) throw new Error('invalid_arguments')
   const root = fileURLToPath(new URL('../', import.meta.url))
   const result = await localChecks(root)
-  if (args.length) result.checks.push(...environmentChecks(args[0].split('=')[1], process.env))
+  const component=args.find(value=>value.startsWith('--component='))?.split('=')[1]
+  if (component) result.checks.push(...environmentChecks(component, process.env))
+  const audit=args.find(value=>value.startsWith('--audit-report='))?.slice('--audit-report='.length)
+  if(audit) {
+    const report=await readJson(audit),lock=await readFile(resolve(root,'package-lock.json'))
+    result.checks.push({check:'runtime_audit_current_lock',ok:report.format===1 && report.scope==='production'
+      && report.lockfileSha256===createHash('sha256').update(lock).digest('hex')})
+    result.checks.push({check:'runtime_audit_clean',ok:Array.isArray(report.packages) && report.packages.length===0
+      && ['info','low','moderate','high','critical','total'].every(name=>report.counts?.[name]===0)})
+  }
   result.ok = result.checks.every(check => check.ok)
   result.remoteReadiness = 'not_checked'
   result.bindingReadiness = 'not_checked'

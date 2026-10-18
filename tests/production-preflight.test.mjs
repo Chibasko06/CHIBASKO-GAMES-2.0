@@ -6,7 +6,7 @@ import { localChecks, environmentChecks, environments } from '../scripts/product
 test('local inventory checks registry dependencies and ordered transactional migrations', async () => {
   const result = await localChecks(fileURLToPath(new URL('../', import.meta.url)))
   assert.equal(result.checks.every(check => check.ok), true)
-  assert.equal(result.migrations.length, 8)
+  assert.equal(result.migrations.length, 9)
   assert.equal(result.migrations.every(item => /^[a-f0-9]{64}$/.test(item.sha256)), true)
 })
 test('missing environment fails without printing secret values', () => {

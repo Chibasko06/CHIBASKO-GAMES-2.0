@@ -1,5 +1,10 @@
 # Audit npm avant activation
 
+Relevé historique PRODUCTION-ACTIVATION-1 PREP, avant corrections.
+Le [relevé GO-LIVE-GATES-1](production-go-gates.md) le complète : runtime à zéro
+alerte après source-map-js/mapping/Resend, 12 alertes dev restantes. Les versions
+et gates ci-dessous décrivent le point de départ, pas l'état corrigé courant.
+
 Relevé du 18 octobre 2026, `npm audit --json --registry=https://registry.npmjs.org`.
 
 **17 paquets signalés : 12 high, 4 moderate, 1 low, 0 critical.** Les alertes héritées ne sont pas 17 vulnérabilités indépendantes. Aucune dépendance ni lockfile modifié dans PREP. Aucun `npm audit fix --force` exécuté.

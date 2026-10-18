@@ -81,6 +81,7 @@ try {
   if(multiplayer){
     await run('psql',[...args,'-f',fileURLToPath(new URL('./multiplayer-lobby-db.sql',import.meta.url))])
     await run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261018000300_artifact_catalogue_and_server_roster.sql',import.meta.url))])
+    await run('psql',[...args,'-f',fileURLToPath(new URL('../supabase/migrations/20261018000400_control_plane_maintenance.sql',import.meta.url))])
     await run('psql',[...args,'-f',fileURLToPath(new URL('./game-server-session-db.sql',import.meta.url))])
     if(process.argv.includes('--production-preflight')) {
       const report=await run('psql',[...args,'-f',fileURLToPath(new URL('../docs/sql/production-preflight.sql',import.meta.url))])
