@@ -598,7 +598,7 @@ HTML, WASM ou binaire du jeu n'est exécuté. Le parser enfant reçoit uniquemen
 cible/policy/chemin scratch, pas les credentials de son superviseur.
 
 Policy unique : `lib/game-distribution/uploads/policy.ts`, snapshot DB par session.
-Par défaut : archive 4 GiB, extrait 16 GiB, fichier 4 GiB, 50k entrées, profondeur
+Par défaut : archive 500 MiB, extrait 16 GiB, fichier 4 GiB, 50k entrées, profondeur
 32, ratio 200, manifest 64 KiB, parsing 15 min, job 1 h, session 24 h, URLs 15 min,
 3 tentatives, 2 uploads actifs/compte, 20/jour, 120 opérations/minute. Ces valeurs
 doivent être dimensionnées et testées sur l'hôte avant activation, pas considérées

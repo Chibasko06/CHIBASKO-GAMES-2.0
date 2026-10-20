@@ -4,6 +4,7 @@ import { changeGameFormType, gameFormPayload, type GameType } from '@/lib/multip
 import GameTypeFields from '@/components/admin/GameTypeFields'
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
 import { useAdminAccess } from '@/components/admin/useAdminAccess'
 import { uploadAdminAvatar, uploadAdminGameThumbnail } from '@/lib/avatarUpload'
@@ -767,6 +768,7 @@ function AdminPanel() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="mb-2 text-2xl font-black uppercase text-cyan-500">Admin Chibasko Games</h1>
+            <Link href="/admin/game-builds" className="text-cyan-300 underline">Revue et publication des builds de jeux</Link>
             <p className="text-zinc-400">
               Gere le catalogue, les categories, la FAQ et les profils joueurs.
             </p>

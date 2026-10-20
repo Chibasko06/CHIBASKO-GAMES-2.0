@@ -177,6 +177,14 @@ Le `gameVersionId` est attribué par l'upload, distinct de `gameId` et de `0.3.0
 
 ## 5. Ressources R2 et Queue
 
+La préparation du producteur vers `chibasko-game-builds` est détaillée dans le
+[runbook dispatcher](build-dispatcher-production.md). Le Worker conserve le binding
+natif `BUILD_VALIDATIONS`, séparément du validateur HTTP Pull et du Gateway.
+La configuration production désactive volontairement le dispatcher avec une liste
+de crons vide pendant la validation manuelle des builds. Réactiver le cron minute
+uniquement après déploiement et vérification d'un Build Validator permanent.
+Les références au cron ci-dessous décrivent cette cible automatique future.
+
 Deux buckets privés de distribution sont nécessaires, en plus du bucket média
 existant `CHIBASKO_ASSETS`. Leurs noms définitifs sont de la configuration externe.
 
@@ -245,10 +253,10 @@ Le parent lit l'archive en stream sur disque ; le child statique a heap 384 MiB,
 permission Node limitée au module et scratch, environnement minimal sans credentials,
 pas d'exécution de JS du jeu. Ce modèle Node est une défense supplémentaire, pas
 un remplacement de l'isolation OS. Tester disque plein, timeout et kill/crash.
-Scratch : jusqu'à 4 GiB archive + 16 GiB décompressés + métadonnées ; réserver au
+Scratch : jusqu'à 500 MiB archive + 16 GiB décompressés + métadonnées ; réserver au
 moins cette capacité avec marge (40 GiB par job comme budget de recette, à mesurer).
 
-Policy centrale `lib/game-distribution/uploads/policy.ts`, révision 1 : archive 4 GiB,
+Policy centrale `lib/game-distribution/uploads/policy.ts`, révision 1 : archive 500 MiB,
 total 16 GiB, fichier 4 GiB, 50 000 fichiers, manifest 64 KiB, profondeur 32,
 ratio 200, extraction 15 min, job 1 h, lease job + 120 s, 3 tentatives, 2 uploads
 actifs et 20/jour par acteur, 120 requêtes/min. Ces limites ne sont pas des variables

@@ -227,6 +227,12 @@ export type Database = {
       }
       game_submissions: {
         Row: {
+          build_upload_id?: string | null
+          submission_kind?: 'new' | 'update' | null
+          release_date?: string | null
+          technology?: string | null
+          cover_image_url?: string | null
+          category_ids?: string[] | null
           admin_notes: string | null
           category_names: string[]
           created_at: string
@@ -251,6 +257,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          build_upload_id?: string | null
+          submission_kind?: 'new' | 'update' | null
+          release_date?: string | null
+          technology?: string | null
+          cover_image_url?: string | null
+          category_ids?: string[] | null
           admin_notes?: string | null
           category_names?: string[]
           created_at?: string
@@ -275,6 +287,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          build_upload_id?: string | null
+          submission_kind?: 'new' | 'update' | null
+          release_date?: string | null
+          technology?: string | null
+          cover_image_url?: string | null
+          category_ids?: string[] | null
           admin_notes?: string | null
           category_names?: string[]
           created_at?: string
@@ -302,6 +320,7 @@ export type Database = {
       }
       games: {
         Row: {
+          catalogue_source?: 'developer_submission' | null
           created_at: string
           description: string | null
           developer_name: string | null
@@ -324,6 +343,7 @@ export type Database = {
           views_count: number
         }
         Insert: {
+          catalogue_source?: 'developer_submission' | null
           created_at?: string
           description?: string | null
           developer_name?: string | null
@@ -346,6 +366,7 @@ export type Database = {
           views_count?: number
         }
         Update: {
+          catalogue_source?: 'developer_submission' | null
           created_at?: string
           description?: string | null
           developer_name?: string | null

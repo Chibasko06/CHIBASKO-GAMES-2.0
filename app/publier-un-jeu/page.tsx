@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
   title: 'Publier un jeu navigateur sur Chibasko Games',
   description:
-    'Developpeur HTML5, WebGL ou iframe : propose ton jeu navigateur a Chibasko Games pour etude, visibilite et eventuelles collaborations.',
+    'Envoyez votre build Web ZIP et suivez sa vérification manuelle par Chibasko Games. Chaque version fait l’objet d’une revue avant publication.',
   path: '/publier-un-jeu',
 })
 

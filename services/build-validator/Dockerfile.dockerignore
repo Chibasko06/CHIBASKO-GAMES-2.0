@@ -1,0 +1,15 @@
+**
+!package.json
+!package-lock.json
+!scripts/
+!scripts/build-validator.mjs
+!services/
+!services/build-validator/
+!services/build-validator/*.ts
+!lib/
+!lib/game-distribution/
+!lib/game-distribution/**
+**/.env*
+**/.dev.vars*
+**/*.pem
+**/*.key

@@ -42,6 +42,22 @@ try {
     assert.equal(counts.stdout.trim(),'1:1:1')
     console.log('Upload SQL passed: ownership/admin/IDOR/RLS, expiration, idempotence, outbox, lease fencing, revocation, retry and concurrent version uniqueness.')
   }
+  if(process.argv.includes('--reviews')) {
+    await run('psql',[...args,'-f',fileURLToPath(new URL('./build-review-db.sql',import.meta.url))])
+    const publish="set role service_role;select public.distribution_review_action('dddddddd-dddd-4ddd-8ddd-dddddddddddd','12121212-1212-4212-8212-121212121212','publish')"
+    const results=await Promise.all([1,2].map(()=>run('psql',[...args,'-Atc',publish])))
+    for(const result of results)assert.match(result.stdout,/published/)
+    const count=await run('psql',[...args,'-Atc',"select count(*) from public.game_build_review_events where upload_id='12121212-1212-4212-8212-121212121212' and action='publish'"])
+    assert.equal(count.stdout.trim(),'1')
+    await run('psql',[...args,'-c',"set role service_role;select public.distribution_review_action('dddddddd-dddd-4ddd-8ddd-dddddddddddd','12121212-1212-4212-8212-121212121212','archive','{}','Retrait fixture')"])
+    const active=await run('psql',[...args,'-Atc',"select active_version_id is null from public.games where id='13131313-1313-4313-8313-131313131313'"])
+    assert.equal(active.stdout.trim(),'t')
+    console.log('Build review SQL passed: admin authorization, RLS, safe projections, review gate, rejection, immutable artifacts, concurrent idempotent publication and archive.')
+    if(process.argv.includes('--submissions')){
+      await run('psql',[...args,'-f',fileURLToPath(new URL('./developer-submissions-db.sql',import.meta.url))])
+      await run('psql',[...args,'-f',fileURLToPath(new URL('./submission-catalogue-db.sql',import.meta.url))])
+    }
+  }
   if(process.argv.includes('--previews') || process.argv.includes('--launches')) {
     await run('psql',[...args,'-f',fileURLToPath(new URL('./game-artifact-db.sql',import.meta.url))])
     const exchanges=await Promise.allSettled(['2','3'].map(hash=>run('psql',[...args,'-c',`set role service_role;select public.distribution_exchange_preview('fafafafa-fafa-4afa-8afa-fafafafafafa',repeat('1',64),repeat('${hash}',64))`])))

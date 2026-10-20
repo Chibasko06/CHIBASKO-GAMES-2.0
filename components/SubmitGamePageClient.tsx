@@ -1,366 +1,138 @@
-"use client";
+'use client'
+import Link from 'next/link'
+import {useEffect,useId,useRef,useState} from 'react'
+import {useAuth} from '@/components/AuthProvider'
+import {SubmissionTabs,ManagedGamePicker,type SubmissionMode,type ManagedGame} from './SubmissionGameChoice'
+import {developerJson,putPart,uploadBuild,zipFileAllowed,submissionError,SubmissionError,type UploadDraft} from '@/lib/game-distribution/browser-upload'
+import {REVIEW_NOTICE} from '@/lib/game-distribution/review'
+import {FormFeedback,HelpText} from './ui/FormFeedback'
+import GameIdentityNotice from './GameIdentityNotice'
 
-import { FormEvent, useMemo, useState } from 'react'
+type Category={id:string;name:string;slug:string}
+function restore<T>(key:string):T|null{try{return typeof sessionStorage==='undefined'?null:JSON.parse(sessionStorage.getItem(key)??'null')}catch{return null}}
+function remember(key:string,value:unknown){try{if(value===null)sessionStorage.removeItem(key);else sessionStorage.setItem(key,JSON.stringify(value))}catch{/* Persistence is optional; live uploads remain usable. */}}
 
-type CategoryOption = {
-  id: string
-  name: string
-  slug: string
+export default function SubmitGamePageClient({categories}:{categories:Category[]}){
+  const {session,loading}=useAuth()
+  if(loading)return <main className="mx-auto max-w-3xl p-6"><FormFeedback tone="info" title="Chargement du compte…" announce/></main>
+  if(!session)return <main className="mx-auto max-w-3xl space-y-5 p-6"><h1 className="text-3xl font-bold">Publier un jeu</h1><FormFeedback tone="info" title="Connectez-vous pour soumettre un jeu"><p>Un compte est nécessaire pour envoyer un build Web ZIP et suivre sa vérification.</p></FormFeedback><HelpText>{REVIEW_NOTICE}</HelpText><nav className="flex gap-4"><Link href="/login?next=%2Fpublier-un-jeu">Se connecter</Link><Link href="/register?next=%2Fpublier-un-jeu">Créer un compte</Link></nav></main>
+  return <Submission key={session.user.id} actor={session.user.id} token={session.access_token} categories={categories}/>
 }
 
-type SubmitGameFormState = {
-  name_or_studio: string
-  email: string
-  developer_website: string
-  game_title: string
-  demo_url: string
-  game_type: string
-  category_names: string[]
-  short_description: string
-  long_description: string
-  mobile_compatibility: string
-  sensitive_content: string
-  has_ads: 'unknown' | 'yes' | 'no'
-  published_elsewhere: string
-  expectations: string
-  message: string
-  ownership_confirmed: boolean
-}
-
-const emptyForm: SubmitGameFormState = {
-  name_or_studio: '',
-  email: '',
-  developer_website: '',
-  game_title: '',
-  demo_url: 'https://',
-  game_type: '',
-  category_names: [],
-  short_description: '',
-  long_description: '',
-  mobile_compatibility: '',
-  sensitive_content: '',
-  has_ads: 'unknown',
-  published_elsewhere: '',
-  expectations: '',
-  message: '',
-  ownership_confirmed: false,
-}
-
-export default function SubmitGamePageClient({
-  categories,
-}: {
-  categories: CategoryOption[]
-}) {
-  const [form, setForm] = useState<SubmitGameFormState>(emptyForm)
-  const [sending, setSending] = useState(false)
-  const [feedback, setFeedback] = useState<string | null>(null)
-
-  const selectedCount = useMemo(() => form.category_names.length, [form.category_names.length])
-
-  const handleCategoryToggle = (name: string) => {
-    setForm((current) => ({
-      ...current,
-      category_names: current.category_names.includes(name)
-        ? current.category_names.filter((entry) => entry !== name)
-        : [...current.category_names, name],
-    }))
-  }
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setFeedback(null)
-
-    if (
-      !form.name_or_studio ||
-      !form.email ||
-      !form.game_title ||
-      !form.demo_url ||
-      !form.game_type ||
-      !form.short_description ||
-      !form.long_description ||
-      !form.mobile_compatibility ||
-      !form.sensitive_content
-    ) {
-      setFeedback('Remplis tous les champs obligatoires avant d envoyer ta proposition.')
-      return
-    }
-
-    if (!form.demo_url.startsWith('https://')) {
-      setFeedback('Le lien de demo doit commencer par https://.')
-      return
-    }
-
-    if (form.developer_website && !form.developer_website.startsWith('https://')) {
-      setFeedback('Le site ou portfolio doit commencer par https://.')
-      return
-    }
-
-    if (!form.ownership_confirmed) {
-      setFeedback('Tu dois confirmer que tu es proprietaire du jeu ou autorise a le proposer.')
-      return
-    }
-
-    setSending(true)
-
-    try {
-      const response = await fetch('/api/game-submissions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(form),
-      })
-
-      const payload = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        throw new Error(payload?.error || 'Impossible d envoyer la proposition.')
+function Submission({actor,token,categories}:{actor:string;token:string;categories:Category[]}){
+  const key='cg-build-upload:'+actor,reservationKey='cg-game-registration:'+actor
+  const [restored]=useState(()=>restore<UploadDraft>(key))
+  const [reserved,setReserved]=useState(()=>restore<{id:string;title:string}>(reservationKey))
+  const [mode,setMode]=useState<SubmissionMode>(restored?.mode??'new')
+  const [games,setGames]=useState<ManagedGame[]>([]),[offset,setOffset]=useState(0),[max,setMax]=useState(0),[loadingGames,setLoadingGames]=useState(true)
+  const [game,setGame]=useState(restored?.gameId??''),[title,setTitle]=useState(reserved?.title??''),[version,setVersion]=useState(restored?.version??'')
+  const [studio,setStudio]=useState(''),[releaseDate,setReleaseDate]=useState(''),[description,setDescription]=useState(''),[website,setWebsite]=useState(''),[technology,setTechnology]=useState(''),[mobile,setMobile]=useState('')
+  const [selected,setSelected]=useState<string[]>([]),[ownership,setOwnership]=useState(false),[file,setFile]=useState<File|null>(null),[cover,setCover]=useState<File|null>(null)
+  const [draft,setDraft]=useState<UploadDraft|null>(restored),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[error,setError]=useState(''),[done,setDone]=useState(false)
+  const [editorialUpload,setEditorialUpload]=useState<string|null>(null)
+  const stop=useRef<AbortController|null>(null),registration=useRef<string|null>(null)
+  const errorId=useId()
+  const gameId=mode==='new'?(draft?.gameId??reserved?.id??''):game
+  useEffect(()=>()=>stop.current?.abort(),[])
+  useEffect(()=>{if(error){const notice=document.getElementById(errorId);notice?.focus({preventScroll:true});notice?.scrollIntoView({block:'nearest'})}},[error,errorId])
+  useEffect(()=>{
+    const id=new URLSearchParams(window.location.search).get('upload');if(!id)return
+    const controller=new AbortController()
+    developerJson('/api/developer/submissions?uploadId='+encodeURIComponent(id),token,{signal:controller.signal}).then(({data})=>{
+      if(!controller.signal.aborted){setEditorialUpload(id);setMode(data.kind);setGame(data.gameId);setVersion(data.version)
+        if(data.kind==='new'){const value={id:data.gameId,title:''};setReserved(value);remember(reservationKey,value)}
       }
-
-      setForm(emptyForm)
-      setFeedback('Ta proposition a bien ete envoyee. Elle passera dans le workflow de validation Chibasko Games.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Impossible d envoyer la proposition.')
-    } finally {
-      setSending(false)
-    }
+    }).catch(()=>{if(!controller.signal.aborted)setError('Soumission introuvable ou accès refusé.')})
+    return()=>controller.abort()
+  },[token,reservationKey])
+  useEffect(()=>{
+    const controller=new AbortController()
+    developerJson('/api/developer/games?offset='+offset,token,{signal:controller.signal}).then(body=>{
+      if(!controller.signal.aborted){setGames(body.data);setMax(body.maxArchiveBytes);setLoadingGames(false)}
+    }).catch(()=>{if(!controller.signal.aborted){setError('Impossible de charger les jeux gérés.');setLoadingGames(false)}})
+    return()=>controller.abort()
+  },[token,offset])
+  const save=(value:UploadDraft)=>{setDraft({...value});remember(key,value)}
+  async function createGame(){
+    setBusy(true);setError('')
+    try{
+      registration.current??=crypto.randomUUID()
+      const body=await developerJson('/api/developer/games',token,{method:'POST',headers:{'Idempotency-Key':registration.current},body:JSON.stringify({title})})
+      const value={id:body.data.gameId,title};setReserved(value);remember(reservationKey,value)
+      registration.current=null
+    }catch(cause){setError(submissionError(cause instanceof SubmissionError?cause.code:''))}finally{setBusy(false)}
   }
-
-  return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-[30px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(6,10,16,0.98),rgba(15,23,42,0.94))] p-8 md:p-10">
-        <p className="text-[11px] uppercase tracking-[0.45em] text-cyan-300/80">Espace developpeur</p>
-        <h1 className="mt-4 text-4xl font-black uppercase text-white md:text-5xl">Publier un jeu</h1>
-        <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-300">
-          Tu developpes un jeu HTML5, WebGL ou jouable directement dans le navigateur ? Propose ton projet a Chibasko Games pour etude manuelle. Nous n acceptons pas les fichiers .exe : seuls les jeux navigateur, embeds HTML5, WebGL ou iframe sont analyses pour une publication potentielle.
-        </p>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <div className="rounded-[22px] border border-zinc-800 bg-black/30 p-4">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Format attendu</p>
-            <p className="mt-3 text-sm leading-6 text-zinc-300">Lien de demo https://, jeu directement jouable en navigateur, et presentation suffisamment claire pour evaluer l integration.</p>
-          </div>
-          <div className="rounded-[22px] border border-zinc-800 bg-black/30 p-4">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Ce que nous ne promettons pas</p>
-            <p className="mt-3 text-sm leading-6 text-zinc-300">Pas de revenus automatiques ni de publication garantie. Chaque proposition est etudiee manuellement.</p>
-          </div>
-          <div className="rounded-[22px] border border-zinc-800 bg-black/30 p-4">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Ce qui peut suivre</p>
-            <p className="mt-3 text-sm leading-6 text-zinc-300">Visibilite sur le site, mise en avant editoriale et collaborations ponctuelles si le jeu colle bien a l univers Chibasko.</p>
-          </div>
+  async function send(){
+    setError('');setDone(false)
+    if(!editorialUpload&&(!file||!zipFileAllowed(file,max))){setError(submissionError(file&&file.size>max?'file_too_large':'invalid_zip'));return}
+    if(!gameId||!version||!ownership){setError('Sélectionner le jeu, saisir la version et confirmer les droits.');return}
+    if(mode==='new'&&(!title.trim()||!studio.trim()||!releaseDate||!description.trim()||!selected.length||!mobile||!technology.trim()||!cover)){
+      setError('Compléter les informations du nouveau jeu et choisir une couverture.');return
+    }
+    if(cover&&cover.size>8*1024**2){setError('La couverture dépasse 8 Mio.');return}
+    setBusy(true);const controller=new AbortController();stop.current=controller
+    try{
+      let uploadId=editorialUpload
+      if(!uploadId&&file){
+        const value=draft??{requestId:crypto.randomUUID(),gameId,version,mode,name:file.name,size:file.size,lastModified:file.lastModified,hashes:{}}
+        save(value);uploadId=await uploadBuild(file,value,controller.signal,{api:(path,init)=>developerJson(path,token,init),put:putPart,save,progress:setProgress})
+      }
+      const metadata=mode==='new'?{title,studio,releaseDate,description,categories:selected,mobile:mobile==='yes',technology,website}:{}
+      const body=new FormData();body.set('metadata',JSON.stringify({uploadId,kind:mode,metadata,ownership}))
+      if(mode==='new'&&cover)body.set('cover',cover)
+      await developerJson('/api/developer/submissions',token,{method:'POST',signal:controller.signal,body})
+      setDone(true);remember(key,null);setDraft(null)
+      if(mode==='new'){remember(reservationKey,null);setReserved(null)}
+    }catch(cause){
+      const code=cause instanceof SubmissionError?cause.code:'upload_interrupted'
+      setError(code==='invalid_cover'?'Couverture invalide : choisir une image JPG, PNG, WEBP, GIF, AVIF ou SVG statique valide.':submissionError(code))
+      if(['invalid_version','version_conflict','invalid_request'].includes(code)&&!draft?.uploadId){setDraft(null);remember(key,null)}
+    }finally{setBusy(false);stop.current=null}
+  }
+  const input='mt-2 block w-full rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-base placeholder:text-zinc-500 focus:border-cyan-500 focus:outline-cyan-500'
+  const button='max-w-full rounded-lg border border-cyan-700 px-4 py-2 disabled:opacity-40'
+  const fields='space-y-4 [&>label]:block [&>label]:text-sm [&>label]:font-medium'
+  return <main className="mx-auto max-w-3xl space-y-6 p-6"><h1 className="text-3xl font-bold">Publier un jeu Web</h1>
+    <HelpText>Envoyez un ZIP autonome contenant <code>chibasko.json</code> à sa racine.</HelpText>
+    <FormFeedback tone="warning" title="Chaque version fait l’objet d’une revue"><p>{REVIEW_NOTICE} Chibasko Games peut refuser un jeu.</p></FormFeedback>
+    <Link className="inline-block text-cyan-300 underline underline-offset-4" href="/developer/submissions">Mes soumissions</Link>
+    {error&&<FormFeedback id={errorId} tone="error" title="Impossible de terminer cette action"><p>{error}</p></FormFeedback>}
+    {done?<FormFeedback tone="success" title="Jeu reçu — vérification sous 24 à 48 h"><p>La publication nécessite une décision admin après vérification.</p><Link className="underline underline-offset-4" href="/developer/submissions">Suivre ma soumission</Link></FormFeedback>:<>
+      <SubmissionTabs mode={mode} disabled={busy||!!draft||!!editorialUpload} onChange={value=>{setMode(value);setError('');setFile(null);setProgress(0)}}/>
+      <form role="tabpanel" id="submission-panel" aria-labelledby={'tab-'+mode} className="space-y-5" onSubmit={event=>{event.preventDefault();void send()}}>
+        {mode==='new'?<fieldset disabled={busy} className={fields}><legend className="text-xl">Informations du nouveau jeu</legend>
+          <label>Titre<input className={input} maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} required/></label>
+          {!gameId&&<><FormFeedback tone="info" title="Réserver l’identité du jeu"><p>Obtenez son gameId avant de construire le ZIP. Cette réservation ne publie pas le jeu.</p></FormFeedback><button type="button" className={button} disabled={!title.trim()} onClick={createGame}>{busy?'Création…':'Créer le jeu privé et obtenir son gameId'}</button></>}
+          {gameId&&<GameIdentityNotice key={gameId} gameId={gameId} newGame/>}
+          <label>Développeur / studio<input className={input} maxLength={160} value={studio} onChange={e=>setStudio(e.target.value)} required/></label>
+          <label>Date de sortie<input className={input} type="date" value={releaseDate} onChange={e=>setReleaseDate(e.target.value)} required/></label>
+          <label>Description<textarea className={input} maxLength={10000} rows={5} value={description} onChange={e=>setDescription(e.target.value)} required/></label>
+          <fieldset><legend>Catégories (1 à 8)</legend>{categories.map(category=><label key={category.id} className="mr-4 inline-block"><input type="checkbox" checked={selected.includes(category.id)} disabled={!selected.includes(category.id)&&selected.length>=8} onChange={e=>setSelected(previous=>e.target.checked?[...previous,category.id]:previous.filter(id=>id!==category.id))}/> {category.name}</label>)}</fieldset>
+          <div><label htmlFor="mobile-compatible">Compatible mobile</label><select id="mobile-compatible" className={input} value={mobile} onChange={e=>setMobile(e.target.value)} required><option value="">Choisir</option><option value="yes">Oui</option><option value="no">Non</option></select></div>
+          <label>Technologie<input className={input} maxLength={120} placeholder="HTML/JS, Unity WebGL, Godot, Phaser…" value={technology} onChange={e=>setTechnology(e.target.value)} required/></label>
+          <label>Site développeur (HTTPS, facultatif)<input className={input} type="url" maxLength={2048} value={website} onChange={e=>setWebsite(e.target.value)}/></label>
+          <label>Miniature / image de couverture<input className={input} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" aria-describedby="cover-help" onChange={e=>setCover(e.target.files?.[0]??null)} required/></label>
+          <HelpText id="cover-help">8 Mio maximum. Image JPG, PNG, WEBP, GIF, AVIF ou SVG statique valide.</HelpText>
+          <HelpText>Ces informations éditoriales sont examinées par l’administration. Le contact utilise l’adresse du compte. Les statistiques de communauté sont calculées par Chibasko Games.</HelpText>
+        </fieldset>:<fieldset disabled={busy||!!draft||!!editorialUpload} className="space-y-4"><legend className="text-xl">Version d’un jeu existant</legend>
+          <ManagedGamePicker games={games} value={game} loading={loadingGames} onChange={setGame}/>
+          <div className="flex gap-3"><button type="button" className={button} disabled={!offset} onClick={()=>setOffset(n=>Math.max(0,n-50))}>Jeux précédents</button><button type="button" className={button} disabled={games.length<50} onClick={()=>setOffset(n=>n+50)}>Jeux suivants</button></div>
+          <FormFeedback tone="info" title="Mise à jour du build uniquement"><p>La fiche catalogue reste inchangée ; ses modifications restent gérées par la revue admin.</p></FormFeedback>
+        </fieldset>}
+        {mode==='update'&&gameId&&<GameIdentityNotice key={gameId} gameId={gameId} newGame={false}/>}
+        <fieldset disabled={busy} className={fields}><legend className="text-xl">Build Web</legend>
+          <label>Version du build (SemVer)<input className={input} placeholder="1.0.0" maxLength={64} value={version} disabled={!!draft||!!editorialUpload} onChange={e=>setVersion(e.target.value)} required/></label>
+          {editorialUpload?<FormFeedback tone="info" title="ZIP déjà reçu"><p>Complétez uniquement la soumission, sans renvoyer le build.</p></FormFeedback>:<><label>ZIP du build<input className={input} type="file" accept=".zip,application/zip" aria-describedby="zip-help" onChange={e=>setFile(e.target.files?.[0]??null)}/></label><HelpText id="zip-help">Maximum {max?(max/1024**2)+' Mio':'en cours de chargement'}. Le manifeste chibasko.json doit être à la racine du ZIP.</HelpText></>}
+          <label className="block"><input type="checkbox" checked={ownership} onChange={e=>setOwnership(e.target.checked)}/> Je dispose des droits nécessaires pour soumettre ce jeu.</label>
+        </fieldset>
+        {draft&&<FormFeedback tone="info" title="Envoi mémorisé"><p>{draft.name}. Pour reprendre, sélectionnez le même ZIP ; les parties reçues sont vérifiées avant réutilisation.</p></FormFeedback>}
+        {busy&&<p role="status" className="text-sm font-medium text-cyan-200">Traitement en cours…</p>}
+        <progress className="w-full" aria-label="Progression de l’envoi" value={progress} max={file?.size||1}/>
+        <div className="flex flex-wrap gap-3"><button type="submit" className={button} disabled={busy||!max||!gameId||(!file&&!editorialUpload)||!ownership}>{busy?'Envoi…':editorialUpload?'Terminer la soumission':draft?'Reprendre et finaliser':'Envoyer le build'}</button>
+          {busy&&<button type="button" className={button} onClick={()=>stop.current?.abort()}>Interrompre</button>}
+          {draft&&!busy&&<button type="button" className={button} onClick={()=>{remember(key,null);setDraft(null);setProgress(0)}}>Nouvel envoi (l’ancien reste suivi)</button>}
         </div>
-      </section>
-
-      <section className="rounded-[28px] border border-zinc-800 bg-zinc-950 p-6 md:p-8">
-        <div className="mb-6">
-          <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Proposition manuelle</p>
-          <h2 className="mt-3 text-2xl font-black uppercase text-white">Envoyer un projet</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-400">
-            Ce formulaire reprend les informations utiles a une vraie etude editoriale : identite du developpeur, lien de demo, categories, compatibilite mobile, contenu sensible et contexte de publication. Cela permet a l equipe Chibasko Games de verifier rapidement si le jeu peut entrer dans le catalogue.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Nom ou studio</span>
-            <input
-              value={form.name_or_studio}
-              onChange={(event) => setForm((current) => ({ ...current, name_or_studio: event.target.value }))}
-              placeholder="Nom du createur ou du studio"
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Email</span>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              placeholder="contact@studio.com"
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Site ou portfolio</span>
-            <input
-              value={form.developer_website}
-              onChange={(event) => setForm((current) => ({ ...current, developer_website: event.target.value }))}
-              placeholder="https://ton-site.dev"
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-            />
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Nom du jeu</span>
-            <input
-              value={form.game_title}
-              onChange={(event) => setForm((current) => ({ ...current, game_title: event.target.value }))}
-              placeholder="Titre du projet"
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Lien de demo HTTPS</span>
-            <input
-              value={form.demo_url}
-              onChange={(event) => setForm((current) => ({ ...current, demo_url: event.target.value }))}
-              placeholder="https://..."
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Type de jeu</span>
-            <input
-              value={form.game_type}
-              onChange={(event) => setForm((current) => ({ ...current, game_type: event.target.value }))}
-              placeholder="Arcade, puzzle, horror, idle, course..."
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
-
-          <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-4 md:col-span-2">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Categories souhaitees</p>
-              <span className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">{selectedCount} selection</span>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {categories.map((category) => (
-                <label key={category.id} className="flex items-center gap-3 rounded-2xl border border-zinc-800 px-3 py-3 text-sm text-zinc-300">
-                  <input
-                    type="checkbox"
-                    checked={form.category_names.includes(category.name)}
-                    onChange={() => handleCategoryToggle(category.name)}
-                  />
-                  <span>{category.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Description courte</span>
-            <input
-              value={form.short_description}
-              onChange={(event) => setForm((current) => ({ ...current, short_description: event.target.value }))}
-              placeholder="Resume rapide en une ou deux phrases"
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Description longue</span>
-            <textarea
-              value={form.long_description}
-              onChange={(event) => setForm((current) => ({ ...current, long_description: event.target.value }))}
-              placeholder="Boucle de jeu, objectifs, controles, progression, points forts..."
-              className="min-h-40 w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Compatibilite mobile</span>
-            <select
-              value={form.mobile_compatibility}
-              onChange={(event) => setForm((current) => ({ ...current, mobile_compatibility: event.target.value }))}
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            >
-              <option value="">Choisir une option</option>
-              <option value="mobile-compatible">Compatible mobile</option>
-              <option value="pc-only">PC uniquement</option>
-              <option value="partial">Partiellement compatible</option>
-            </select>
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Contenu sensible</span>
-            <select
-              value={form.sensitive_content}
-              onChange={(event) => setForm((current) => ({ ...current, sensitive_content: event.target.value }))}
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-              required
-            >
-              <option value="">Choisir une option</option>
-              <option value="none">Aucun contenu sensible</option>
-              <option value="violence-light">Violence legere</option>
-              <option value="violence-strong">Violence marquee</option>
-              <option value="adult-themes">Themes adultes</option>
-              <option value="mixed-sensitive">Contenu sensible mixte</option>
-            </select>
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Presence de pubs</span>
-            <select
-              value={form.has_ads}
-              onChange={(event) => setForm((current) => ({ ...current, has_ads: event.target.value as SubmitGameFormState['has_ads'] }))}
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-            >
-              <option value="unknown">Non renseignee</option>
-              <option value="yes">Oui, le jeu contient des pubs</option>
-              <option value="no">Non, pas de pubs</option>
-            </select>
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Publication ailleurs</span>
-            <input
-              value={form.published_elsewhere}
-              onChange={(event) => setForm((current) => ({ ...current, published_elsewhere: event.target.value }))}
-              placeholder="Steam, Itch.io, CrazyGames, perso..."
-              className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-            />
-          </label>
-
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Attentes / conditions</span>
-            <textarea
-              value={form.expectations}
-              onChange={(event) => setForm((current) => ({ ...current, expectations: event.target.value }))}
-              placeholder="Visibilite, exclusivite, credits, contraintes techniques, collaboration..."
-              className="min-h-32 w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-            />
-          </label>
-          <label className="space-y-2 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Message complementaire</span>
-            <textarea
-              value={form.message}
-              onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
-              placeholder="Infos supplementaires a transmettre a l equipe"
-              className="min-h-32 w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-            />
-          </label>
-
-          <label className="rounded-[24px] border border-zinc-800 bg-black/35 p-4 text-sm text-zinc-300 md:col-span-2">
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                checked={form.ownership_confirmed}
-                onChange={(event) => setForm((current) => ({ ...current, ownership_confirmed: event.target.checked }))}
-                className="mt-1"
-                required
-              />
-              <span>
-                Je confirme etre proprietaire du jeu ou avoir l autorisation de le proposer a Chibasko Games.
-              </span>
-            </div>
-          </label>
-
-          {feedback ? (
-            <p className="text-sm text-cyan-300 md:col-span-2">{feedback}</p>
-          ) : null}
-
-          <button
-            type="submit"
-            disabled={sending}
-            className="rounded-full bg-cyan-400 px-6 py-4 font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2"
-          >
-            {sending ? 'Envoi en cours...' : 'Envoyer la proposition'}
-          </button>
-        </form>
-      </section>
-    </div>
-  )
+      </form>
+    </>}
+  </main>
 }

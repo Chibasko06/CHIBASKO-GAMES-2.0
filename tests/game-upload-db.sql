@@ -8,7 +8,7 @@ insert into auth.users values('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),('bbbbbbbb
 insert into public.admin_users values('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
 insert into public.game_developer_members values('22222222-2222-4222-8222-222222222222','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','owner'),
  ('22222222-2222-4222-8222-222222222222','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','editor');
-create function public.upload_test_policy() returns jsonb language sql as $$select '{"revision":1,"maxArchiveBytes":4294967296,"maxTotalBytes":17179869184,"maxFileBytes":4294967296,"maxFiles":50000,"maxManifestBytes":65536,"maxCompressionRatio":200,"maxPathDepth":32,"partBytes":33554432,"validationMs":900000,"sessionSeconds":86400,"signedUrlSeconds":900,"jobSeconds":3600,"maxAttempts":3,"maxActiveUploads":2,"maxUploadsPerDay":20,"maxApiPerMinute":120}'::jsonb$$;
+create function public.upload_test_policy() returns jsonb language sql as $$select '{"revision":1,"maxArchiveBytes":524288000,"maxTotalBytes":17179869184,"maxFileBytes":4294967296,"maxFiles":50000,"maxManifestBytes":65536,"maxCompressionRatio":200,"maxPathDepth":32,"partBytes":33554432,"validationMs":900000,"sessionSeconds":86400,"signedUrlSeconds":900,"jobSeconds":3600,"maxAttempts":3,"maxActiveUploads":2,"maxUploadsPerDay":20,"maxApiPerMinute":120}'::jsonb$$;
 -- Regrant the test-only failure helper; the migration correctly revoked browser
 -- access to every distribution RPC, including this disposable fixture helper.
 grant execute on function public.distribution_expect_failure(text) to anon,authenticated;

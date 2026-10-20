@@ -30,6 +30,10 @@ export function createUploadService(db: UploadRepository, storage: StagingStorag
       return publicUpload(row)
     },
     async status(actor: string, id: string) { return publicUpload(await get(actor,id)) },
+    async review(actor:string,id:string) {
+      assertUploadId(id)
+      return db.call<import('../review').ReviewSummary>('distribution_developer_review',{p_actor:actor,p_id:id})
+    },
     async parts(actor: string, id: string, numbers?: unknown) {
       const row = await get(actor,id)
       if (row.status === 'expired') throw new UploadError('upload_expired',410)

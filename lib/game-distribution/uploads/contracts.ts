@@ -24,6 +24,7 @@ export type StagingStorage = {
 export type UploadRepository = { call<T>(name: string, args: Record<string,unknown>): Promise<T> }
 export function publicUpload(upload: Upload) {
   return { id: upload.id, gameId: upload.game_id, version: upload.version, status: upload.status,
+    reviewUrl: '/developer/builds/'+upload.id,
     expiresAt: upload.expires_at, error: upload.error_code ? {code:upload.error_code} : null,
     gameVersionId: upload.status === 'completed' ? upload.version_id : null,
     upload: { protocol: 'multipart-v1', archiveSize: upload.expected_size,

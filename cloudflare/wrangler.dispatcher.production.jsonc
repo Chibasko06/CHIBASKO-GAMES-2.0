@@ -1,0 +1,17 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "chibasko-build-dispatcher",
+  "main": "build-dispatcher.ts",
+  "compatibility_date": "2026-10-16",
+  "workers_dev": false,
+  "preview_urls": false,
+  "keep_vars": true,
+  "triggers": { "crons": [] },
+  "queues": {
+    "producers": [{ "binding": "BUILD_VALIDATIONS", "queue": "chibasko-game-builds" }]
+  },
+  "observability": {
+    "logs": { "enabled": true, "invocation_logs": false },
+    "traces": { "enabled": false }
+  }
+}

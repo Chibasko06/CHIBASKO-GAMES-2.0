@@ -43,7 +43,9 @@ ticket, cookie, credential, JWT, URL signée ou capture réseau brute.
 10. [ ] **Préparer Queue/DLQ** : producer `BUILD_VALIDATIONS`, HTTP pull, visibilité 2 h,
     retry 60 s, 5 redeliveries configurées/testées, alerte DLQ/âge backlog. Contrôler le
     contrat réel pull/ack, séparé des 3 tentatives DB.
-11. [ ] **Déployer le validateur isolé** et dispatcher cron minute. Node 24, child sans
+11. [ ] **Déployer le validateur isolé**, puis réactiver le cron minute du dispatcher.
+    Le dispatcher reste volontairement désactivé pendant la validation manuelle des builds.
+    Node 24, child sans
     secrets, scratch/quota, egress, kill/timeout/retry, privilèges minimum. Vérifier une
     fixture en staging, conditional write, hash, duplicate delivery et cleanup.
 12. [ ] **Préparer le domaine et gateway** : domaine exclusivement contenu, PSL effective,

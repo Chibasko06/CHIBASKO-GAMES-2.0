@@ -8,7 +8,7 @@ export type UploadPolicy = BuildLimits & {
 }
 /** Service policy, independent of engine, game or publisher. Snapshot per upload. */
 export const UPLOAD_POLICY: Readonly<UploadPolicy> = Object.freeze({
-  revision: 1, maxArchiveBytes: 4 * 1024 ** 3, maxTotalBytes: 16 * 1024 ** 3,
+  revision: 1, maxArchiveBytes: 524_288_000, maxTotalBytes: 16 * 1024 ** 3,
   maxFileBytes: 4 * 1024 ** 3, maxFiles: 50_000, maxManifestBytes: 64 * 1024,
   maxCompressionRatio: 200, maxPathDepth: 32, partBytes: 32 * 1024 ** 2,
   validationMs: 15 * 60_000, sessionSeconds: 86_400, signedUrlSeconds: 900,

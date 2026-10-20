@@ -2,6 +2,7 @@ import MultiplayerGamePanel from '@/components/multiplayer/MultiplayerGamePanel'
 import ArtifactOnlineLinks from '@/components/multiplayer/ArtifactOnlineLinks'
 import GameReactions from '@/components/GameReactions'
 import { isClassicGame } from '@/lib/multiplayer/catalogue'
+import { catalogueSource } from '@/lib/catalogueSource'
 import type { Metadata } from 'next'
 import FavoriteButton from '@/components/FavoriteButton'
 import GameReviews from '@/components/GameReviews'
@@ -180,8 +181,8 @@ export default async function GamePage({
           <p className="text-base font-bold text-white">{game.technology || 'Non renseignee'}</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">Provider</p>
-          <p className="text-base font-bold text-white">{game.provider_name || 'Non renseigne'}</p>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">{catalogueSource(game).label}</p>
+          <p className="text-base font-bold text-white">{catalogueSource(game).value}</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 p-4">
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">Communaute</p>

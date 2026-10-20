@@ -3,14 +3,24 @@
 Asynchronous static inspection of uploaded Web builds. No game JS is executed.
 This service has no dependency on Pong, its SDK, Next.js or the game-server.
 
+For manual admin review, run `npm run review:game -- <upload-id>` with local server
+credentials. This command reuses the same validator without consuming the Queue.
+See the [manual review workflow](../../docs/manual-build-review.md).
+
 Build from the platform checkout: `npm run build:distribution`.
 Run the resulting Node 24 service: `node .distribution/validator/main.mjs`.
+The standalone production build is `npm run build:validator`; container, resource
+budgets, shutdown, secrets and rollout commands are documented in the
+[production runbook](../../docs/build-validator-production.md).
 Do not run it until private storage, the migrations and Queue are configured.
 No service or cloud resources are provisioned by these commands.
 
 The separate scheduled dispatcher reads the transactional outbox and sends **text
 JSON** messages (`validate_game_build`, uploadId only) to Cloudflare Queues.
 `wrangler.dispatcher.example.jsonc` is an example, not a portal deployment change.
+Production uses `cloudflare/wrangler.dispatcher.production.jsonc`; see the
+[dispatcher runbook](../../docs/build-dispatcher-production.md) for bounded delivery,
+retry semantics, secrets and the existing HTTP Pull consumer.
 The validator uses a pull consumer (batch 1, visibility two hours), preventing a
 large ZIP from depending on a portal request/Worker memory budget. Configure a
 dead-letter queue and alerting before operation. DB leases/outbox remain the
@@ -52,7 +62,7 @@ defense in depth, **not** a replacement for an OS sandbox against a parser explo
 No hosting for third-party game servers is implemented.
 
 The service spools the ZIP and extracted files to private disk, with fixed-size
-reads/writes and no full archive/file buffering. Default policy: 4 GiB archive,
+reads/writes and no full archive/file buffering. Default policy: 500 MiB archive,
 16 GiB extracted, 4 GiB/file, 50k entries, depth 32, ratio 200, 15 min parsing,
 one hour total job, three attempts, two concurrent uploads/account, 20/day.
 Provision at least archive + extracted + overhead disk per active job (24 GiB for
@@ -78,6 +88,6 @@ covers a crash between R2 creation and attachment to the DB. Never apply a blank
 staging object TTL shorter than the maximum queue/retry window. Add monitoring for
 stuck finalizing/queued/validating sessions, DLQ backlog and GC failures.
 
-Neither migration is applied to production. Feature flag is off by default.
+Migration and feature-flag state must be verified on the target environment.
 The preview resolver/player belongs to GAME-DISTRIBUTION-3 and must authorize a
 validated version; it must never return a staging URL.
