@@ -56,6 +56,7 @@ try {
     if(process.argv.includes('--submissions')){
       await run('psql',[...args,'-f',fileURLToPath(new URL('./developer-submissions-db.sql',import.meta.url))])
       await run('psql',[...args,'-f',fileURLToPath(new URL('./submission-catalogue-db.sql',import.meta.url))])
+      await run('psql',[...args,'-f',fileURLToPath(new URL('./submission-drafts-db.sql',import.meta.url))])
     }
   }
   if(process.argv.includes('--previews') || process.argv.includes('--launches')) {

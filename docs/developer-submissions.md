@@ -7,7 +7,7 @@ du compte connecté, avec pagination et actualisation explicite.
 ## Parcours
 
 1. Choisir l’onglet « Publier un nouveau jeu » ou « Mettre à jour un jeu existant ».
-   Le premier ne présente aucune liste de catalogue. Le second liste uniquement
+   Le premier présente les publications privées en cours, sans catalogue public. Le second liste uniquement
    les memberships du compte, même pour un administrateur ; les droits backend
    étendus de l’administration restent inchangés.
    Les réservations dont aucune première version n’est encore publiée restent
@@ -24,7 +24,7 @@ du compte connecté, avec pagination et actualisation explicite.
    la validation serveur contrôle leur concordance avec le manifeste.
 3. Pour un nouveau jeu, renseigner titre, studio, date de sortie, description,
    une à huit catégories, compatibilité mobile oui/non et technologie. Joindre
-   une couverture ; le site HTTPS reste facultatif. Le contact provient du compte
+   une couverture. Aucun site développeur n’est demandé. Le contact provient du compte
    authentifié. La communauté reste calculée par la plateforme.
    Une mise à jour demande uniquement le jeu géré, sa version, son ZIP et la
    confirmation des droits. Elle ne modifie aucune métadonnée du catalogue.
@@ -48,12 +48,44 @@ la visibilité éditoriale restent contrôlés par les procédures admin existan
 
 ## Reprise et suivi
 
-L’onglet conserve en sessionStorage les identifiants d’upload, les caractéristiques
-du fichier et les SHA-256 des parties effectivement envoyées. Après interruption,
-sélectionner le même ZIP. Une partie distante n’est réutilisée que si sa taille
-et l’empreinte locale mémorisée correspondent. Les URLs signées et tokens ne sont
-jamais persistés. La reprise reste limitée à la durée de vie de l’upload et aux
-données conservées dans cet onglet ; elle n’est pas une reprise interappareils.
+Les nouvelles publications utilisent `game_submission_drafts`, une ligne privée
+par jeu. « Publications en cours » est limité au créateur ayant encore un
+membership. Les droits admin n’élargissent pas cette liste aux autres comptes.
+Les jeux ayant une version publiée en sont exclus. « Reprendre » lit le brouillon
+existant ; cette action ne réserve aucun nouveau gameId.
+
+Après création de l’identité, titre, studio, date de sortie, description,
+catégories, compatibilité mobile, technologie et version sont sauvegardés après
+une seconde sans saisie, à la sortie des champs et avant l’envoi. Les brouillons
+incomplets sont acceptés ; les validations complètes restent obligatoires à la
+soumission. « Brouillon enregistré » signifie que le serveur a confirmé la
+sauvegarde, jamais une soumission ou une publication. Les changements encore en
+attente lors d’une fermeture brutale peuvent être perdus. Une sauvegarde
+best-effort à la mise en arrière-plan et une alerte de fermeture limitent ce cas.
+
+Une révision éditoriale interdit l’écrasement silencieux depuis un autre appareil.
+En cas de conflit, recharger depuis la liste. Après transmission des métadonnées
+à l’administration, le brouillon reste consultable mais n’est plus modifiable.
+
+Le serveur conserve l’upload lié, sa clé d’idempotence, les caractéristiques du
+ZIP et les SHA-256 des parties envoyées. Une nouvelle session ou un autre appareil
+retrouve ces informations. Le navigateur ne peut pas restaurer un File local :
+« Resélectionnez le même fichier ZIP pour reprendre l’envoi. » Une partie n’est
+réutilisée que si sa taille et le SHA-256 recalculé correspondent au reçu mémorisé.
+Sans reçu, elle est renvoyée. Ces reçus ne remplacent jamais la validation serveur.
+Une copie du même ZIP peut changer sa date de modification sans bloquer la reprise.
+
+La couverture n’est envoyée qu’à la soumission finale : elle doit être
+resélectionnée après un retour tant qu’elle n’est pas enregistrée. Aucun chemin
+local n’est conservé. Une couverture déjà enregistrée est consultable depuis la
+soumission reçue. La confirmation des droits doit être renouvelée explicitement.
+Les mises à jour de jeux publiés conservent leur reprise historique en
+sessionStorage, distincte des brouillons de première publication.
+
+Une session d’upload expirée ou échouée peut être remplacée depuis le brouillon :
+le gameId et les métadonnées restent identiques, mais une nouvelle session d’envoi
+est créée. La suppression de brouillon n’est pas proposée afin de préserver les
+liens de revue et le nettoyage existant. Aucun jeu ou artifact n’est supprimé.
 
 Si le ZIP est reçu mais que la liaison éditoriale a échoué, « Terminer les
 informations éditoriales » dans Mes soumissions permet de réessayer sans nouvel
@@ -70,9 +102,14 @@ Elles ne sont pas attribuées automatiquement à un compte par rapprochement ema
 - `POST /api/developer/submissions` : multipart borné, avec champ JSON `metadata`
   contenant `{uploadId,kind,metadata,ownership}`. `kind` vaut `new` ou `update`.
   Pour `new`, `metadata` contient `title`, `studio`, `releaseDate` (YYYY-MM-DD),
-  `description`, `categories` (UUID), `mobile` (booléen), `technology`, `website`,
+  `description`, `categories` (UUID), `mobile` (booléen), `technology`,
   et le champ fichier `cover` est obligatoire. Pour `update`, `metadata` vaut
   `{}` et aucun fichier cover n’est accepté. JSON seul reste accepté pour update.
+- `GET /api/developer/drafts?offset=0` : brouillons privés, 50 par page.
+- `GET /api/developer/drafts?gameId=<uuid>` : snapshot privé pour la reprise.
+- `POST /api/developer/drafts` : actions `save` (révision et métadonnées),
+  `upload-state` (reçus multipart) et `restart-upload` (session terminale).
+  Aucun acteur client ni chemin de stockage n’est accepté.
 - Les sessions, parties signées et finalisations utilisent les API uploads existantes.
 
 Chaque API vérifie le bearer auprès de Supabase. L’identité est dérivée de cette
@@ -102,6 +139,21 @@ Seuls les jeux présents dans le registre des créations développeur reçoivent
 la provenance `developer_submission` lors du rattrapage. Cette provenance affiche
 « Source : Soumission développeur » ; les anciens jeux GameMonetize gardent leur
 provider d’origine.
+
+La migration additive `20261020000400_game_submission_drafts.sql` s’applique après
+`20261020000300_submission_catalogue.sql`. Son fichier contient le SQL exact à
+appliquer selon la procédure DB. Elle ajoute table, RLS, RPC service-only et
+triggers de création/liaison, puis récupère les réservations privées antérieures.
+Seules les métadonnées déjà sauvegardées peuvent être récupérées ; les anciennes
+données restées uniquement en mémoire React sont irrécupérables. Aucun jeu n’est
+recréé, aucun UUID n’est modifié et aucune ancienne migration n’est réécrite.
+La colonne historique `developer_website` reste nullable ; les nouvelles
+soumissions omettent `website` et la RPC enregistre null.
+
+Pour reprendre une réservation, se connecter avec son compte créateur, ouvrir
+« Publications en cours », puis « Reprendre ». Le lien direct est
+`/publier-un-jeu?draft=<gameId>`. La liste et les mutations utilisent les mêmes
+contrôles de propriété côté serveur, y compris pour les liens directs.
 
 ## Configuration
 
@@ -156,8 +208,8 @@ Le statut HTTP et un code S3 allowlisté (par exemple `AccessDenied`) sont conse
 les URL, clés, identifiants multipart, messages XML bruts et credentials sont exclus.
 Le header `X-Request-Id` corrèle le navigateur, ce log et les éventuels logs RPC.
 
-Après configuration, redémarrer Next.js et reprendre avec le même ZIP dans le
-même onglet. Le brouillon conserve son Idempotency-Key même si aucune session
+Après configuration, redémarrer Next.js et reprendre avec le même ZIP depuis
+le brouillon. Le serveur conserve son Idempotency-Key même si aucune session
 d’upload n’a encore pu être créée. Un multipart qui échoue après la création DB
 laisse la session `created`, réutilisée au prochain POST avec cette même clé.
 Ne pas effacer le brouillon ni recréer le jeu pour résoudre une erreur de configuration.

@@ -20,14 +20,15 @@ export function putPart(url:string,headers:Record<string,string>,body:Blob,progr
     if(signal.aborted){finish(false);return}signal.addEventListener('abort',abort,{once:true});xhr.send(body)
   })
 }
-type Dependencies={api:(path:string,init?:RequestInit)=>Promise<{data:unknown}>;put:typeof putPart;save:(draft:UploadDraft)=>void;progress:(bytes:number)=>void}
+type Dependencies={api:(path:string,init?:RequestInit)=>Promise<{data:unknown}>;put:typeof putPart;save:(draft:UploadDraft)=>void|Promise<void>;progress:(bytes:number)=>void}
 export async function uploadBuild(file:File,draft:UploadDraft,signal:AbortSignal,deps:Dependencies) {
-  if(file.name!==draft.name||file.size!==draft.size||file.lastModified!==draft.lastModified)throw new SubmissionError('file_changed')
+  if(file.name!==draft.name||file.size!==draft.size)throw new SubmissionError('file_changed')
+  // Copying the same ZIP between devices can change mtime. Chunk hashes still govern reuse.
   const json=(method:string,body?:unknown)=>({method,signal,...(body?{body:JSON.stringify(body)}:{})})
   type State={id:string;status:string;upload:{partSize:number}}
   const state=(await deps.api(draft.uploadId?'/api/developer/uploads/'+draft.uploadId:'/api/developer/games/'+draft.gameId+'/uploads',
     draft.uploadId?{signal}:{...json('POST',{version:draft.version,archiveSize:file.size}),headers:{'Idempotency-Key':draft.requestId}})).data as State
-  draft.uploadId=state.id;deps.save(draft)
+  draft.uploadId=state.id;await deps.save(draft)
   if(['queued','validating','completed'].includes(state.status)){deps.progress(file.size);return state.id}
   if(state.status==='expired')throw new SubmissionError('upload_expired')
   if(!['uploading','finalizing'].includes(state.status))throw new SubmissionError('invalid_state')
@@ -42,7 +43,7 @@ export async function uploadBuild(file:File,draft:UploadDraft,signal:AbortSignal
       if(!parts.parts.some(p=>p.number===number&&p.size===chunk.size&&draft.hashes[String(number)]===digest)){
         const signed=(await deps.api('/api/developer/uploads/'+state.id+'/parts',json('POST',{partNumbers:[number]}))).data as {parts:{url:string;headers:Record<string,string>}[]}
         await deps.put(signed.parts[0].url,signed.parts[0].headers,chunk,n=>deps.progress(sent+n),signal)
-        draft.hashes[String(number)]=digest;deps.save(draft)
+        draft.hashes[String(number)]=digest;await deps.save(draft)
       }
       sent+=chunk.size;deps.progress(sent)
     }

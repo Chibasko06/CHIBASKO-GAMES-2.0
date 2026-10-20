@@ -1,5 +1,5 @@
 import 'server-only'
-import {createUserAuthClient} from './adminAuthorization'
+import {authenticateDeveloper} from './developerIdentity'
 import {adminOriginAllowed} from './adminRequest'
 import {readJsonObject,InputError} from './inputValidation'
 import {uploadRepository} from '../game-distribution/uploads/repository'
@@ -22,8 +22,7 @@ export function editorialInput(body:Record<string,unknown>) {
 export type SubmissionDiagnostic={event:'developer_submission_failed';requestId:string;operation:string;phase:string;status:number;code:string;reason?:'uploads_disabled'}
 type Dependencies={authenticate(request:Request):Promise<string>;db(requestId:string):UploadRepository;enabled():boolean;cover?:(file:File)=>Promise<string>;log?:(event:SubmissionDiagnostic)=>void}
 const defaults:Dependencies={
-  async authenticate(request){const h=request.headers.get('authorization');if(!h?.startsWith('Bearer ')||h.length>8192)throw new UploadError('unauthorized',401)
-    const token=h.slice(7),{data,error}=await createUserAuthClient(token).auth.getUser(token);if(error||!data.user)throw new UploadError('unauthorized',401);return data.user.id},
+  authenticate:authenticateDeveloper,
   db:requestId=>uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??'',fetch,{requestId}),
   enabled:()=>process.env.GAME_DISTRIBUTION_UPLOADS_ENABLED==='1',cover:uploadGameThumbnail
 }

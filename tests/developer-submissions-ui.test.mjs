@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {createElement} from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
 import Submit from '../components/SubmitGamePageClient.tsx'
+import Editor from '../components/NewGameDraftEditor.tsx'
+import {emptyDraftMetadata} from '../lib/game-distribution/submission-drafts.ts'
 import Submissions from '../components/DeveloperSubmissions.tsx'
 import {SubmissionTabs,ManagedGamePicker} from '../components/SubmissionGameChoice.tsx'
 import {catalogueSource} from '../lib/catalogueSource.ts'
@@ -30,9 +32,11 @@ test('feedback distinguishes errors, statuses, warnings, information and seconda
 test('connected form exposes game reservation, ZIP and editorial separation; submissions stay private',()=>{
  globalThis.__productAuth={session:{user:{id:'fixture-user'},access_token:'fixture-token'},loading:false}
  const html=renderToStaticMarkup(createElement(Submit,{categories:[]}))
- assert.match(html,/type="file"/);assert.match(html,/chibasko.json/);assert.match(html,/obtenir son gameId/);assert.match(html,/Informations du nouveau jeu/)
+ assert.match(html,/Publications en cours/);assert.match(html,/chibasko.json/);assert.match(html,/obtenir son gameId/)
+ const editor=renderToStaticMarkup(createElement(Editor,{initial:{gameId:'fixture-id',metadata:emptyDraftMetadata,version:'',revision:0,submitted:false,upload:null,file:null,hashes:{}},token:'fixture-token',categories:[],max:524288000,onBack:()=>{}}))
+ assert.match(editor,/Informations du nouveau jeu/);assert.doesNotMatch(editor,/Site développeur/)
  assert.match(html,/role="tablist"/);assert.match(html,/Publier un nouveau jeu/);assert.match(html,/Mettre à jour un jeu existant/)
- for(const field of ['Développeur / studio','Date de sortie','Compatible mobile','Technologie','image de couverture','Version du build'])assert.ok(html.includes(field))
+ for(const field of ['Développeur / studio','Date de sortie','Compatible mobile','Technologie','image de couverture','Version du build'])assert.ok(editor.includes(field))
  assert.doesNotMatch(html,/Jeu géré|<option value="">Nouveau jeu|Provider|GameMonetize/)
  assert.doesNotMatch(html,/fixture-token|service_role|staging_key/)
  assert.match(renderToStaticMarkup(createElement(Submissions)),/Mes soumissions/)

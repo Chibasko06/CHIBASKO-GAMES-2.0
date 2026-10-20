@@ -10,7 +10,7 @@ export function catalogueInput(body:Record<string,unknown>) {
   if(body.kind==='update'){
     if(Object.keys(data).length)throw new UploadError('invalid_request')
   }else{
-    if(Object.keys(data).some(k=>!['title','studio','releaseDate','description','categories','mobile','technology','website'].includes(k)))throw new UploadError('invalid_request')
+    if(Object.keys(data).some(k=>!['title','studio','releaseDate','description','categories','mobile','technology'].includes(k)))throw new UploadError('invalid_request')
     for(const [key,max] of [['title',160],['studio',160],['description',10000],['technology',120]] as const){
       if(typeof data[key]!=='string'||!data[key].trim()||data[key].length>max)throw new UploadError('invalid_request')
     }
@@ -18,8 +18,6 @@ export function catalogueInput(body:Record<string,unknown>) {
       ||!Number.isFinite(Date.parse(data.releaseDate))||new Date(data.releaseDate).toISOString().slice(0,10)!==data.releaseDate)throw new UploadError('invalid_request')
     if(!Array.isArray(data.categories)||data.categories.length<1||data.categories.length>8||new Set(data.categories).size!==data.categories.length)throw new UploadError('invalid_request')
     data.categories.forEach(v=>assertUploadId(String(v)))
-    if(typeof data.website!=='string'||data.website.length>2048)throw new UploadError('invalid_request')
-    if(data.website){try{const url=new URL(data.website);if(url.protocol!=='https:'||url.username||url.password)throw Error()}catch{throw new UploadError('invalid_request')}}
   }
   return {p_upload:body.uploadId as string,p_kind:body.kind as 'new'|'update',p_metadata:data}
 }

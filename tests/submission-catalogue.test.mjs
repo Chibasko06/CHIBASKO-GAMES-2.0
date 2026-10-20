@@ -4,7 +4,7 @@ import {catalogueInput,readCatalogueForm} from '../lib/server/submissionCatalogu
 import {developerSubmissionRequest} from '../lib/server/developerSubmissions.ts'
 import {UploadError} from '../lib/game-distribution/uploads/policy.ts'
 const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-const metadata={title:'Fixture',studio:'Fixture studio',releaseDate:'2026-10-20',description:'Description',categories:[id],mobile:true,technology:'HTML/JS',website:''}
+const metadata={title:'Fixture',studio:'Fixture studio',releaseDate:'2026-10-20',description:'Description',categories:[id],mobile:true,technology:'HTML/JS'}
 const input={uploadId:id,kind:'new',metadata,ownership:true}
 const png=new File([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')],'cover.png',{type:'image/png'})
 function request(body=input,cover=png){const form=new FormData();form.set('metadata',JSON.stringify(body));if(cover)form.set('cover',cover);return new Request('https://site.example/api/developer/submissions',{method:'POST',body:form})}
