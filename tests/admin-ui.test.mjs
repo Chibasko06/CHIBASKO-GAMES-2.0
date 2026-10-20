@@ -152,3 +152,15 @@ test('AuthProvider ignores stale bootstrap after signOut and cleans its subscrip
   },Probe)
   assert.equal(subscribers.size,0)
 })
+
+
+test('admin dashboard has one publications entry and no duplicate developer proposals section',async t=>{
+  const requests=[];const original=globalThis.fetch
+  t.mock.method(globalThis,'fetch',async(input,init)=>{requests.push(input);return original(input,init)})
+  await mounted(async()=>{
+    const link=document.querySelector('a[href="/admin/game-builds"]')
+    assert.match(link.textContent,/Publications de jeux/)
+    assert.doesNotMatch(document.body.textContent,/Propositions developpeurs/)
+    assert.ok(!requests.includes('/api/admin/game-submissions'))
+  })
+})

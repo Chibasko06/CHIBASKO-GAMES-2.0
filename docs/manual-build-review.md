@@ -22,10 +22,11 @@ et ses permissions sur le jeu ; les réponses sont des projections explicites.
 1. Le développeur envoie son ZIP via les API multipart existantes et finalise
    l'upload. Il reste `queued` dans `game_build_uploads`. L'outbox est conservée.
    La réponse contient `reviewUrl`, vers `/developer/builds/<upload-id>`.
-2. L'admin ouvre **Administration → Revue et publication des builds de jeux**.
+2. L'admin ouvre **Administration → Publications de jeux**.
    `/admin/game-builds` présente les uploads par pages de 50 ; le filtre de statut
-   porte sur la page courante. Le détail présente le jeu, le déposant, les erreurs
-   techniques, la version immuable et l'historique de revue.
+   porte sur la page courante. Le détail présente en premier le titre proposé,
+   la version, le développeur et la prochaine action, puis les informations
+   destinées au catalogue avec un aperçu de couverture.
 3. Si une proposition catalogue existe, l'admin peut associer son identifiant.
    `game_submissions` n'avait aucune relation avec les uploads : le rapprochement
    est explicite, jamais déduit d'un email, d'un titre ou du manifest.
@@ -42,13 +43,49 @@ et ses permissions sur le jeu ; les réponses sont des projections explicites.
    nécessaires. Aucun ZIP n'est exécuté sur le poste local.
 7. Vérifier contenu, informations et comportement ; enregistrer la checklist.
    Cette décision humaine place la version `in_review` sans remplacer la sandbox.
-8. **Accepter et publier cette version** réalise dans une transaction les transitions
+8. **Publier** réalise dans une transaction les transitions
    `in_review → approved → published` puis `set_active_game_version`. Les octets,
    hashes et manifest ne changent pas. Un second appel ne réactive pas une ancienne
    version si une publication plus récente est devenue active entre-temps.
 
 La visibilité catalogue reste gérée par l'admin jeux existant (`is_published`).
-Publier une version ne réécrit ni les métadonnées ni la configuration multiplayer.
+Publier conserve les artifacts immuables et la configuration multiplayer. Pour
+une première soumission développeur, les métadonnées éditoriales approuvées sont
+appliquées par le mécanisme catalogue existant ; une mise à jour de build laisse
+la fiche inchangée.
+
+## Interface de revue
+
+Le dossier sépare quatre étapes : vérification technique, test, revue et décision.
+La première affiche En attente, En cours, Réussie ou Échec. Les instructions de
+la commande locale sont repliées sous « Voir les instructions de vérification »
+puis « Mode avancé / Instructions techniques ». Le navigateur ne lance pas la
+commande locale et n'accède à aucun credential serveur.
+
+Le test est proposé seulement lorsqu'une version validée et prévisualisable
+existe. Le bouton ouvre le player isolé existant. Le test multijoueur conserve
+sa session préparée ; aucun contournement d'admission n'est ajouté.
+
+Les quatre cases de revue se distinguent de leur enregistrement serveur :
+« Revue complète » signifie que les contrôles sont cochés. « Prêt à publier »
+nécessite aussi leur enregistrement, la date de revue et le statut de version
+attendu. Les autorisations et préconditions DB restent la source de vérité.
+Refuser ou archiver ouvre une zone dédiée au motif visible par le développeur.
+
+« Détails techniques » regroupe UUID, états bruts, tentatives, taille, dates,
+manifeste, commande, association historique et historique détaillé. Ces données
+ne sont plus mêlées aux informations éditoriales principales.
+
+L'ancien panneau de propositions est retiré de `/admin`. Les demandes sans ZIP
+restent accessibles sous « Archives — propositions sans build » dans
+`/admin/game-builds`, avec leurs notes et opérations historiques. Les propositions
+déjà liées à un upload n'y apparaissent pas : leur revue passe par le dossier de
+publication. Aucun endpoint ni donnée historique n'est supprimé.
+
+Les tests d'interface s'exécutent avec `npm run test:build-review-ui` et
+`npm run test:build-review-browser`. Pour contrôler le rendu avec le CSS compilé,
+définir `ADMIN_REVIEW_VISUAL=1` avant le test navigateur, après un build Next.js.
+Les fixtures ne déclenchent aucune publication réelle.
 
 ## Commande locale
 

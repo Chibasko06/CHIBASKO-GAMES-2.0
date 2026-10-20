@@ -8,6 +8,8 @@
     "test:developer-submissions-db": "node tests/game-distribution-db.mjs --uploads --reviews --submissions",
     "review:game": "node scripts/review-game.mjs",
     "test:build-reviews": "node --import ./tests/admin-register.mjs --test tests/build-review.test.mjs tests/admin-security.test.mjs",
+    "test:build-review-ui": "node --import ./tests/register.mjs --test tests/admin-review-presentation.test.mjs && node --import ./tests/admin-ui-register.mjs --test tests/admin-ui.test.mjs",
+    "test:build-review-browser": "node --test tests/admin-build-review.browser.test.mjs",
     "test:build-reviews-db": "node tests/game-distribution-db.mjs --uploads --reviews",
     "generate:distribution-schema": "node scripts/generate-distribution-validator.mjs",
     "check:distribution-schema": "node scripts/generate-distribution-validator.mjs --check",

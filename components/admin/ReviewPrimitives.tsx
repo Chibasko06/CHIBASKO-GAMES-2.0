@@ -1,0 +1,6 @@
+import type {ReactNode} from 'react'
+const tones={muted:'border-zinc-600 bg-zinc-800 text-zinc-200',error:'border-rose-700 bg-rose-950/50 text-rose-200',success:'border-emerald-700 bg-emerald-950/50 text-emerald-200',info:'border-cyan-700 bg-cyan-950/50 text-cyan-200',warning:'border-amber-700 bg-amber-950/50 text-amber-200'}
+export function ReviewBadge({children,tone='muted'}:{children:ReactNode;tone?:keyof typeof tones}){return <span className={'inline-flex rounded-full border px-3 py-1 text-sm font-medium '+tones[tone]}>{children}</span>}
+export function ReviewCard({title,children,id}:{title:string;children:ReactNode;id?:string}){return <section id={id} className="min-w-0 space-y-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6"><h2 className="text-xl font-semibold text-white">{title}</h2>{children}</section>}
+export const reviewButton='inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-600 px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:border-cyan-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-40'
+export const reviewPrimary=reviewButton+' border-cyan-400 bg-cyan-400 text-zinc-950 hover:bg-cyan-300'

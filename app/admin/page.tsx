@@ -16,24 +16,6 @@ type Game = Tables<'games'> & {
 type AdminUser = Tables<'profiles'> & { email: string | null }
 type Category = Tables<'categories'> & { games_count?: number; game_categories?: { game_id: string }[] }
 type FaqEntry = Tables<'faq_entries'>
-type GameSubmission = Tables<'game_submissions'>
-
-const submissionStatusLabels: Record<string, string> = {
-  pending: 'En attente',
-  reviewing: 'En cours de revue',
-  accepted: 'Acceptee',
-  rejected: 'Refusee',
-  archived: 'Archivee',
-}
-
-const submissionActionHelp: Record<string, string> = {
-  pending: 'Laisser la demande en file d attente sans action immediate.',
-  reviewing: 'Marquer la proposition comme en cours d analyse.',
-  accepted: 'Valider la proposition pour une integration manuelle ulterieure.',
-  rejected: 'Refuser la proposition si elle ne convient pas au catalogue.',
-  archived: 'Ranger la demande hors du flux principal sans la supprimer.',
-}
-
 type GameFormState = {
   game_type: GameType
   multiplayer_game_id: string
@@ -177,8 +159,6 @@ function AdminPanel() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [faqEntries, setFaqEntries] = useState<FaqEntry[]>([])
-  const [submissions, setSubmissions] = useState<GameSubmission[]>([])
-  const [submissionNotes, setSubmissionNotes] = useState<Record<string, string>>({})
   const [gameForm, setGameForm] = useState<GameFormState>(emptyGameForm)
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm)
@@ -191,12 +171,10 @@ function AdminPanel() {
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [loadingFaq, setLoadingFaq] = useState(true)
-  const [loadingSubmissions, setLoadingSubmissions] = useState(true)
   const [savingGame, setSavingGame] = useState(false)
   const [savingUser, setSavingUser] = useState(false)
   const [savingCategory, setSavingCategory] = useState(false)
   const [savingFaq, setSavingFaq] = useState(false)
-  const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null)
   const [uploadingGameThumbnail, setUploadingGameThumbnail] = useState(false)
   const [uploadingUserAvatar, setUploadingUserAvatar] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -296,32 +274,6 @@ function AdminPanel() {
     }
   }, [authorizedFetch])
 
-  const loadSubmissions = useCallback(async (signal?: AbortSignal) => {
-    setLoadingSubmissions(true)
-    try {
-      const response = await authorizedFetch('/api/admin/game-submissions', { signal })
-      const payload = await response.json()
-      if (signal?.aborted) return
-      if (!response.ok) {
-        throw new Error(payload.error || 'Acces propositions refuse.')
-      }
-      const nextSubmissions = payload.submissions || []
-      setSubmissions(nextSubmissions)
-      setSubmissionNotes(
-        Object.fromEntries(
-          nextSubmissions.map((submission: GameSubmission) => [submission.id, submission.admin_notes || ''])
-        )
-      )
-      setErrorMessage(null)
-    } catch (error) {
-      if (signal?.aborted) return
-      setSubmissions([])
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur propositions developpeurs.')
-    } finally {
-      if (!signal?.aborted) setLoadingSubmissions(false)
-    }
-  }, [authorizedFetch])
-
   useEffect(() => {
     if (accessStatus === 'unauthenticated') router.replace('/login?next=%2Fadmin')
   }, [accessStatus, router])
@@ -331,10 +283,10 @@ function AdminPanel() {
     const controller = new AbortController()
     // Cancelled mounts (including Strict Mode) must not launch duplicate requests.
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void Promise.all([loadGames(controller.signal), loadUsers(controller.signal), loadCategories(controller.signal), loadFaq(controller.signal), loadSubmissions(controller.signal)])
+      if (!controller.signal.aborted) void Promise.all([loadGames(controller.signal), loadUsers(controller.signal), loadCategories(controller.signal), loadFaq(controller.signal)])
     })
     return () => controller.abort()
-  }, [accessStatus, loadGames, loadUsers, loadCategories, loadFaq, loadSubmissions])
+  }, [accessStatus, loadGames, loadUsers, loadCategories, loadFaq])
 
   const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
     setGameForm((current) => ({ ...current, [field]: value }))
@@ -605,90 +557,6 @@ function AdminPanel() {
     }
   }
 
-  const handleSubmissionStatus = async (id: string, status: GameSubmission['status']) => {
-    setSavingSubmissionId(id)
-    try {
-      const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, admin_notes: submissionNotes[id] || '' }),
-      })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error || 'Erreur mise a jour proposition.')
-      }
-      await loadSubmissions()
-      setErrorMessage(null)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur mise a jour proposition.')
-    } finally {
-      setSavingSubmissionId(null)
-    }
-  }
-
-  const handleSubmissionNotesSave = async (id: string, currentStatus: GameSubmission['status']) => {
-    setSavingSubmissionId(id)
-    try {
-      const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: currentStatus, admin_notes: submissionNotes[id] || '' }),
-      })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error || 'Erreur sauvegarde notes admin.')
-      }
-      await loadSubmissions()
-      setErrorMessage(null)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur sauvegarde notes admin.')
-    } finally {
-      setSavingSubmissionId(null)
-    }
-  }
-
-  const handleCopySubmissionLink = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url)
-      setErrorMessage(null)
-    } catch {
-      setErrorMessage('Impossible de copier le lien automatiquement.')
-    }
-  }
-
-  const handleOpenExternalLink = (url: string) => {
-    const confirmed = window.confirm(
-      `Tu vas ouvrir un lien externe soumis par un developpeur.\n\n${url}\n\nVerifie toujours la source avant de poursuivre.`
-    )
-
-    if (!confirmed) {
-      return
-    }
-
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-
-  const handleDeleteSubmission = async (id: string) => {
-    if (!confirmDeletion('cette proposition developpeur')) {
-      return
-    }
-
-    setSavingSubmissionId(id)
-    try {
-      const response = await authorizedFetch(`/api/admin/game-submissions/${id}`, { method: 'DELETE' })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error || 'Erreur suppression proposition.')
-      }
-      await loadSubmissions()
-      setErrorMessage(null)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur suppression proposition.')
-    } finally {
-      setSavingSubmissionId(null)
-    }
-  }
-
   const handleUserAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !editingUserId) {
@@ -768,7 +636,7 @@ function AdminPanel() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="mb-2 text-2xl font-black uppercase text-cyan-500">Admin Chibasko Games</h1>
-            <Link href="/admin/game-builds" className="text-cyan-300 underline">Revue et publication des builds de jeux</Link>
+
             <p className="text-zinc-400">
               Gere le catalogue, les categories, la FAQ et les profils joueurs.
             </p>
@@ -792,6 +660,8 @@ function AdminPanel() {
         </div>
         {errorMessage ? <p className="mt-4 text-sm text-red-400">{errorMessage}</p> : null}
       </section>
+
+      <Link href="/admin/game-builds" className="block rounded-2xl border border-cyan-800 bg-cyan-950/20 p-6 transition hover:border-cyan-400 focus-visible:outline-2 focus-visible:outline-cyan-300"><h2 className="text-xl font-bold text-cyan-200">Publications de jeux</h2><p className="mt-2 text-sm text-zinc-300">Consulter les soumissions, vérifier les jeux et décider de leur publication.</p><span className="mt-3 inline-block text-sm font-semibold text-cyan-300">Ouvrir les publications →</span></Link>
 
       <section className="grid grid-cols-1 gap-8 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="border border-zinc-800 bg-zinc-950 p-6">
@@ -1046,220 +916,6 @@ function AdminPanel() {
             </div>
           )}
         </div>
-      </section>
-
-      <section className="border border-zinc-800 bg-zinc-950 p-6">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-black uppercase text-white">Propositions developpeurs</h2>
-            <p className="mt-2 text-sm text-zinc-400">
-              Demandes recues depuis la page publique Publier un jeu. Tu peux les examiner, noter leur statut, sauvegarder tes notes puis integrer manuellement les jeux retenus dans ton formulaire catalogue.
-            </p>
-          </div>
-          <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{submissions.length} demandes</span>
-        </div>
-
-        {loadingSubmissions ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-32 animate-pulse border border-zinc-800 bg-zinc-900" />
-            ))}
-          </div>
-        ) : submissions.length === 0 ? (
-          <p className="text-sm text-zinc-500">Aucune proposition developpeur pour le moment.</p>
-        ) : (
-          <div className="space-y-4">
-            {submissions.map((submission) => (
-              <article key={submission.id} className="space-y-5 rounded-[28px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(20,24,33,0.82),rgba(9,9,11,0.94))] p-5">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="text-lg font-black text-white">{submission.game_title}</p>
-                    <p className="mt-1 text-sm text-zinc-400">{submission.name_or_studio} • {submission.email}</p>
-                    <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-300">
-                      {submission.short_description || submission.description}
-                    </p>
-                  </div>
-                  <span className={`rounded-full border px-3 py-2 text-[10px] uppercase tracking-[0.3em] ${
-                    submission.status === 'accepted'
-                      ? 'border-cyan-900 text-cyan-400'
-                      : submission.status === 'rejected'
-                        ? 'border-red-950 text-red-400'
-                        : submission.status === 'reviewing'
-                          ? 'border-amber-900 text-amber-300'
-                          : submission.status === 'archived'
-                            ? 'border-zinc-800 text-zinc-500'
-                            : 'border-zinc-800 text-zinc-400'
-                  }`}>
-                    {submissionStatusLabels[submission.status] || submission.status}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Type de jeu</p>
-                    <p className="mt-2 text-sm text-white">{submission.game_type}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Compatibilite mobile</p>
-                    <p className="mt-2 text-sm text-white">{submission.mobile_compatibility || 'Non renseignee'}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Contenu sensible</p>
-                    <p className="mt-2 text-sm text-white">{submission.sensitive_content || 'Non renseigne'}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pubs</p>
-                    <p className="mt-2 text-sm text-white">
-                      {submission.has_ads === true ? 'Oui' : submission.has_ads === false ? 'Non' : 'Non renseigne'}
-                    </p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Date</p>
-                    <p className="mt-2 text-sm text-white">{new Date(submission.created_at).toLocaleString('fr-FR')}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Lien de demo complet</p>
-                    <p className="mt-3 break-all text-sm leading-6 text-cyan-300">{submission.demo_url}</p>
-                    <p className="mt-3 text-xs leading-5 text-zinc-500">
-                      Attention : lien externe soumis par un developpeur. Verifie toujours la source avant ouverture.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => void handleCopySubmissionLink(submission.demo_url)}
-                        className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-200"
-                      >
-                        Copier le lien
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenExternalLink(submission.demo_url)}
-                        className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300"
-                      >
-                        Ouvrir dans un nouvel onglet
-                      </button>
-                    </div>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Site / portfolio</p>
-                    <p className="mt-3 break-all text-sm leading-6 text-zinc-300">
-                      {submission.developer_website || 'Non renseigne'}
-                    </p>
-                    {submission.developer_website ? (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenExternalLink(submission.developer_website!)}
-                        className="mt-4 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300"
-                      >
-                        Ouvrir le site
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Categories proposees</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {submission.category_names.length > 0 ? submission.category_names.map((categoryName) => (
-                        <span key={categoryName} className="border border-cyan-900 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-300">
-                          {categoryName}
-                        </span>
-                      )) : <span className="text-sm text-zinc-500">Aucune categorie</span>}
-                    </div>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Publication ailleurs</p>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300">{submission.published_elsewhere || 'Non renseignee'}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Confirmation de droits</p>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300">
-                      {submission.ownership_confirmed ? 'Le developpeur affirme etre proprietaire ou autorise a proposer ce jeu.' : 'Confirmation absente.'}
-                    </p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Description longue</p>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.long_description || submission.description}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Attentes / conditions</p>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.expectations || 'Aucune condition precise.'}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-zinc-800 bg-zinc-950 p-4 xl:col-span-2">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Message</p>
-                    <p className="mt-3 text-sm leading-6 text-zinc-300 whitespace-pre-line">{submission.message || 'Aucun message complementaire.'}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-cyan-950/60 bg-cyan-950/10 p-4">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Notes admin</p>
-                  <textarea
-                    value={submissionNotes[submission.id] || ''}
-                    onChange={(event) =>
-                      setSubmissionNotes((current) => ({
-                        ...current,
-                        [submission.id]: event.target.value,
-                      }))
-                    }
-                    placeholder="Observations, points a verifier, decision interne..."
-                    className="mt-3 min-h-28 w-full rounded-2xl border border-zinc-800 bg-black/50 p-4 text-white outline-none focus:border-cyan-500"
-                  />
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleSubmissionNotesSave(submission.id, submission.status)}
-                      disabled={savingSubmissionId === submission.id}
-                      className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300 disabled:opacity-60"
-                    >
-                      Sauvegarder les notes
-                    </button>
-                    <span className="text-xs leading-5 text-zinc-500">
-                      Ces notes servent a documenter ton analyse avant la decision finale.
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                  {(['pending', 'reviewing', 'accepted', 'rejected', 'archived'] as const).map((statusKey) => (
-                    <button
-                      key={statusKey}
-                      type="button"
-                      onClick={() => void handleSubmissionStatus(submission.id, statusKey)}
-                      disabled={savingSubmissionId === submission.id}
-                      className={`rounded-[20px] border px-4 py-4 text-left disabled:opacity-60 ${
-                        submission.status === statusKey
-                          ? 'border-cyan-700 bg-cyan-950/20'
-                          : 'border-zinc-800 bg-black/25'
-                      }`}
-                    >
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-white">
-                        {submissionStatusLabels[statusKey]}
-                      </p>
-                      <p className="mt-2 text-xs leading-5 text-zinc-400">
-                        {submissionActionHelp[statusKey]}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleDeleteSubmission(submission.id)}
-                    disabled={savingSubmissionId === submission.id}
-                    className="border border-red-950 px-3 py-2 text-xs font-bold text-red-500 disabled:opacity-60"
-                  >
-                    Supprimer definitivement
-                  </button>
-                  <span className="text-xs leading-5 text-zinc-500">
-                    Suppression reservee aux doublons ou demandes inutilisables.
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
       </section>
 
       <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
