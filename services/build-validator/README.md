@@ -80,6 +80,15 @@ upload uses a different version UUID even for identical content.
 
 ## Cleanup and operational prerequisites
 
+The local `npm run review:game -- <upload-id>` launcher loads the dedicated,
+Git-ignored `.env.review.local` at the repository root. Copy
+`services/build-validator/review.env.example` and configure it locally; injected
+environment values take precedence. Next.js `.env.local` and Cloudflare secrets
+are not imported. `npm run review:game -- --check-config` checks local names and
+formats without any remote access. The permanent Queue consumer retains its
+environment-only configuration. See `docs/manual-build-review.md` for the local
+review procedure and safe diagnostics.
+
 Terminal jobs wait one day before cleanup. Completed versions keep final content;
 failed/expired jobs remove only their unique final prefix and staging object/MPU.
 Cleanup is retry-safe and marks the DB row only after deletions succeed.

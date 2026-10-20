@@ -48,6 +48,11 @@
   },
   "vars": {
     "CHIBASKO_CLOUDFLARE": "1",
+    "GAME_RUNTIME_LAUNCHES_ENABLED": "1",
+    "GAME_CONTENT_BASE_DOMAIN": "chibaskogames-play.fr",
+    "GAME_CONTENT_PUBLIC_BASE": "chibaskogames-play.fr",
+    "GAME_CONTENT_PREVIEW_BASE": "chibaskogames-play.fr",
+    "GAME_PORTAL_ORIGINS": "https://chibaskogames.fr,https://www.chibaskogames.fr",
     "NEXT_PUBLIC_SUPABASE_URL": "https://oakjtjrzqkoiajmzbdlc.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_oxR8nmsY2eqq5sNsb_XoNw_-iWAXMNq",
     "RESEND_FROM_EMAIL": "noreply@chibaskogames.fr",

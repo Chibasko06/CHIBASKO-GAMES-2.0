@@ -5,11 +5,65 @@
 > décrivent leur état historique. Le parcours courant et les prérequis production
 > sont documentés dans [pong-migration.md](pong-migration.md).
 
-Activation désactivée par défaut : `GAME_RUNTIME_LAUNCHES_ENABLED` côté portail,
-`GAME_ARTIFACT_GATEWAY_ENABLED` côté Worker. Avant toute activation autorisée,
-configurer `GAME_CONTENT_BASE_DOMAIN` (frontière PSL), les bases public/preview
-du gateway, les origines portail et les bindings backend ; aucune valeur réelle
-ni flag d'activation n'est écrit ici.
+Les garde-fous restent fermés en l'absence de `GAME_RUNTIME_LAUNCHES_ENABLED=1`
+côté portail et `GAME_ARTIFACT_GATEWAY_ENABLED=1` côté Gateway. La configuration
+production versionnée active désormais ces deux flags sur leurs Workers distincts.
+La base de contenu est `chibaskogames-play.fr`, domaine enregistrable distinct du
+portail ; la PRIVATE PSL reste un durcissement facultatif, sans prérequis bloquant.
+
+## Configuration des launches côté portail
+
+Le Worker `chibasko-games-preview` doit posséder ses propres variables. Celles du
+Worker `chibasko-game-artifact-gateway` ne lui sont pas transmises :
+
+| Nom | Valeur attendue sur le portail |
+| --- | --- |
+| `GAME_RUNTIME_LAUNCHES_ENABLED` | `1` |
+| `GAME_CONTENT_BASE_DOMAIN` | `chibaskogames-play.fr` |
+| `GAME_CONTENT_PUBLIC_BASE` | `chibaskogames-play.fr` |
+| `GAME_CONTENT_PREVIEW_BASE` | `chibaskogames-play.fr` |
+| `GAME_PORTAL_ORIGINS` | `https://chibaskogames.fr,https://www.chibaskogames.fr` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Origine HTTPS du projet, sans `/rest/v1/` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clé publique existante, requise pour vérifier le compte en preview |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret serveur existant, configuré séparément |
+
+Les cinq variables non secrètes de lancement sont déclarées dans `wrangler.jsonc`.
+La procédure CLI habituelle conserve les autres variables dashboard avec
+`--keep-vars`. Si la livraison ne lit pas ce fichier, configurer ces mêmes noms
+dans Settings → Variables and Secrets du Worker du portail, puis rendre cette
+configuration effective sur la version active. Aucun binding R2 ou service
+Gateway supplémentaire n'est requis par `POST /api/game-launches` : la route
+crée une session autorisée via Supabase et calcule une origine aléatoire. L'iframe
+contacte ensuite le Gateway séparé, qui conserve son binding `ARTIFACTS`.
+
+La preview admin utilise `audience=preview` pour `draft`, `in_review` ou `approved`.
+Le flag historique `GAME_ARTIFACT_PREVIEWS_ENABLED` des tickets top-level n'est
+pas utilisé par ce bouton : il passe par les launch sessions sans cookie tiers.
+L'autorisation Supabase précède la résolution du manifeste privé et est répétée
+à la création du launch. Une demande `published` pour un draft reste refusée.
+La projection `distribution_resolve_version` vérifie UUID/version, manifeste,
+hash, préfixe client immutable et policy ; aucun préfixe ni donnée DB privée n'est
+retourné dans le descriptor. Le test ne publie jamais une version.
+
+### Diagnostic d'un échec de lancement
+
+Chaque réponse porte `X-Request-Id`. Un échec produit `game_launch_failed` avec
+requestId, opération, phase, étape, code et statut ; audience et exécution sont
+incluses seulement après validation de leurs valeurs. Les phases distinguent
+configuration, authentification, autorisation, résolution de version, création
+de session, origine de contenu, base de données et erreur inattendue.
+
+`reason=launches_disabled` identifie le premier garde-fou de configuration.
+`configuration.present/missing/invalid` ne contient que des noms de variables.
+Pour une erreur DB, `phase=database`, `stage` conserve l'étape fonctionnelle et
+`rpc` indique opération, catégorie, statut HTTP et code PostgreSQL/PostgREST sûr.
+Les autres erreurs conservent leur code public stable. Une erreur inattendue
+retourne `service_unavailable`, sans détail brut.
+
+Aucun corps, acteur Auth, cookie, bearer, controlToken, ticket, hash de capability,
+URL de launch, message SQL ou stack n'est journalisé. Les échecs de logging ne
+modifient jamais l'autorisation ou les réponses. Les tests de diagnostic sont
+inclus dans `npm run test:game-runtime` avec des fixtures uniquement.
 
 Le nouveau player `components/game-runtime/GameRuntime.tsx` consomme uniquement des
 builds Web via le gateway. Il n'importe aucun jeu, registre de modules, SDK installé,

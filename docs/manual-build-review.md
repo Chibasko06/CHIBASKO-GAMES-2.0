@@ -89,8 +89,12 @@ Les fixtures ne déclenchent aucune publication réelle.
 
 ## Commande locale
 
-Node.js 24, dépendances installées avec `npm ci`. Injecter les variables suivantes
-dans l'environnement par un gestionnaire de secrets ou un fichier **hors dépôt** :
+Node.js 24, dépendances installées avec `npm ci`. Le lanceur charge uniquement
+`.env.review.local` à la racine du projet, ignoré par Git. Copier le modèle
+`services/build-validator/review.env.example` vers ce fichier et renseigner les
+valeurs localement par la gestion habituelle des secrets. Les variables déjà
+injectées dans le processus prennent priorité. Aucun secret Cloudflare n'est
+récupéré automatiquement ; `.env.local` de Next.js n'est pas chargé.
 
 | Variable | Usage |
 | --- | --- |
@@ -103,9 +107,23 @@ dans l'environnement par un gestionnaire de secrets ou un fichier **hors dépôt
 | `GAME_BUILDS_ARTIFACTS_BUCKET` | `chibasko-game-artifacts` |
 | `GAME_BUILDS_SCRATCH_DIR` | Facultatif : disque temporaire dédié ; sinon temp OS |
 
-Aucun token Queue n'est nécessaire. Aucun fichier `.env` n'est chargé implicitement.
+Aucun token Queue n'est nécessaire. `SUPABASE_URL` est prioritaire ;
+`NEXT_PUBLIC_SUPABASE_URL` peut servir de fallback si fourni dans l'environnement
+ou le fichier dédié. L'URL doit être l'origine du projet, sans `/rest/v1/`.
 La credential locale est une capacité serveur privilégiée ; ne pas la distribuer
 aux développeurs ni la saisir dans l'interface admin.
+
+Contrôler la présence et les formats locaux sans RPC, claim, téléchargement ou
+modification distante :
+
+```sh
+npm run review:game -- --check-config
+```
+
+Cette commande ne prouve pas que les credentials distants ont les permissions
+requises. Elle ne vérifie pas non plus l'espace disque ; le traitement conserve
+son contrôle d'espace et de quotas existant. Le scratch facultatif doit disposer
+de la taille archive + quota décompressé + 1 Gio de marge, vérifiée après le claim.
 
 ```sh
 npm run review:game -- <upload-id>
@@ -122,6 +140,16 @@ validator. Il relit l'état DB après traitement : un rejet technique, un confli
 une erreur persistée ou une validation concurrente retourne un code non nul.
 La sortie contient uniquement upload ID, version ID et résultat technique.
 Le champ `published:false` indique que la commande n'effectue aucune publication.
+
+Les erreurs locales affichent des codes distincts pour configuration manquante,
+configuration invalide, compilation, lancement, scratch, état incompatible et
+échec de validation. Les diagnostics de traitement ajoutent la phase et les seuls
+codes R2 sûrs, sans exception brute, chemin privé, ticket ou credential. Une erreur
+de configuration intervient avant `distribution_review_job` et `distribution_claim`.
+Le même upload en attente peut être validé après correction, sans nouveau ZIP,
+gameId ou upload. Une validation déjà terminée reste idempotente ; une lease active
+ne peut pas être contournée et un rejet technique persistant exige son traitement
+normal depuis l'administration.
 
 Les quotas et protections du service restent inchangés. Prévoir jusqu'à 24–32 GiB
 de scratch dédié pour les limites maximales actuelles ; voir

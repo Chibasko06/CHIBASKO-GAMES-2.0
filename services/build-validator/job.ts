@@ -9,9 +9,11 @@ import { gameArtifactKeys } from '../../lib/game-distribution/keys'
 import { artifactMedia } from '../../lib/game-distribution/paths'
 import { UploadError } from '../../lib/game-distribution/uploads/policy'
 import type { DistributionR2 } from '../../lib/game-distribution/uploads/r2'
+import {R2RequestError,type R2Failure} from '../../lib/game-distribution/uploads/r2'
 import { hashFile } from './extract'
 
 type Storage = Pick<DistributionR2,'read'|'bucket'|'metadata'>
+export type JobFailure={phase:'scratch'|'download'|'extract'|'checkpoint'|'artifacts'|'complete';code:string;r2?:R2Failure;reason?:'scratch_space_insufficient'}
 export async function isolatedExtract(directory: string, milliseconds: number, signal: AbortSignal, childModule=join(import.meta.dirname,'child.mjs')) {
   signal.throwIfAborted()
   await new Promise<void>((accept,reject)=>{
@@ -31,21 +33,23 @@ export async function isolatedExtract(directory: string, milliseconds: number, s
 }
 /** One fenced job; all heavy work is asynchronous outside any portal request. */
 export async function processUpload(id: string, db: UploadRepository, staging: Storage, artifacts: Storage,
-  extract=isolatedExtract,options:{signal?:AbortSignal;scratchRoot?:string}={}) {
+  extract=isolatedExtract,options:{signal?:AbortSignal;scratchRoot?:string;onFailure?:(failure:JobFailure)=>void}={}) {
   options.signal?.throwIfAborted()
   const upload=await db.call<Upload|null>('distribution_claim',{p_id:id})
   if(!upload?.id)return
   const root=resolve(options.scratchRoot ?? tmpdir());let directory=''
   const timeout=AbortSignal.timeout(upload.policy.jobSeconds*1000)
   const signal=options.signal?AbortSignal.any([timeout,options.signal]):timeout
+  let phase:JobFailure['phase']='scratch',reason:JobFailure['reason']
   try {
     signal.throwIfAborted()
     if(upload.id!==id || upload.staging_key!==`staging/uploads/${id}/source.zip` || !upload.staging_etag)throw new UploadError('validation_failed',422)
     if(options.scratchRoot) {
       const space=await import('node:fs/promises').then(fs=>fs.statfs(root))
-      if(space.bavail*space.bsize<upload.expected_size+upload.policy.maxTotalBytes+1024**3)throw new UploadError('storage_error',503)
+      if(space.bavail*space.bsize<upload.expected_size+upload.policy.maxTotalBytes+1024**3){reason='scratch_space_insufficient';throw new UploadError('storage_error',503)}
     }
     directory=await mkdtemp(join(root,'chibasko-build-'))
+    phase='download'
     const stream=await staging.read(upload.staging_key,(upload as Upload & {staging_etag:string}).staging_etag,signal)
     const archive=await import('node:fs/promises').then(fs=>fs.open(join(directory,'archive.zip'),'wx',0o600))
     let total=0
@@ -60,12 +64,15 @@ export async function processUpload(id: string, db: UploadRepository, staging: S
     finally {await archive.close()}
     if(total!==upload.expected_size)throw new UploadError('validation_failed',422)
     await writeFile(join(directory,'request.json'),JSON.stringify({target:{gameId:upload.game_id,version:upload.version},policy:upload.policy}),{mode:0o600})
+    phase='extract'
     await extract(directory,upload.policy.validationMs,signal)
     const {checkpoint,spools}: {checkpoint:Checkpoint;spools:{path:string;spool:string}[]}=JSON.parse(await readFile(join(directory,'result.json'),'utf8'))
     const summary={manifest:checkpoint.manifest,artifactSha256:checkpoint.artifactSha256,artifactSize:checkpoint.artifactSize,
       archiveSha256:checkpoint.archiveSha256,archiveSize:checkpoint.archiveSize,fileCount:checkpoint.files.length}
     signal.throwIfAborted()
+    phase='checkpoint'
     await db.call('distribution_checkpoint',{p_id:id,p_lease:upload.lease_token,p_checkpoint:summary})
+    phase='artifacts'
     const keys=gameArtifactKeys(upload.game_id,upload.version_id,checkpoint.artifactSha256), bucket=artifacts.bucket(signal)
     async function put(key: string,size: number,sha256: string,makeBody: ()=>Uint8Array | ReadableStream<Uint8Array>, media={contentType:'application/octet-stream'} as {contentType:string;contentEncoding?:'gzip'|'br'}) {
       signal.throwIfAborted()
@@ -91,9 +98,11 @@ export async function processUpload(id: string, db: UploadRepository, staging: S
     // Inventory is written last; DB completion is possible only after every object.
     await put(keys.inventoryKey,inventory.length,hash,()=>inventory,{contentType:'application/json'})
     signal.throwIfAborted()
+    phase='complete'
     return await db.call<Upload>('distribution_complete',{p_id:id,p_lease:upload.lease_token})
   } catch(error) {
     const code=signal.aborted?'validation_timeout':error instanceof UploadError?error.code:'validation_failed'
+    try{options.onFailure?.({phase,code,...(reason?{reason}:{}),...(error instanceof R2RequestError?{r2:error.diagnostic}:{})})}catch{/* Diagnostics must not affect the persisted failure or retries. */}
     await db.call('distribution_fail',{p_id:id,p_lease:upload.lease_token,p_code:code,
       p_retry:['storage_error','database_error','service_unavailable','validation_timeout'].includes(code)})
     if(options.signal?.aborted)throw new UploadError('validator_stopping',503)
