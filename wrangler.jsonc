@@ -35,6 +35,10 @@
     {
       "binding": "CHIBASKO_ASSETS",
       "bucket_name": "chibasko-assets"
+    },
+    {
+      "binding": "GAME_BUILDS_STAGING",
+      "bucket_name": "chibasko-game-staging"
     }
   ],
   "assets": {

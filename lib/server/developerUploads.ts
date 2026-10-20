@@ -3,7 +3,8 @@ import { createUserAuthClient } from './adminAuthorization'
 import { adminOriginAllowed } from './adminRequest'
 import { readJsonObject, InputError } from './inputValidation'
 import { uploadRepository } from '../game-distribution/uploads/repository'
-import { r2FromEnvironment,R2ConfigurationError,R2RequestError,type R2EnvironmentReport,type R2Failure } from '../game-distribution/uploads/r2'
+import { R2ConfigurationError,R2RequestError,type R2EnvironmentReport,type R2Failure } from '../game-distribution/uploads/r2'
+import {uploadStagingStorage} from './uploadStagingStorage'
 import { createUploadService } from '../game-distribution/uploads/service'
 import { UploadError } from '../game-distribution/uploads/policy'
 
@@ -25,7 +26,7 @@ const dependencies: Dependencies = {
   service(requestId) {
     // Fail closed until migrations, private buckets, queue/consumer and CORS are configured.
     if(process.env.GAME_DISTRIBUTION_UPLOADS_ENABLED!=='1')throw new UploadError('service_unavailable',503)
-    return createUploadService(uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',fetch,{requestId}),r2FromEnvironment(process.env,'STAGING'))
+    return createUploadService(uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',fetch,{requestId}),uploadStagingStorage())
   },
 }
 export async function developerUploadRequest(request: Request, operation: 'create' | 'status' | 'parts' | 'finalize' | 'review', id: string, deps=dependencies) {

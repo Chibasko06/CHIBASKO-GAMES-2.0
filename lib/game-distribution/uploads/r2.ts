@@ -17,7 +17,7 @@ export class R2ConfigurationError extends UploadError{
   constructor(readonly configuration:R2EnvironmentReport){super('service_unavailable',503)}
 }
 type R2Action='multipart_create'|'multipart_list'|'multipart_complete'|'multipart_abort'|'multipart_sign'|'object_head'|'object_read'|'object_write'|'object_delete'|'object_list'
-export type R2Failure={kind:'signing_error'|'network_error'|'timeout'|'http_error'|'invalid_response';action:R2Action;upstreamStatus?:number;r2Code?:string}
+export type R2Failure={kind:'signing_error'|'network_error'|'binding_error'|'timeout'|'http_error'|'invalid_response';action:R2Action;upstreamStatus?:number;r2Code?:string}
 export class R2RequestError extends UploadError{
   constructor(readonly diagnostic:R2Failure){super('storage_error',503)}
 }
@@ -56,7 +56,8 @@ export class DistributionR2 implements StagingStorage {
     const action=actionFor(method,query),requestSignal=signal??AbortSignal.timeout(30_000)
     let signed=false
     try {const request=await this.aws.sign(this.url(key,query),{method,body,headers,signal:requestSignal});signed=true
-      return await this.fetcher(request,{redirect:'error',signal:requestSignal})}
+      // workerd supports manual/follow; manual also prevents forwarding signed headers to redirects.
+      return await this.fetcher(request,{redirect:'manual',signal:requestSignal})}
     catch {throw new R2RequestError({kind:requestSignal.aborted?'timeout':signed?'network_error':'signing_error',action})}
   }
   private async checkResponse(response:Response,action:R2Action){

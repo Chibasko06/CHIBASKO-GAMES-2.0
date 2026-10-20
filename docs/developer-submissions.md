@@ -191,7 +191,12 @@ autorisations serveur et les permissions DB.
 ### Initialisation du staging multipart
 
 La création d’une identité de jeu ne configure pas R2. Le portail initialise
-le client S3 staging avant toute RPC de création d’upload. Les quatre noms
+le stockage staging avant toute RPC de création d’upload. Sur Cloudflare,
+`GAME_BUILDS_STAGING` pointe vers `chibasko-game-staging` et assure les opérations
+natives disponibles. S3 reste utilisé pour les signatures et `ListParts`, absent
+de l’API binding. En Node, l’adaptateur S3 assure toutes les opérations.
+Voir `upload-staging-storage.md` pour le diagnostic workerd et l’activation.
+Les quatre noms
 `GAME_BUILDS_R2_ACCOUNT_ID`, `GAME_BUILDS_R2_ACCESS_KEY_ID`,
 `GAME_BUILDS_R2_SECRET_ACCESS_KEY` et `GAME_BUILDS_STAGING_BUCKET` doivent être
 configurés côté serveur, y compris dans `.env.local` pour un test local. Utiliser
