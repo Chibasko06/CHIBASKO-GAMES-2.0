@@ -9,6 +9,25 @@ import {createGameBridge} from '../lib/game-runtime/bridge.ts'
 import {mountGameRuntime,validateLaunchHandle,IFRAME_SANDBOX} from '../lib/game-runtime/controller.ts'
 import {safeContext,validGameMessage} from '../lib/game-runtime/contracts.ts'
 
+test('client accepts non-PSL preview descriptors and rejects malformed or same-site origins',async()=>{
+  const base='chibaskogames-play.fr',h=await runtimeHarness('solo','preview','normal',{publicBase:base,previewBase:base,contentBase:base,portalOrigins:['https://chibaskogames.fr']})
+  const handle=await h.client.create(h.request)
+  assert.equal(handle.descriptor.bridgeVersion,2)
+  assert.equal(validateLaunchHandle(handle,h.request,'https://chibaskogames.fr'),handle)
+  for(const origin of ['https://l-'+'a'.repeat(47)+'.'+base,'https://l-'+'a'.repeat(48)+'.extra.'+base,'https://l-'+'a'.repeat(48)+'.chibaskogames.fr','https://l-'+'a'.repeat(48)+'.fr','http://l-'+'a'.repeat(48)+'.'+base]){
+    const bad=structuredClone(handle);bad.descriptor.contentOrigin=origin;bad.descriptor.entrypointUrl=origin+'/local/index.html'
+    assert.throws(()=>validateLaunchHandle(bad,h.request,'https://chibaskogames.fr'),/origin_rejected/)
+  }
+  const dom=new JSDOM('<div id="host"></div>',{url:'https://chibaskogames.fr'}),states=[]
+  const runtime=mountGameRuntime({container:dom.window.document.getElementById('host'),request:h.request,client:h.client,onState:s=>states.push(s),onLeave(){}})
+  try{
+    await new Promise(resolve=>setTimeout(resolve,20))
+    const iframe=dom.window.document.querySelector('iframe')
+    assert.ok(iframe);assert.ok(new URL(iframe.src).hostname.endsWith('.'+base))
+    assert.equal(states.at(-1).phase,'loading')
+  }finally{runtime.dispose();dom.window.close()}
+})
+
 test('non-PSL launch delivery ignores cookies, rejects other hosts and never caches authorization',async()=>{
   const base='chibaskogames-play.fr',configuration={publicBase:base,previewBase:base,contentBase:base,portalOrigins:['https://chibaskogames.fr']}
   const h=await runtimeHarness('solo','preview','normal',configuration)

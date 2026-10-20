@@ -42,8 +42,8 @@ test('non-PSL sibling cookies cannot authorize a revoked launch; origins retain 
     assert.ok(cookies.some(cookie=>cookie.includes('shared_fixture=yes')))
   }finally{await context.close()}
 })
-async function setup(kind='solo',audience='published',behavior='normal',viewport={width:1366,height:768},clock=false) {
-  const h=await runtimeHarness(kind,audience,behavior),context=await browser.newContext({viewport,serviceWorkers:'block'}),requests=[]
+async function setup(kind='solo',audience='published',behavior='normal',viewport={width:1366,height:768},clock=false,base='github.io') {
+  const h=await runtimeHarness(kind,audience,behavior,{publicBase:base,previewBase:base,contentBase:base,portalOrigins:['https://portal.test']}),context=await browser.newContext({viewport,serviceWorkers:'block'}),requests=[]
   await context.addCookies([{name:'portal-auth-fixture',value:'not-a-real-session',domain:'portal.test',path:'/',secure:true,sameSite:'None'}])
   await context.route('**/*',async route=>{
     const r=route.request(),url=new URL(r.url()),headers=await r.allHeaders();requests.push({host:url.hostname,path:url.pathname,cookie:headers.cookie ?? ''})
@@ -57,7 +57,7 @@ async function setup(kind='solo',audience='published',behavior='normal',viewport
         const id=url.pathname.split('/')[3]
         response=await gameLaunchRequest(req,id,{actor:async req=>req.headers.has('authorization')?'owner':null,service:()=>h.service})
       }
-    }else if(url.hostname.startsWith('l-') && url.hostname.endsWith('.github.io')) {
+    }else if(url.hostname.startsWith('l-') && url.hostname.endsWith('.'+base)) {
       response=await h.gateway(new Request(r.url(),{method:r.method(),headers}))
     }
     if(!response)return route.fulfill({status:404,body:''})
@@ -69,6 +69,19 @@ async function setup(kind='solo',audience='published',behavior='normal',viewport
   await page.evaluate(request=>window.runtimeFixture.open(request),h.request)
   return {h,context,page,requests,async running(){await page.locator('[data-phase="running"]').waitFor();return page.frames().find(f=>new URL(f.url()).hostname.startsWith('l-'))}}
 }
+test('browser non-PSL preview descriptor creates iframe, loads entrypoint and completes Bridge v2',async()=>{
+  const x=await setup('solo','preview','normal',{width:1366,height:768},false,'chibaskogames-play.fr')
+  try {
+    const frame=await x.running(),firstOrigin=new URL(frame.url()).origin
+    assert.equal((await frame.evaluate(()=>fixture.context)).execution,'local')
+    assert.ok(x.requests.some(r=>r.host.endsWith('.chibaskogames-play.fr') && r.path==='/play/start.html'))
+    await frame.evaluate(()=>location.reload())
+    await x.page.locator('[data-phase="failed"]').waitFor()
+    await x.page.getByRole('button',{name:'Réessayer'}).click()
+    const second=await x.running()
+    assert.notEqual(new URL(second.url()).origin,firstOrigin)
+  }finally{await x.context.close()}
+})
 for(const [kind,audience] of [['pong-like','published'],['solo','preview'],['online','published']])test('browser iframe handshake, safe '+kind+' / '+audience+' context, no third-party-cookie dependency',async()=>{
   const x=await setup(kind,audience)
   try {

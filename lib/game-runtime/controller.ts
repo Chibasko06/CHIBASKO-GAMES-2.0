@@ -12,10 +12,12 @@ export function validateLaunchHandle(value:unknown,request:LaunchRequest,parentO
     || !['web-v1','web-isolated-v1','web-legacy-v1'].includes(d.iframeProfile) || !safeContext(d.context)
     || d.context.gameId!==d.gameId || d.context.gameVersionId!==d.gameVersionId || d.context.execution!==d.execution)throw new RuntimeError('invalid_descriptor')
   const parent=new URL(parentOrigin),url=new URL(d.entrypointUrl),origin=new URL(d.contentOrigin)
-  const suffix=parse(origin.hostname,{allowPrivateDomains:true})
+  const launchHost=/^l-[a-f0-9]{48}\.(.+)$/.exec(origin.hostname)
+  const base=launchHost?.[1],suffix=base?parse(base,{allowPrivateDomains:true}):undefined
+  const parentSite=getDomain(parent.hostname,{allowPrivateDomains:true}),contentSite=getDomain(origin.hostname,{allowPrivateDomains:true})
   if(origin.origin!==d.contentOrigin || url.origin!==origin.origin || url.hash || url.search || url.username || url.password || origin.protocol!=='https:' || origin.port
-    || !/^l-[a-f0-9]{48}\./.test(origin.hostname) || !suffix.isPrivate || suffix.publicSuffix!==origin.hostname.split('.').slice(1).join('.')
-    || getDomain(parent.hostname,{allowPrivateDomains:true})===getDomain(origin.hostname,{allowPrivateDomains:true}))throw new RuntimeError('invalid_descriptor')
+    || !base || !suffix || !(suffix.domain===base || (suffix.isPrivate && suffix.publicSuffix===base))
+    || !parentSite || !contentSite || parentSite===contentSite)throw new RuntimeError('origin_rejected')
   if(!Number.isFinite(Date.parse(d.expiresAt)) || Date.parse(d.expiresAt)<=Date.now())throw new RuntimeError('launch_expired')
   if(Date.parse(d.expiresAt)>Date.now()+RUNTIME_POLICY.sessionSeconds*1000+5000)throw new RuntimeError('invalid_descriptor')
   return h

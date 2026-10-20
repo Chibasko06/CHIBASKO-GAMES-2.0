@@ -103,27 +103,23 @@ Chaque lancement, y compris retry, possède une origine nouvelle, jamais réutil
 Les objets R2 restent les mêmes, immuables. Les anciens hosts `v-` publics et `p-`
 preview top-level de phase 3 restent disponibles, sans être utilisés par ce player.
 
-## Frontière de cookies : contrainte de mise en production
+## Domaine de contenu et frontière de cookies
 
-Un domaine enregistrable distinct du portail protège ses cookies, mais des
-sous-domaines sous une même base permettent encore à un jeu de poser un cookie
-`Domain=<base>` partagé avec ses voisins. Ce n'est pas une isolation complète.
+Le navigateur et le serveur acceptent une base enregistrable dédiée distincte du
+site du portail, ou un suffixe PRIVATE reconnu. Le descriptor exige exactement
+`l-<48 hex>.<base>`, HTTPS et un entrypoint de même origine. Un rejet produit
+le code interne `origin_rejected` avant toute création d’iframe.
 
-La cible durable est donc une base de contenu dédiée, gérée par Chibasko Games,
-reconnue dans la section PRIVATE de la Public Suffix List. Chaque `l-...` devient
-alors un site enregistrable distinct. Un seul wildcard DNS/TLS suffit toujours.
-Le serveur et le contrôle de descriptor refusent une base sans cette frontière.
-Pas de bypass manuel « trusted official game ». `tldts` consulte la PSL, suffixes
-privés compris. La reconnaissance doit être vérifiée dans les navigateurs supportés
-après propagation de l'inscription : une liste serveur seule ne change pas le navigateur.
+La base de production est `chibaskogames-play.fr`. PRIVATE PSL est un
+durcissement facultatif. Sans inscription, les cookies Domain peuvent être
+partagés entre sous-domaines : ils ne constituent jamais une autorisation.
+Le Gateway ignore les cookies entrants et ne crée aucun cookie. Les capacités
+aléatoires propres aux lancements contrôlent l’accès aux fichiers ; les origines
+séparent le stockage navigateur, avec un sandbox cross-origin. Les Service
+Workers restent interdits. Le domaine distinct protège les cookies du portail.
 
-Aucun domaine réel n'est choisi/acheté/enregistré ici. L'exemple de configuration
-reste désactivé et non activable tant qu'une base adéquate n'est pas configurée.
-Les tests interceptent localement des hosts sous github.io (suffixe privé connu),
-sans faire de requête vers GitHub ni le considérer comme domaine de déploiement.
-L'alternative sans PSL serait de renoncer à la garantie d'isolation cookies, ou de
-reconcevoir un sandbox à origine opaque avec ses contraintes de messaging/stockage.
-Un wildcard ordinaire ne garantit pas cette isolation des cookies.
+Les tests navigateur interceptent localement les requêtes vers cette base et
+vers `github.io` pour conserver la couverture des suffixes PRIVATE existants.
 
 Références : [PSL](https://publicsuffix.org/learn/index.html),
 [critères de suffixe privé](https://github.com/publicsuffix/list/wiki/Guidelines),
@@ -264,7 +260,7 @@ Sandbox : `allow-scripts allow-same-origin allow-pointer-lock`.
 allow-same-origin est volontaire : sinon origin devient null, stockage/Workers
 peuvent casser et on perd le ciblage postMessage exact. Il est acceptable ici
 seulement avec une origine dédiée par lancement, hors origine du parent et avec
-frontière de cookies PSL. Le jeu ne peut pas retirer le sandbox cross-origin.
+autorisation indépendante des cookies. Le jeu ne peut pas retirer le sandbox cross-origin.
 
 Aucune permission top-navigation, popup, forms ou downloads. Fullscreen est refusé
 à l'iframe elle-même : le bouton du portail met son conteneur en plein écran,
@@ -354,7 +350,7 @@ Les anciennes dépendances Git SDK/Pong restent présentes, blocage Cloudflare c
 3. Préparer côté plateforme l'adaptateur de session online vérifié : pseudonymes,
    contexte/ticket de connexion limité au serveur gameplay, sans JWT Supabase ni
    réservation interne. Conserver public/private dans l'orchestration du lobby.
-4. Configurer domaine de contenu, frontière PSL, TLS, buckets/queue/gateway, migrations
+4. Configurer domaine de contenu dédié, TLS, buckets/queue/gateway, migrations
    et politiques réseau après autorisation distincte ; recette moteurs/navigateurs.
 5. Uploader le même build officiel par le pipeline générique, valider une DRAFT,
    tester preview avec ce player, local anonyme et online à deux comptes.
