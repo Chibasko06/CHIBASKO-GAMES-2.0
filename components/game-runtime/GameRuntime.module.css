@@ -1,6 +1,6 @@
-.shell{box-sizing:border-box;position:relative;isolation:isolate;display:grid;grid-template-rows:minmax(0,1fr) auto;width:100%;height:var(--game-runtime-height,calc(100dvh - 10rem));min-height:20rem;background:#090d16;color:#f8fafc;border:1px solid #25404b;border-radius:12px;box-shadow:0 12px 36px #0004;overflow:hidden;font-family:system-ui,sans-serif}
+.shell{box-sizing:border-box;position:relative;isolation:isolate;display:grid;grid-template-rows:auto auto;container-type:inline-size;width:100%;height:auto;min-height:0;--player-available-height:calc(100dvh - 14rem);--player-dock-height:57px;background:#090d16;color:#f8fafc;border:1px solid #25404b;border-radius:12px;box-shadow:0 12px 36px #0004;overflow:hidden;font-family:system-ui,sans-serif}
 .shell:fullscreen{width:100%;height:100dvh;min-height:0;border:0;border-radius:0;background:#09090b}
-.surface{position:relative;min-width:0;min-height:0;overflow:hidden}
+.surface{container:game-surface / size;position:relative;min-width:0;min-height:0;height:min(56.25cqw,720px,max(0px,calc(var(--player-available-height) - var(--player-dock-height) - 2px)));overflow:hidden}
 .viewport{position:absolute;inset:0;min-width:0;min-height:0}
 .dock{position:relative;z-index:3;display:flex;align-items:center;gap:16px;min-width:0;box-sizing:border-box;width:100%;padding:6px 14px;border-top:1px solid #ffffff14;background:linear-gradient(135deg,#111827,#0b1018);color:#cbd5e1}
 .logo{width:28px;height:28px;flex:none;border-radius:50%;object-fit:contain}
@@ -25,14 +25,15 @@
 .notice{position:absolute;z-index:3;bottom:12px;left:12px;right:12px;margin:0;padding:.75rem;border-radius:.5rem;background:#09090be6;color:#e2e8f0;font-size:.8125rem;text-align:center}
 .execution,.legacyFrame{position:absolute;inset:0;width:100%;height:100%;border:0;min-width:0;min-height:0}
 .legacyFrame{display:block}
-.launcher{position:absolute;inset:0;display:grid;place-items:center;overflow:auto;padding:24px;box-sizing:border-box;background:radial-gradient(ellipse at 30% 10%,#164e6340,transparent 65%),#090d16}
+.launcher{position:absolute;inset:0;display:grid;place-items:center;overflow:clip;padding:24px;box-sizing:border-box;background:radial-gradient(ellipse at 30% 10%,#164e6340,transparent 65%),#090d16}
 .launcherContent{display:grid;grid-template-columns:minmax(180px,320px) minmax(0,1fr);align-items:center;gap:32px;width:min(100%,960px)}
 .cover{display:grid;place-items:center;aspect-ratio:16/10;border-radius:18px;border:1px solid #ffffff1a;background:linear-gradient(135deg,#164e63,#111827);overflow:hidden;box-shadow:0 12px 30px #0004;color:#67e8f9;font-size:4rem;font-weight:750}
 .cover img{width:100%;height:100%;object-fit:cover}
 .launcherInfo{min-width:0}
 .eyebrow{margin:0 0 10px;color:#67e8f9;font-size:.6875rem;text-transform:uppercase;letter-spacing:.25em}
-.launcherInfo h2{font-size:clamp(1.25rem,3vw,2rem);font-weight:750;margin:0 0 24px;overflow-wrap:anywhere;line-height:1.2}
-.modes{display:flex;flex-wrap:wrap;gap:10px}
+.launcherInfo h2{font-size:clamp(1.25rem,3vw,2rem);font-weight:750;margin:0 0 8px;overflow-wrap:anywhere;line-height:1.2}
+.developer{margin:0;color:#94a3b8;font-size:.8125rem;line-height:1.5;overflow-wrap:anywhere}
+.modes{margin-top:20px;display:flex;flex-wrap:wrap;gap:10px}
 .modeButton{display:flex;flex:1 1 180px;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:80px;padding:14px 12px;border:1px solid #22d3ee59;border-radius:12px;background:#164e6333;color:#cffafe;cursor:pointer;font:inherit}
 .modeButton strong{font-size:.9375rem}.modeButton span{font-size:.75rem;color:#94a3b8}
 .modeButton:hover:not(:disabled){background:#164e6380;border-color:#67e8f9}
@@ -42,11 +43,31 @@
 .lobbySurface:has(.execution){padding:0;overflow:hidden}
 @media(max-width:600px){.dock{gap:4px;padding:5px 6px}.logo{width:24px;height:24px}.reactions,.reactionButtons,.actions{gap:0}.launcher{padding:16px}.launcherContent{grid-template-columns:1fr;gap:16px;text-align:center}.cover{width:min(100%,220px);justify-self:center}.launcherInfo h2{margin-bottom:16px}.modeButton{min-height:68px}.modes{justify-content:center}}
 @media(max-width:360px){.dock{padding-inline:3px;gap:0}.logo{width:20px;height:20px}}
-@media(max-height:500px){.shell{height:calc(100dvh - 1rem);min-height:14rem}.shell:fullscreen{height:100dvh;min-height:0}.launcher{padding:14px}.launcherContent{grid-template-columns:minmax(130px,220px) minmax(0,1fr);gap:20px;text-align:left}.cover{width:100%;max-height:160px}.launcherInfo h2{margin-bottom:12px}.modeButton{min-height:60px;padding:10px}}
+@media(max-height:500px){.launcher{padding:14px}.launcherContent{grid-template-columns:minmax(130px,220px) minmax(0,1fr);gap:20px;text-align:left}.cover{width:100%;max-height:160px}.launcherInfo h2{margin-bottom:12px}.modeButton{min-height:60px;padding:10px}}
 
-/* A fixed legacy viewport is scaled uniformly inside a stable presentation surface. */
-.shell[data-presentation="legacy"] { height:auto; min-height:0; }
-.shell[data-presentation="legacy"] > .surface { aspect-ratio:16 / 9; }
+
 .shell:fullscreen, .shell[data-presentation="legacy"]:fullscreen { height:100dvh; grid-template-rows:minmax(0,1fr); }
-.shell:fullscreen > .surface { aspect-ratio:auto; }
+.shell:fullscreen > .surface { height:100dvh; aspect-ratio:auto; }
 .shell:fullscreen > .dock { display:none; }
+
+@media(max-width:600px) and (min-height:501px){
+ .surface{height:min(460px,max(0px,calc(var(--player-available-height) - var(--player-dock-height) - 2px)))}
+ .launcher{padding:14px}.launcherContent{gap:12px}.cover{width:min(100%,160px);border-radius:12px}
+ .launcherInfo h2{margin-bottom:6px}.eyebrow{margin-bottom:6px}.modes{margin-top:12px;gap:8px}.modeButton{min-height:54px;padding:8px;flex-basis:130px}
+}
+@media(max-height:500px){.cover{max-width:150px}.launcherContent{grid-template-columns:minmax(90px,150px) minmax(0,1fr);gap:16px}.launcherInfo h2{margin-bottom:4px;font-size:1.25rem}.eyebrow{margin-bottom:4px}.modes{margin-top:10px;gap:6px}.modeButton{flex-basis:120px;min-height:48px;padding:6px}.modeButton strong{font-size:.8125rem}.modeButton span{font-size:.6875rem}}
+
+/* Short landscape viewports keep launch actions visible without an inner scrollbar. */
+@media(max-height:500px){.surface{min-height:128px}}
+@container game-surface (max-height:220px){
+ .launcher{padding:8px}
+ .launcherContent{grid-template-columns:minmax(0,1fr);gap:0;text-align:center}
+ .cover{display:none}
+ .eyebrow{margin:0 0 3px;font-size:.625rem;line-height:1.2}
+ .launcherInfo h2{margin:0 0 4px;font-size:1rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .developer{font-size:.75rem;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .modes{margin-top:8px;gap:6px;flex-wrap:nowrap}
+ .modeButton{flex:1 1 0;min-width:0;min-height:44px;padding:4px;gap:4px}
+ .modeButton strong,.modeButton span{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .modeButton strong{font-size:.75rem;line-height:1.2}.modeButton span{font-size:.625rem;line-height:1.2}
+}

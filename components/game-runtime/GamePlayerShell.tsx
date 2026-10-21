@@ -14,6 +14,22 @@ export default function GamePlayerShell({children,onLeave,socialControls,audioCo
     document.addEventListener('fullscreenchange',sync)
     return()=>document.removeEventListener('fullscreenchange',sync)
   },[])
+  useEffect(()=>{
+    const element=shell.current!,view=element.ownerDocument.defaultView!
+    const measure=()=>{
+      if(element.ownerDocument.fullscreenElement===element)return
+      const dock=element.querySelector<HTMLElement>('[data-player-dock]')!
+      const available=Math.max(0,view.innerHeight-Math.max(0,element.getBoundingClientRect().top)-16)
+      element.style.setProperty('--player-available-height',available+'px')
+      element.style.setProperty('--player-dock-height',dock.getBoundingClientRect().height+'px')
+    }
+    const observer=new ResizeObserver(measure)
+    observer.observe(element)
+    measure()
+    view.addEventListener('resize',measure)
+    element.ownerDocument.addEventListener('fullscreenchange',measure)
+    return()=>{observer.disconnect();view.removeEventListener('resize',measure);element.ownerDocument.removeEventListener('fullscreenchange',measure)}
+  },[])
   async function fullscreen(){const element=shell.current;if(!element)return;try{if(element.ownerDocument.fullscreenElement===element)await element.ownerDocument.exitFullscreen();else await element.requestFullscreen();setFullscreenError(false)}catch{setFullscreenError(true)}}
   const fullscreenLabel=isFullscreen?'Quitter le plein écran':'Plein écran'
   const audioLabel=audioControl && !audioControl.disabled?(audioControl.muted?'Réactiver le son':'Couper le son'):'Contrôle audio indisponible pour ce jeu'
