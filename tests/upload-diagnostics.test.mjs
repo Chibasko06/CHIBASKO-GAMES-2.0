@@ -10,6 +10,25 @@ const config={accountId:'a'.repeat(32),accessKeyId:'fixture-private-access',secr
 const names=['GAME_BUILDS_R2_ACCOUNT_ID','GAME_BUILDS_R2_ACCESS_KEY_ID','GAME_BUILDS_R2_SECRET_ACCESS_KEY','GAME_BUILDS_STAGING_BUCKET']
 const environment=()=>Object.fromEntries(names.map((name,index)=>[name,Object.values(config)[index]]))
 const request=()=>new Request('https://portal.example/api/developer/games/'+id+'/uploads',{method:'POST',headers:{Authorization:'Bearer fixture-private-token','Content-Type':'application/json','Idempotency-Key':requestKey},body:JSON.stringify({version:'0.3.0',archiveSize:8})})
+
+test('upload HTTP admission accepts patch releases for an existing game and rejects malformed SemVer before storage',async()=>{
+ const gameId='0509712e-589d-433d-8395-fa4bcf25c55f'
+ for(const version of ['0.3.1','1.0.0','2.4.12','0.3','v0.3.1','0.3.1.0','abc',' 0.3.1 ','01.3.1','0.3.1\n']){
+  let calls=0,begins=0
+  const valid=['0.3.1','1.0.0','2.4.12'].includes(version)
+  const db={async call(name,args){
+   calls++;assert.equal(name,'distribution_create_upload');assert.equal(args.p_game,gameId);assert.equal(args.p_version,version)
+   // Existing game, active version 0.3.0; version uniqueness remains a database responsibility.
+   return {id,game_id:gameId,version,status:'uploading',expected_size:8,policy:UPLOAD_POLICY,multipart_id:'fixture-only'}
+  }}
+  const req=new Request('https://portal.example/api/developer/games/'+gameId+'/uploads',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':requestKey},body:JSON.stringify({version,archiveSize:8})})
+  const response=await developerUploadRequest(req,'create',gameId,{authenticate:async()=>id,service:()=>createUploadService(db,{begin:async()=>{begins++;return 'fixture'}})})
+  const body=await response.json()
+  assert.equal(response.status,valid?201:400,version)
+  if(valid){assert.equal(body.data.version,version);assert.equal(body.data.gameId,gameId)}else assert.equal(body.error.code,'invalid_version',version)
+  assert.equal(calls,valid?1:0);assert.equal(begins,0)
+ }
+})
 test('missing environment reproduces pre-multipart 503; only names and request correlation reach logs',async()=>{
  const logs=[];let factory=0
  const response=await developerUploadRequest(request(),'create',id,{authenticate:async()=>id,service:()=>{factory++;return createUploadService({call:()=>assert.fail('No database write')},r2FromEnvironment({},'STAGING'))},log:event=>logs.push(event)})

@@ -1,6 +1,6 @@
 import { UPLOAD_POLICY, UploadError, assertUploadId, expectedPartSize } from './policy'
 import { publicUpload, type Upload, type UploadRepository, type StagingStorage } from './contracts'
-import { validateManifest } from '../manifest'
+import { isBuildVersion } from '../version'
 
 /** All operations, including status/parts, authorize through the DB using verified actor. */
 export function createUploadService(db: UploadRepository, storage: StagingStorage) {
@@ -14,10 +14,7 @@ export function createUploadService(db: UploadRepository, storage: StagingStorag
       if (Object.keys(body).some(key => !['version','archiveSize'].includes(key))
         || typeof body.version !== 'string' || !Number.isSafeInteger(body.archiveSize)
         || Number(body.archiveSize) < 1 || Number(body.archiveSize) > UPLOAD_POLICY.maxArchiveBytes) throw new UploadError('invalid_request')
-      // Reuse the canonical SemVer/schema rules, no independent version regex.
-      try { validateManifest({schemaVersion:1,gameId,version:body.version,integrationVersion:1,
-        capabilities:{local:{players:{min:1,max:1}}},client:{entrypoints:{local:'index.html'}}},{gameId,version:body.version}) }
-      catch { throw new UploadError('invalid_version') }
+      if (!isBuildVersion(body.version)) throw new UploadError('invalid_version')
       let row = await db.call<Upload>('distribution_create_upload', {p_actor:actor,p_game:gameId,p_version:body.version,
         p_size:body.archiveSize,p_request:idempotency,p_policy:UPLOAD_POLICY})
       if (row.status === 'created') {
