@@ -12,7 +12,7 @@ const bundle=await build({stdin:{contents:`import React from 'react';import{crea
  api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:`export function useAuth(){return {loading:false,session:new URLSearchParams(location.search).has('anonymous')?null:{user:{id:new URLSearchParams(location.search).has('other')?'other-user':'fixture-user'},access_token:new URLSearchParams(location.search).has('other')?'other-token':'fixture-token'}}}`}))
 }}]})
 let contact={firstName:'Fixture',lastName:'Developer',contactEmail:'contact@example.test',publicName:'Studio fixture',website:null,otherContact:null}
-let publishedParts=0,submissions=[],requests=[],draft=null,registrations=0,failPart=false
+let publishedParts=0,submissions=[],requests=[],draft=null,registrations=0,failPart=false,uploadFailure=''
 const freshDraft=title=>({gameId:game,title,metadata:{title,studio:'',releaseDate:'',description:'',categories:[],mobile:null,technology:''},version:'',revision:0,updatedAt:'2026-10-20T10:00:00Z',requestId:'57575757-5757-4757-8757-575757575757',file:null,hashes:{},submitted:false,coverUrl:null,state:'draft',upload:null})
 let styles=''
 if(process.env.SUBMISSION_VISUAL_CHECK==='1'){
@@ -55,7 +55,7 @@ const server=createServer(async(request,response)=>{
    if(request.headers.referer?.includes('registration-error=1')){response.writeHead(503,{'Content-Type':'application/json'});response.end(JSON.stringify({error:{code:'service_unavailable'}}));return}
    registrations++;draft=freshDraft(JSON.parse(bytes).title);json(response,{data:{gameId:game}});return
  }
- if(url.pathname.endsWith('/uploads')){if(draft){draft.upload={id:upload,status:'uploading',version:draft.version,archiveSize:8,expiresAt:'2099-01-01T00:00:00Z',partSize:33554432};draft.state='uploading'}json(response,{data:{id:upload,status:'uploading',upload:{partSize:33554432}}});return}
+ if(url.pathname.endsWith('/uploads')){if(uploadFailure){response.writeHead(400,{'Content-Type':'application/json'});response.end(JSON.stringify({error:{code:uploadFailure}}));return}if(draft){draft.upload={id:upload,status:'uploading',version:draft.version,archiveSize:8,expiresAt:'2099-01-01T00:00:00Z',partSize:33554432};draft.state='uploading'}json(response,{data:{id:upload,status:'uploading',upload:{partSize:33554432}}});return}
  if(url.pathname==='/api/developer/uploads/'+upload){json(response,{data:{id:upload,status:draft?.upload?.status??'uploading',upload:{partSize:33554432}}});return}
  if(url.pathname.endsWith('/parts')){json(response,{data:{parts:request.method==='POST'?[{url:storageOrigin+'/part',headers:{'Content-Length':'8'}}]:[]}});return}
  if(url.pathname.endsWith('/finalize')){if(draft?.upload)draft.upload.status='queued';json(response,{data:{id:upload,status:'queued'}});return}
@@ -73,6 +73,34 @@ const origin='http://127.0.0.1:'+server.address().port
 let browser
 try{
  browser=await chromium.launch({channel:'chrome',headless:true})
+ await test('Chrome: upload errors stay beside their fields/actions and corrections clear them',async()=>{
+  draft=null;const page=await browser.newPage();await page.goto(origin)
+  await page.getByRole('tab',{name:'Mettre à jour un jeu existant'}).click()
+  await page.getByLabel('Jeu géré',{exact:true}).selectOption(game)
+  const version=page.getByLabel('Version du build (SemVer)',{exact:true}),zip=page.locator('input[accept=".zip,application/zip"]')
+  await version.fill('0.3.1');await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')})
+  await page.getByRole('checkbox',{name:'Je dispose des droits nécessaires',exact:false}).check()
+  for(const code of ['invalid_version','version_conflict','invalid_archive_size','storage_error','developer_profile_required']){
+   uploadFailure=code
+   await page.getByRole('button',{name:/Envoyer le build|Reprendre et finaliser/}).click()
+   const alert=page.getByRole('alert');await alert.waitFor()
+   if(code==='invalid_version'||code==='version_conflict'){
+    assert.equal(await version.getAttribute('aria-describedby'),'update-error')
+    assert.equal(await version.getAttribute('aria-invalid'),'true')
+    if(code==='version_conflict')assert.match(await alert.innerText(),/0\.3\.1/)
+    await version.fill('0.3.2');await alert.waitFor({state:'detached'});await version.fill('0.3.1')
+   }else if(code==='invalid_archive_size'){
+    assert.equal(await zip.getAttribute('aria-invalid'),'true');await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')});await alert.waitFor({state:'detached'})
+   }else if(code==='developer_profile_required'){
+    assert.equal(await page.locator('#developer-contact-errors [role=alert]').count(),1)
+    await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')});await alert.waitFor({state:'detached'})
+   }else{
+    const bounds=await alert.boundingBox(),button=await page.getByRole('button',{name:'Reprendre et finaliser'}).boundingBox()
+    assert.ok(bounds.y+ bounds.height<=button.y);await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')});await alert.waitFor({state:'detached'})
+   }
+  }
+  uploadFailure='';await page.close()
+ })
  await test('Chrome: contact is required, saved once, restored and editable independently of drafts',async()=>{
   contact=null;const page=await browser.newPage();await page.goto(origin)
   await page.getByLabel('Prénom',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Créer le jeu privé et obtenir son gameId',exact:true}).isDisabled(),true)

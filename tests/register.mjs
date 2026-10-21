@@ -40,7 +40,7 @@ registerHooks({
       'phase0:next': 'export const NextResponse = Response; export function after(task) { globalThis.__phase0.after.push(task) }',
       'phase0:supabase': 'export function getSupabaseAdminClient() { return globalThis.__phase0.admin }',
       'phase0:resend': 'export class Resend { emails = { send: (...args) => globalThis.__phase0.send(...args) } }',
-      'phase0:cloudflare': 'export function getCloudflareContext() { return { env: { CHIBASKO_ASSETS: globalThis.__r2.bucket } } }',
+      'phase0:cloudflare': 'export function getCloudflareContext() { return globalThis.__r2.context ?? { env: { CHIBASKO_ASSETS: globalThis.__r2.bucket } } }',
       'phase0:admin-check': 'export function requireAdmin(request) { return globalThis.__r2.adminCheck(request) } export function adminJson(body,init){return Response.json(body,init)} export function adminErrorMessage(){return "Opération impossible."} export function readAdminJson(request){return request.json()}',
       'phase0:server-only': 'export {}',
       'phase0:headers': 'export async function cookies(){return globalThis.__adminCookies}',

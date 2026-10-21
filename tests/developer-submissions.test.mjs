@@ -24,7 +24,7 @@ test('500 MiB archive policy is shared by catalogue, client and server; extracti
    return {id,game_id:id,version:'1.0.0',status:'uploading',expected_size:limit,policy:args.p_policy}
  }},{})
  await service.create(id,id,{version:'1.0.0',archiveSize:limit},id)
- await assert.rejects(service.create(id,id,{version:'1.0.0',archiveSize:limit+1},id),{code:'invalid_request'})
+ await assert.rejects(service.create(id,id,{version:'1.0.0',archiveSize:limit+1},id),{code:'invalid_archive_size'})
  assert.equal(calls,1)
 })
 test('anonymous refused; verified actor only; private-safe catalog and editorial input',async()=>{

@@ -3,23 +3,28 @@ import { publicUpload, type Upload, type UploadRepository, type StagingStorage }
 import { isBuildVersion } from '../version'
 
 /** All operations, including status/parts, authorize through the DB using verified actor. */
-export function createUploadService(db: UploadRepository, storage: StagingStorage) {
+export function createUploadService(db: UploadRepository, storage: StagingStorage, onPhase?: (phase: string) => void) {
   const get = (actor: string, id: string) => {
     assertUploadId(id)
     return db.call<Upload>('distribution_get_upload', {p_actor:actor,p_id:id})
   }
   return {
     async create(actor: string, gameId: string, body: Record<string,unknown>, idempotency: string) {
+      onPhase?.('request_validation')
       assertUploadId(gameId); assertUploadId(idempotency)
-      if (Object.keys(body).some(key => !['version','archiveSize'].includes(key))
-        || typeof body.version !== 'string' || !Number.isSafeInteger(body.archiveSize)
-        || Number(body.archiveSize) < 1 || Number(body.archiveSize) > UPLOAD_POLICY.maxArchiveBytes) throw new UploadError('invalid_request')
+      if (Object.keys(body).some(key => !['version','archiveSize'].includes(key))) throw new UploadError('invalid_request')
+      onPhase?.('version_validation')
       if (!isBuildVersion(body.version)) throw new UploadError('invalid_version')
+      onPhase?.('archive_size_validation')
+      if (!Number.isSafeInteger(body.archiveSize) || Number(body.archiveSize) < 1 || Number(body.archiveSize) > UPLOAD_POLICY.maxArchiveBytes) throw new UploadError('invalid_archive_size')
+      onPhase?.('upload_repository_create')
       let row = await db.call<Upload>('distribution_create_upload', {p_actor:actor,p_game:gameId,p_version:body.version,
         p_size:body.archiveSize,p_request:idempotency,p_policy:UPLOAD_POLICY})
       if (row.status === 'created') {
+        onPhase?.('storage_multipart_create')
         const multipart = await storage.begin(row.staging_key)
         try {
+          onPhase?.('upload_repository_attach')
           row = await db.call<Upload>('distribution_attach_transport',{p_actor:actor,p_id:row.id,p_multipart:multipart})
           if (row.multipart_id !== multipart) await storage.abort(row.staging_key,multipart)
         } catch (error) { await storage.abort(row.staging_key,multipart).catch(()=>{}); throw error }
