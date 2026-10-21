@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import GameRuntime from '@/components/game-runtime/GameRuntime'
@@ -8,14 +8,17 @@ import { lobbyClient } from '@/lib/multiplayer-lobby/client'
 import { LOBBY_UI_POLICY, type DirectoryLobby, type LobbySnapshot, type LobbyAccess } from '@/lib/multiplayer-lobby/contracts'
 import { multiplayerButton, AuthInvitation } from './MultiplayerAccess'
 
-type Props={gameId:string;slug:string;access:LobbyAccess;lobbyId?:string}
+export type LobbyPlayerHandle={leave:()=>void}
+type Props={gameId:string;slug:string;access:LobbyAccess;lobbyId?:string;embedded?:boolean;onLeave?:()=>void;exitRef?:Ref<LobbyPlayerHandle>}
 export default function DurableLobby(props:Props) {
  const {session,loading}=useAuth()
  if(loading)return <p role="status">Vérification de la connexion…</p>
- if(!session)return <AuthInvitation next={`/games/${props.slug}/${props.access==='public'?'online':'private'}`} />
+ if(!session)return <AuthInvitation next={props.embedded?`/games/${props.slug}`:`/games/${props.slug}/${props.access==='public'?'online':'private'}`} />
  return <AuthenticatedLobby key={session.user.id} {...props} token={session.access_token} />
 }
-function AuthenticatedLobby({gameId,slug,access,lobbyId,token}:Props & {token:string}) {
+function AuthenticatedLobby({gameId,slug,access,lobbyId:routeLobbyId,token,embedded=false,onLeave,exitRef}:Props & {token:string}) {
+ const [inlineLobbyId,setInlineLobbyId]=useState(routeLobbyId)
+ const lobbyId=embedded?inlineLobbyId:routeLobbyId
  const router=useRouter()
  const request=useMemo(()=>lobbyClient(async()=>token),[token])
  const launchClient=useMemo(()=>httpLaunchClient(async()=>token),[token])
@@ -46,8 +49,8 @@ function AuthenticatedLobby({gameId,slug,access,lobbyId,token}:Props & {token:st
   try {
    const next=await request<LobbySnapshot>(path,body,abort.signal)
    if(abort.signal.aborted)return
-   if(path.endsWith('/leave')){router.push('/games/'+slug);return}
-   if(!lobbyId)router.push(`/games/${slug}/lobby/${next.id}`)
+   if(path.endsWith('/leave')){if(embedded){setInlineLobbyId(undefined);setLobby(null);onLeave?.()}else router.push('/games/'+slug);return}
+   if(!lobbyId){if(embedded){setInlineLobbyId(next.id);setLobby(next)}else router.push(`/games/${slug}/lobby/${next.id}`)}
    else setLobby(previous=>previous?.id===next.id && previous.revision>next.revision?previous:next)
   }catch{if(!abort.signal.aborted)setError('Cette action n’est pas disponible. Vérifie les places et l’état du salon.')}
   finally{if(!abort.signal.aborted)setBusy(false)}
@@ -56,8 +59,10 @@ function AuthenticatedLobby({gameId,slug,access,lobbyId,token}:Props & {token:st
   const next=await request<{items:DirectoryLobby[];nextCursor:string|null}>(`games/${gameId}/lobbies?after=${cursor}`)
   setItems(current=>[...new Map([...current,...next.items].map(item=>[item.id,item])).values()]);setCursor(next.nextCursor)
  }catch{setError('La liste des salons est temporairement indisponible.')}}
+ useImperativeHandle(exitRef,()=>({leave:()=>{if(lobby)void action(`lobbies/${lobby.id}/leave`);else onLeave?.()}}))
  const self=lobby?.members.find(member=>member.self)
- return <section className="space-y-5 rounded-2xl border border-cyan-900 p-5" aria-label="Salon multijoueur">
+ if(embedded && lobby && ['starting','playing'].includes(lobby.status) && lobby.onlineSessionReference)return <><GameRuntime key={lobby.onlineSessionReference} embedded gameId={lobby.gameId} gameVersionId={lobby.gameVersionId} execution="online" audience="published" locale="fr" onlineSessionReference={lobby.onlineSessionReference} client={launchClient} onLeave={()=>void action(`lobbies/${lobby.id}/leave`)} />{error && <p role="alert" className="absolute inset-x-4 bottom-24 z-10 rounded-lg bg-zinc-950 p-3 text-sm text-rose-200">{error}</p>}</>
+ return <section className={embedded?"space-y-5 p-4 sm:p-6":"space-y-5 rounded-2xl border border-cyan-900 p-5"} aria-label="Salon multijoueur">
   {error && <p role="alert">{error}</p>}
   {!lobbyId?<>
    <button className={multiplayerButton} disabled={busy} onClick={()=>void action('lobbies',{gameId,access,requestId:crypto.randomUUID()})}>Créer un salon {access==='public'?'public':'privé'}</button>

@@ -1,10 +1,7 @@
-import MultiplayerGamePanel from '@/components/multiplayer/MultiplayerGamePanel'
-import ArtifactOnlineLinks from '@/components/multiplayer/ArtifactOnlineLinks'
-import GameReactions from '@/components/GameReactions'
+import ArtifactGamePlayer from '@/components/game-runtime/ArtifactGamePlayer'
 import { isClassicGame } from '@/lib/multiplayer/catalogue'
 import { catalogueSource } from '@/lib/catalogueSource'
 import type { Metadata } from 'next'
-import FavoriteButton from '@/components/FavoriteButton'
 import GameReviews from '@/components/GameReviews'
 import GameViewport from '@/components/GameViewport'
 import PlaySessionTracker from '@/components/PlaySessionTracker'
@@ -120,6 +117,7 @@ export default async function GamePage({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-3">
           <h1 className="text-3xl font-black uppercase text-cyan-400 sm:text-4xl">{game.title}</h1>
+          {game.developer_name && <p className="text-sm text-zinc-400">{game.developer_name}</p>}
           <div className="flex flex-wrap gap-2">
             {game.categories?.map((category) => (
               <Link
@@ -133,39 +131,23 @@ export default async function GamePage({
           </div>
         </div>
 
-        <FavoriteButton gameId={game.id} />
+
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Vues</p>
-          <p className="mt-2 text-2xl font-black text-white">{game.views_count}</p>
-        </div>
-        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Likes</p>
-          <p className="mt-2 text-2xl font-black text-white">{game.likes_count}</p>
-        </div>
-        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Dislikes</p>
-          <p className="mt-2 text-2xl font-black text-white">{game.dislikes_count}</p>
-        </div>
-        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Note moyenne</p>
-          <p className="mt-2 text-2xl font-black text-white">{game.average_rating.toFixed(1)} / 5</p>
-        </div>
-      </div>
-
-      {game.active_version_id ? <ArtifactOnlineLinks capabilities={game.runtime_capabilities} slug={game.slug} availableAccess={availableAccess.filter(access=>access!==null)} /> : isClassicGame(game) ? (
-        <GameViewport
+      {!game.active_version_id && isClassicGame(game) ? (
+        <GameViewport gameId={game.id} gameUrl={game.game_url} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
+      ) : (
+        <ArtifactGamePlayer
+          key={game.id+':'+game.active_version_id}
           gameId={game.id}
-          gameUrl={game.game_url}
+          versionId={game.active_version_id??null}
+          slug={game.slug}
+          capabilities={game.runtime_capabilities}
+          availableAccess={availableAccess.filter(access=>access!==null)}
           initialLikes={game.likes_count}
           initialDislikes={game.dislikes_count}
         />
-      ) : <>
-        <MultiplayerGamePanel game={game} />
-        <GameReactions gameId={game.id} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
-      </>}
+      )}
 
       <p className="text-zinc-400">
         {game.description ?? 'Aucune description disponible.'}
@@ -197,6 +179,25 @@ export default async function GamePage({
           <p className="text-base font-bold text-white">
             {game.favorites_count} favoris • {game.ratings_count} notes • {game.comments_count} commentaires
           </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Vues</p>
+          <p className="mt-2 text-2xl font-black text-white">{game.views_count}</p>
+        </div>
+        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Likes</p>
+          <p className="mt-2 text-2xl font-black text-white">{game.likes_count}</p>
+        </div>
+        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Dislikes</p>
+          <p className="mt-2 text-2xl font-black text-white">{game.dislikes_count}</p>
+        </div>
+        <div className="rounded-[20px] border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Note moyenne</p>
+          <p className="mt-2 text-2xl font-black text-white">{game.average_rating.toFixed(1)} / 5</p>
         </div>
       </div>
 

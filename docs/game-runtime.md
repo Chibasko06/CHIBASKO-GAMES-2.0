@@ -502,10 +502,11 @@ conserve son contrôle de déploiement, notamment en cas de désactivation ulté
 Une erreur de lecture désactive les modes online sans retirer l’accès local.
 
 Le lecteur utilise la largeur du conteneur de page et une hauteur liée au viewport.
+`GamePlayerShell` fournit la surface commune aux iframes legacy et à GameRuntime.
 Son dock flottant inférieur appartient au portail : logo, réactions, favoris,
 audio, toggle plein écran et sortie. Les contrôles restent hors iframe, y compris
 en plein écran. Les composants de réactions/favoris existants sont réutilisés en
-version compacte pour le lecteur local publié ; leur accès authentifié reste
+version compacte pour les jeux publiés ; leur accès authentifié reste
 inchangé. Le jeu conserve son propre ratio et ses contrôles.
 
 Le Bridge actuel ne fournit pas de commande audio. Sans adaptateur audio réel,
@@ -514,3 +515,29 @@ le mute est désactivé avec une explication accessible. Le prop optionnel
 il ne donne aucun accès au DOM ou aux médias de l’iframe cross-origin et ne
 modifie pas le protocole. Chargement, erreurs et retry restent des overlays
 temporaires, sans statut permanent pendant la partie.
+
+## Fiche orientée player
+
+La fiche `/games/[slug]` affiche titre, développeur et catégories, puis le player.
+Description, informations, statistiques et avis suivent le jeu. Les cartes du
+catalogue continuent de mener à cette fiche.
+
+`ArtifactGamePlayer` combine capabilities et availability sans requête gameplay :
+un seul mode disponible est ouvert immédiatement ; plusieurs modes affichent un
+sélecteur centré dans le shell ; zéro mode disponible affiche l’indisponibilité.
+Les modes déclarés mais indisponibles restent désactivés dans le sélecteur.
+Le local charge GameRuntime dans cette même surface. L’online ouvre le lobby
+durable intégré, avec l’authentification existante, sans navigation vers une autre
+page. Choisir le mode ne crée pas de lobby ni de session : leurs actions explicites
+restent nécessaires. Après START, le runtime utilise la version et la session
+figées par le lobby. Quitter passe par la mutation leave existante.
+
+GameRuntime peut être affiché seul ou intégré dans le shell d’une fiche. Le
+contrôleur, les budgets, la génération, la validation du descriptor et le bridge
+restent identiques. Le shell ne transporte aucune donnée d’admission.
+
+`GameViewport` charge directement l’iframe legacy, sans descriptor, sans bridge
+artificiel et sans accès au DOM cross-origin. Ses permissions iframe existantes
+sont conservées ; elles ne deviennent pas celles des artifacts. Fermeture et
+relecture sont locales au lecteur legacy. Le contrôle audio reste désactivé sans
+adaptateur réel, pour les deux moteurs.
