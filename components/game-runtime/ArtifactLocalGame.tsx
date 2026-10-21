@@ -1,8 +1,6 @@
 'use client'
-import { useRouter } from 'next/navigation'
-import GameRuntime from './GameRuntime'
-import GameSocialControls from './GameSocialControls'
-export default function ArtifactLocalGame({gameId,versionId,slug,initialLikes=0,initialDislikes=0}:{gameId:string;versionId:string;slug:string;initialLikes?:number;initialDislikes?:number}){
- const router=useRouter()
- return <GameRuntime gameId={gameId} gameVersionId={versionId} execution="local" audience="published" locale="fr" onLeave={()=>router.push('/games/'+slug)} socialControls={<GameSocialControls gameId={gameId} initialLikes={initialLikes} initialDislikes={initialDislikes}/>} />
+import type {GameCapabilities} from '@chibaskogames/sdk'
+import ArtifactGamePlayer from './ArtifactGamePlayer'
+export default function ArtifactLocalGame({gameId,versionId,slug,title,coverUrl,local,initialLikes=0,initialDislikes=0}:{gameId:string;versionId:string;slug:string;title:string;coverUrl?:string|null;local:NonNullable<GameCapabilities['local']>;initialLikes?:number;initialDislikes?:number}){
+ return <ArtifactGamePlayer gameId={gameId} versionId={versionId} slug={slug} title={title} coverUrl={coverUrl} capabilities={{local}} availableAccess={[]} initialLikes={initialLikes} initialDislikes={initialDislikes}/>
 }

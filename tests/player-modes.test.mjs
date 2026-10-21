@@ -1,14 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {initialPlayerMode,playerModes} from '../lib/game-runtime/modes.ts'
+import {playerModes} from '../lib/game-runtime/modes.ts'
 const capabilities={local:{players:{min:2,max:2}},online:{access:['public','private'],players:{min:2,max:2}}}
-test('exactly one available mode auto-launches, regardless of unsupported online infrastructure',()=>{
- assert.equal(initialPlayerMode(capabilities,[]),'local')
- assert.equal(initialPlayerMode({online:capabilities.online},['private']),'private')
- assert.equal(initialPlayerMode(capabilities,['public']),null)
- assert.equal(initialPlayerMode({online:capabilities.online},[]),null)
- assert.equal(initialPlayerMode(undefined,['public']),null)
+test('mode list never invents unsupported modes or a default selection',()=>{
+ assert.deepEqual(playerModes(undefined,['public']),[])
+ assert.deepEqual(playerModes({online:capabilities.online},['private']).map(({id,available})=>({id,available})),[{id:'public',available:false},{id:'private',available:true}])
 })
+
 test('declared capabilities and operational availability remain separate in the selector',()=>{
  const modes=playerModes(capabilities,[])
  assert.deepEqual(modes.map(({id,available})=>({id,available})),[{id:'local',available:true},{id:'public',available:false},{id:'private',available:false}])

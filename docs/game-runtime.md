@@ -503,9 +503,10 @@ Une erreur de lecture désactive les modes online sans retirer l’accès local.
 
 Le lecteur utilise la largeur du conteneur de page et une hauteur liée au viewport.
 `GamePlayerShell` fournit la surface commune aux iframes legacy et à GameRuntime.
-Son dock flottant inférieur appartient au portail : logo, réactions, favoris,
-audio, toggle plein écran et sortie. Les contrôles restent hors iframe, y compris
-en plein écran. Les composants de réactions/favoris existants sont réutilisés en
+Son dock appartient au portail : logo, réactions, favoris, audio, toggle plein
+écran et sortie. Il occupe une ligne de layout sous la surface, sans overlay ni
+recouvrement des pixels de l’iframe, y compris en plein écran. Une bordure et une
+ombre légères séparent le player du site. Les composants de réactions/favoris existants sont réutilisés en
 version compacte pour les jeux publiés ; leur accès authentifié reste
 inchangé. Le jeu conserve son propre ratio et ses contrôles.
 
@@ -522,22 +523,33 @@ La fiche `/games/[slug]` affiche titre, développeur et catégories, puis le pla
 Description, informations, statistiques et avis suivent le jeu. Les cartes du
 catalogue continuent de mener à cette fiche.
 
-`ArtifactGamePlayer` combine capabilities et availability sans requête gameplay :
-un seul mode disponible est ouvert immédiatement ; plusieurs modes affichent un
-sélecteur centré dans le shell ; zéro mode disponible affiche l’indisponibilité.
-Les modes déclarés mais indisponibles restent désactivés dans le sélecteur.
-Le local charge GameRuntime dans cette même surface. L’online ouvre le lobby
+`GameLauncher` est l’écran initial commun : cover du catalogue et titre, puis les
+actions utiles, sans description longue. Si la cover manque ou échoue, un visuel
+de remplacement reprend l’initiale du titre. Aucun logo dédié n’est exigé.
+
+`ArtifactGamePlayer` combine capabilities et availability. Tous les modes déclarés
+apparaissent sur le launcher, avec les modes indisponibles désactivés. Aucun mode
+ne se lance automatiquement, même lorsque le local est le seul disponible.
+Le clic local monte GameRuntime dans cette même surface. L’online ouvre le lobby
 durable intégré, avec l’authentification existante, sans navigation vers une autre
 page. Choisir le mode ne crée pas de lobby ni de session : leurs actions explicites
 restent nécessaires. Après START, le runtime utilise la version et la session
-figées par le lobby. Quitter passe par la mutation leave existante.
+figées par le lobby. Quitter passe par la mutation leave existante, démonte le
+runtime et restaure le launcher initial avec le même titre, la même cover et les
+mêmes actions. Aucune interface distincte de fermeture n’est affichée.
 
 GameRuntime peut être affiché seul ou intégré dans le shell d’une fiche. Le
 contrôleur, les budgets, la génération, la validation du descriptor et le bridge
 restent identiques. Le shell ne transporte aucune donnée d’admission.
 
-`GameViewport` charge directement l’iframe legacy, sans descriptor, sans bridge
-artificiel et sans accès au DOM cross-origin. Ses permissions iframe existantes
-sont conservées ; elles ne deviennent pas celles des artifacts. Fermeture et
-relecture sont locales au lecteur legacy. Le contrôle audio reste désactivé sans
-adaptateur réel, pour les deux moteurs.
+`GameViewport` commence sur le même launcher, avec une seule action « Jouer ».
+L’iframe legacy n’est créée qu’au clic, sans descriptor, sans bridge artificiel et
+sans accès au DOM cross-origin. Ses permissions existantes sont conservées ;
+elles ne deviennent pas celles des artifacts. Quitter démonte l’iframe et revient
+au launcher, sans écran intermédiaire ni bouton de relecture distinct.
+
+Le flux UI est launcher → lancement → jeu → launcher. Les erreurs utilisent la
+surface commune avec Réessayer et, pour les parcours intégrés, Retour au launcher.
+Chaque nouveau lancement repart avec une iframe et un launch neufs ; les leases,
+générations et nettoyages restent gérés par le moteur. Le contrôle audio reste
+désactivé sans adaptateur réel, pour les deux moteurs.

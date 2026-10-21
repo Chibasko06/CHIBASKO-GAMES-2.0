@@ -5,6 +5,7 @@ import {chromium} from '@playwright/test'
 import {readFileSync} from 'node:fs'
 import {runtimeHarness} from './helpers/runtime-harness.mjs'
 import {gameLaunchRequest} from '../lib/server/gameLaunches.ts'
+import {assertPlayerLayout} from './helpers/player-layout.mjs'
 
 let browser,js,css
 before(async()=>{
@@ -166,15 +167,13 @@ test('browser fullscreen is host-controlled and retains the outside exit button'
     await x.page.getByRole('button',{name:'Plein écran',exact:true}).click()
     await x.page.waitForFunction(()=>document.fullscreenElement?.getAttribute('aria-label')==='Jeu Chibasko Games')
     assert.ok(await x.page.getByRole('button',{name:'Quitter le jeu'}).isVisible())
-    const bounds=await x.page.locator('iframe').boundingBox()
-    assert.equal(bounds.x,0);assert.equal(bounds.y,0)
-    assert.equal(bounds.width,await x.page.evaluate(()=>innerWidth));assert.equal(bounds.height,await x.page.evaluate(()=>innerHeight))
+    await assertPlayerLayout(x.page,true)
     await x.page.getByRole('button',{name:'Quitter le plein écran',exact:true}).click()
     await x.page.waitForFunction(()=>document.fullscreenElement===null)
     await x.page.getByRole('button',{name:'Plein écran',exact:true}).waitFor()
   }finally{await x.context.close()}
 })
-test('floating controls retain accessible labels, keyboard focus, tooltips and exit',async()=>{
+test('attached dock retains accessible labels, keyboard focus, tooltips and exit',async()=>{
   const x=await setup()
   try{
     await x.running()
@@ -206,15 +205,7 @@ for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:3
     assert.ok(iframe.y+iframe.height<=viewport.height+1)
     assert.equal(await x.page.getByText('Partie en cours',{exact:true}).count(),0)
     assert.equal(await x.page.locator('[role="status"]').count(),0)
-    const shell=await x.page.getByRole('region',{name:'Jeu Chibasko Games'}).boundingBox()
-    assert.equal(iframe.y,shell.y);assert.equal(iframe.height,shell.height)
-    assert.equal(iframe.width,shell.width)
-    const dock=await x.page.getByRole('group',{name:'Commandes du lecteur',exact:true}).boundingBox()
-    assert.ok(Math.abs(shell.y+shell.height-dock.y-dock.height-12)<1)
-    assert.ok(dock.x>=shell.x && dock.x+dock.width<=shell.x+shell.width)
-    const buttons=await x.page.getByRole('group',{name:'Commandes du lecteur',exact:true}).getByRole('button').all()
-    const boxes=await Promise.all(buttons.map(button=>button.boundingBox()))
-    assert.ok(boxes.every(box=>box.width>=44 && box.height>=44 && Math.abs(box.y-exit.y)<1))
+    await assertPlayerLayout(x.page)
     const controls=x.page.getByRole('button',{name:'Quitter le jeu'})
     assert.equal(await controls.evaluate(node=>{const r=node.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===node || node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),true)
     if(viewport.width===390)assert.ok(exit.width>=44 && exit.height>=44)

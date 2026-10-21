@@ -4,8 +4,8 @@ import styles from './GameRuntime.module.css'
 import PlayerIcon from './PlayerIcon'
 
 export type PlayerAudioControl={muted:boolean;onToggle:()=>void;disabled?:boolean}
-type Props={children:ReactNode;onLeave:()=>void;socialControls?:ReactNode;audioControl?:PlayerAudioControl;phase?:string}
-export default function GamePlayerShell({children,onLeave,socialControls,audioControl,phase}:Props){
+type Props={children:ReactNode;onLeave:()=>void;socialControls?:ReactNode;audioControl?:PlayerAudioControl;phase?:string;canLeave?:boolean}
+export default function GamePlayerShell({children,onLeave,socialControls,audioControl,phase,canLeave=true}:Props){
   const shell=useRef<HTMLElement>(null)
   const [isFullscreen,setIsFullscreen]=useState(false),[fullscreenError,setFullscreenError]=useState(false)
   useEffect(()=>{
@@ -18,6 +18,10 @@ export default function GamePlayerShell({children,onLeave,socialControls,audioCo
   const fullscreenLabel=isFullscreen?'Quitter le plein écran':'Plein écran'
   const audioLabel=audioControl && !audioControl.disabled?(audioControl.muted?'Réactiver le son':'Couper le son'):'Contrôle audio indisponible pour ce jeu'
   return <section ref={shell} className={styles.shell} aria-label="Jeu Chibasko Games" data-phase={phase}>
+    <div className={styles.surface} data-player-surface>
+      {children}
+      {fullscreenError?<p className={styles.notice} role="status">Le plein écran n’est pas disponible. Tu peux continuer ici.</p>:null}
+    </div>
     <div className={styles.dock} role="group" aria-label="Commandes du lecteur">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className={styles.logo} src="/logo-chibaskogames-rond.ico" alt="Chibasko Games" width="28" height="28"/>
@@ -30,11 +34,9 @@ export default function GamePlayerShell({children,onLeave,socialControls,audioCo
           <span className={styles.tooltip} aria-hidden="true">{audioLabel}</span>
         </span>
         <button className={styles.iconButton} type="button" aria-label={fullscreenLabel} title={fullscreenLabel} aria-pressed={isFullscreen} onClick={fullscreen} disabled={phase==='closed'}><PlayerIcon name={isFullscreen?'restore':'fullscreen'}/><span className={styles.tooltip} aria-hidden="true">{fullscreenLabel}</span></button>
-        <button className={styles.iconButton} type="button" aria-label="Quitter le jeu" title="Quitter le jeu" onClick={onLeave}><PlayerIcon name="close"/><span className={styles.tooltip} aria-hidden="true">Quitter le jeu</span></button>
+        <button className={styles.iconButton} type="button" aria-label="Quitter le jeu" title="Quitter le jeu" disabled={!canLeave} onClick={onLeave}><PlayerIcon name="close"/><span className={styles.tooltip} aria-hidden="true">Quitter le jeu</span></button>
       </div>
     </div>
 
-    {children}
-    {fullscreenError?<p className={styles.notice} role="status">Le plein écran n’est pas disponible. Tu peux continuer ici.</p>:null}
   </section>
 }

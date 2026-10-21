@@ -6,7 +6,3 @@ export function playerModes(capabilities:GameCapabilities|undefined,availableAcc
     ...(capabilities?.online?.access.map(id=>({id,label:id==='public'?'Jouer en ligne':'Partie privée',description:availableAccess.includes(id)?id==='public'?'Rejoindre un salon public':'Créer ou rejoindre un salon privé':'Serveur indisponible',available:availableAccess.includes(id)}))??[]),
   ]
 }
-export function initialPlayerMode(capabilities:GameCapabilities|undefined,availableAccess:readonly ('public'|'private')[]):PlayerMode|null{
-  const playable=playerModes(capabilities,availableAccess).filter(mode=>mode.available)
-  return playable.length===1?playable[0].id:null
-}

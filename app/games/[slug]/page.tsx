@@ -135,13 +135,15 @@ export default async function GamePage({
       </div>
 
       {!game.active_version_id && isClassicGame(game) ? (
-        <GameViewport gameId={game.id} gameUrl={game.game_url} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
+        <GameViewport title={game.title} coverUrl={game.thumbnail_url} gameId={game.id} gameUrl={game.game_url} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
       ) : (
         <ArtifactGamePlayer
           key={game.id+':'+game.active_version_id}
           gameId={game.id}
           versionId={game.active_version_id??null}
           slug={game.slug}
+          title={game.title}
+          coverUrl={game.thumbnail_url}
           capabilities={game.runtime_capabilities}
           availableAccess={availableAccess.filter(access=>access!==null)}
           initialLikes={game.likes_count}
