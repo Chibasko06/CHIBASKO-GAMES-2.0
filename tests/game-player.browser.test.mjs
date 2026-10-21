@@ -26,7 +26,7 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function setup({kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0}={}){
+async function setup({kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
  const h=await runtimeHarness('pong-like'),context=await browser.newContext({viewport,isMobile:touch,hasTouch:touch,deviceScaleFactor:touch?2:1}),calls=[]
  let snapshot={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',gameId:h.request.gameId,gameVersionId:h.request.gameVersionId,access:'public',status:'waiting',code:'',minPlayers:1,maxPlayers:8,revision:1,startPolicy:'manual',expiresAt:new Date(Date.now()+3600000).toISOString(),onlineSessionReference:null,members:[{id:'opaque-fixture',displayName:'Player',self:true,leader:true,ready:false}]}
  await context.route('**/*',async route=>{
@@ -61,12 +61,13 @@ async function setup({kind='artifact',availableAccess=[],viewport={width:1366,he
  })
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto('https://portal.test/games/fixture');await page.waitForFunction(()=>!!window.gamePlayerFixture,null,{timeout:3000}).catch(()=>{throw Error('Fixture bootstrap: '+JSON.stringify(errors))})
  await page.evaluate(signed=>window.fixtureSignedIn=signed,signed)
- await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title:'Fixture Arena',coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl:'https://legacy.test/index.html'})
+ await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title,coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl:'https://legacy.test/index.html'})
  await page.waitForTimeout(100);assert.deepEqual(errors,[])
  return {page,context,h,calls}
 }
 async function oneDock(page){assert.equal(await page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).count(),1);assert.equal(await page.locator('[data-player-dock]').count(),1)}
 
+const boxSize=({width,height})=>({width,height})
 const launcher=page=>page.getByLabel('Écran de lancement',{exact:true})
 const startLocal=page=>page.getByRole('button',{name:/^Jouer en local/}).click()
 async function assertIdle(x){
@@ -116,7 +117,7 @@ test('multiple available modes launch inside the same fullscreen player and retu
  try{
   await assertIdle(x);const initial=await launcher(x.page).innerHTML()
   assert.equal(await launcher(x.page).getByRole('button',{disabled:false}).count(),3)
-  if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/game-launcher.png'})
+  if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({fullPage:true,path:'.distribution/game-launcher.png'})
   await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
   await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()
   await oneDock(x.page);await assertPlayerLayout(x.page,true)
@@ -159,7 +160,7 @@ for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:3
   await assertIdle(x);await assertPlayerLayout(x.page)
   const initialSurface=await x.page.locator('[data-player-surface]').boundingBox()
   const shell=await x.page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).boundingBox()
-  assert.ok(shell.y+shell.height<=viewport.height-15)
+  assert.ok(shell.width<=1282 && shell.height>100)
   await launcher(x.page).getByText('Par Fixture Studio',{exact:true}).waitFor()
   const overflowing=await launcher(x.page).evaluate(node=>node.scrollHeight>node.clientHeight+1)
   assert.equal(overflowing,false,'launcher contents must fit without internal scrolling')
@@ -168,14 +169,14 @@ for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:3
   if(kind==='artifact'){await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()}
   else{await x.page.getByRole('button',{name:'Jouer',exact:true}).click();await x.page.frameLocator('iframe').getByText('Legacy HTML5 fixture').waitFor()}
   await oneDock(x.page);await assertPlayerLayout(x.page)
-  assert.deepEqual(await x.page.locator('[data-player-surface]').boundingBox(),initialSurface)
+  assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),boxSize(initialSurface))
   await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
   await assertPlayerLayout(x.page,true)
   if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/'+kind+'-fullscreen-'+viewport.width+'x'+viewport.height+'.png'})
   await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForFunction(()=>!document.fullscreenElement)
   await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click();await launcher(x.page).waitFor()
   await assertPlayerLayout(x.page)
-  assert.deepEqual(await x.page.locator('[data-player-surface]').boundingBox(),initialSurface)
+  assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),boxSize(initialSurface))
  }finally{await x.context.close()}
 })
 
@@ -232,7 +233,7 @@ for(const viewport of [{width:1366,height:768},{width:1920,height:1080}])test('c
  const x=await setup({kind,viewport,headingHeight:200})
  try{
  const shell=await x.page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).boundingBox(),surface=await x.page.locator('[data-player-surface]').boundingBox()
- assert.ok(shell.y+shell.height<=viewport.height-15);assert.ok(surface.height<=720)
+ assert.ok(surface.height<=720);assert.ok(Math.abs(surface.width/surface.height-16/9)<0.001)
  boxes.push({width:surface.width,height:surface.height,shellHeight:shell.height})
  console.log(kind+' '+viewport.width+'x'+viewport.height+' '+JSON.stringify(boxes.at(-1)))
  }finally{await x.context.close()}
@@ -258,17 +259,17 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
  await assertIdle(x)
  const measured=await inspectMobilePlayer(x.page)
  console.log('MOBILE '+kind+' '+viewport.width+'x'+viewport.height+' heading='+headingHeight+' '+JSON.stringify(measured))
- assert.ok(measured.dock.y+measured.dock.height<=viewport.height,'dock visible without page scrolling')
+ assert.ok(measured.dock.y>=measured.surface.y+measured.surface.height-1,'dock below game surface')
  assert.equal(await launcher(x.page).evaluate(node=>{node.scrollTop=500;return node.scrollTop}),0,'launcher cannot scroll programmatically')
  if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/mobile-check-'+kind+'-'+viewport.width+'x'+viewport.height+'-'+headingHeight+'.png'})
  for(const container of measured.scroll.slice(3))assert.ok(container.scrollHeight<=container.clientHeight+1,JSON.stringify(container))
  const bounds=measured.surface
- for(const action of measured.actions){assert.ok(action.x>=bounds.x && action.y>=bounds.y-1,action.text);assert.ok(action.x+action.width<=bounds.x+bounds.width+1 && action.y+action.height<=bounds.y+bounds.height+1,action.text);assert.ok(action.y+action.height<=viewport.height,action.text)}
+ for(const action of measured.actions){assert.ok(action.x>=bounds.x && action.y>=bounds.y-1,action.text);assert.ok(action.x+action.width<=bounds.x+bounds.width+1 && action.y+action.height<=bounds.y+bounds.height+1,action.text)}
  await x.page.getByRole('button',{name:kind==='legacy'?'Jouer':/^Jouer en local/,exact:kind==='legacy'}).click()
  if(kind==='artifact'){
  await x.page.locator('[data-phase="running"]').waitFor()
  const frame=x.page.frames()[1],before=await x.page.locator('[data-player-surface]').boundingBox()
- assert.deepEqual(before,measured.surface)
+ assert.deepEqual(boxSize(before),boxSize(measured.surface))
  const size=await frame.evaluate(()=>({width:innerWidth,height:innerHeight}));assert.ok(Math.abs(size.width-before.width)<=1 && Math.abs(size.height-before.height)<=1)
  console.log('SDK_VIEWPORT '+viewport.width+'x'+viewport.height+' heading='+headingHeight+' '+JSON.stringify(size))
  const pageHeight=await x.page.evaluate(()=>document.documentElement.scrollHeight)
@@ -278,4 +279,27 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
  assert.deepEqual(await x.page.locator('[data-player-surface]').boundingBox(),before)
  }
  }finally{await x.context.close()}
+})
+
+for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:390,height:844},{width:844,height:390}])test('standard player ignores page offset '+viewport.width+'x'+viewport.height,async()=>{
+ const dimensions=[],expected={1920:{width:1280,height:720},1366:{width:1120,height:630},390:{width:356,height:200.25},844:{width:810,height:455.625}}[viewport.width]
+ for(const kind of ['legacy','artifact'])for(const headingHeight of [36,200,900]){
+ const x=await setup({kind,viewport,headingHeight,pagePadding:16,touch:viewport.width<1025})
+ try{
+ const initial=await x.page.locator('[data-player-surface]').boundingBox(),shell=await x.page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).boundingBox()
+ assert.ok(Math.abs(initial.width/initial.height-16/9)<0.001)
+ assert.deepEqual(boxSize(initial),expected)
+ assert.ok(Math.abs(shell.x+shell.width/2-await x.page.evaluate(()=>document.documentElement.clientWidth/2))<1,'player centered in page')
+ dimensions.push({width:initial.width,height:initial.height})
+ await x.page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));await x.page.waitForTimeout(50)
+ let measured=await x.page.locator('[data-player-surface]').boundingBox();assert.deepEqual({width:measured.width,height:measured.height},dimensions[0])
+ await x.page.setViewportSize({width:viewport.width-10,height:viewport.height});await x.page.setViewportSize(viewport);await x.page.waitForTimeout(50)
+ measured=await x.page.locator('[data-player-surface]').boundingBox();assert.deepEqual({width:measured.width,height:measured.height},dimensions[0])
+ if(headingHeight===200){
+ console.log('STANDARD '+kind+' '+viewport.width+'x'+viewport.height+' '+JSON.stringify({surface:dimensions.at(-1),player:{width:shell.width,height:shell.height}}))
+ if(process.env.RUNTIME_SCREENSHOTS==='1'){await x.page.evaluate(()=>scrollTo(0,0));await x.page.screenshot({fullPage:true,path:'.distribution/standard-'+kind+'-'+viewport.width+'x'+viewport.height+'.png'})}
+ }
+ }finally{await x.context.close()}
+ }
+ for(const size of dimensions)assert.deepEqual(size,dimensions[0])
 })

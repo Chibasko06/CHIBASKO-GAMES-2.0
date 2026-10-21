@@ -2,18 +2,24 @@
 
 ## Géométrie commune
 
-Hors plein écran, legacy et SDK partagent la même surface. Sur desktop et mobile
-paysage, sa hauteur est le minimum de 9/16 de la largeur intérieure du shell,
-720 px et de la hauteur disponible après déduction du dock et des bordures.
-La hauteur disponible est mesurée depuis le haut du shell jusqu’au bas du
-viewport, avec une marge de 16 px. Le dock réel est mesuré, sans hypothèse sur
-sa hauteur mobile. ResizeObserver et resize mettent ces mesures à jour ;
-aucune mesure ne dépend de l’état launcher ou playing.
+Hors plein écran, legacy et SDK partagent une surface 16:9 et le même shell
+centré horizontalement. La largeur maximale du shell est 1282 px, soit une
+surface de 1280×720 px et 2 px de bordure. Le dock est ajouté sous cette surface
+et ne fait pas partie du ratio.
 
-Sur mobile portrait (largeur ≤600 px et hauteur >500 px), la hauteur cible
-est 460 px, toujours bornée par cet espace disponible. Le launcher passe sur
-une colonne avec une couverture compacte. En fullscreen, la surface occupe
-tout le viewport et le dock est masqué.
+Sur desktop (viewport de largeur au moins 1025 px), la largeur du shell est :
+
+`min(largeur du conteneur, 1282 px, (100svh − 138 px) × 16/9 + 2 px)`.
+
+Sur mobile et tablette, la largeur disponible est utilisée, plafonnée à 1282 px.
+La hauteur de la surface vaut toujours 9/16 de sa largeur intérieure. La limite
+desktop dépend uniquement de la hauteur globale du viewport. Aucun calcul
+n’utilise le haut du player, le défilement ou le contenu précédent de la page.
+Il est normal de faire défiler la page pour atteindre le player et son dock.
+
+Launcher, jeu et retour au launcher gardent exactement la même géométrie.
+En fullscreen, la surface occupe tout l’écran, sans plafond de largeur, et le
+dock est masqué. La sortie restitue la géométrie 16:9 standard.
 
 Le nom du développeur provient de games.developer_name, transmis depuis la
 fiche et la page locale à GameLauncher. Une valeur vide masque l’attribution ;
@@ -86,11 +92,11 @@ le clic Jouer. Son overflow est clip, sans défilement interne, y compris lors
 d'une tentative de scrollTop. Les tests contrôlent aussi les rectangles des
 boutons, du titre et de l'attribution : masquer un débordement ne suffit pas.
 
-Une surface de moins de 220 px de haut utilise un launcher compact sans cover.
+Une surface de moins de 220 px de haut utilise un launcher compact. La cover
+est conservée si la surface atteint 340 px de large et 180 px de haut.
 Le surtitre de marque et le logo du dock sont conservés. Les actions
 restent tactiles (44 px minimum). Les titres longs gardent leur texte accessible
-et un attribut title. En paysage court, la surface conserve au moins 128 px ;
-si la page ne laisse plus assez de place, son défilement normal reste possible.
+et un attribut title. Le défilement normal de la page reste possible.
 Aucun overflow hidden global n'est imposé à html, body ou au root de la page.
 
 Mesures Chrome en émulation tactile, marge horizontale de 16 px et haut du
@@ -98,16 +104,21 @@ player à 200 px, identiques pour legacy et artifact, en pixels CSS :
 
 | Viewport | Surface | Player complet | Dock |
 | --- | --- | --- | --- |
-| 390×844 | 356×460 | 358×517 | 356×55 |
-| 844×390 | 810×128 | 812×187 | 810×57 |
+| 390×844 | 356×200,25 | 358×257,25 | 356×55 |
+| 844×390 | 810×455,625 | 812×514,625 | 810×57 |
 | 768×1024 | 734×412,875 | 736×471,875 | 734×57 |
-| 1024×768 | 990×493 | 992×552 | 990×57 |
+| 1024×768 | 990×556,875 | 992×615,875 | 990×57 |
 
 Les tests vérifient clientHeight/scrollHeight sur le shell, la surface et le
-launcher, la visibilité initiale de toutes les actions et du dock, puis les
+launcher, la présence de toutes les actions dans la surface et du dock sous le jeu, puis les
 dimensions natives du document SDK. innerHeight est arrondi au pixel CSS entier
 (413 pour une surface de 412,875 px). Un contenu SDK volontairement géant ne
 peut agrandir ni le shell ni la page parent.
 
 Le contenu propre aux jeux legacy cross-origin reste hors du contrôle du
 lecteur. Cette limite ne concerne pas le launcher Chibasko Games.
+
+Les tests desktop mesurent 1280×720 px sur 1920×1080 et 1120×630 px sur
+1366×768. Pour chaque moteur, les dimensions sont comparées avec 36, 200 et
+900 px au-dessus du player, après défilement et redimensionnement : elles sont
+identiques à viewport et largeur de conteneur constants.

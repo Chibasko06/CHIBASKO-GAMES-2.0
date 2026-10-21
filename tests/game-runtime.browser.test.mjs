@@ -195,18 +195,18 @@ test('attached dock retains accessible labels, keyboard focus, tooltips and exit
     assert.equal(await x.page.locator('iframe').count(),0)
   }finally{await x.context.close()}
 })
-for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:390,height:844},{width:768,height:1024},{width:844,height:390}])test('browser responsive '+viewport.width+'x'+viewport.height+' preserves visible outside controls and iframe bounds',async()=>{
+for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:390,height:844},{width:768,height:1024},{width:844,height:390}])test('browser responsive '+viewport.width+'x'+viewport.height+' preserves accessible dock and iframe bounds with normal page scrolling',async()=>{
   const x=await setup('solo','published','normal',viewport)
   try {
     await x.running()
     const iframe=await x.page.locator('iframe').boundingBox(),exit=await x.page.getByRole('button',{name:'Quitter le jeu'}).boundingBox()
-    assert.ok(iframe.width<=viewport.width && iframe.height>100);assert.ok(exit.y>=0 && exit.y+exit.height<=viewport.height)
+    assert.ok(iframe.width<=viewport.width && iframe.height>100);assert.ok(exit.y>=iframe.y+iframe.height-1)
     assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
-    assert.ok(iframe.y+iframe.height<=viewport.height+1)
     assert.equal(await x.page.getByText('Partie en cours',{exact:true}).count(),0)
     assert.equal(await x.page.locator('[role="status"]').count(),0)
     await assertPlayerLayout(x.page)
     const controls=x.page.getByRole('button',{name:'Quitter le jeu'})
+    await controls.scrollIntoViewIfNeeded()
     assert.equal(await controls.evaluate(node=>{const r=node.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===node || node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),true)
     if(viewport.width===390)assert.ok(exit.width>=44 && exit.height>=44)
     if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:`.distribution/runtime-${viewport.width}x${viewport.height}.png`})
