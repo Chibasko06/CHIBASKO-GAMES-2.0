@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import { GameCard } from '@/components/GameCard'
+import collectionStyles from '@/components/GameCardCollection.module.css'
 import HomeHeroActions from '@/components/HomeHeroActions'
 import { getFeaturedGames, getGamesByCategory, getHomepageHighlights, getGamesCatalog } from '@/lib/queries/games'
 import { buildPageMetadata } from '@/lib/seo'
@@ -111,7 +112,7 @@ export default async function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className={collectionStyles.grid}>
           {featuredGames.map((game) => (
             <GameCard key={game.id} game={game} />
           ))}
@@ -135,7 +136,7 @@ export default async function Home() {
             </Link>
           </div>
 
-          <HorizontalScroller label={section.category.name}>
+          <HorizontalScroller className={collectionStyles.row} label={section.category.name}>
             {section.games.map((game) => (
               <GameCard key={game.id} game={game} />
             ))}

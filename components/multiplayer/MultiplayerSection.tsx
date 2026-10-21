@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { GameCard } from '@/components/GameCard'
+import collectionStyles from '@/components/GameCardCollection.module.css'
 import type { GameWithCategoriesAndStats } from '@/lib/queries/games'
 
 export default function MultiplayerSection({ games, home = false }: { games: GameWithCategoriesAndStats[]; home?: boolean }) {
@@ -11,7 +12,7 @@ export default function MultiplayerSection({ games, home = false }: { games: Gam
       </div>
       {home && <Link href="/multiplayer" className="rounded text-sm font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-2 focus-visible:outline-cyan-300">Voir tous les jeux multijoueurs</Link>}
     </div>
-    {games.length ? <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+    {games.length ? <div className={collectionStyles.grid}>
       {games.map(game => <GameCard key={game.id} game={game} />)}
     </div> : <div className="rounded-[24px] border border-cyan-950 bg-gradient-to-br from-cyan-950/20 to-zinc-950 p-6 sm:p-8">
       <p className="font-semibold text-white">Les premiers jeux multijoueurs Chibasko Games arrivent bientôt.</p>

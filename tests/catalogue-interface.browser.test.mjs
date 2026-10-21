@@ -17,7 +17,7 @@ before(async()=>{
  auth:"const user={id:'fixture-user',email:'fixture@example.test'},session={access_token:'fixture-only',user};export function useAuth(){return {user,session,loading:false}}",
  supabase:"export const supabase={auth:{async signOut(){}},from(){return {select(){return this},eq(){return this},abortSignal(){return this},async maybeSingle(){return {data:null,error:null}}}},async rpc(){return {data:[],error:null}}}",
  profile:"export async function ensureProfile(){return {ok:true}}",
- navigation:"export function useRouter(){return {push(){}}}",
+ navigation:"export function useRouter(){return {push(){}}} export function useSearchParams(){return new URLSearchParams(window.location.search)}",
  link:"import {createElement} from 'react';export default function Link(props){return createElement('a',props)}",
  image:"import {createElement} from 'react';export default function Image({fill,priority,unoptimized,...props}){return createElement('img',{...props,style:fill?{position:'absolute',inset:0,width:'100%',height:'100%'}:props.style})}",
  }[path]}))
@@ -50,7 +50,7 @@ for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:7
  try{
  const track=x.page.getByRole('region',{name:'Action',exact:true}),metrics=await track.evaluate(node=>{const r=node.getBoundingClientRect();return {width:node.clientWidth,scrollWidth:node.scrollWidth,visible:[...node.children].filter(child=>{const c=child.getBoundingClientRect();return c.x>=r.x-1 && c.right<=r.right+1}).length,scrollbar:getComputedStyle(node).scrollbarWidth}})
  console.log('HOME '+viewport.width+' '+JSON.stringify(metrics))
- assert.equal(metrics.visible,viewport.width===1920?7:viewport.width===1366?5:viewport.width===768?3:1);assert.equal(metrics.scrollbar,'none')
+ assert.equal(metrics.visible,viewport.width===1920?5:viewport.width===1366?4:viewport.width===768?3:1);assert.equal(metrics.scrollbar,'none')
  const previous=x.page.getByRole('button',{name:'Précédents : Action',includeHidden:true}),next=x.page.getByRole('button',{name:'Suivants : Action',includeHidden:true})
  assert.equal(await track.locator(':scope > div').count(),10)
  const cards=await track.locator('article').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {height:r.height,image:node.firstElementChild.getBoundingClientRect().height,stats:node.querySelector('[class*="stats"]').getBoundingClientRect().y-r.y,footer:node.querySelector('[class*="footer"]').getBoundingClientRect().y-r.y}}))
@@ -130,4 +130,16 @@ test('account portal covers transformed cards',async()=>{
  const menu=x.page.getByRole('navigation',{name:'Menu du compte'})
  assert.equal(await menu.evaluate(node=>{const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.bottom-8))}),true)
  }finally{await x.context.close()}
+})
+
+for(const width of [1920,1366,768])test('catalogue and home share card geometry '+width,async()=>{
+ const catalogue=await setup('catalogue',{width,height:1080}),home=await setup('home',{width,height:1080});
+ try{
+ const geometry=node=>{const card=node.getBoundingClientRect();return {width:card.width,height:card.height,image:node.firstElementChild.getBoundingClientRect().height,font:getComputedStyle(node.querySelector('h3')).fontSize}};
+ const reference=await catalogue.page.locator('article').first().evaluate(geometry);
+ assert.equal(reference.height,376);assert.ok(Math.abs(reference.width-(width===1920?352:width===1366?309.5:720/3-32/3))<.02);
+ for(const label of ['Action','Arcade'])for(const card of await home.page.getByRole('region',{name:label,exact:true}).locator('article').all())assert.deepEqual(await card.evaluate(geometry),reference);
+ for(const card of await home.page.locator('[data-popular] article').all())assert.deepEqual(await card.evaluate(geometry),reference);
+ console.log('CARD REFERENCE '+width+' '+JSON.stringify(reference));
+ }finally{await catalogue.context.close();await home.context.close()}
 })

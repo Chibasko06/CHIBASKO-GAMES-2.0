@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import { GameCard } from '@/components/GameCard'
+import collectionStyles from '@/components/GameCardCollection.module.css'
 import { getFavoriteGames } from '@/lib/queries/favorites'
 import { ensureProfile } from '@/lib/profileSync'
 import { Tables } from '@/types/database'
@@ -72,7 +73,7 @@ export default function FavoritesPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={collectionStyles.grid}>
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="h-64 rounded-xl border border-zinc-800 bg-zinc-900 animate-pulse" />
           ))}
@@ -110,7 +111,7 @@ export default function FavoritesPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={collectionStyles.grid}>
             {games.map((game) => (
               <GameCard key={game.id} game={game} />
             ))}

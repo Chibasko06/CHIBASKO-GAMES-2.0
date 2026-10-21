@@ -3,8 +3,13 @@
 ## Rangées de catégories
 
 La home charge au maximum dix jeux par catégorie et réutilise GameCard.
-HorizontalScroller conserve des cartes de 220 px (180 px sous 600 px), sans
-scrollbar native visible. Les commandes apparaissent uniquement si le contenu
+Les grilles et les rangées partagent GameCardCollection : une colonne par défaut,
+deux dès 640 px, trois dès 768 px, quatre dès 1280 px et cinq dès 1536 px.
+La largeur correspond à (largeur du conteneur − espaces entre colonnes) / nombre
+de colonnes, avec un espace de 16 px. Les rangées utilisent exactement cette
+même largeur dès 640 px ; sous ce seuil, leurs cartes restent à 180 px avec
+un espace de 12 px pour le swipe et l’aperçu suivant. Aucune scrollbar native
+n’est visible. Les commandes apparaissent uniquement si le contenu
 déborde, et sont désactivées à la première et à la dernière position.
 Les commandes sont superposées sur les bords, sans hauteur réservée sous les
 cartes, avec un fond dégradé très transparent et un chevron centré. Les commandes
@@ -13,8 +18,9 @@ swipe libre.
 ResizeObserver suit les changements de largeur ; le défilement natif reste
 accessible au tactile et au clavier. Le mouvement respecte reduced-motion.
 
-Avec le conteneur et les marges du site, les mesures Chrome sont : sept cartes
-entières à 1920 px, cinq à 1366 px, trois à 768 px, une à 390 px avec aperçu de
+Avec le conteneur et les marges du site, les mesures Chrome sont : cinq cartes
+entières de 352 px à 1920 px, quatre de 309,5 px à 1366 px, trois à 768 px,
+une à 390 px avec aperçu de
 la suivante. Une catégorie moins fournie affiche simplement ses jeux disponibles.
 
 GameCard utilise une hauteur commune de 376 px, une image de 160 px et des

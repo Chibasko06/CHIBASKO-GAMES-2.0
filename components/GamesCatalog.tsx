@@ -4,6 +4,7 @@ import { useDeferredValue } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { readCatalogueFilters, catalogueQueryString, filterCatalogue, type CatalogueFilters, type CatalogueType, type SortOption, type DeviceFilter } from '@/lib/catalogueFilters'
 import { GameCard } from '@/components/GameCard'
+import collectionStyles from '@/components/GameCardCollection.module.css'
 import type { Category, GameWithCategoriesAndStats } from '@/lib/queries/games'
 
 
@@ -158,7 +159,7 @@ export default function GamesCatalog({
           Aucun jeu ne correspond aux filtres actuels.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className={collectionStyles.grid}>
           {visibleGames.map((game) => (
             <GameCard key={game.id} game={game} />
           ))}

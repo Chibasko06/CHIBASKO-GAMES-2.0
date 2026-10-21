@@ -1,0 +1,8 @@
+.grid,.row{--game-card-columns:1;--game-card-gap:16px;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(var(--game-card-columns),minmax(0,1fr));gap:var(--game-card-gap)}
+.row{container-type:inline-size}
+.row [data-horizontal-items]{grid-auto-columns:min(180px,100cqw);gap:12px;padding-inline:0;scroll-padding-inline:0}
+@media(min-width:640px){.grid,.row{--game-card-columns:2}.row [data-horizontal-items]{grid-auto-columns:calc((100cqw - (var(--game-card-columns) - 1)*var(--game-card-gap))/var(--game-card-columns));gap:var(--game-card-gap)}}
+@media(min-width:768px){.grid,.row{--game-card-columns:3}}
+@media(min-width:1280px){.grid,.row{--game-card-columns:4}}
+@media(min-width:1536px){.grid,.row{--game-card-columns:5}}
