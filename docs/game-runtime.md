@@ -483,3 +483,24 @@ Le runtime reçoit seulement cette version et `onlineSessionReference` ;
 OnlineLaunchAuthorizer vérifie le membre authentifié. Le ticket gameplay frais
 reste généré au START v2 après READY. Les transports public/privé, le polling du
 salon et le gameplay restent indépendants. Voir [multiplayer-sessions.md](multiplayer-sessions.md).
+
+## Disponibilité des modes distribués
+
+Les capabilities décrivent le build, pas l’état de l’infrastructure. Le local
+reste disponible si la version active le supporte. Pour chaque accès online,
+la fiche vérifie le droit publié via distribution_multiplayer_access, puis
+un déploiement actif de game_server_deployments associé à cette version exacte
+dans game_server_deployment_versions. Le premier déploiement est choisi selon
+created_at/id, comme au START, et son endpoint est validé par gameplayEndpoint.
+Aucun endpoint ni credential serveur n’est envoyé à la fiche. Cette disponibilité
+est déclarative : elle utilise le statut du control plane, sans sonde réseau.
+
+Sans déploiement utilisable, les contrôles online sont désactivés et les pages
+online ne sont pas ouvertes. La création de lobby vérifie à nouveau cette
+disponibilité côté serveur après sa limitation de débit. Le START transactionnel
+conserve son contrôle de déploiement, notamment en cas de désactivation ultérieure.
+Une erreur de lecture désactive les modes online sans retirer l’accès local.
+
+Le lecteur utilise la largeur du conteneur de page et une hauteur liée au viewport.
+Sa toolbar compacte appartient au portail ; sortie et plein écran restent hors
+iframe, y compris en plein écran. Le jeu conserve son propre ratio et ses contrôles.

@@ -12,6 +12,7 @@ import { getGameBySlug } from '@/lib/queries/games'
 import { absoluteUrl } from '@/lib/seo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { publishedOnlineAccess } from '@/lib/server/publishedOnlineAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,13 @@ export default async function GamePage({
   if (!game) {
     notFound()
   }
+
+  const availableAccess=game.active_version_id && game.runtime_capabilities?.online
+    ? await Promise.all(game.runtime_capabilities.online.access.map(async access=>{
+      try{return await publishedOnlineAccess(game.id,game.active_version_id!,access) ? access : null}
+      catch{console.error(JSON.stringify({event:'game_availability_failed',gameId:game.id,code:'availability_unavailable'}));return null}
+    }))
+    : []
 
   const structuredData = {
     '@context': 'https://schema.org',
@@ -147,7 +155,7 @@ export default async function GamePage({
         </div>
       </div>
 
-      {game.active_version_id ? <ArtifactOnlineLinks capabilities={game.runtime_capabilities} slug={game.slug} /> : isClassicGame(game) ? (
+      {game.active_version_id ? <ArtifactOnlineLinks capabilities={game.runtime_capabilities} slug={game.slug} availableAccess={availableAccess.filter(access=>access!==null)} /> : isClassicGame(game) ? (
         <GameViewport
           gameId={game.id}
           gameUrl={game.game_url}

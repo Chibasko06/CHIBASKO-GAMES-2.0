@@ -167,7 +167,7 @@ test('browser fullscreen is host-controlled and retains the outside exit button'
     await x.page.evaluate(()=>document.exitFullscreen())
   }finally{await x.context.close()}
 })
-for(const viewport of [{width:390,height:844},{width:768,height:1024},{width:844,height:390}])test('browser responsive '+viewport.width+'x'+viewport.height+' preserves visible outside controls and iframe bounds',async()=>{
+for(const viewport of [{width:1366,height:768},{width:390,height:844},{width:768,height:1024},{width:844,height:390}])test('browser responsive '+viewport.width+'x'+viewport.height+' preserves visible outside controls and iframe bounds',async()=>{
   const x=await setup('solo','published','normal',viewport)
   try {
     await x.running()
@@ -175,6 +175,10 @@ for(const viewport of [{width:390,height:844},{width:768,height:1024},{width:844
     assert.ok(iframe.width<=viewport.width && iframe.height>100);assert.ok(exit.y>=0 && exit.y+exit.height<=viewport.height)
     assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
     assert.ok(iframe.y+iframe.height<=viewport.height+1)
+    assert.ok((await x.page.locator('[role="status"]').first().boundingBox()).height<32)
+    const toolbar=await x.page.locator('iframe').evaluate(node=>node.parentElement.previousElementSibling.getBoundingClientRect().height)
+    assert.ok(toolbar<=48)
+    if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:`.distribution/runtime-${viewport.width}x${viewport.height}.png`})
   }finally{await x.context.close()}
 })
 

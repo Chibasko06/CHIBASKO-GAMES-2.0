@@ -50,7 +50,7 @@
     "test:online-session": "node --import ./tests/register.mjs --test tests/online-session.test.mjs",
     "test:online-session-db": "node tests/game-distribution-db.mjs --online",
     "test:online-session-browser": "node --test tests/online-session.browser.test.mjs",
-    "test:multiplayer": "node --import ./tests/register.mjs --test tests/multiplayer-lobbies.test.mjs tests/game-server-session.test.mjs",
+    "test:multiplayer": "node --import ./tests/register.mjs --test tests/multiplayer-lobbies.test.mjs tests/game-server-session.test.mjs tests/game-availability.test.mjs",
     "test:multiplayer-db": "node tests/game-distribution-db.mjs --multiplayer",
     "test:pong-e2e": "node tests/game-distribution-db.mjs --pong"
   },

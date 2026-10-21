@@ -6,6 +6,8 @@ import { UploadError } from '../game-distribution/uploads/policy'
 import { createUserAuthClient } from './adminAuthorization'
 import { adminOriginAllowed } from './adminRequest'
 import { readJsonObject, InputError } from './inputValidation'
+import { publishedOnlineAccess } from './publishedOnlineAccess'
+import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
 
 export const multiplayerDependencies={
  async actor(request:Request) {
@@ -15,7 +17,13 @@ export const multiplayerDependencies={
   if(error || !data.user)throw new LobbyError('unauthorized',401)
   return data.user.id
  },
- service(){return multiplayerLobbyService(uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??''))},
+ service(){
+  return multiplayerLobbyService(uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??''),async(gameId,access)=>{
+   const {data,error}=await getSupabaseAdminClient().from('games').select('active_version_id').eq('id',gameId).eq('is_published',true).maybeSingle()
+   if(error)throw new LobbyError('service_unavailable',503)
+   return !!data?.active_version_id && await publishedOnlineAccess(gameId,data.active_version_id,access)
+  })
+ },
 }
 export async function multiplayerRequest(request:Request,segments:string[],deps=multiplayerDependencies) {
  const headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}

@@ -12,7 +12,7 @@ export function privateLobbyCode(value:unknown) {
  return code
 }
 /** Instances share no directory, membership, seat reservation or session state. */
-export function multiplayerLobbyService(db:UploadRepository) {
+export function multiplayerLobbyService(db:UploadRepository,available?:(gameId:string,access:LobbyAccess)=>Promise<boolean>) {
  async function limit(actor:string,operation:string) {
   if(!actor)throw new LobbyError('unauthorized',401)
   lobbyId(actor)
@@ -24,6 +24,7 @@ export function multiplayerLobbyService(db:UploadRepository) {
    lobbyId(gameId);lobbyId(requestId)
    if(!['public','private'].includes(access))throw new LobbyError('invalid_request')
    await limit(actor,'create')
+   if(available && !await available(gameId,access))throw new LobbyError('deployment_unavailable',409)
    return db.call<LobbySnapshot>('distribution_multiplayer_create',{p_actor:actor,p_game:gameId,p_access:access,p_request:requestId})
   },
   async get(actor:string,id:string){lobbyId(id);await limit(actor,'get');return db.call<LobbySnapshot>('distribution_multiplayer_snapshot',{p_actor:actor,p_id:id})},
