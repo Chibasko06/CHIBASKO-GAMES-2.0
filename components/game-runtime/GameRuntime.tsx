@@ -21,13 +21,20 @@ export default function GameRuntime({gameId,gameVersionId,execution,audience,loc
   const busy=['resolving','launching','loading'].includes(state.phase)
   async function fullscreen(){try{await shell.current?.requestFullscreen();setFullscreenError(false)}catch{setFullscreenError(true)}}
   return <section ref={shell} className={styles.shell} aria-label="Jeu Chibasko Games" data-phase={state.phase}>
-    <div className={styles.toolbar}>
-      <button type="button" onClick={()=>controller.current?.close()}>Quitter le jeu</button>
-      <button type="button" onClick={fullscreen} disabled={state.phase==='closed'}>Plein écran</button>
-      <span role="status" aria-live="polite">{busy?'Chargement du jeu…':state.phase==='running'?'Partie en cours':state.phase==='ready'?'Jeu prêt':state.phase==='closed'?'Jeu fermé':''}</span>
+    <div className={styles.controls}>
+      <button type="button" aria-label="Plein écran" title="Plein écran" onClick={fullscreen} disabled={state.phase==='closed'}>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
+        <span className={styles.tooltip} aria-hidden="true">Plein écran</span>
+      </button>
+      <button type="button" aria-label="Quitter le jeu" title="Quitter le jeu" onClick={()=>controller.current?.close()}>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        <span className={styles.tooltip} aria-hidden="true">Quitter le jeu</span>
+      </button>
     </div>
-    {fullscreenError?<p role="status">Le plein écran n’est pas disponible. Tu peux continuer ici.</p>:null}
-    {state.phase==='failed'?<div className={styles.error} role="alert"><p>{['hello_timeout','handshake_timeout','game_ready_timeout'].includes(state.error ?? '')?'Le jeu n’a pas terminé son initialisation.':'Le jeu ne peut pas continuer pour le moment.'}</p><button type="button" onClick={()=>setAttempt(n=>n+1)}>Réessayer</button></div>:null}
     <div ref={container} className={styles.viewport} aria-busy={busy}/>
+    {busy?<div className={styles.overlay}><p className={styles.message} role="status" aria-live="polite">Chargement du jeu…</p></div>:null}
+    {state.phase==='failed'?<div className={styles.overlay}><div className={styles.message} role="alert"><p>{state.error==='launch_expired'?'La session de jeu a expiré.': ['hello_timeout','handshake_timeout','game_ready_timeout'].includes(state.error ?? '')?'Le jeu n’a pas terminé son initialisation.':'Le jeu ne peut pas continuer pour le moment.'}</p><button className={styles.retry} type="button" onClick={()=>setAttempt(n=>n+1)}>Réessayer</button></div></div>:null}
+    {state.phase==='closed'?<div className={styles.overlay}><p className={styles.message} role="status">Jeu fermé</p></div>:null}
+    {fullscreenError?<p className={styles.notice} role="status">Le plein écran n’est pas disponible. Tu peux continuer ici.</p>:null}
   </section>
 }

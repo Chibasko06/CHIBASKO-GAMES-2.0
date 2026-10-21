@@ -164,10 +164,30 @@ test('browser fullscreen is host-controlled and retains the outside exit button'
     await x.page.getByRole('button',{name:'Plein écran',exact:true}).click()
     await x.page.waitForFunction(()=>document.fullscreenElement?.getAttribute('aria-label')==='Jeu Chibasko Games')
     assert.ok(await x.page.getByRole('button',{name:'Quitter le jeu'}).isVisible())
+    const bounds=await x.page.locator('iframe').boundingBox()
+    assert.equal(bounds.x,0);assert.equal(bounds.y,0)
+    assert.equal(bounds.width,await x.page.evaluate(()=>innerWidth));assert.equal(bounds.height,await x.page.evaluate(()=>innerHeight))
     await x.page.evaluate(()=>document.exitFullscreen())
   }finally{await x.context.close()}
 })
-for(const viewport of [{width:1366,height:768},{width:390,height:844},{width:768,height:1024},{width:844,height:390}])test('browser responsive '+viewport.width+'x'+viewport.height+' preserves visible outside controls and iframe bounds',async()=>{
+test('floating controls retain accessible labels, keyboard focus, tooltips and exit',async()=>{
+  const x=await setup()
+  try{
+    await x.running()
+    await x.page.keyboard.press('Tab')
+    const fullscreen=x.page.getByRole('button',{name:'Plein écran',exact:true})
+    assert.equal(await fullscreen.evaluate(node=>document.activeElement===node),true)
+    assert.equal(await fullscreen.locator('span').isVisible(),true)
+    await x.page.keyboard.press('Tab')
+    const exit=x.page.getByRole('button',{name:'Quitter le jeu'})
+    assert.equal(await exit.evaluate(node=>document.activeElement===node),true)
+    assert.equal(await exit.locator('span').isVisible(),true)
+    await x.page.keyboard.press('Enter')
+    await x.page.getByText('Jeu quitté',{exact:true}).waitFor()
+    assert.equal(await x.page.locator('iframe').count(),0)
+  }finally{await x.context.close()}
+})
+for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:390,height:844},{width:768,height:1024},{width:844,height:390}])test('browser responsive '+viewport.width+'x'+viewport.height+' preserves visible outside controls and iframe bounds',async()=>{
   const x=await setup('solo','published','normal',viewport)
   try {
     await x.running()
@@ -175,9 +195,15 @@ for(const viewport of [{width:1366,height:768},{width:390,height:844},{width:768
     assert.ok(iframe.width<=viewport.width && iframe.height>100);assert.ok(exit.y>=0 && exit.y+exit.height<=viewport.height)
     assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
     assert.ok(iframe.y+iframe.height<=viewport.height+1)
-    assert.ok((await x.page.locator('[role="status"]').first().boundingBox()).height<32)
-    const toolbar=await x.page.locator('iframe').evaluate(node=>node.parentElement.previousElementSibling.getBoundingClientRect().height)
-    assert.ok(toolbar<=48)
+    assert.equal(await x.page.getByText('Partie en cours',{exact:true}).count(),0)
+    assert.equal(await x.page.locator('[role="status"]').count(),0)
+    const shell=await x.page.getByRole('region',{name:'Jeu Chibasko Games'}).boundingBox()
+    assert.equal(iframe.y,shell.y);assert.equal(iframe.height,shell.height)
+    assert.equal(iframe.width,shell.width)
+    assert.ok(Math.abs(exit.y-shell.y-12)<1)
+    const controls=x.page.getByRole('button',{name:'Quitter le jeu'})
+    assert.equal(await controls.evaluate(node=>{const r=node.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===node || node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),true)
+    if(viewport.width===390)assert.ok(exit.width>=44 && exit.height>=44)
     if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:`.distribution/runtime-${viewport.width}x${viewport.height}.png`})
   }finally{await x.context.close()}
 })
