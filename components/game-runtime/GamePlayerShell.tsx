@@ -4,8 +4,8 @@ import styles from './GameRuntime.module.css'
 import PlayerIcon from './PlayerIcon'
 
 export type PlayerAudioControl={muted:boolean;onToggle:()=>void;disabled?:boolean}
-type Props={children:ReactNode;onLeave:()=>void;socialControls?:ReactNode;audioControl?:PlayerAudioControl;phase?:string;canLeave?:boolean}
-export default function GamePlayerShell({children,onLeave,socialControls,audioControl,phase,canLeave=true}:Props){
+type Props={presentation?:'legacy'|'sdk';children:ReactNode;onLeave:()=>void;socialControls?:ReactNode;audioControl?:PlayerAudioControl;phase?:string;canLeave?:boolean}
+export default function GamePlayerShell({children,onLeave,socialControls,audioControl,phase,canLeave=true,presentation='sdk'}:Props){
   const shell=useRef<HTMLElement>(null)
   const [isFullscreen,setIsFullscreen]=useState(false),[fullscreenError,setFullscreenError]=useState(false)
   useEffect(()=>{
@@ -17,12 +17,12 @@ export default function GamePlayerShell({children,onLeave,socialControls,audioCo
   async function fullscreen(){const element=shell.current;if(!element)return;try{if(element.ownerDocument.fullscreenElement===element)await element.ownerDocument.exitFullscreen();else await element.requestFullscreen();setFullscreenError(false)}catch{setFullscreenError(true)}}
   const fullscreenLabel=isFullscreen?'Quitter le plein écran':'Plein écran'
   const audioLabel=audioControl && !audioControl.disabled?(audioControl.muted?'Réactiver le son':'Couper le son'):'Contrôle audio indisponible pour ce jeu'
-  return <section ref={shell} className={styles.shell} aria-label="Jeu Chibasko Games" data-phase={phase}>
+  return <section ref={shell} className={styles.shell} aria-label="Jeu Chibasko Games" data-phase={phase} data-presentation={presentation}>
     <div className={styles.surface} data-player-surface>
       {children}
       {fullscreenError?<p className={styles.notice} role="status">Le plein écran n’est pas disponible. Tu peux continuer ici.</p>:null}
     </div>
-    <div className={styles.dock} role="group" aria-label="Commandes du lecteur">
+    <div className={styles.dock} data-player-dock role="group" aria-label="Commandes du lecteur">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className={styles.logo} src="/logo-chibaskogames-rond.ico" alt="Chibasko Games" width="28" height="28"/>
       <div className={styles.reactions} role="group" aria-label="Réactions au jeu">

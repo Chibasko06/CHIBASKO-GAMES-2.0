@@ -157,7 +157,7 @@ test('browser ignores forged messages and detects iframe navigation without losi
     await x.page.getByRole('button',{name:'Quitter le jeu'}).click();await x.page.getByText('Jeu quitté',{exact:true}).waitFor()
   }finally{await x.context.close()}
 })
-test('browser fullscreen is host-controlled and retains the outside exit button',async()=>{
+test('browser fullscreen is host-controlled and hides the dock',async()=>{
   const x=await setup()
   try {
     const frame=await x.running()
@@ -166,9 +166,9 @@ test('browser fullscreen is host-controlled and retains the outside exit button'
     await frame.waitForFunction(()=>window.childFullscreen==='denied')
     await x.page.getByRole('button',{name:'Plein écran',exact:true}).click()
     await x.page.waitForFunction(()=>document.fullscreenElement?.getAttribute('aria-label')==='Jeu Chibasko Games')
-    assert.ok(await x.page.getByRole('button',{name:'Quitter le jeu'}).isVisible())
+    assert.equal(await x.page.getByRole('button',{name:'Quitter le jeu'}).isVisible(),false)
     await assertPlayerLayout(x.page,true)
-    await x.page.getByRole('button',{name:'Quitter le plein écran',exact:true}).click()
+    await x.page.evaluate(()=>document.exitFullscreen())
     await x.page.waitForFunction(()=>document.fullscreenElement===null)
     await x.page.getByRole('button',{name:'Plein écran',exact:true}).waitFor()
   }finally{await x.context.close()}

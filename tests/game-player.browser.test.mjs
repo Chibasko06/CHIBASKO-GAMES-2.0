@@ -26,7 +26,7 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function setup({kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0}={}){
+async function setup({kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport}={}){
  const h=await runtimeHarness('pong-like'),context=await browser.newContext({viewport}),calls=[]
  let snapshot={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',gameId:h.request.gameId,gameVersionId:h.request.gameVersionId,access:'public',status:'waiting',code:'',minPlayers:1,maxPlayers:8,revision:1,startPolicy:'manual',expiresAt:new Date(Date.now()+3600000).toISOString(),onlineSessionReference:null,members:[{id:'opaque-fixture',displayName:'Player',self:true,leader:true,ready:false}]}
  await context.route('**/*',async route=>{
@@ -61,11 +61,11 @@ async function setup({kind='artifact',availableAccess=[],viewport={width:1366,he
  })
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto('https://portal.test/games/fixture');await page.waitForFunction(()=>!!window.gamePlayerFixture,null,{timeout:3000}).catch(()=>{throw Error('Fixture bootstrap: '+JSON.stringify(errors))})
  await page.evaluate(signed=>window.fixtureSignedIn=signed,signed)
- await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title:'Fixture Arena',coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl:'https://legacy.test/index.html'})
+ await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title:'Fixture Arena',coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl:'https://legacy.test/index.html'})
  await page.waitForTimeout(100);assert.deepEqual(errors,[])
  return {page,context,h,calls}
 }
-async function oneDock(page){assert.equal(await page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).count(),1);assert.equal(await page.getByRole('group',{name:'Commandes du lecteur',exact:true}).count(),1)}
+async function oneDock(page){assert.equal(await page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).count(),1);assert.equal(await page.locator('[data-player-dock]').count(),1)}
 
 const launcher=page=>page.getByLabel('Écran de lancement',{exact:true})
 const startLocal=page=>page.getByRole('button',{name:/^Jouer en local/}).click()
@@ -121,9 +121,9 @@ test('multiple available modes launch inside the same fullscreen player and retu
   await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()
   await oneDock(x.page);await assertPlayerLayout(x.page,true)
   assert.equal(x.page.url(),'https://portal.test/games/fixture')
+  await x.page.evaluate(()=>document.exitFullscreen())
   await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click();await launcher(x.page).waitFor()
   assert.equal(await launcher(x.page).innerHTML(),initial)
-  assert.equal(await x.page.evaluate(()=>document.fullscreenElement===document.querySelector('[aria-label="Jeu Chibasko Games"]')),true)
  }finally{await x.context.close()}
 })
 test('online lobby stays integrated and leaves through the dock before restoring the launcher',async()=>{
@@ -165,8 +165,55 @@ for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:3
   await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
   await assertPlayerLayout(x.page,true)
   if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/'+kind+'-fullscreen-'+viewport.width+'x'+viewport.height+'.png'})
-  await x.page.getByRole('button',{name:'Quitter le plein écran',exact:true}).click();await x.page.waitForFunction(()=>!document.fullscreenElement)
+  await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForFunction(()=>!document.fullscreenElement)
   await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click();await launcher(x.page).waitFor()
   await assertPlayerLayout(x.page)
+ }finally{await x.context.close()}
+})
+
+for(const nativeViewport of [{width:960,height:720},{width:1920,height:800}])test('legacy contains native '+nativeViewport.width+'x'+nativeViewport.height,async()=>{
+ const x=await setup({kind:'legacy',nativeViewport})
+ try{
+ await x.page.getByRole('button',{name:'Jouer',exact:true}).click();await x.page.locator('iframe').waitFor()
+ for(const viewport of [{width:1366,height:768},{width:390,height:844},{width:844,height:390}]){
+ await x.page.setViewportSize(viewport);await x.page.waitForTimeout(100);await assertPlayerLayout(x.page)
+ const box=await x.page.locator('iframe').boundingBox();assert.ok(Math.abs(box.width/box.height-nativeViewport.width/nativeViewport.height)<0.01)
+ const dimensions=await x.page.frames()[1].evaluate(()=>({width:innerWidth,height:innerHeight}));assert.deepEqual(dimensions,nativeViewport)
+ }
+ }finally{await x.context.close()}
+})
+test('SDK receives real viewport dimensions and native resize events',async()=>{
+ const x=await setup()
+ try{
+ await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()
+ const frame=x.page.frames()[1];await frame.evaluate(()=>{
+ window.resizeCount=0;document.body.style.margin='0';const canvas=document.createElement('canvas');document.body.replaceChildren(canvas)
+ const resize=()=>{window.resizeCount++;canvas.width=innerWidth;canvas.height=innerHeight;canvas.style.cssText='display:block;width:100vw;height:100vh'}
+ addEventListener('resize',resize);resize()
+ })
+ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:1920,height:1080}]){
+ await x.page.setViewportSize(viewport);await x.page.waitForTimeout(100)
+ const box=await x.page.locator('[data-player-surface]').boundingBox();const size=await frame.evaluate(()=>({width:innerWidth,height:innerHeight}));assert.ok(Math.abs(size.width-box.width)<=1 && Math.abs(size.height-box.height)<=1)
+ const canvas=await frame.locator('canvas').boundingBox();assert.ok(Math.abs(canvas.width-box.width)<=1 && Math.abs(canvas.height-box.height)<=1)
+ }
+ assert.ok(await frame.evaluate(()=>window.resizeCount)>0)
+ await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForTimeout(100);await assertPlayerLayout(x.page,true)
+ await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForTimeout(100);await assertPlayerLayout(x.page)
+ }finally{await x.context.close()}
+})
+
+test('fixed SDK compatibility viewport is uniformly contained through resize and fullscreen',async()=>{
+ const fixedViewport={width:1000,height:750},x=await setup({fixedViewport})
+ try{
+ await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()
+ await x.page.frames()[1].evaluate(()=>{document.body.style.margin='0';const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=750;canvas.style.cssText='display:block;width:1000px;height:750px';document.body.replaceChildren(canvas)})
+ for(const viewport of [{width:1366,height:768},{width:390,height:844},{width:844,height:390}]){
+ await x.page.setViewportSize(viewport);await x.page.waitForTimeout(100);await assertPlayerLayout(x.page)
+ const box=await x.page.locator('iframe').boundingBox();assert.ok(Math.abs(box.width/box.height-4/3)<0.01)
+ const canvas=await x.page.frames()[1].locator('canvas').evaluate(element=>({width:element.getBoundingClientRect().width,height:element.getBoundingClientRect().height}));assert.deepEqual(canvas,fixedViewport)
+ assert.deepEqual(await x.page.frames()[1].evaluate(()=>({width:innerWidth,height:innerHeight})),fixedViewport)
+ }
+ await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForTimeout(100);await assertPlayerLayout(x.page,true)
+ await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForTimeout(100);await assertPlayerLayout(x.page)
  }finally{await x.context.close()}
 })
