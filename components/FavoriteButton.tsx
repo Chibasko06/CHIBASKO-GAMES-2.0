@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { addFavorite, isFavorite, removeFavorite } from '@/lib/queries/favorites'
 import { ensureProfile } from '@/lib/profileSync'
+import PlayerIcon from './game-runtime/PlayerIcon'
+import playerStyles from './game-runtime/GameRuntime.module.css'
 
 type Props = {
   gameId: string
+  compact?: boolean
 }
 
-export default function FavoriteButton({ gameId }: Props) {
+export default function FavoriteButton({ gameId, compact=false }: Props) {
   const { loading: authLoading, session, user } = useAuth()
   const [isGameFavorite, setIsGameFavorite] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -111,6 +114,8 @@ export default function FavoriteButton({ gameId }: Props) {
 
     setPending(false)
   }
+
+  if(compact)return <button type="button" className={playerStyles.iconButton} aria-label="Favori" aria-pressed={isGameFavorite} disabled={loading || pending} title={loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'} onClick={()=>void toggleFavorite()}><PlayerIcon name="favorite"/><span className={playerStyles.tooltip} aria-hidden="true">{loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'}</span></button>
 
   if (loading) {
     return <div className="w-10 h-10 bg-zinc-900 animate-pulse border border-zinc-800" />

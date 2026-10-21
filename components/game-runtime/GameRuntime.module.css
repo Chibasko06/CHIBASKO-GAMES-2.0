@@ -1,18 +1,26 @@
 .shell{box-sizing:border-box;position:relative;isolation:isolate;width:100%;height:var(--game-runtime-height,calc(100dvh - 10rem));min-height:16rem;background:transparent;color:#f8fafc;border-radius:.5rem;overflow:hidden;font-family:system-ui,sans-serif}
 .shell:fullscreen{width:100%;height:100dvh;min-height:0;border-radius:0;background:#09090b}
 .viewport{position:absolute;inset:0;min-width:0;min-height:0}
-.controls{position:absolute;z-index:3;top:12px;right:12px;display:flex;gap:6px}
-.controls button{position:relative;display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid #ffffff1f;border-radius:.5rem;background:#09090bbf;backdrop-filter:blur(6px);color:#e2e8f0;cursor:pointer}
-.controls button:hover{border-color:#22d3ee80;background:#083344e6;color:#67e8f9}
-.shell button:focus-visible{outline:2px solid #67e8f9;outline-offset:3px}
-.controls button:disabled{opacity:.5;cursor:default}
-.tooltip{position:absolute;top:calc(100% + 8px);right:0;visibility:hidden;opacity:0;white-space:nowrap;pointer-events:none;border:1px solid #334155;border-radius:.375rem;background:#09090bf2;padding:.375rem .5rem;font-size:.75rem;color:#e2e8f0}
-.controls button:hover .tooltip,.controls button:focus-visible .tooltip{visibility:visible;opacity:1}
-.overlay{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:4.5rem 1rem 1rem;background:#09090b99;box-sizing:border-box}
+.dock{position:absolute;z-index:3;bottom:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:16px;width:min(480px,calc(100% - 24px));box-sizing:border-box;padding:6px 10px;border:1px solid #ffffff1a;border-radius:18px;background:linear-gradient(135deg,#111827e8,#09090be0);backdrop-filter:blur(14px);box-shadow:0 8px 28px #0005;color:#cbd5e1}
+.logo{width:28px;height:28px;flex:none;border-radius:50%;object-fit:contain}
+.reactions,.reactionButtons,.actions{display:flex;align-items:center;gap:2px;min-width:0}
+.reactions{flex:1;justify-content:center}
+.actions{margin-left:auto}
+.iconButton{position:relative;display:grid;place-items:center;width:44px;height:44px;flex:none;padding:0;border:1px solid transparent;border-radius:12px;background:transparent;color:inherit;cursor:pointer}
+.iconButton:hover:not(:disabled){border-color:#22d3ee40;background:#164e6359;color:#67e8f9}
+.iconButton[aria-pressed="true"]{background:#0891b233;border-color:#22d3ee59;color:#67e8f9}
+.reactions .iconButton[aria-pressed="true"] svg{fill:#22d3ee26}
+.shell button:focus-visible,.control:focus-visible{outline:2px solid #67e8f9;outline-offset:2px}
+.iconButton:disabled{opacity:.35;cursor:not-allowed}
+.control{position:relative;display:block;border-radius:12px}
+.tooltip{position:absolute;bottom:calc(100% + 10px);right:0;visibility:hidden;opacity:0;pointer-events:none;width:max-content;max-width:min(260px,70vw);box-sizing:border-box;border:1px solid #334155;border-radius:8px;background:#09090bf5;padding:6px 8px;font-size:.75rem;line-height:1.4;text-align:center;color:#e2e8f0}
+.iconButton:hover .tooltip,.iconButton:focus-visible .tooltip,.control:hover>.tooltip,.control:focus-visible>.tooltip{visibility:visible;opacity:1}
+.overlay{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:1rem 1rem 6rem;background:#09090b99;box-sizing:border-box}
 .message{max-width:28rem;margin:0;text-align:center;font-size:.9375rem;line-height:1.6;color:#e2e8f0}
 .message p{margin:0}
 .retry{margin-top:1rem;padding:.625rem 1rem;border:1px solid #22d3ee80;border-radius:.5rem;background:#164e63;color:#ecfeff;font:inherit;cursor:pointer}
 .retry:hover{background:#155e75}
-.notice{position:absolute;z-index:3;bottom:12px;left:12px;right:12px;margin:0;padding:.75rem;border-radius:.5rem;background:#09090be6;color:#e2e8f0;font-size:.8125rem;text-align:center}
-@media(pointer:coarse),(max-width:600px){.controls button{width:44px;height:44px}}
+.notice{position:absolute;z-index:3;bottom:86px;left:12px;right:12px;margin:0;padding:.75rem;border-radius:.5rem;background:#09090be6;color:#e2e8f0;font-size:.8125rem;text-align:center}
+@media(max-width:600px){.dock{gap:4px;padding:5px 6px;border-radius:16px}.logo{width:24px;height:24px}.reactions,.reactionButtons,.actions{gap:0}}
+@media(max-width:360px){.dock{width:calc(100% - 12px);padding-inline:3px;gap:0}.logo{width:20px;height:20px}}
 @media(max-height:500px){.shell{height:calc(100dvh - 1rem);min-height:12rem}.shell:fullscreen{height:100dvh;min-height:0}}

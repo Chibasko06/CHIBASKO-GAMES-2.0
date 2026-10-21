@@ -43,7 +43,7 @@
     "preview:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs preview",
     "deploy:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs deploy",
     "test:catalogue-db": "node tests/game-catalogue-db.mjs",
-    "test:product": "node --import ./tests/product-register.mjs --test tests/artifact-product.test.mjs && node --import ./tests/admin-ui-register.mjs --test tests/admin-ui.test.mjs",
+    "test:product": "node --import ./tests/product-register.mjs --test tests/artifact-product.test.mjs tests/player-social.test.mjs && node --import ./tests/admin-ui-register.mjs --test tests/admin-ui.test.mjs",
     "test:admin": "node --import ./tests/admin-register.mjs --test tests/admin-security.test.mjs",
     "test:admin-db": "node tests/admin-db.mjs",
     "pretest:product": "npm run build:sdk",

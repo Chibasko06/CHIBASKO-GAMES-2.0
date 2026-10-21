@@ -502,5 +502,15 @@ conserve son contrôle de déploiement, notamment en cas de désactivation ulté
 Une erreur de lecture désactive les modes online sans retirer l’accès local.
 
 Le lecteur utilise la largeur du conteneur de page et une hauteur liée au viewport.
-Sa toolbar compacte appartient au portail ; sortie et plein écran restent hors
-iframe, y compris en plein écran. Le jeu conserve son propre ratio et ses contrôles.
+Son dock flottant inférieur appartient au portail : logo, réactions, favoris,
+audio, toggle plein écran et sortie. Les contrôles restent hors iframe, y compris
+en plein écran. Les composants de réactions/favoris existants sont réutilisés en
+version compacte pour le lecteur local publié ; leur accès authentifié reste
+inchangé. Le jeu conserve son propre ratio et ses contrôles.
+
+Le Bridge actuel ne fournit pas de commande audio. Sans adaptateur audio réel,
+le mute est désactivé avec une explication accessible. Le prop optionnel
+`audioControl` décrit un état muted et un callback fourni par un futur adaptateur ;
+il ne donne aucun accès au DOM ou aux médias de l’iframe cross-origin et ne
+modifie pas le protocole. Chargement, erreurs et retry restent des overlays
+temporaires, sans statut permanent pendant la partie.

@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
+import PlayerIcon from './game-runtime/PlayerIcon'
+import playerStyles from './game-runtime/GameRuntime.module.css'
 
 type Reaction = 'like' | 'dislike' | null
-export default function GameReactions({ gameId, initialLikes, initialDislikes }: { gameId: string; initialLikes: number; initialDislikes: number }) {
+export default function GameReactions({ gameId, initialLikes, initialDislikes, compact=false }: { gameId: string; initialLikes: number; initialDislikes: number; compact?:boolean }) {
   const { session, user } = useAuth()
   const [likes, setLikes] = useState(initialLikes)
   const [dislikes, setDislikes] = useState(initialDislikes)
@@ -135,6 +137,9 @@ export default function GameReactions({ gameId, initialLikes, initialDislikes }:
     setPending(false)
   }
 
+  if(compact)return <div className={playerStyles.reactionButtons}>
+    {(['like','dislike'] as const).map(value=><button key={value} className={playerStyles.iconButton} type="button" aria-label={value==='like'?'J’aime':'Je n’aime pas'} aria-pressed={reaction===value} title={value==='like'?`J’aime · ${likes}`:`Je n’aime pas · ${dislikes}`} disabled={pending} onClick={()=>void applyReaction(value)}><PlayerIcon name={value}/><span className={playerStyles.tooltip} aria-hidden="true">{value==='like'?`J’aime · ${likes}`:`Je n’aime pas · ${dislikes}`}</span></button>)}
+  </div>
 
   return (
         <div className="flex flex-wrap items-center gap-2">
