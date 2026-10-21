@@ -20,7 +20,7 @@ export const metadata: Metadata = buildPageMetadata({
 export default async function Home() {
   const [featuredGames, categorySections, homepageHighlights, multiplayerGames] = await Promise.all([
     getFeaturedGames(8),
-    getGamesByCategory(12),
+    getGamesByCategory(10),
     getHomepageHighlights(),
     getGamesCatalog('multiplayer_chibasko'),
   ])

@@ -28,7 +28,7 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function setup(pageKind,viewport,count=12){
+async function setup(pageKind,viewport,count=16){
  const context=await browser.newContext({viewport})
  await context.route('**/*',route=>{
  const url=new URL(route.request().url())
@@ -51,10 +51,25 @@ for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:7
  const track=x.page.getByRole('region',{name:'Action',exact:true}),metrics=await track.evaluate(node=>{const r=node.getBoundingClientRect();return {width:node.clientWidth,scrollWidth:node.scrollWidth,visible:[...node.children].filter(child=>{const c=child.getBoundingClientRect();return c.x>=r.x-1 && c.right<=r.right+1}).length,scrollbar:getComputedStyle(node).scrollbarWidth}})
  console.log('HOME '+viewport.width+' '+JSON.stringify(metrics))
  assert.equal(metrics.visible,viewport.width===1920?7:viewport.width===1366?5:viewport.width===768?3:1);assert.equal(metrics.scrollbar,'none')
- const previous=x.page.getByRole('button',{name:'Précédents : Action'}),next=x.page.getByRole('button',{name:'Suivants : Action'})
+ const previous=x.page.getByRole('button',{name:'Précédents : Action',includeHidden:true}),next=x.page.getByRole('button',{name:'Suivants : Action',includeHidden:true})
+ assert.equal(await track.locator(':scope > div').count(),10)
+ const cards=await track.locator('article').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {height:r.height,image:node.firstElementChild.getBoundingClientRect().height,stats:node.querySelector('[class*="stats"]').getBoundingClientRect().y-r.y,footer:node.querySelector('[class*="footer"]').getBoundingClientRect().y-r.y}}))
+ for(const card of cards)assert.deepEqual(card,cards[0])
+ assert.equal(cards[0].height,376);assert.equal(cards[0].image,160)
+ await track.getByRole('heading',{name:'Chibasko Pong',exact:true}).waitFor({state:'attached'})
+ const pong=track.locator('article').filter({has:x.page.getByRole('heading',{name:'Chibasko Pong',exact:true})})
+ assert.equal(await pong.getByText('Multijoueur',{exact:true}).count(),1);assert.equal(await pong.getByText('2 joueurs',{exact:true}).count(),1)
+ assert.equal(await pong.locator('[class*="badges"] span').evaluateAll(nodes=>nodes.every(node=>{const r=node.getBoundingClientRect(),p=node.closest('[class*="badges"]').getBoundingClientRect();return r.width>0 && r.height>0 && r.x>=p.x-1 && r.right<=p.right+1 && r.y>=p.y-1 && r.bottom<=p.bottom+1})),true,'all multiplayer badges remain inside their reserved slot')
+ const rail=await track.locator('..').boundingBox(),trackBounds=await track.boundingBox()
+ assert.equal(rail.height,trackBounds.height,'navigation must reserve no space beneath cards')
+ if(viewport.width>600){
+ const overlay=await next.boundingBox();assert.ok(overlay.y>=trackBounds.y && overlay.y+overlay.height<=trackBounds.y+trackBounds.height);assert.ok(overlay.height>=cards[0].height-1)
+ assert.equal(await next.evaluate(node=>getComputedStyle(node).borderRadius),'0px')
+ }else assert.equal(await next.isVisible(),false)
  assert.equal(await previous.isDisabled(),true);assert.equal(await next.isDisabled(),false)
  if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/home-initial-'+viewport.width+'.png',fullPage:true})
- await next.click();await x.page.waitForTimeout(650);assert.equal(await previous.isDisabled(),false)
+ if(viewport.width>600){await next.focus();await x.page.keyboard.press('Enter')}else await track.evaluate(node=>node.scrollBy({left:node.clientWidth,behavior:'instant'}));await x.page.waitForTimeout(650);assert.equal(await previous.isDisabled(),false)
+ await track.evaluate(node=>node.scrollTo({left:(node.scrollWidth-node.clientWidth)/2,behavior:'instant'}));await x.page.waitForTimeout(100);assert.equal(await previous.isDisabled(),false);assert.equal(await next.isDisabled(),false)
  await track.evaluate(node=>node.scrollTo({left:node.scrollWidth,behavior:'instant'}));await x.page.waitForTimeout(100);assert.equal(await next.isDisabled(),true)
  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/home-row-'+viewport.width+'.png',fullPage:true})
@@ -62,7 +77,7 @@ for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:7
 })
 test('non-overflowing row has no navigation buttons and reacts to resizing',async()=>{
  const x=await setup('home',{width:1920,height:1080},3)
- try{assert.equal(await x.page.getByRole('group',{name:'Défilement : Action'}).count(),0);await x.page.setViewportSize({width:390,height:844});await x.page.getByRole('button',{name:'Suivants : Action'}).waitFor();await x.page.setViewportSize({width:1920,height:1080});await x.page.waitForTimeout(100);assert.equal(await x.page.getByRole('group',{name:'Défilement : Action'}).count(),0)}finally{await x.context.close()}
+ try{assert.equal(await x.page.getByRole('group',{name:'Défilement : Action'}).count(),0);await x.page.setViewportSize({width:390,height:844});await x.page.waitForFunction(()=>{const node=document.querySelector('[aria-label="Action"]');return node.scrollWidth>node.clientWidth});await x.page.setViewportSize({width:1920,height:1080});await x.page.waitForTimeout(100);assert.equal(await x.page.getByRole('group',{name:'Défilement : Action'}).count(),0)}finally{await x.context.close()}
 })
 for(const pageKind of ['home','game','admin'])test('account menu stacks above '+pageKind,async()=>{
  const x=await setup(pageKind,{width:1920,height:1080})
@@ -83,5 +98,36 @@ for(const viewport of [{width:1920,height:1080},{width:1680,height:1080},{width:
  if(viewport.width===1366)assert.ok(Math.abs(surface.width-1120)<1 && Math.abs(surface.height-630)<1)
  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({fullPage:true,path:'.distribution/site-recommendations-'+viewport.width+'.png'})
+ }finally{await x.context.close()}
+})
+
+for(const pageKind of ['home','game','admin'])test('account portal escapes clipping and follows its anchor on '+pageKind,async()=>{
+ const x=await setup(pageKind,{width:1920,height:1080})
+ try{
+ if(pageKind==='game')await x.page.locator('[data-stacking-probe]').evaluate(node=>{node.style.display='none'})
+ await x.page.locator('header').evaluate(node=>{node.style.zIndex='0';node.style.overflow='hidden';node.style.transform='translateZ(0)'})
+ await x.page.locator('main').evaluate(node=>{node.style.zIndex='5'})
+ const button=x.page.getByRole('button',{name:'Mon compte',exact:true})
+ await button.click();const menu=x.page.getByRole('navigation',{name:'Menu du compte'})
+ assert.equal(await menu.evaluate(node=>node.parentElement===document.body),true)
+ assert.equal(await menu.evaluate(node=>getComputedStyle(node).position),'fixed')
+ const first=await menu.boundingBox(),anchor=await button.boundingBox();assert.ok(Math.abs(first.y-anchor.y-anchor.height-8)<1)
+ assert.equal(await menu.evaluate(node=>{const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height-8))}),true)
+ await x.page.setViewportSize({width:1366,height:768});await x.page.waitForTimeout(100)
+ let bounds=await menu.boundingBox(),trigger=await button.boundingBox();assert.ok(Math.abs(bounds.x+bounds.width-trigger.x-trigger.width)<1)
+ await x.page.evaluate(()=>{const footer=document.createElement('div');footer.style.height='2000px';document.body.append(footer);scrollTo(0,15)})
+ await x.page.waitForTimeout(100);bounds=await menu.boundingBox();trigger=await button.boundingBox();assert.ok(Math.abs(bounds.y-trigger.y-trigger.height-8)<1)
+ await x.page.keyboard.press('Escape');assert.equal(await menu.count(),0);assert.equal(await button.evaluate(node=>document.activeElement===node),true)
+ await button.click();await menu.waitFor();await x.page.mouse.click(5,300);assert.equal(await menu.count(),0)
+ }finally{await x.context.close()}
+})
+
+test('account portal covers transformed cards',async()=>{
+ const x=await setup('home',{width:1920,height:1080})
+ try{
+ await x.page.locator('[data-stacking-probe]').evaluate(node=>{node.style.display='none'})
+ await x.page.getByRole('button',{name:'Mon compte',exact:true}).click()
+ const menu=x.page.getByRole('navigation',{name:'Menu du compte'})
+ assert.equal(await menu.evaluate(node=>{const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.bottom-8))}),true)
  }finally{await x.context.close()}
 })
