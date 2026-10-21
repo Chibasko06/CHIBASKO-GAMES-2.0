@@ -1,3 +1,6 @@
+import {cache} from 'react'
+import GamePagePlayerLayout from '@/components/GamePagePlayerLayout'
+import {selectGameRecommendations} from '@/lib/catalogueRecommendations'
 import ArtifactGamePlayer from '@/components/game-runtime/ArtifactGamePlayer'
 import { isClassicGame } from '@/lib/multiplayer/catalogue'
 import { catalogueSource } from '@/lib/catalogueSource'
@@ -5,12 +8,13 @@ import type { Metadata } from 'next'
 import GameReviews from '@/components/GameReviews'
 import GameViewport from '@/components/GameViewport'
 import PlaySessionTracker from '@/components/PlaySessionTracker'
-import { getGameBySlug } from '@/lib/queries/games'
+import { getGamesCatalog } from '@/lib/queries/games'
 import { absoluteUrl } from '@/lib/seo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { publishedOnlineAccess } from '@/lib/server/publishedOnlineAccess'
 
+const getCatalogue=cache(getGamesCatalog)
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({
@@ -19,7 +23,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
-  const game = await getGameBySlug(slug)
+  const catalogue=await getCatalogue()
+  const game=catalogue.find(game=>game.slug===slug)
 
   if (!game) {
     return {
@@ -63,7 +68,8 @@ export default async function GamePage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const game = await getGameBySlug(slug)
+  const catalogue=await getCatalogue()
+  const game=catalogue.find(game=>game.slug===slug)
 
   if (!game) {
     notFound()
@@ -134,6 +140,7 @@ export default async function GamePage({
 
       </div>
 
+      <GamePagePlayerLayout recommendations={selectGameRecommendations(game,catalogue)} primaryCategoryId={game.categories[0]?.id}>
       {!game.active_version_id && isClassicGame(game) ? (
         <GameViewport title={game.title} developerName={game.developer_name} coverUrl={game.thumbnail_url} gameId={game.id} gameUrl={game.game_url} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
       ) : (
@@ -151,6 +158,8 @@ export default async function GamePage({
           initialDislikes={game.dislikes_count}
         />
       )}
+
+      </GamePagePlayerLayout>
 
       <p className="text-zinc-400">
         {game.description ?? 'Aucune description disponible.'}

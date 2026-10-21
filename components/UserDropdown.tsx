@@ -1,7 +1,7 @@
 "use client";
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useId,useState } from 'react'
 import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabaseClient'
@@ -15,6 +15,7 @@ export default function UserDropdown({
   isAdmin: boolean
   avatarUrl?: string | null
 }) {
+  const menuId=useId()
   const [open, setOpen] = useState(false)
 
   const handleLogout = async () => {
@@ -25,6 +26,7 @@ export default function UserDropdown({
   return (
     <div className="relative">
       <button
+        type="button" aria-label="Mon compte" aria-expanded={open} aria-controls={menuId}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 rounded-full bg-zinc-900 border border-cyan-900 px-3 py-1 hover:bg-zinc-800 transition"
       >
@@ -48,7 +50,7 @@ export default function UserDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(14rem,calc(100vw-1.5rem))] overflow-hidden rounded-[20px] border border-cyan-900 bg-zinc-950 shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+        <div id={menuId} role="navigation" aria-label="Menu du compte" className="account-dropdown absolute right-0 mt-2 w-[min(14rem,calc(100vw-1.5rem))] overflow-hidden rounded-[20px] border border-cyan-900 bg-zinc-950 shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
           <Link
             href="/dashboard"
             className="block px-4 py-2 text-xs font-bold text-zinc-400 hover:text-cyan-400 hover:bg-zinc-900 border-b border-zinc-900"

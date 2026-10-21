@@ -82,7 +82,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="border-b border-cyan-950/70 bg-black/85 backdrop-blur">
+    <header className="site-header border-b border-cyan-950/70 bg-black/85 backdrop-blur">
       <nav className="mx-auto w-full max-w-[2200px] px-4 py-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <div className="flex items-center justify-between gap-4">
           <ChibaskoLogo />

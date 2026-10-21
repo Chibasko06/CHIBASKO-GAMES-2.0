@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 :root {
+  --layer-page: 0;
+  --layer-floating: 10;
+  --layer-header: 20;
+  --layer-dropdown: 1;
+  --layer-modal: 30;
   --background: #06070b;
   --foreground: #f3f7fb;
   --panel: #0d1119;
@@ -42,3 +47,9 @@ a {
   background: rgba(34, 211, 238, 0.25);
   color: #fff;
 }
+
+/* Content stacking stays below navigation, including transformed cards and player overlays. */
+.site-header{position:relative;z-index:var(--layer-header);isolation:isolate;overflow:visible}
+.site-content{position:relative;z-index:var(--layer-page);min-width:0}
+.account-dropdown{z-index:var(--layer-dropdown)}
+.floating-control{z-index:var(--layer-floating)}

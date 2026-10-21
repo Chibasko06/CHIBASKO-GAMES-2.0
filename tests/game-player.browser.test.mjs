@@ -26,7 +26,7 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function setup({kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
+async function setup({kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,withRecommendations=false,title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
  const h=await runtimeHarness('pong-like'),context=await browser.newContext({viewport,isMobile:touch,hasTouch:touch,deviceScaleFactor:touch?2:1}),calls=[]
  let snapshot={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',gameId:h.request.gameId,gameVersionId:h.request.gameVersionId,access:'public',status:'waiting',code:'',minPlayers:1,maxPlayers:8,revision:1,startPolicy:'manual',expiresAt:new Date(Date.now()+3600000).toISOString(),onlineSessionReference:null,members:[{id:'opaque-fixture',displayName:'Player',self:true,leader:true,ready:false}]}
  await context.route('**/*',async route=>{
@@ -61,7 +61,7 @@ async function setup({kind='artifact',availableAccess=[],viewport={width:1366,he
  })
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto('https://portal.test/games/fixture');await page.waitForFunction(()=>!!window.gamePlayerFixture,null,{timeout:3000}).catch(()=>{throw Error('Fixture bootstrap: '+JSON.stringify(errors))})
  await page.evaluate(signed=>window.fixtureSignedIn=signed,signed)
- await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title,coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl:'https://legacy.test/index.html'})
+ await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,withRecommendations,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title,coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl:'https://legacy.test/index.html'})
  await page.waitForTimeout(100);assert.deepEqual(errors,[])
  return {page,context,h,calls}
 }
@@ -302,4 +302,24 @@ for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:3
  }finally{await x.context.close()}
  }
  for(const size of dimensions)assert.deepEqual(size,dimensions[0])
+})
+
+for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:768,height:1024},{width:390,height:844},{width:844,height:390}])for(const kind of ['legacy','artifact'])test('recommendations preserve '+kind+' player geometry '+viewport.width+'x'+viewport.height,async()=>{
+ const baseline=await setup({kind,viewport,pagePadding:16,headingHeight:200}),x=await setup({kind,viewport,pagePadding:16,headingHeight:200,withRecommendations:true})
+ try{
+ const original=boxSize(await baseline.page.locator('[data-player-surface]').boundingBox()),surface=await x.page.locator('[data-player-surface]').boundingBox(),aside=await x.page.getByRole('complementary',{name:'À découvrir aussi'}).boundingBox()
+ assert.deepEqual(boxSize(surface),original)
+ if(viewport.width>=1680){assert.ok(aside.x>=surface.x+surface.width);assert.ok(Math.abs(aside.y-surface.y)<=1)}else assert.ok(aside.y>=surface.y+surface.height)
+ assert.equal(await x.page.getByRole('complementary',{name:'À découvrir aussi'}).getByRole('link').count(),5)
+ assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({fullPage:true,path:'.distribution/recommendations-'+kind+'-'+viewport.width+'.png'})
+ if(kind==='artifact'){await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()}else{await x.page.getByRole('button',{name:'Jouer',exact:true}).click();await x.page.locator('iframe').waitFor()}
+ assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),original)
+ await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement);await assertPlayerLayout(x.page,true)
+ await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForFunction(()=>!document.fullscreenElement)
+ assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),original)
+ await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click();await launcher(x.page).waitFor()
+ assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),original)
+ console.log('UNCHANGED '+kind+' '+viewport.width+'x'+viewport.height+' '+JSON.stringify(original))
+ }finally{await baseline.context.close();await x.context.close()}
 })

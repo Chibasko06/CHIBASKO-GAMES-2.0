@@ -119,7 +119,7 @@ export default function RootLayout({
         <AuthProvider>
             <ClientEnhancements />
             <Navbar />
-            <main className="mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">
+            <main className="site-content mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">
               {children}
             </main>
             <Footer />

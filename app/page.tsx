@@ -1,3 +1,4 @@
+import HorizontalScroller from '@/components/HorizontalScroller'
 import MultiplayerSection from '@/components/multiplayer/MultiplayerSection'
 import { GameBadges } from '@/components/multiplayer/GameBadges'
 import Link from 'next/link'
@@ -19,7 +20,7 @@ export const metadata: Metadata = buildPageMetadata({
 export default async function Home() {
   const [featuredGames, categorySections, homepageHighlights, multiplayerGames] = await Promise.all([
     getFeaturedGames(8),
-    getGamesByCategory(4),
+    getGamesByCategory(12),
     getHomepageHighlights(),
     getGamesCatalog('multiplayer_chibasko'),
   ])
@@ -134,11 +135,11 @@ export default async function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+          <HorizontalScroller label={section.category.name}>
             {section.games.map((game) => (
               <GameCard key={game.id} game={game} />
             ))}
-          </div>
+          </HorizontalScroller>
         </section>
       ))}
     </div>

@@ -30,7 +30,7 @@ export default function ScrollToTopButton() {
       type="button"
       onClick={scrollToTop}
       aria-label="Remonter en haut"
-      className={`fixed bottom-5 left-1/2 z-[70] flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border border-cyan-700/80 bg-zinc-950/95 text-cyan-200 shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all duration-300 hover:bg-zinc-900 sm:bottom-6 ${
+      className={`fixed bottom-5 left-1/2 floating-control flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border border-cyan-700/80 bg-zinc-950/95 text-cyan-200 shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all duration-300 hover:bg-zinc-900 sm:bottom-6 ${
         visible
           ? 'pointer-events-auto opacity-100'
           : 'pointer-events-none translate-y-4 opacity-0'

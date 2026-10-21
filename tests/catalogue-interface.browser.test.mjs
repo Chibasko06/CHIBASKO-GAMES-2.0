@@ -1,0 +1,87 @@
+import test,{before,after} from 'node:test'
+import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
+import {resolve} from 'node:path'
+import {build} from 'esbuild'
+import {chromium} from '@playwright/test'
+import postcss from 'postcss'
+import tailwind from '@tailwindcss/postcss'
+let browser,js,css
+before(async()=>{
+ const bundle=await build({entryPoints:['tests/fixtures/catalogue-interface-host.tsx'],bundle:true,platform:'browser',format:'iife',jsx:'automatic',write:false,outdir:'.distribution/catalogue-interface',define:{'process.env':'{}','process.env.NODE_ENV':'"production"'},plugins:[{name:'fixture-services',setup(build){
+ build.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}))
+ build.onResolve({filter:/supabaseClient$/},()=>({path:'supabase',namespace:'fixture'}))
+ build.onResolve({filter:/^@\/lib\/profileSync$/},()=>({path:'profile',namespace:'fixture'}))
+ build.onResolve({filter:/^next\/(link|image|navigation)$/},({path})=>({path:path.split('/')[1],namespace:'fixture'}))
+ build.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({resolveDir:process.cwd(),loader:'js',contents:{
+ auth:"const user={id:'fixture-user',email:'fixture@example.test'},session={access_token:'fixture-only',user};export function useAuth(){return {user,session,loading:false}}",
+ supabase:"export const supabase={auth:{async signOut(){}},from(){return {select(){return this},eq(){return this},abortSignal(){return this},async maybeSingle(){return {data:null,error:null}}}},async rpc(){return {data:[],error:null}}}",
+ profile:"export async function ensureProfile(){return {ok:true}}",
+ navigation:"export function useRouter(){return {push(){}}}",
+ link:"import {createElement} from 'react';export default function Link(props){return createElement('a',props)}",
+ image:"import {createElement} from 'react';export default function Image({fill,priority,unoptimized,...props}){return createElement('img',{...props,style:fill?{position:'absolute',inset:0,width:'100%',height:'100%'}:props.style})}",
+ }[path]}))
+ }}]})
+ js=bundle.outputFiles.find(file=>file.path.endsWith('.js')).contents
+ const globalCss=await postcss([tailwind()]).process(readFileSync('app/globals.css','utf8'),{from:resolve('app/globals.css')})
+ css=globalCss.css+'\n'+new TextDecoder().decode(bundle.outputFiles.find(file=>file.path.endsWith('.css')).contents)
+ browser=await chromium.launch({channel:'chrome',headless:true})
+})
+after(async()=>browser?.close())
+async function setup(pageKind,viewport,count=12){
+ const context=await browser.newContext({viewport})
+ await context.route('**/*',route=>{
+ const url=new URL(route.request().url())
+ if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/fixture.js"></script>'})
+ if(url.pathname==='/fixture.js')return route.fulfill({contentType:'text/javascript',body:Buffer.from(js)})
+ if(url.pathname==='/fixture.css')return route.fulfill({contentType:'text/css',body:css})
+ if(url.pathname==='/chibaskogames-logo.png')return route.fulfill({contentType:'image/png',body:readFileSync('public/chibaskogames-logo.png')})
+ if(url.pathname==='/logo-chibaskogames-rond.ico')return route.fulfill({contentType:'image/x-icon',body:readFileSync('public/logo-chibaskogames-rond.ico')})
+ if(url.pathname==='/api/admin/status')return route.fulfill({json:{isAdmin:true}})
+ if(url.pathname==='/cover.svg')return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225"><rect width="400" height="225" fill="#164e63"/></svg>'})
+ return route.fulfill({status:404,body:''})
+ })
+ const page=await context.newPage();await page.goto('https://portal.test/');await page.waitForFunction(()=>!!window.catalogueFixture)
+ await page.evaluate(options=>window.catalogueFixture.render(options),{page:pageKind,count});await page.locator('header').waitFor();await page.waitForTimeout(100)
+ return {page,context}
+}
+for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:768,height:1024},{width:390,height:844}])test('home responsive row '+viewport.width,async()=>{
+ const x=await setup('home',viewport)
+ try{
+ const track=x.page.getByRole('region',{name:'Action',exact:true}),metrics=await track.evaluate(node=>{const r=node.getBoundingClientRect();return {width:node.clientWidth,scrollWidth:node.scrollWidth,visible:[...node.children].filter(child=>{const c=child.getBoundingClientRect();return c.x>=r.x-1 && c.right<=r.right+1}).length,scrollbar:getComputedStyle(node).scrollbarWidth}})
+ console.log('HOME '+viewport.width+' '+JSON.stringify(metrics))
+ assert.equal(metrics.visible,viewport.width===1920?7:viewport.width===1366?5:viewport.width===768?3:1);assert.equal(metrics.scrollbar,'none')
+ const previous=x.page.getByRole('button',{name:'Précédents : Action'}),next=x.page.getByRole('button',{name:'Suivants : Action'})
+ assert.equal(await previous.isDisabled(),true);assert.equal(await next.isDisabled(),false)
+ if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/home-initial-'+viewport.width+'.png',fullPage:true})
+ await next.click();await x.page.waitForTimeout(650);assert.equal(await previous.isDisabled(),false)
+ await track.evaluate(node=>node.scrollTo({left:node.scrollWidth,behavior:'instant'}));await x.page.waitForTimeout(100);assert.equal(await next.isDisabled(),true)
+ assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/home-row-'+viewport.width+'.png',fullPage:true})
+ }finally{await x.context.close()}
+})
+test('non-overflowing row has no navigation buttons and reacts to resizing',async()=>{
+ const x=await setup('home',{width:1920,height:1080},3)
+ try{assert.equal(await x.page.getByRole('group',{name:'Défilement : Action'}).count(),0);await x.page.setViewportSize({width:390,height:844});await x.page.getByRole('button',{name:'Suivants : Action'}).waitFor();await x.page.setViewportSize({width:1920,height:1080});await x.page.waitForTimeout(100);assert.equal(await x.page.getByRole('group',{name:'Défilement : Action'}).count(),0)}finally{await x.context.close()}
+})
+for(const pageKind of ['home','game','admin'])test('account menu stacks above '+pageKind,async()=>{
+ const x=await setup(pageKind,{width:1920,height:1080})
+ try{
+ await x.page.getByRole('button',{name:'Mon compte',exact:true}).click();const menu=x.page.getByRole('navigation',{name:'Menu du compte'})
+ assert.equal(await menu.isVisible(),true)
+ assert.equal(await menu.evaluate(node=>{const r=node.getBoundingClientRect();return node.contains(document.elementFromPoint(r.x+r.width/2,r.bottom-8))}),true)
+ assert.equal(await x.page.locator('header').evaluate(node=>getComputedStyle(node).zIndex),'20')
+ if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/account-menu-'+pageKind+'.png',fullPage:true})
+ }finally{await x.context.close()}
+})
+
+for(const viewport of [{width:1920,height:1080},{width:1680,height:1080},{width:1679,height:1080},{width:1366,height:768},{width:768,height:1024},{width:390,height:844}])test('recommendations responsive breakpoint with site CSS '+viewport.width,async()=>{
+ const x=await setup('game',viewport)
+ try{
+ const surface=await x.page.locator('[data-player-surface]').boundingBox(),aside=await x.page.getByRole('complementary',{name:'À découvrir aussi'}).boundingBox()
+ if(viewport.width>=1680){assert.ok(aside.x>=surface.x+surface.width);assert.ok(Math.abs(surface.width-1280)<1 && Math.abs(surface.height-720)<1);assert.equal(await x.page.getByRole('group',{name:'Défilement : Jeux recommandés'}).count(),0)}else assert.ok(aside.y>=surface.y+surface.height)
+ if(viewport.width===1366)assert.ok(Math.abs(surface.width-1120)<1 && Math.abs(surface.height-630)<1)
+ assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({fullPage:true,path:'.distribution/site-recommendations-'+viewport.width+'.png'})
+ }finally{await x.context.close()}
+})
