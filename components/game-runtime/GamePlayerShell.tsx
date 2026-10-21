@@ -16,7 +16,8 @@ export default function GamePlayerShell({children,onLeave,socialControls,audioCo
   },[])
   async function fullscreen(){const element=shell.current;if(!element)return;try{if(element.ownerDocument.fullscreenElement===element)await element.ownerDocument.exitFullscreen();else await element.requestFullscreen();setFullscreenError(false)}catch{setFullscreenError(true)}}
   const fullscreenLabel=isFullscreen?'Quitter le plein écran':'Plein écran'
-  const audioLabel=audioControl && !audioControl.disabled?(audioControl.muted?'Réactiver le son':'Couper le son'):'Contrôle audio indisponible pour ce jeu'
+  const audioPending=['launcher','resolving','launching','loading'].includes(phase??'')
+  const audioLabel=audioControl && !audioControl.disabled?(audioControl.muted?'Réactiver le son':'Couper le son'):audioPending?'Disponible pendant la partie':'Ce jeu ne prend pas en charge le contrôle audio'
   return <section ref={shell} className={styles.shell} aria-label="Jeu Chibasko Games" data-phase={phase} data-presentation={presentation}>
     <div className={styles.surface} data-player-surface>
       {children}

@@ -178,7 +178,7 @@ test('attached dock retains accessible labels, keyboard focus, tooltips and exit
   try{
     await x.running()
     await x.page.keyboard.press('Tab')
-    const audio=x.page.getByLabel('Contrôle audio indisponible pour ce jeu',{exact:true}).filter({has:x.page.getByRole('button')})
+    const audio=x.page.getByLabel('Ce jeu ne prend pas en charge le contrôle audio',{exact:true}).filter({has:x.page.getByRole('button')})
     assert.equal(await audio.evaluate(node=>document.activeElement===node),true)
     assert.equal(await audio.locator('span').isVisible(),true)
     assert.equal(await audio.getByRole('button').isDisabled(),true)

@@ -328,7 +328,9 @@ for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:7
 test('SDK audio dock negotiates support, persists mute/volume over reload and fullscreen; legacy stays disabled',async()=>{
  const x=await setup({audioEnabled:true})
  try{
-  assert.equal(await x.page.getByRole('button',{name:'Contrôle audio indisponible pour ce jeu',exact:true}).isDisabled(),true)
+  const pending=x.page.getByRole('button',{name:'Disponible pendant la partie',exact:true})
+  assert.equal(await pending.isVisible(),true);assert.equal(await pending.isDisabled(),true)
+  assert.equal(await pending.getAttribute('title'),'Disponible pendant la partie')
   await startLocal(x.page);await x.page.getByRole('button',{name:'Couper le son',exact:true}).waitFor()
   const frame=()=>x.page.frames().find(f=>new URL(f.url()).hostname.startsWith('l-'))
   await frame().waitForFunction(()=>window.fixture.audio?.volume===1)
@@ -339,5 +341,6 @@ test('SDK audio dock negotiates support, persists mute/volume over reload and fu
   const options=await x.page.evaluate(()=>gamePlayerFixture.last);await x.page.reload();await x.page.waitForFunction(()=>!!window.gamePlayerFixture);await x.page.evaluate(options=>gamePlayerFixture.render(options),options)
   await startLocal(x.page);await x.page.getByRole('button',{name:'Couper le son',exact:true}).waitFor();await frame().waitForFunction(()=>window.fixture.audio?.volume===.25&&window.fixture.audio?.muted===false)
  }finally{await x.context.close()}
- const legacy=await setup({kind:'legacy'});try{await legacy.page.getByRole('button',{name:'Jouer',exact:true}).click();assert.equal(await legacy.page.getByRole('button',{name:'Contrôle audio indisponible pour ce jeu',exact:true}).isDisabled(),true)}finally{await legacy.context.close()}
+ const legacy=await setup({kind:'legacy'});try{assert.equal(await legacy.page.getByRole('button',{name:'Disponible pendant la partie',exact:true}).isDisabled(),true);await legacy.page.getByRole('button',{name:'Jouer',exact:true}).click();assert.equal(await legacy.page.getByRole('button',{name:'Ce jeu ne prend pas en charge le contrôle audio',exact:true}).isDisabled(),true)}finally{await legacy.context.close()}
+ const unsupported=await setup();try{await startLocal(unsupported.page);const button=unsupported.page.getByRole('button',{name:'Ce jeu ne prend pas en charge le contrôle audio',exact:true});assert.equal(await button.isVisible(),true);assert.equal(await button.isDisabled(),true)}finally{await unsupported.context.close()}
 })
