@@ -10,6 +10,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ])
 
   const staticRoutes: MetadataRoute.Sitemap = [
+    { url: absoluteUrl('/developpeurs'), changeFrequency: 'monthly', priority: 0.7 },
+    { url: absoluteUrl('/confidentialite'), changeFrequency: 'monthly', priority: 0.3 },
+    { url: absoluteUrl('/cookies'), changeFrequency: 'monthly', priority: 0.3 },
     { url: absoluteUrl('/multiplayer'), changeFrequency: 'weekly', priority: 0.9 },
     {
       url: absoluteUrl('/'),

@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import SiteAnalytics from '@/components/SiteAnalytics'
+import {ANALYTICS_CONSENT_DEFAULT_SCRIPT} from '@/lib/analyticsConsent'
 import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import ClientEnhancements from '@/components/ClientEnhancements'
@@ -104,6 +105,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <head>
+        <script id="analytics-consent-default" dangerouslySetInnerHTML={{__html:ANALYTICS_CONSENT_DEFAULT_SCRIPT}}/>
         <script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9977547315559489"

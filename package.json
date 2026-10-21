@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:analytics-consent": "node --import ./tests/register.mjs --test tests/analytics-consent.test.mjs",
+    "test:analytics-consent-browser": "node --import ./tests/register.mjs --test tests/analytics-consent.browser.test.mjs",
+    "test:developer-guide": "node --import ./tests/product-register.mjs --test tests/developer-guide.test.mjs",
+    "test:developer-guide-browser": "node --import ./tests/product-register.mjs --test tests/developer-guide.browser.test.mjs",
     "test:developer-submissions": "node --import ./tests/register.mjs --test tests/developer-submissions.test.mjs tests/submission-catalogue.test.mjs tests/submission-feedback.test.mjs tests/submission-drafts.test.mjs && node --import ./tests/product-register.mjs --test tests/developer-submissions-ui.test.mjs",
     "test:developer-submissions-browser": "node --test tests/submission-browser.test.mjs",
     "test:developer-submissions-db": "node tests/game-distribution-db.mjs --uploads --reviews --submissions",

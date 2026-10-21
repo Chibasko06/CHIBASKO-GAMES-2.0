@@ -1,8 +1,15 @@
-// This entry point belongs exclusively to the separate preview Worker.
+// The same Worker serves the public custom domains and protected preview hosts.
+const publicHosts = new Set(['chibaskogames.fr', 'www.chibaskogames.fr'])
+
 export function previewHandler(handler) {
   return {
     async fetch(request, env, ctx) {
-      const response = new URL(request.url).pathname === '/robots.txt'
+      const url = new URL(request.url)
+      // Use the incoming URL, never forwarded headers or the shared canonical URL.
+      // Preserve route-specific indexing restrictions returned by the application.
+      if (publicHosts.has(url.hostname)) return handler.fetch(request, env, ctx)
+
+      const response = url.pathname === '/robots.txt'
         ? new Response('User-agent: *\nDisallow: /\n', {
           headers: { 'Content-Type': 'text/plain; charset=utf-8' },
         })

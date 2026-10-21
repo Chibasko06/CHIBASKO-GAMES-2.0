@@ -1,103 +1,11 @@
-import type { Metadata } from 'next'
-import { buildPageMetadata } from '@/lib/seo'
-
-export const metadata: Metadata = buildPageMetadata({
-  title: 'Mentions legales de Chibasko Games',
-  description:
-    'Consulte les mentions legales de Chibasko Games : objet du site, propriete intellectuelle, responsabilite, donnees personnelles, cookies et loi applicable.',
-  path: '/mentions-legales',
-})
-
-export default function MentionsLegalesPage() {
-  return (
-    <div className="mx-auto max-w-5xl rounded-[32px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 md:p-10">
-      <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Cadre juridique</p>
-      <h1 className="mt-3 text-4xl font-black uppercase text-white">Mentions legales</h1>
-      <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">
-        Voici les informations legales essentielles relatives a l utilisation du site Chibasko Games.
-      </p>
-
-      <div className="mt-10 space-y-5">
-        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">1. Objet du site</h2>
-          <p className="mt-3 text-sm leading-7 text-zinc-400">
-            Chibasko Games est une plateforme proposant des jeux video crees par des developpeurs
-            independants. Les utilisateurs peuvent jouer en ligne et acceder aux contenus publies
-            par les createurs.
-          </p>
-        </section>
-
-        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">2. Propriete intellectuelle</h2>
-          <div className="mt-3 space-y-3 text-sm leading-7 text-zinc-400">
-            <p>
-              Tous les contenus presents sur ce site, notamment les textes, images, jeux, logos
-              et videos, sont proteges par le droit de la propriete intellectuelle.
-            </p>
-            <p>
-              Les jeux fournis par des tiers restent la propriete exclusive de leurs createurs.
-            </p>
-            <p>
-              Toute reproduction, distribution ou modification sans autorisation prealable est interdite.
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">3. Responsabilite</h2>
-          <div className="mt-3 space-y-3 text-sm leading-7 text-zinc-400">
-            <p>
-              Chibasko Games ne peut etre tenu responsable des contenus publies par les createurs.
-            </p>
-            <p>
-              Les utilisateurs jouent aux jeux a leurs propres risques.
-            </p>
-            <p>
-              Nous nous reservons le droit de retirer tout contenu juge inapproprie, illicite ou
-              contraire au bon fonctionnement de la plateforme.
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">4. Donnees personnelles</h2>
-          <div className="mt-3 space-y-3 text-sm leading-7 text-zinc-400">
-            <p>
-              Les informations collectees via le formulaire de contact, a savoir nom, prenom,
-              email et message, sont utilisees uniquement pour repondre aux demandes des utilisateurs.
-            </p>
-            <p>
-              Conformement a la loi Informatique et Libertes ainsi qu au RGPD, les utilisateurs
-              disposent d un droit d acces, de modification et de suppression de leurs donnees.
-            </p>
-            <p>
-              Pour exercer ce droit, contacte-nous a l adresse suivante :
-              <span className="ml-2 font-bold text-cyan-300">chibasko06@gmail.com</span>
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">5. Cookies</h2>
-          <div className="mt-3 space-y-3 text-sm leading-7 text-zinc-400">
-            <p>
-              Le site peut utiliser des cookies ou des mecanismes techniques similaires afin d ameliorer
-              l experience utilisateur et le bon fonctionnement du service.
-            </p>
-            <p>
-              Aucun cookie n est utilise a des fins commerciales sans consentement explicite de l utilisateur.
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
-          <h2 className="text-lg font-black uppercase text-white">6. Loi applicable</h2>
-          <p className="mt-3 text-sm leading-7 text-zinc-400">
-            Le site Chibasko Games et l ensemble de son contenu sont regis par la legislation francaise.
-            Tout litige relatif a l utilisation du site releve de la competence des tribunaux francais.
-          </p>
-        </section>
-      </div>
-    </div>
-  )
-}
+import Link from 'next/link'
+import DocumentationPage from '@/components/DocumentationPage'
+import {buildPageMetadata} from '@/lib/seo'
+export const metadata=buildPageMetadata({title:'Mentions légales',description:'Édition, contact, hébergement et propriété intellectuelle de Chibasko Games.',path:'/mentions-legales'})
+export default function LegalNotice(){return <DocumentationPage title="Mentions légales" intro="Informations sur le service Chibasko Games et ses contenus. Mise à jour du 22 octobre 2026." sections={[
+ {id:'edition',title:'Édition et contact',content:<><p>Chibasko Games est une plateforme de jeux navigateur accessible sur chibaskogames.fr. Les builds de jeux distribués sont servis séparément sur chibaskogames-play.fr.</p><p>Contact du service : <a className="text-cyan-300 underline" href="mailto:chibasko06@gmail.com">chibasko06@gmail.com</a> ou <Link className="text-cyan-300 underline" href="/contact">formulaire de contact</Link>.</p></>},
+ {id:'hebergement',title:'Hébergement et services techniques',content:<><p>Le portail et la diffusion des artifacts utilisent Cloudflare Workers et Cloudflare R2. Cloudflare, Inc., 101 Townsend Street, San Francisco, CA 94107, États-Unis. Téléphone : +1 888 993 5273.</p><p>Les comptes et données applicatives utilisent Supabase Auth/Postgres. Les e-mails transactionnels utilisent Resend. Le formulaire de contact utilise FormSubmit. Le détail des traitements et destinataires figure dans la politique de confidentialité.</p><a className="text-cyan-300 underline" href="https://www.cloudflare.com/policies/terms/">Informations officielles Cloudflare</a></>},
+ {id:'contenus',title:'Jeux et propriété intellectuelle',content:<><p>Les textes, marques, logiciels et visuels sont protégés selon leurs droits et licences respectifs. Les jeux tiers restent la propriété de leurs ayants droit. La soumission d’un build n’emporte pas transfert de propriété intellectuelle à Chibasko Games.</p><p>Certains jeux sont intégrés depuis des services tiers, notamment GameMonetize ; d’autres sont des artifacts hébergés par Chibasko Games. Les conditions et licences propres à chaque contenu continuent de s’appliquer. Aucune autorisation générale de copier ou redistribuer un jeu tiers n’est accordée par sa présence au catalogue.</p></>},
+ {id:'signalement',title:'Disponibilité, modération et signalement',content:<><p>Le service peut interrompre un jeu, refuser une soumission ou retirer un contenu pour des raisons de sécurité, de droits ou de modération. Pour signaler un contenu, précisez son titre, son URL et les éléments utiles via le contact du service.</p><p>La disponibilité d’un jeu ou d’un serveur multijoueur n’est pas garantie. Les droits et responsabilités prévus par la loi restent applicables ; cette page ne constitue pas une exclusion générale de responsabilité.</p></>},
+ {id:'donnees',title:'Données et traceurs',content:<><p>Comptes, profils, communauté et soumissions font l’objet de traitements distincts du simple contact.</p><p><Link className="text-cyan-300 underline" href="/confidentialite">Consulter la confidentialité</Link> · <Link className="text-cyan-300 underline" href="/cookies">Consulter les cookies et traceurs</Link>.</p></>}
+ ]}/>}
