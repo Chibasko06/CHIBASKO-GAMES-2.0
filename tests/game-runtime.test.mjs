@@ -150,3 +150,20 @@ test('load/handshake timeout and unmount before late descriptor never mount stal
   controller.dispose();const count=states.length,handle=await h.client.create(h.request);resolve(handle);await new Promise(r=>setTimeout(r,10))
   assert.equal(states.length,count);assert.equal(next.window.document.querySelectorAll('iframe').length,0);assert.deepEqual(released,[handle.descriptor.launchId]);next.window.close()
 })
+
+
+test('audio is opt-in, origin/generation/document scoped and cleaned without changing v1/v2 handshake',async(t)=>{
+ const h=await runtimeHarness(),{descriptor}=await h.client.create(h.request),dom=new JSDOM('',{url:'https://portal.test',pretendToBeVisual:true}),host=dom.window
+ const sent=[],supported=[],source={postMessage:m=>sent.push(m)},doc=randomUUID();let audio={muted:true,volume:.3}
+ const bridge=createGameBridge({host,source:()=>source,descriptor,getAudioState:()=>audio,onAudioSupport:v=>supported.push(v),onPhase(){},onFailure:assert.fail,onLeave(){}})
+ t.after(()=>{bridge.dispose();dom.window.close()})
+ const base={channel:'chibasko.game',protocolVersion:2,launchId:descriptor.launchId,generation:descriptor.generation,type:'GAME_HELLO',payload:{documentId:doc}}
+ const emit=(data,origin=descriptor.contentOrigin)=>host.dispatchEvent(new host.MessageEvent('message',{data,origin,source}))
+ emit(base);assert.equal(sent.some(m=>m.type==='PLATFORM_AUDIO_STATE'),false)
+ const ready={...base,type:'GAME_AUDIO_SUPPORT',payload:{documentId:doc,supported:true}}
+ emit(ready,'https://wrong.test');emit({...ready,generation:randomUUID()});assert.equal(supported.length,0)
+ emit(ready);assert.deepEqual(sent.at(-1).payload.state,audio)
+ audio={muted:false,volume:.8};bridge.updateAudio();assert.deepEqual(sent.at(-1).payload.state,audio)
+ emit({...ready,payload:{documentId:doc,supported:false}});const count=sent.length;bridge.updateAudio();assert.equal(sent.length,count)
+ bridge.dispose();assert.equal(supported.at(-1),false)
+})

@@ -9,14 +9,14 @@ import { LOBBY_UI_POLICY, type DirectoryLobby, type LobbySnapshot, type LobbyAcc
 import { multiplayerButton, AuthInvitation } from './MultiplayerAccess'
 
 export type LobbyPlayerHandle={leave:()=>void}
-type Props={gameId:string;slug:string;access:LobbyAccess;lobbyId?:string;embedded?:boolean;onLeave?:()=>void;exitRef?:Ref<LobbyPlayerHandle>}
+type Props={onAudioSupport?:(supported:boolean)=>void;gameId:string;slug:string;access:LobbyAccess;lobbyId?:string;embedded?:boolean;onLeave?:()=>void;exitRef?:Ref<LobbyPlayerHandle>}
 export default function DurableLobby(props:Props) {
  const {session,loading}=useAuth()
  if(loading)return <p role="status">Vérification de la connexion…</p>
  if(!session)return <AuthInvitation next={props.embedded?`/games/${props.slug}`:`/games/${props.slug}/${props.access==='public'?'online':'private'}`} />
  return <AuthenticatedLobby key={session.user.id} {...props} token={session.access_token} />
 }
-function AuthenticatedLobby({gameId,slug,access,lobbyId:routeLobbyId,token,embedded=false,onLeave,exitRef}:Props & {token:string}) {
+function AuthenticatedLobby({gameId,slug,access,lobbyId:routeLobbyId,token,embedded=false,onLeave,exitRef,onAudioSupport}:Props & {token:string}) {
  const [inlineLobbyId,setInlineLobbyId]=useState(routeLobbyId)
  const lobbyId=embedded?inlineLobbyId:routeLobbyId
  const router=useRouter()
@@ -61,7 +61,7 @@ function AuthenticatedLobby({gameId,slug,access,lobbyId:routeLobbyId,token,embed
  }catch{setError('La liste des salons est temporairement indisponible.')}}
  useImperativeHandle(exitRef,()=>({leave:()=>{if(lobby)void action(`lobbies/${lobby.id}/leave`);else onLeave?.()}}))
  const self=lobby?.members.find(member=>member.self)
- if(embedded && lobby && ['starting','playing'].includes(lobby.status) && lobby.onlineSessionReference)return <><GameRuntime key={lobby.onlineSessionReference} embedded gameId={lobby.gameId} gameVersionId={lobby.gameVersionId} execution="online" audience="published" locale="fr" onlineSessionReference={lobby.onlineSessionReference} client={launchClient} onLeave={()=>void action(`lobbies/${lobby.id}/leave`)} />{error && <p role="alert" className="absolute inset-x-4 bottom-24 z-10 rounded-lg bg-zinc-950 p-3 text-sm text-rose-200">{error}</p>}</>
+ if(embedded && lobby && ['starting','playing'].includes(lobby.status) && lobby.onlineSessionReference)return <><GameRuntime onAudioSupport={onAudioSupport} key={lobby.onlineSessionReference} embedded gameId={lobby.gameId} gameVersionId={lobby.gameVersionId} execution="online" audience="published" locale="fr" onlineSessionReference={lobby.onlineSessionReference} client={launchClient} onLeave={()=>void action(`lobbies/${lobby.id}/leave`)} />{error && <p role="alert" className="absolute inset-x-4 bottom-24 z-10 rounded-lg bg-zinc-950 p-3 text-sm text-rose-200">{error}</p>}</>
  return <section className={embedded?"space-y-5 p-4 sm:p-6":"space-y-5 rounded-2xl border border-cyan-900 p-5"} aria-label="Salon multijoueur">
   {error && <p role="alert">{error}</p>}
   {!lobbyId?<>

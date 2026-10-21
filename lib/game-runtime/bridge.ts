@@ -1,13 +1,16 @@
+import {DEFAULT_AUDIO,safeAudio,type PlayerAudioState} from './audio'
 import { BRIDGE_CHANNEL, objectWithKeys, runtimePolicy, validGameMessage, type RuntimePolicy, type RuntimeLaunchDescriptor, type RuntimePhase } from './contracts'
 import type { GameStartContext } from '../online-session/contracts'
 
-type Options={host:Window;source:()=>Window|null;descriptor:RuntimeLaunchDescriptor;onPhase:(phase:RuntimePhase)=>void;onFailure:(code:string)=>void;onLeave:()=>void;onDocument?:()=>void;policy?:Partial<RuntimePolicy>;getStartContext?:()=>Promise<GameStartContext>}
+type Options={getAudioState?:()=>PlayerAudioState;onAudioSupport?:(supported:boolean)=>void;host:Window;source:()=>Window|null;descriptor:RuntimeLaunchDescriptor;onPhase:(phase:RuntimePhase)=>void;onFailure:(code:string)=>void;onLeave:()=>void;onDocument?:()=>void;policy?:Partial<RuntimePolicy>;getStartContext?:()=>Promise<GameStartContext>}
 /** Independent document, HELLO/INIT acknowledgement and game-ready budgets.
  * PONG acknowledges INIT without introducing a new wire message. */
 export function createGameBridge(options:Options) {
   const {host,descriptor:d}=options,policy=runtimePolicy(options.policy)
   let disposed=false,documentId='',connected=false,ready=false,running=false,sequence=0,pending=0,deadline=0,expiresAt=Date.parse(d.expiresAt)
   let helloTimer:ReturnType<typeof setTimeout>|undefined,handshakeTimer:ReturnType<typeof setTimeout>|undefined,readyTimer:ReturnType<typeof setTimeout>|undefined
+  let audioSupported=false
+  function updateAudio(){if(active()&&documentId&&audioSupported){const state=safeAudio(options.getAudioState?.()??DEFAULT_AUDIO);if(state)send('PLATFORM_AUDIO_STATE',{documentId,state})}}
   let protocol:1|2=1,starting=false,wanted=false,everStarted=false,startContext:GameStartContext|undefined,startTimer:ReturnType<typeof setTimeout>|undefined
   const fail=(code:string)=>{if(disposed)return;dispose();options.onFailure(code)}
   function active(){if(disposed)return false;if(expiresAt<=Date.now()){fail('launch_expired');return false}return true}
@@ -66,6 +69,7 @@ export function createGameBridge(options:Options) {
     }
     if(message.protocolVersion!==protocol)return
     if(!documentId || documentId!==doc)return
+    if(message.type==='GAME_AUDIO_SUPPORT'){audioSupported=message.payload.supported===true;options.onAudioSupport?.(audioSupported);if(audioSupported)updateAudio();return}
     if(message.type==='GAME_PONG' && pending && message.payload.sequence===pending){pending=0;deadline=0;acknowledge();return}
     if(message.type==='GAME_READY') {
       if(ready)return
@@ -75,9 +79,9 @@ export function createGameBridge(options:Options) {
     if(ready && message.type==='LEAVE_REQUEST')options.onLeave()
   }
   function visibility(){if(connected){pending=0;deadline=0}if(host.document.hidden)stop();else{start();ping()}}
-  function dispose(){if(disposed)return;disposed=true;clearTimeout(startTimer);clearTimeout(helloTimer);clearTimeout(handshakeTimer);clearTimeout(readyTimer);clearInterval(heartbeat);host.removeEventListener('message',receive);host.document.removeEventListener('visibilitychange',visibility)}
+  function dispose(){if(disposed)return;disposed=true;audioSupported=false;options.onAudioSupport?.(false);clearTimeout(startTimer);clearTimeout(helloTimer);clearTimeout(handshakeTimer);clearTimeout(readyTimer);clearInterval(heartbeat);host.removeEventListener('message',receive);host.document.removeEventListener('visibilitychange',visibility)}
   host.addEventListener('message',receive)
   host.document.addEventListener('visibilitychange',visibility)
   const heartbeat=setInterval(ping,Math.min(policy.pingMs,policy.pongMs))
-  return {start,stop,loaded,dispose,renew(expires:string){if(!disposed)expiresAt=Date.parse(expires)}}
+  return {start,stop,loaded,dispose,updateAudio,renew(expires:string){if(!disposed)expiresAt=Date.parse(expires)}}
 }

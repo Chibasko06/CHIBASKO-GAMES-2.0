@@ -6,5 +6,5 @@
   "workers_dev": false,
   "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "logs": { "enabled": true, "invocation_logs": false } },
-  "vars": { "GAME_SESSION_MAINTENANCE_ENABLED": "0" }
+  "vars": { "GAME_SESSION_MAINTENANCE_ENABLED": "0", "GAME_SUBMISSION_NOTIFICATIONS_ENABLED": "0" }
 }

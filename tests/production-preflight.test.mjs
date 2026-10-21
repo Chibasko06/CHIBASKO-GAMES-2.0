@@ -3,6 +3,18 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { localChecks, environmentChecks, environments } from '../scripts/production-preflight.mjs'
 
+test('production notifications require server configuration on portal and enabled maintenance only',()=>{
+ const base={GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'1'}
+ for(const component of ['portal','maintenance']){
+  const checks=environmentChecks(component,base)
+  assert.equal(checks.find(c=>c.check==='GAME_SUBMISSION_NOTIFY_EMAIL:email').ok,false)
+  const ready=environmentChecks(component,{...base,RESEND_API_KEY:'fixture-secret',RESEND_FROM_EMAIL:'Games <from@example.test>',GAME_SUBMISSION_NOTIFY_EMAIL:'admin@example.test'})
+  assert.equal(ready.filter(c=>/submission_notifications|:email|no_newline/.test(c.check)).every(c=>c.ok),true)
+  assert.doesNotMatch(JSON.stringify(ready),/fixture-secret|admin@example/)
+ }
+ assert.equal(environmentChecks('maintenance',{GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'0'}).some(c=>c.check==='GAME_SUBMISSION_NOTIFY_EMAIL:email'),false)
+})
+
 test('local inventory checks registry dependencies and ordered transactional migrations', async () => {
   const result = await localChecks(fileURLToPath(new URL('../', import.meta.url)))
   assert.equal(result.checks.every(check => check.ok), true)

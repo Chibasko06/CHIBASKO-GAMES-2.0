@@ -11,6 +11,7 @@ const bundle=await build({stdin:{contents:`import React from 'react';import{crea
  api.onResolve({filter:/^(?:@\/components\/AuthProvider|next\/link)$/},args=>({path:args.path,namespace:'fixture'}))
  api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:`export function useAuth(){return {loading:false,session:new URLSearchParams(location.search).has('anonymous')?null:{user:{id:new URLSearchParams(location.search).has('other')?'other-user':'fixture-user'},access_token:new URLSearchParams(location.search).has('other')?'other-token':'fixture-token'}}}`}))
 }}]})
+let contact={firstName:'Fixture',lastName:'Developer',contactEmail:'contact@example.test',publicName:'Studio fixture',website:null,otherContact:null}
 let publishedParts=0,submissions=[],requests=[],draft=null,registrations=0,failPart=false
 const freshDraft=title=>({gameId:game,title,metadata:{title,studio:'',releaseDate:'',description:'',categories:[],mobile:null,technology:''},version:'',revision:0,updatedAt:'2026-10-20T10:00:00Z',requestId:'57575757-5757-4757-8757-575757575757',file:null,hashes:{},submitted:false,coverUrl:null,state:'draft',upload:null})
 let styles=''
@@ -34,6 +35,7 @@ const server=createServer(async(request,response)=>{
  if(!url.pathname.startsWith('/api/')){response.end('<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/styles.css"><div id="root"></div><script src="/bundle.js"></script>');return}
  requests.push(url.pathname)
  assert.ok(['Bearer fixture-token','Bearer other-token'].includes(request.headers.authorization))
+ if(url.pathname==='/api/developer/profile'&&request.method==='GET'){json(response,{data:request.headers.authorization==='Bearer fixture-token'?contact:null});return}
  if(url.pathname==='/api/developer/drafts'&&request.method==='GET'){
   const owned=request.headers.authorization==='Bearer fixture-token'?draft:null
   if(url.searchParams.has('gameId')&&(!owned||url.searchParams.get('gameId')!==game)){response.writeHead(404,{'Content-Type':'application/json'});response.end(JSON.stringify({error:{code:'draft_not_found'}}));return}
@@ -42,6 +44,7 @@ const server=createServer(async(request,response)=>{
  if(url.pathname==='/api/developer/games'&&request.method==='GET'){json(response,{data:[{id:game,title:'Managed fixture'}],maxArchiveBytes:524288000});return}
  const chunks=[];for await(const chunk of request)chunks.push(chunk)
  const bytes=Buffer.concat(chunks)
+ if(url.pathname==='/api/developer/profile'&&request.method==='PUT'){contact=JSON.parse(bytes);json(response,{data:contact});return}
  if(url.pathname==='/api/developer/drafts'){
   const body=JSON.parse(bytes)
   if(body.action==='save'){draft.metadata=body.metadata;draft.title=body.metadata.title;draft.version=body.version;draft.revision++}
@@ -70,6 +73,16 @@ const origin='http://127.0.0.1:'+server.address().port
 let browser
 try{
  browser=await chromium.launch({channel:'chrome',headless:true})
+ await test('Chrome: contact is required, saved once, restored and editable independently of drafts',async()=>{
+  contact=null;const page=await browser.newPage();await page.goto(origin)
+  await page.getByLabel('Prénom',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Créer le jeu privé et obtenir son gameId',exact:true}).isDisabled(),true)
+  await page.getByLabel('Prénom',{exact:true}).fill('Fixture');await page.getByLabel('Nom',{exact:true}).fill('Developer');await page.getByLabel('E-mail de contact',{exact:true}).fill('contact@example.test');await page.getByLabel('Nom public / studio',{exact:true}).fill('Studio fixture')
+  await page.getByRole('button',{name:'Enregistrer la fiche développeur'}).click();await page.getByText('Fiche développeur enregistrée.',{exact:true}).waitFor()
+  await page.reload();await page.waitForFunction(()=>document.querySelector('input[type=email]')?.value==='contact@example.test')
+  assert.equal(await page.getByLabel('Prénom',{exact:true}).inputValue(),'Fixture')
+  await page.getByLabel('Prénom',{exact:true}).fill('Edited');await page.getByRole('button',{name:'Enregistrer la fiche développeur'}).click();await page.getByText('Fiche développeur enregistrée.',{exact:true}).waitFor();assert.equal(contact.firstName,'Edited')
+  await page.close()
+ })
  await test('Chrome: anonymous sees no private identity; tabs isolate new metadata and managed update picker',async()=>{
    draft=null;const page=await browser.newPage();await page.goto(origin+'/?anonymous=1')
    await page.getByText('Un compte est nécessaire',{exact:false}).waitFor()

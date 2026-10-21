@@ -53,7 +53,8 @@
     "test:multiplayer": "node --import ./tests/register.mjs --test tests/multiplayer-lobbies.test.mjs tests/game-server-session.test.mjs tests/game-availability.test.mjs",
     "test:multiplayer-db": "node tests/game-distribution-db.mjs --multiplayer",
     "test:pong-e2e": "node tests/game-distribution-db.mjs --pong",
-    "test:catalogue-interface": "node --import ./tests/product-register.mjs --test tests/catalogue-recommendations.test.mjs && node --test tests/catalogue-interface.browser.test.mjs"
+    "test:catalogue-interface": "node --import ./tests/product-register.mjs --test tests/catalogue-recommendations.test.mjs && node --test tests/catalogue-interface.browser.test.mjs",
+    "test:developer-contacts": "node --import ./tests/register.mjs --test tests/developer-contact.test.mjs"
   },
   "dependencies": {
     "@chibaskogames/sdk": "0.3.0",

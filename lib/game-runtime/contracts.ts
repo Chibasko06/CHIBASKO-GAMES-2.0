@@ -33,7 +33,7 @@ export type RuntimeLaunchDescriptor=GameLaunchDescriptor & Readonly<{
 export type LaunchHandle={descriptor:RuntimeLaunchDescriptor;controlToken:string}
 export type LaunchLease=Readonly<{launchId:string;generation:string;expiresAt:string}>
 export type LaunchClient={start?(handle:LaunchHandle,signal:AbortSignal):Promise<GameStartContext>;create(request:LaunchRequest,signal:AbortSignal):Promise<LaunchHandle>;renew(handle:LaunchHandle,signal:AbortSignal):Promise<LaunchLease>;release(handle:LaunchHandle):Promise<void>}
-export type GameMessageType='GAME_HELLO'|'GAME_READY'|'LEAVE_REQUEST'|'GAME_ERROR'|'GAME_PONG'
+export type GameMessageType='GAME_HELLO'|'GAME_READY'|'LEAVE_REQUEST'|'GAME_ERROR'|'GAME_PONG'|'GAME_AUDIO_SUPPORT'
 export type BridgeMessage={channel:typeof BRIDGE_CHANNEL;protocolVersion:1|2;launchId:string;generation:string;type:string;payload:Record<string,unknown>}
 export class RuntimeError extends Error {constructor(readonly code:string){super(code);this.name='RuntimeError'}}
 
@@ -58,9 +58,10 @@ export function safeContext(value:unknown):value is SafeLaunchContext {
 export function validGameMessage(data:unknown):data is BridgeMessage {
   if(!objectWithKeys(data,['channel','protocolVersion','launchId','generation','type','payload']) || data.channel!==BRIDGE_CHANNEL
     || (data.protocolVersion!==1 && data.protocolVersion!==2) || typeof data.launchId!=='string' || !uuid.test(data.launchId) || typeof data.generation!=='string' || !uuid.test(data.generation))return false
-  const keys=data.type==='GAME_ERROR'?['documentId','code']:data.type==='GAME_PONG'?['documentId','sequence']:['documentId']
-  if(!['GAME_HELLO','GAME_READY','LEAVE_REQUEST','GAME_ERROR','GAME_PONG'].includes(String(data.type)) || !objectWithKeys(data.payload,keys)
+  const keys=data.type==='GAME_AUDIO_SUPPORT'?['documentId','supported']:data.type==='GAME_ERROR'?['documentId','code']:data.type==='GAME_PONG'?['documentId','sequence']:['documentId']
+  if(!['GAME_HELLO','GAME_READY','LEAVE_REQUEST','GAME_ERROR','GAME_PONG','GAME_AUDIO_SUPPORT'].includes(String(data.type)) || !objectWithKeys(data.payload,keys)
     || typeof data.payload.documentId!=='string' || !uuid.test(data.payload.documentId))return false
+  if(data.type==='GAME_AUDIO_SUPPORT')return data.protocolVersion===2 && typeof data.payload.supported==='boolean'
   if(data.type==='GAME_ERROR')return typeof data.payload.code==='string' && /^[a-z][a-z0-9_]{0,63}$/.test(data.payload.code)
   return data.type!=='GAME_PONG' || (Number.isSafeInteger(data.payload.sequence) && Number(data.payload.sequence)>0)
 }

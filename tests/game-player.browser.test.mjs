@@ -26,8 +26,8 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function setup({kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,withRecommendations=false,title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
- const h=await runtimeHarness('pong-like'),context=await browser.newContext({viewport,isMobile:touch,hasTouch:touch,deviceScaleFactor:touch?2:1}),calls=[]
+async function setup({audioEnabled=false,kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,withRecommendations=false,title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
+ const h=await runtimeHarness('pong-like','published',audioEnabled?'audio':'normal'),context=await browser.newContext({viewport,isMobile:touch,hasTouch:touch,deviceScaleFactor:touch?2:1}),calls=[]
  let snapshot={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',gameId:h.request.gameId,gameVersionId:h.request.gameVersionId,access:'public',status:'waiting',code:'',minPlayers:1,maxPlayers:8,revision:1,startPolicy:'manual',expiresAt:new Date(Date.now()+3600000).toISOString(),onlineSessionReference:null,members:[{id:'opaque-fixture',displayName:'Player',self:true,leader:true,ready:false}]}
  await context.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url());calls.push({path:url.pathname,method:req.method(),host:url.hostname})
@@ -322,4 +322,22 @@ for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:7
  assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),original)
  console.log('UNCHANGED '+kind+' '+viewport.width+'x'+viewport.height+' '+JSON.stringify(original))
  }finally{await baseline.context.close();await x.context.close()}
+})
+
+
+test('SDK audio dock negotiates support, persists mute/volume over reload and fullscreen; legacy stays disabled',async()=>{
+ const x=await setup({audioEnabled:true})
+ try{
+  assert.equal(await x.page.getByRole('button',{name:'Contrôle audio indisponible pour ce jeu',exact:true}).isDisabled(),true)
+  await startLocal(x.page);await x.page.getByRole('button',{name:'Couper le son',exact:true}).waitFor()
+  const frame=()=>x.page.frames().find(f=>new URL(f.url()).hostname.startsWith('l-'))
+  await frame().waitForFunction(()=>window.fixture.audio?.volume===1)
+  await x.page.getByRole('button',{name:'Couper le son',exact:true}).click();await frame().waitForFunction(()=>window.fixture.audio?.muted===true)
+  await x.page.evaluate(()=>gamePlayerFixture.audio({muted:true,volume:.25}));await frame().waitForFunction(()=>window.fixture.audio?.volume===.25)
+  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement);assert.equal(await frame().evaluate(()=>fixture.audio.muted),true)
+  await x.page.evaluate(()=>document.exitFullscreen());await x.page.getByRole('button',{name:'Réactiver le son',exact:true}).click();await frame().waitForFunction(()=>window.fixture.audio?.muted===false)
+  const options=await x.page.evaluate(()=>gamePlayerFixture.last);await x.page.reload();await x.page.waitForFunction(()=>!!window.gamePlayerFixture);await x.page.evaluate(options=>gamePlayerFixture.render(options),options)
+  await startLocal(x.page);await x.page.getByRole('button',{name:'Couper le son',exact:true}).waitFor();await frame().waitForFunction(()=>window.fixture.audio?.volume===.25&&window.fixture.audio?.muted===false)
+ }finally{await x.context.close()}
+ const legacy=await setup({kind:'legacy'});try{await legacy.page.getByRole('button',{name:'Jouer',exact:true}).click();assert.equal(await legacy.page.getByRole('button',{name:'Contrôle audio indisponible pour ce jeu',exact:true}).isDisabled(),true)}finally{await legacy.context.close()}
 })

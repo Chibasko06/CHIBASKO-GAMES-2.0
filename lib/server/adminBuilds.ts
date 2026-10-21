@@ -14,7 +14,9 @@ export async function adminBuildRequest(request:NextRequest,id?:string) {
     if(request.method==='GET') {
       const offset=Number(new URL(request.url).searchParams.get('offset')??0)
       if(!Number.isInteger(offset)||offset<0||offset>100000)throw new UploadError('invalid_request',400)
-      return adminJson({data:await db.call('distribution_admin_builds',{p_actor:auth.user.id,p_id:id??null,p_offset:offset})})
+      const data=await db.call<Record<string,unknown>|unknown[]>('distribution_admin_builds',{p_actor:auth.user.id,p_id:id??null,p_offset:offset})
+      if(id && !Array.isArray(data))data.developerProfile=await db.call('distribution_admin_developer_profile',{p_actor:auth.user.id,p_upload:id})
+      return adminJson({data})
     }
     if(!id)throw new UploadError('invalid_request',400)
     const body=await readAdminJson(request,4096)

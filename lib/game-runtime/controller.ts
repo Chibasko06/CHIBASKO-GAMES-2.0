@@ -1,3 +1,4 @@
+import type {PlayerAudioState} from './audio'
 import { getDomain, parse } from 'tldts'
 import { createGameBridge } from './bridge'
 import { objectWithKeys, safeContext, RuntimeError, RUNTIME_POLICY, runtimePolicy, type RuntimePolicy, type LaunchClient, type LaunchHandle, type LaunchRequest, type RuntimeState } from './contracts'
@@ -22,7 +23,7 @@ export function validateLaunchHandle(value:unknown,request:LaunchRequest,parentO
   if(Date.parse(d.expiresAt)>Date.now()+RUNTIME_POLICY.sessionSeconds*1000+5000)throw new RuntimeError('invalid_descriptor')
   return h
 }
-type Options={container:HTMLElement;request:LaunchRequest;client:LaunchClient;onState:(state:RuntimeState)=>void;onLeave:()=>void;policy?:Partial<RuntimePolicy>}
+type Options={getAudioState?:()=>PlayerAudioState;onAudioSupport?:(supported:boolean)=>void;container:HTMLElement;request:LaunchRequest;client:LaunchClient;onState:(state:RuntimeState)=>void;onLeave:()=>void;policy?:Partial<RuntimePolicy>}
 /** DOM host, reusable without React. A retry must create a completely new launch. */
 export function mountGameRuntime(options:Options) {
   const {container,client,request}=options,host=container.ownerDocument.defaultView!,policy=runtimePolicy(options.policy),abort=new AbortController()
@@ -73,12 +74,12 @@ export function mountGameRuntime(options:Options) {
     iframe.src=src.href
     iframe.addEventListener('load',loaded)
     iframe.addEventListener('error',iframeError)
-    bridge=createGameBridge({host,source:()=>iframe?.contentWindow ?? null,descriptor:d,policy,
+    bridge=createGameBridge({getAudioState:options.getAudioState,onAudioSupport:options.onAudioSupport,host,source:()=>iframe?.contentWindow ?? null,descriptor:d,policy,
       getStartContext:async()=>{if(!handle || !client.start)throw new RuntimeError('online_session_unavailable');return client.start(handle,abort.signal)},
       onDocument:()=>clearTimeout(loadTimer),onPhase:phase=>{state(phase)},onFailure:fail,onLeave:close})
     loadTimer=setTimeout(()=>fail('iframe_load_timeout'),policy.loadMs)
     armLease(d.expiresAt);scheduleRenew();host.document.addEventListener('visibilitychange',visibility)
     state('loading');container.replaceChildren(iframe)
   }).catch(()=>{if(!disposed && !failed)fail('launch_unavailable')})
-  return {close,dispose(){if(disposed)return;detach();disposed=true},start(){bridge?.start()},stop(){bridge?.stop()}}
+  return {updateAudio(){bridge?.updateAudio()},close,dispose(){if(disposed)return;detach();disposed=true},start(){bridge?.start()},stop(){bridge?.stop()}}
 }

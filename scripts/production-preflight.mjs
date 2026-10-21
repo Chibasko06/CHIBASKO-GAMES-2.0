@@ -34,6 +34,12 @@ export function environmentChecks(component, env) {
   if (!Object.hasOwn(environments, component)) throw new Error('unknown_component')
   const checks = environments[component].map(name => ({ check: name, ok: typeof env[name] === 'string' && env[name].trim().length > 0 }))
   const add = (check, ok) => checks.push({ check, ok: Boolean(ok) })
+  if (component === 'portal' || (component === 'maintenance' && env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED === '1')) {
+    for (const name of ['RESEND_API_KEY', 'RESEND_FROM_EMAIL', 'GAME_SUBMISSION_NOTIFY_EMAIL']) add(name + ':submission_notifications', typeof env[name] === 'string' && env[name].trim().length > 0)
+    add('GAME_SUBMISSION_NOTIFY_EMAIL:email', /^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(env.GAME_SUBMISSION_NOTIFY_EMAIL?.trim() ?? ''))
+    add('RESEND_FROM_EMAIL:no_newline', Boolean(env.RESEND_FROM_EMAIL?.trim()) && !/[\r\n]/.test(env.RESEND_FROM_EMAIL))
+  }
+  if (component === 'maintenance') add('GAME_SUBMISSION_NOTIFICATIONS_ENABLED:boolean', ['0', '1'].includes(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED))
   for (const name of environments[component].filter(name => name.endsWith('_ENABLED'))) add(name + ':boolean', ['0', '1'].includes(env[name]))
   for (const name of ['SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SITE_URL'].filter(name => environments[component].includes(name))) {
     let valid = false

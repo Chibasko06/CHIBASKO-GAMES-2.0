@@ -57,6 +57,14 @@ try {
       await run('psql',[...args,'-f',fileURLToPath(new URL('./developer-submissions-db.sql',import.meta.url))])
       await run('psql',[...args,'-f',fileURLToPath(new URL('./submission-catalogue-db.sql',import.meta.url))])
       await run('psql',[...args,'-f',fileURLToPath(new URL('./submission-drafts-db.sql',import.meta.url))])
+      await run('psql',[...args,'-f',fileURLToPath(new URL('./developer-contact-db.sql',import.meta.url))])
+      await run('psql',[...args,'-c',"set role service_role;update public.game_submission_notifications set sent_at=null,attempts=0,first_attempt_at=null,next_attempt_at=now(),lease_token=null,lease_until=null"])
+      const claims=await Promise.all([1,2].map(()=>run('psql',[...args,'-Atc',"set role service_role;select public.distribution_claim_submission_email()"])))
+      assert.equal(claims.filter(result=>result.stdout.includes('contact')).length,1)
+      await run('psql',[...args,'-c',"set role service_role;update public.game_submission_notifications set lease_until=now()-interval '1 second',first_attempt_at=now()-interval '25 hours';select public.distribution_claim_submission_email();"])
+      const attention=await run('psql',[...args,'-Atc',"set role service_role;select count(*) from public.game_submission_notifications where last_error='attention_required'"])
+      assert.ok(attention.stdout.includes('1'))
+      console.log('Developer contact SQL passed: own/admin RLS, private fields, profile gate, transactional outbox, concurrent claims, stable retry and idempotency deadline.')
     }
   }
   if(process.argv.includes('--previews') || process.argv.includes('--launches')) {
