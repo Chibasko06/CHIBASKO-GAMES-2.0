@@ -43,6 +43,7 @@ yarn-error.log*
 /.open-next/
 /.wrangler/
 .distribution/
+/public/optimized-game-images/
 .dev.vars*
 
 # Private legacy media migration journals (URLs and user identifiers)

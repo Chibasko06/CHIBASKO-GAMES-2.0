@@ -1,6 +1,7 @@
 import { GameBadges, type GameBadgeData } from './multiplayer/GameBadges'
 import Link from 'next/link'
-import Image from 'next/image'
+import GameThumbnail from './GameThumbnail'
+import type {CatalogueImage} from '@/lib/catalogueImages'
 import styles from './GameCard.module.css'
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
     title: string
     slug: string
     thumbnail_url: string | null
+    thumbnail_image?:CatalogueImage
     categories?: { id: string; name: string; slug: string }[]
     description?: string | null
     views_count?: number
@@ -25,8 +27,9 @@ export function GameCard({ game }: Props) {
       <article className={styles.card}>
         {game.thumbnail_url ? (
           <div className={styles.image}>
-            <Image
+            <GameThumbnail
               src={game.thumbnail_url}
+              image={game.thumbnail_image}
               alt={game.title}
               fill
               className="object-cover"

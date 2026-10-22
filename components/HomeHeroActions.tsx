@@ -14,14 +14,16 @@ export default function HomeHeroActions() {
       >
         Explorer les jeux
       </Link>
-      {!loading && !user ? (
+      <div className="min-h-[48px] sm:min-w-[206px]">
+      {loading ? <span aria-hidden="true" className="invisible block rounded-full border px-5 py-3 text-center text-sm font-black uppercase tracking-[0.16em] sm:px-6">Creer un compte</span> : (
         <Link
-          href="/register"
-          className="rounded-full border border-cyan-700/70 px-5 py-3 text-center text-sm font-black uppercase tracking-[0.16em] text-cyan-200 transition hover:bg-zinc-900 sm:px-6"
+          href={user?'/dashboard':'/register'}
+          className="block rounded-full border border-cyan-700/70 px-5 py-3 text-center text-sm font-black uppercase tracking-[0.16em] text-cyan-200 transition hover:bg-zinc-900 sm:px-6"
         >
-          Creer un compte
+          {user?'Mon compte':'Creer un compte'}
         </Link>
-      ) : null}
+      )}
+      </div>
     </div>
   )
 }

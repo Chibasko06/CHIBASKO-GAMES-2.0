@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:home-performance": "node --import ./tests/product-register.mjs --test tests/home-performance.test.mjs && node --test tests/catalogue-interface.browser.test.mjs",
     "test:seo": "node --import ./tests/product-register.mjs --test tests/seo.test.mjs",
     "test:seo-browser": "node --test tests/seo.browser.test.mjs",
     "audit:seo-catalogue": "node scripts/seo-catalogue-audit.mjs",
@@ -34,8 +35,9 @@
     "test:game-runtime-browser": "node --import ./tests/register.mjs --test tests/game-runtime.browser.test.mjs tests/game-player.browser.test.mjs",
     "test:game-runtime-db": "node tests/game-distribution-db.mjs --launches",
     "dev": "next dev",
-    "predev": "npm run build:sdk",
-    "build": "npm run build:sdk && npm run check:game-boundaries && next build",
+    "predev": "npm run build:sdk && npm run build:images",
+    "build:images": "node scripts/build-catalogue-images.mjs",
+    "build": "npm run build:sdk && npm run check:game-boundaries && npm run build:images && next build",
     "build:sdk": "node scripts/build-game-sdk.mjs",
     "check:game-boundaries": "node scripts/check-game-boundaries.mjs",
     "test:sdk": "npm run build:sdk && node --import ./tests/register.mjs --test tests/game-sdk.test.mjs",
@@ -90,6 +92,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "jsdom": "^29.1.1",
+    "sharp": "0.35.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "4.148.0"

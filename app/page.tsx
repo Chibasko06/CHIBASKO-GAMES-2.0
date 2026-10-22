@@ -3,7 +3,8 @@ import MultiplayerSection from '@/components/multiplayer/MultiplayerSection'
 import { GameBadges } from '@/components/multiplayer/GameBadges'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import Image from 'next/image'
+import GameThumbnail from '@/components/GameThumbnail'
+import {withHomeImage} from '@/lib/server/homeImages'
 import { GameCard } from '@/components/GameCard'
 import collectionStyles from '@/components/GameCardCollection.module.css'
 import HomeHeroActions from '@/components/HomeHeroActions'
@@ -19,12 +20,16 @@ export const metadata: Metadata = buildPageMetadata({
 })
 
 export default async function Home() {
-  const [featuredGames, categorySections, homepageHighlights, multiplayerGames] = await Promise.all([
+  const [featuredRows, categoryRows, highlightRows, multiplayerRows] = await Promise.all([
     getFeaturedGames(8),
     getGamesByCategory(10),
     getHomepageHighlights(),
     getGamesCatalog('multiplayer_chibasko'),
   ])
+  const featuredGames=featuredRows.map(withHomeImage)
+  const categorySections=categoryRows.map(section=>({...section,games:section.games.map(withHomeImage)}))
+  const homepageHighlights=highlightRows.map(highlight=>({...highlight,game:withHomeImage(highlight.game)}))
+  const multiplayerGames=multiplayerRows.map(withHomeImage)
 
   return (
     <div className="space-y-12 xl:space-y-14">
@@ -73,8 +78,9 @@ export default async function Home() {
               >
                 {highlight.game.thumbnail_url ? (
                   <div className={`relative overflow-hidden ${index === 0 ? 'h-56' : 'h-40'}`}>
-                    <Image
+                    <GameThumbnail
                       src={highlight.game.thumbnail_url}
+                      image={highlight.game.thumbnail_image}
                       alt={highlight.game.title}
                       fill
                       priority={index === 0}

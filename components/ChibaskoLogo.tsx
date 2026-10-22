@@ -9,7 +9,7 @@ export default function ChibaskoLogo({ compact = false }: Props) {
   return (
     <Link href="/" className="inline-flex items-center gap-3 group">
       <Image
-        src="/chibaskogames-logo.png"
+        src="/chibaskogames-logo-small.webp"
         alt="Logo Chibasko Games"
         width={48}
         height={48}
