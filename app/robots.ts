@@ -7,9 +7,8 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
       // Account pages remain crawlable so their explicit noindex can be read.
-      disallow: ['/admin', '/api/'],
+      disallow: ['/api/'],
     },
     sitemap: `${siteConfig.url}/sitemap.xml`,
-    host: siteConfig.url,
   }
 }

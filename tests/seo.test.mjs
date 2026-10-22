@@ -105,6 +105,25 @@ test('private routes have noindex without changing public indexing or preview pr
  assert.ok(manifest().icons.every(icon=>icon.sizes==='512x512'))
 })
 
+test('public robots has only the API exclusion and no Host directive',async()=>{
+ const metadata=robots()
+ assert.deepEqual(metadata,{
+  rules:{userAgent:'*',allow:'/',disallow:['/api/']},
+  sitemap:'https://chibaskogames.fr/sitemap.xml',
+ })
+ assert.equal(Object.hasOwn(metadata,'host'),false)
+ for(const path of ['/multiplayer','/sitemap.xml','/icon.png','/games/chibasko-pong','/developpeurs','/confidentialite','/admin','/dashboard','/favorites','/login','/register','/reset-password']){
+  assert.ok(!metadata.rules.disallow.some(prefix=>path.startsWith(prefix)),path)
+ }
+ assert.ok(metadata.rules.disallow.some(prefix=>'/api/developer/games'.startsWith(prefix)))
+ const adminLayout=await readFile(new URL('../app/admin/layout.tsx',import.meta.url),'utf8')
+ assert.match(adminLayout,/robots:\s*\{\s*index:\s*false,\s*follow:\s*false\s*\}/)
+ for(const path of ['dashboard','favorites','login','register','reset-password']){
+  const {metadata}=await import(`../app/${path}/layout.tsx`)
+  assert.equal(metadata.robots.index,false,path)
+ }
+})
+
 test('home has a single h1 and real category/game/multiplayer links',async()=>{
  fixture();const html=renderToStaticMarkup(await Home())
  assert.equal((html.match(/<h1\b/g)??[]).length,1)

@@ -76,7 +76,7 @@ test('public domains delegate all routes unchanged, including robots and ads.txt
   assert.equal(metadata.rules.allow, '/')
   assert.ok(!metadata.rules.disallow.includes('/'))
   assert.ok(!metadata.rules.disallow.some(path => '/ads.txt'.startsWith(path)))
-  assert.ok(metadata.rules.disallow.includes('/admin'))
+  assert.deepEqual(metadata.rules.disallow, ['/api/'])
   const ads = await readFile(new URL('../public/ads.txt', import.meta.url), 'utf8')
   assert.equal(ads, 'google.com, pub-9977547315559489, DIRECT, f08c47fec0942fa0\n')
   let calls = 0
