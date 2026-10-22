@@ -26,7 +26,7 @@ registerHooks({
       const base = specifier.startsWith('@/') ? new URL(specifier.slice(2), root) : new URL(specifier, context.parentURL)
       for (const suffix of ['', '.ts', '.tsx']) {
         const url = new URL(base.href + suffix)
-        if (existsSync(url) && /\.(tsx?|json|mjs)$/.test(url.pathname)) return { url: url.href, shortCircuit: true }
+        if (existsSync(url) && /\.(tsx?|json|mjs|css)$/.test(url.pathname)) return { url: url.href, shortCircuit: true }
       }
     }
     return nextResolve(specifier, context.parentURL?.startsWith('product:') ? { ...context, parentURL: import.meta.url } : context)
@@ -34,7 +34,7 @@ registerHooks({
   load(url, context, nextLoad) {
     if (url.endsWith('.module.css')) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, {get:(_target,key)=>String(key)})' }
     const stubs = {
-      'product:link': "import {createElement} from 'react'; export default function Link({children, ...props}) {return createElement('a', props, children)}",
+      'product:link': "import {createElement} from 'react'; export default function Link({children, prefetch: _prefetch, ...props}) {return createElement('a', props, children)}",
       'product:image': "import {createElement} from 'react'; export default function Image({fill,priority,unoptimized,...props}) {return createElement('img', props)}",
       'product:auth': 'export function useAuth() { return globalThis.__productAuth ?? {user:null,session:null,loading:false} }',
       'product:multiplayer': `export function useMultiplayer(){return globalThis.__productMultiplayer ?? {available:true,state:{busy:false,error:'',lobby:null,game:{connected:false,count:0,expected:0,status:''}},controller:{connect:async()=>{throw new Error('Unexpected connection')}}}}`,

@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import type {ReactNode} from 'react'
 
 export type DocumentationSection={id:string;title:string;content:ReactNode}
@@ -9,7 +8,6 @@ export default function DocumentationPage({title,intro,sections,children}:{title
    <nav aria-label="Sommaire" className="self-start rounded-xl border border-zinc-800 p-4 lg:sticky lg:top-24"><h2 className="font-semibold text-white">Sur cette page</h2><ul className="mt-3 space-y-2 text-sm">{sections.map(section=><li key={section.id}><a className="block rounded text-cyan-300 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-cyan-400" href={'#'+section.id}>{section.title}</a></li>)}</ul></nav>
    <div className="min-w-0 space-y-6">{sections.map(section=><section key={section.id} id={section.id} className="min-w-0 scroll-mt-24 space-y-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-5 leading-7 sm:p-7"><h2 className="text-xl font-semibold text-white">{section.title}</h2>{section.content}</section>)}</div>
   </div>
-  <nav aria-label="Informations du service" className="flex flex-wrap gap-4 border-t border-zinc-800 pt-5 text-sm text-cyan-300"><Link href="/developpeurs">Guide développeur</Link><Link href="/mentions-legales">Mentions légales</Link><Link href="/confidentialite">Confidentialité</Link><Link href="/cookies">Cookies et traceurs</Link><Link href="/contact">Contact</Link></nav>
  </article>
 }
 export function DocumentationCode({children,label}:{children:string;label:string}){

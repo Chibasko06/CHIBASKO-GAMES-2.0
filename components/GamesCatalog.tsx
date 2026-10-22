@@ -2,6 +2,7 @@
 
 import { useDeferredValue } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { readCatalogueFilters, catalogueQueryString, filterCatalogue, type CatalogueFilters, type CatalogueType, type SortOption, type DeviceFilter } from '@/lib/catalogueFilters'
 import { GameCard } from '@/components/GameCard'
 import collectionStyles from '@/components/GameCardCollection.module.css'
@@ -28,7 +29,6 @@ export default function GamesCatalog({
     window.history.replaceState(null, '', catalogueQueryString({ ...current, ...patch }))
   }
   const setSearch = (search: string) => updateFilters({ search })
-  const setSelectedCategory = (category: string) => updateFilters({ category })
   const setSort = (sort: SortOption) => updateFilters({ sort })
   const setDeviceFilter = (device: DeviceFilter) => updateFilters({ device })
   const visibleGames = filterCatalogue(games, { ...filters, search: deferredSearch })
@@ -92,21 +92,19 @@ export default function GamesCatalog({
             <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">
               Categories
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                updateFilters({ type: 'all', category: 'all', search: '', sort: 'popular', device: 'all' })
-              }}
+            <Link
+              href="/games"
+              prefetch={false}
               className="text-xs text-zinc-400 transition-colors hover:text-cyan-400"
             >
               Reinitialiser
-            </button>
+            </Link>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('all')}
+            <Link
+              href="/games"
+              prefetch={false}
               className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors sm:tracking-[0.2em] ${
                 selectedCategory === 'all'
                   ? 'border-cyan-500 bg-cyan-500 text-black'
@@ -114,12 +112,12 @@ export default function GamesCatalog({
               }`}
             >
               Toutes
-            </button>
+            </Link>
             {categories.map((category) => (
-              <button
+              <Link
                 key={category.id}
-                type="button"
-                onClick={() => setSelectedCategory(category.slug)}
+                href={'/games?category='+encodeURIComponent(category.slug)}
+                prefetch={false}
                 className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors sm:tracking-[0.2em] ${
                   selectedCategory === category.slug
                     ? 'border-cyan-500 bg-cyan-500 text-black'
@@ -127,7 +125,7 @@ export default function GamesCatalog({
                 }`}
               >
                 {category.name}
-              </button>
+              </Link>
             ))}
           </div>
         </div>

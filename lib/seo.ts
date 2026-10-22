@@ -3,9 +3,10 @@ import type { Metadata } from 'next'
 export const siteConfig = {
   name: 'Chibasko Games',
   shortName: 'Chibasko Games',
-  url: process.env.NEXT_PUBLIC_SITE_URL || 'https://chibaskogames.fr',
+  // Canonicals describe the public site, including when rendered on a preview host.
+  url: 'https://chibaskogames.fr',
   description:
-    'Joue gratuitement a des jeux en ligne sur Chibasko Games : catalogue navigateur, profils joueurs, favoris, avis et futurs projets de creation.',
+    'Découvre les jeux gratuits de Chibasko Games : action, arcade, sport et jeux à partager, directement dans ton navigateur.',
   logoPath: '/chibaskogames-logo.png',
   ogImage: '/chibaskogames-logo.png',
   faviconPath: '/chibaskogames-logo.png',
@@ -27,11 +28,13 @@ export function buildPageMetadata({
   description,
   path,
   image,
+  imageAlt,
 }: {
   title: string
   description: string
   path: string
   image?: string
+  imageAlt?: string
 }): Metadata {
   const canonical = absoluteUrl(path)
   const imageUrl = image ? (image.startsWith('http') ? image : absoluteUrl(image)) : absoluteUrl(siteConfig.ogImage)
@@ -52,7 +55,7 @@ export function buildPageMetadata({
       images: [
         {
           url: imageUrl,
-          alt: `${siteConfig.name} logo`,
+          alt: imageAlt || (image ? title : `Logo ${siteConfig.name}`),
         },
       ],
     },
@@ -63,4 +66,14 @@ export function buildPageMetadata({
       images: [imageUrl],
     },
   }
+}
+
+export const privatePageMetadata: Metadata = {
+  robots: { index: false, follow: false },
+  alternates: { canonical: null },
+}
+
+// JSON-LD can contain catalogue text; escape HTML delimiters before script output.
+export function serializeJsonLd(value: unknown) {
+  return JSON.stringify(value).replace(/</g, '\\u003c')
 }

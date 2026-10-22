@@ -40,7 +40,7 @@ export default async function Home() {
                 <span className="block text-cyan-400"> votre console</span>
               </h1>
               <p className="max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
-                Accedez a des centaines de jeux gratuits sans aucune installation. Creez votre profil et retrouvez vos jeux preferes.
+                Découvrez des jeux gratuits directement dans votre navigateur. Explorez les catégories, lancez une partie et retrouvez vos favoris avec votre compte.
               </p>
             </div>
 
@@ -79,7 +79,7 @@ export default async function Home() {
                       fill
                       priority={index === 0}
                       className="object-cover transition duration-300 group-hover:scale-105"
-                      sizes={index === 0 ? '(min-width: 640px) 50vw, 100vw' : '(min-width: 640px) 25vw, 100vw'}
+                      sizes={index === 0 ? '(min-width: 1024px) 50vw, 100vw' : '(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw'}
                     />
                   </div>
                 ) : (

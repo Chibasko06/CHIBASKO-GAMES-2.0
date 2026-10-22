@@ -6,7 +6,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/admin', '/dashboard', '/favorites', '/login', '/register', '/reset-password', '/api/'],
+      // Account pages remain crawlable so their explicit noindex can be read.
+      disallow: ['/admin', '/api/'],
     },
     sitemap: `${siteConfig.url}/sitemap.xml`,
     host: siteConfig.url,

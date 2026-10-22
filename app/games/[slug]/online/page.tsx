@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { onlineGamePage } from '@/lib/server/onlineGamePage'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'Salons publics | Chibasko Games', robots: { index: false, follow: false } }
+export const metadata: Metadata = { title: 'Salons publics', robots: { index: false, follow: false }, alternates:{canonical:null} }
 export default async function OnlineGamePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const game = await onlineGamePage(slug, 'public')

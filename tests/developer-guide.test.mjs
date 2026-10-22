@@ -15,6 +15,17 @@ import {manifestExample,manifestCode,archiveLimitBytes,lifecycleCode,audioCode,r
 import {validateManifest} from '../lib/game-distribution/manifest.ts'
 const html=component=>renderToStaticMarkup(createElement(component))
 
+test('documentation retains its contents and table of contents without a second footer navigation',()=>{
+ for(const component of [Guide,Privacy,Cookies,Legal]){
+  const page=html(component)
+  assert.match(page,/aria-label="Sommaire"/)
+  assert.doesNotMatch(page,/aria-label="Informations du service"|<footer\b/)
+ }
+ const footer=html(Footer)
+ assert.equal([...footer.matchAll(/<footer\b/g)].length,1)
+ for(const path of ['/developpeurs','/mentions-legales','/confidentialite','/cookies','/contact'])assert.ok(footer.includes(`href="${path}"`))
+})
+
 test('guide manifest follows the real validator and upload policy; no private game identity is used',()=>{
  assert.deepEqual(validateManifest(JSON.parse(manifestCode),manifestExample),manifestExample)
  assert.equal(manifestExample.schemaVersion,1);assert.equal(manifestExample.integrationVersion,1)

@@ -6,7 +6,7 @@ import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import ClientEnhancements from '@/components/ClientEnhancements'
 import Footer from '@/components/Footer'
-import { siteConfig } from '@/lib/seo'
+import { siteConfig, serializeJsonLd } from '@/lib/seo'
 
 
 export const metadata: Metadata = {
@@ -27,9 +27,6 @@ export const metadata: Metadata = {
     'jeux pc',
     'jeux mobile',
   ],
-  alternates: {
-    canonical: siteConfig.url,
-  },
   openGraph: {
     title: siteConfig.name,
     description: siteConfig.description,
@@ -116,7 +113,7 @@ export default function RootLayout({
         <SiteAnalytics />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
         />
         <AuthProvider>
             <ClientEnhancements />

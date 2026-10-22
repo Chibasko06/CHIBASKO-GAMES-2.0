@@ -30,7 +30,7 @@ export function GameCard({ game }: Props) {
               alt={game.title}
               fill
               className="object-cover"
-              sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw"
+              sizes="(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
             />
           </div>
         ) : (

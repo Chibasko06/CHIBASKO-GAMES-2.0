@@ -11,11 +11,12 @@ import Guide from '../app/developpeurs/page.tsx'
 import Privacy from '../app/confidentialite/page.tsx'
 import Cookies from '../app/cookies/page.tsx'
 import Legal from '../app/mentions-legales/page.tsx'
+import Footer from '../components/Footer.tsx'
 const pages={'/developpeurs':Guide,'/confidentialite':Privacy,'/cookies':Cookies,'/mentions-legales':Legal}
 async function cssFiles(directory){const files=[];for(const item of await readdir(directory,{withFileTypes:true})){const path=join(directory,item.name);if(item.isDirectory())files.push(...await cssFiles(path));else if(item.name.endsWith('.css'))files.push(path)}return files}
 const css=(await Promise.all((await cssFiles('.next/static')).map(path=>readFile(path,'utf8')))).join('\n')
 assert.ok(css,'Run the Next build before the documentation browser check')
-const server=createServer((request,response)=>{if(request.url==='/styles.css'){response.setHeader('Content-Type','text/css');response.end(css);return}const component=pages[request.url];if(!component){response.writeHead(404);response.end();return}response.setHeader('Content-Type','text/html; charset=utf-8');response.end('<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body class="bg-zinc-950 p-4 text-white">'+renderToStaticMarkup(createElement(component))+'</body></html>')})
+const server=createServer((request,response)=>{if(request.url==='/styles.css'){response.setHeader('Content-Type','text/css');response.end(css);return}const component=pages[request.url];if(!component){response.writeHead(404);response.end();return}response.setHeader('Content-Type','text/html; charset=utf-8');response.end('<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body class="bg-zinc-950 text-white"><main class="p-4">'+renderToStaticMarkup(createElement(component))+'</main>'+renderToStaticMarkup(createElement(Footer))+'</body></html>')})
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
 const browser=await chromium.launch({channel:'chrome',headless:true})
 const screenshots=await mkdtemp(join(tmpdir(),'chibasko-developer-guide-'))
@@ -28,6 +29,13 @@ try{
    assert.equal(await page.locator('h1').isVisible(),true)
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,path)
    assert.equal(await page.getByRole('navigation',{name:'Sommaire'}).isVisible(),true)
+   assert.equal(await page.getByRole('navigation',{name:'Informations du service'}).count(),0)
+   assert.equal(await page.locator('footer').count(),1)
+   assert.equal(await page.locator('article footer').count(),0)
+   assert.equal(await page.locator('footer a[href="/cookies"]').count(),1)
+   assert.equal(await page.evaluate(()=>document.querySelector('footer').getBoundingClientRect().top>document.querySelector('article').getBoundingClientRect().bottom),true)
+   await page.locator('article').evaluate(node=>window.scrollTo(0,node.getBoundingClientRect().bottom+scrollY-innerHeight/2))
+   await page.screenshot({path:join(screenshots,path.slice(1)+'-bottom-'+viewport.width+'.png')})
   }
   await page.goto('http://127.0.0.1:'+server.address().port+'/developpeurs')
   await page.screenshot({path:join(screenshots,'guide-'+viewport.width+'.png')})

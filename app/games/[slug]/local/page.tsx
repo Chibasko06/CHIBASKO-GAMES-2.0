@@ -4,7 +4,7 @@ import { getGameBySlug } from '@/lib/queries/games'
 import ArtifactLocalGame from '@/components/game-runtime/ArtifactLocalGame'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'Partie locale | Chibasko Games', robots: { index: false, follow: false } }
+export const metadata: Metadata = { title: 'Partie locale', robots: { index: false, follow: false }, alternates:{canonical:null} }
 export default async function LocalGamePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const game = await getGameBySlug(slug)

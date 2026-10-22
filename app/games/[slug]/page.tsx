@@ -9,7 +9,8 @@ import GameReviews from '@/components/GameReviews'
 import GameViewport from '@/components/GameViewport'
 import PlaySessionTracker from '@/components/PlaySessionTracker'
 import { getGamesCatalog } from '@/lib/queries/games'
-import { absoluteUrl } from '@/lib/seo'
+import { serializeJsonLd } from '@/lib/seo'
+import { gameMetadata, gameStructuredData } from '@/lib/seoCatalogue'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { publishedOnlineAccess } from '@/lib/server/publishedOnlineAccess'
@@ -36,30 +37,7 @@ export async function generateMetadata({
     }
   }
 
-  const description =
-    game.description ||
-    `Joue a ${game.title} sur Chibasko Games, gratuitement depuis ton navigateur.`
-
-  return {
-    title: game.title,
-    description,
-    alternates: {
-      canonical: `https://chibaskogames.fr/games/${game.slug}`,
-    },
-    openGraph: {
-      title: game.title,
-      description,
-      url: `https://chibaskogames.fr/games/${game.slug}`,
-      type: 'article',
-      images: game.thumbnail_url ? [{ url: game.thumbnail_url }] : undefined,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: game.title,
-      description,
-      images: game.thumbnail_url ? [game.thumbnail_url] : undefined,
-    },
-  }
+  return gameMetadata(game)
 }
 
 export default async function GamePage({
@@ -82,43 +60,18 @@ export default async function GamePage({
     }))
     : []
 
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'VideoGame',
-    name: game.title,
-    description: game.description || `Joue a ${game.title} sur Chibasko Games.`,
-    url: absoluteUrl(`/games/${game.slug}`),
-    image: game.thumbnail_url || absoluteUrl('/logo-chibaskogames-rond.ico'),
-    genre: game.categories?.map((category) => category.name),
-    author: game.developer_name
-      ? {
-          '@type': 'Organization',
-          name: game.developer_name,
-        }
-      : undefined,
-    publisher: {
-      '@type': 'Organization',
-      name: 'Chibasko Games',
-      url: absoluteUrl('/'),
-    },
-    aggregateRating: game.ratings_count > 0
-      ? {
-          '@type': 'AggregateRating',
-          ratingValue: Number(game.average_rating.toFixed(1)),
-          ratingCount: game.ratings_count,
-          bestRating: 5,
-          worstRating: 1,
-        }
-      : undefined,
-  }
+  const structuredData = gameStructuredData(game)
 
   return (
     <div className="space-y-6 xl:space-y-8">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
       />
       <PlaySessionTracker gameId={game.id} recordPlay={isClassicGame(game)} />
+      <nav aria-label="Fil d’Ariane" className="flex flex-wrap gap-2 text-sm text-zinc-400">
+        <Link href="/">Accueil</Link><span aria-hidden="true">/</span><Link href="/games">Jeux</Link><span aria-hidden="true">/</span><span aria-current="page">{game.title}</span>
+      </nav>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-3">

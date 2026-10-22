@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: '/api/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }]
+  },
   images: {
     // Workers serves original images; the standard Next/Vercel build keeps its optimizer.
     unoptimized: process.env.CHIBASKO_CLOUDFLARE === '1',

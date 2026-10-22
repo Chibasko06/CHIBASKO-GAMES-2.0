@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import { getPublishedFaqEntries } from '@/lib/queries/faq'
 import { buildPageMetadata } from '@/lib/seo'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = buildPageMetadata({
-  title: 'FAQ Chibasko Games',
+  title: 'Aide et questions fréquentes',
   description:
     'Retrouve les reponses aux questions frequentes sur Chibasko Games : compte joueur, jeux en ligne, profils, favoris et fonctionnement de la plateforme.',
   path: '/faq',
@@ -12,29 +13,9 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default async function FaqPage() {
   const faqEntries = await getPublishedFaqEntries()
-  const structuredData = faqEntries.length
-    ? {
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: faqEntries.map((entry) => ({
-          '@type': 'Question',
-          name: entry.question,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: entry.answer,
-          },
-        })),
-      }
-    : null
 
   return (
     <div className="mx-auto max-w-5xl rounded-[32px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 md:p-10">
-      {structuredData ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
-      ) : null}
       <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Aide rapide</p>
       <h1 className="mt-3 text-4xl font-black uppercase text-white">FAQ</h1>
       <p className="mt-5 max-w-3xl text-sm leading-7 text-zinc-400">
@@ -58,6 +39,9 @@ export default async function FaqPage() {
           ))
         )}
       </div>
+      <nav aria-label="Liens utiles" className="mt-8 flex flex-wrap gap-4 text-sm text-cyan-300">
+        <Link href="/games">Trouver un jeu</Link><Link href="/developpeurs">Guide développeur</Link><Link href="/contact">Nous contacter</Link>
+      </nav>
     </div>
   )
 }

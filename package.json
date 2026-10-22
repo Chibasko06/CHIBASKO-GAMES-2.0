@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:seo": "node --import ./tests/product-register.mjs --test tests/seo.test.mjs",
+    "test:seo-browser": "node --test tests/seo.browser.test.mjs",
+    "audit:seo-catalogue": "node scripts/seo-catalogue-audit.mjs",
     "test:analytics-consent": "node --import ./tests/register.mjs --test tests/analytics-consent.test.mjs",
     "test:analytics-consent-browser": "node --import ./tests/register.mjs --test tests/analytics-consent.browser.test.mjs",
     "test:developer-guide": "node --import ./tests/product-register.mjs --test tests/developer-guide.test.mjs",
