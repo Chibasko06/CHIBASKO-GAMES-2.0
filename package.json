@@ -48,7 +48,8 @@
     "test:go-live": "node --test tests/production-preflight.test.mjs tests/go-live-gates.test.mjs tests/source-map-security.test.mjs && node --import ./tests/register.mjs --test tests/session-maintenance.test.mjs",
     "test:go-live-db": "node tests/production-schema-reference.mjs",
     "test:db": "node tests/database-security.mjs",
-    "build:cloudflare": "node scripts/cloudflare.mjs build",
+    "build:cloudflare": "node scripts/cloudflare.mjs build && npm run test:cloudflare-runtime",
+    "test:cloudflare-runtime": "wrangler deploy --dry-run --outdir .distribution/runtime-smoke && node --test tests/cloudflare-runtime.test.mjs",
     "preview:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs preview",
     "deploy:cloudflare": "npm run build:cloudflare && node scripts/cloudflare.mjs deploy",
     "test:catalogue-db": "node tests/game-catalogue-db.mjs",
@@ -89,7 +90,7 @@
     "tldts": "7.4.18"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "1.20.9",
+    "@opennextjs/cloudflare": "1.20.12",
     "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -106,6 +107,9 @@
     "wrangler": "4.152.0"
   },
   "overrides": {
-    "undici": "7.30.1"
+    "undici": "7.30.1",
+    "@node-minify/core": {
+      "glob": "10.5.0"
+    }
   }
 }
