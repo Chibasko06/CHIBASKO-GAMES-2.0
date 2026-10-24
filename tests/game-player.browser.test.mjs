@@ -6,6 +6,7 @@ import {chromium} from '@playwright/test'
 import {runtimeHarness} from './helpers/runtime-harness.mjs'
 import {gameLaunchRequest} from '../lib/server/gameLaunches.ts'
 import {assertPlayerLayout} from './helpers/player-layout.mjs'
+import {PORTAL_SECURITY_HEADERS} from '../lib/httpSecurity.mjs'
 let browser,js,css
 before(async()=>{
  const bundle=await build({entryPoints:['tests/fixtures/game-player-host.tsx'],bundle:true,platform:'browser',format:'iife',jsx:'automatic',write:false,outdir:'.distribution/game-player-browser',define:{'process.env':'{}','process.env.NODE_ENV':'"production"'},plugins:[{name:'fixture-platform-services',setup(build){
@@ -26,12 +27,14 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function setup({audioEnabled=false,kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,withRecommendations=false,title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
+async function setup({audioEnabled=false,kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,withRecommendations=false,gameUrl='https://legacy.test/index.html',legacyBody, title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
  const h=await runtimeHarness('pong-like','published',audioEnabled?'audio':'normal'),context=await browser.newContext({viewport,isMobile:touch,hasTouch:touch,deviceScaleFactor:touch?2:1}),calls=[]
  let snapshot={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',gameId:h.request.gameId,gameVersionId:h.request.gameVersionId,access:'public',status:'waiting',code:'',minPlayers:1,maxPlayers:8,revision:1,startPolicy:'manual',expiresAt:new Date(Date.now()+3600000).toISOString(),onlineSessionReference:null,members:[{id:'opaque-fixture',displayName:'Player',self:true,leader:true,ready:false}]}
  await context.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url());calls.push({path:url.pathname,method:req.method(),host:url.hostname})
   if(url.hostname==='portal.test'){
+   if(url.pathname==='/legacy.html')return route.fulfill({contentType:'text/html',body:legacyBody??'<!doctype html><p>Legacy officiel</p>'})
+   if(url.pathname==='/privileged')return route.fulfill({headers:PORTAL_SECURITY_HEADERS,contentType:'text/html',body:'<script>parent.compromised=true</script><p>Privileged portal</p>'})
    if(url.pathname==='/games/fixture')return route.fulfill({contentType:'text/html',body:'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/host.css"></head><body style="margin:0;background:#09090b;color:white"><h1 style="font:600 18px system-ui;margin:0;height:'+headingHeight+'px">Fixture · Chibasko Games</h1><div id="player" style="min-width:0;margin-inline:'+pagePadding+'px"></div><script src="/host.js"></script></body></html>'})
    if(url.pathname==='/host.js')return route.fulfill({contentType:'text/javascript',body:Buffer.from(js)})
    if(url.pathname==='/host.css')return route.fulfill({contentType:'text/css',body:Buffer.from(css)})
@@ -52,7 +55,7 @@ async function setup({audioEnabled=false,kind='artifact',availableAccess=[],view
     return route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())})
    }
   }
-  if(url.hostname==='legacy.test')return route.fulfill({contentType:'text/html',body:'<!doctype html><body style="margin:0;background:#102332;color:white;font:24px system-ui;display:grid;place-items:center;height:100vh">Legacy HTML5 fixture</body>'})
+  if(url.hostname==='legacy.test')return route.fulfill({contentType:'text/html',body:legacyBody??'<!doctype html><body style="margin:0;background:#102332;color:white;font:24px system-ui;display:grid;place-items:center;height:100vh">Legacy HTML5 fixture</body>'})
   if(url.hostname.startsWith('l-')){
    const response=await h.gateway(new Request(req.url(),{headers:await req.allHeaders()}))
    return route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())})
@@ -61,7 +64,7 @@ async function setup({audioEnabled=false,kind='artifact',availableAccess=[],view
  })
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto('https://portal.test/games/fixture');await page.waitForFunction(()=>!!window.gamePlayerFixture,null,{timeout:3000}).catch(()=>{throw Error('Fixture bootstrap: '+JSON.stringify(errors))})
  await page.evaluate(signed=>window.fixtureSignedIn=signed,signed)
- await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,withRecommendations,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title,coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl:'https://legacy.test/index.html'})
+ await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,withRecommendations,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title,coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl})
  await page.waitForTimeout(100);assert.deepEqual(errors,[])
  return {page,context,h,calls}
 }
@@ -76,6 +79,60 @@ async function assertIdle(x){
  assert.equal(x.h.sessions.size,0)
  assert.ok(!x.calls.some(call=>call.path.startsWith('/api/')))
 }
+
+for(const sameOrigin of [false,true])test(`isolation navigateur legacy ${sameOrigin?'officiel même origine':'tiers'} : parent, stockage, navigation, popup et téléchargement`,async()=>{
+ const legacyBody=`<!doctype html><body><p id="result">ready</p>
+ <button id="top" onclick="try{top.location.href='https://escape.test/'}catch{}">Navigation</button>
+ <button id="popup" onclick="window.open('https://escape.test/')">Popup</button>
+ <button id="download" onclick="const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['fixture']));a.download='fixture.txt';a.click()">Télécharger</button>
+ <button id="fullscreen" onclick="document.documentElement.requestFullscreen().catch(()=>document.body.dataset.fullscreen='blocked')">Fullscreen interne</button>
+ <script>try{parent.document.body.dataset.compromised='yes';document.body.dataset.parent='accessible'}catch{document.body.dataset.parent='blocked'}
+ try{localStorage.setItem('legacy-fixture','ok');document.body.dataset.storage='ok'}catch{document.body.dataset.storage='blocked'}</script>`
+ const x=await setup({kind:'legacy',gameUrl:sameOrigin?'https://portal.test/legacy.html':'https://legacy.test/index.html',legacyBody})
+ try{
+  await x.page.evaluate(()=>localStorage.setItem('portal-private-fixture','private'))
+  await x.page.getByRole('button',{name:'Jouer',exact:true}).click()
+  const frame=x.page.frameLocator('iframe');await frame.locator('#result').waitFor()
+  assert.equal(await frame.locator('body').getAttribute('data-parent'),'blocked')
+  assert.equal(await frame.locator('body').getAttribute('data-storage'),sameOrigin?'blocked':'ok')
+  assert.equal(await x.page.locator('body').getAttribute('data-compromised'),null)
+  await frame.locator('#top').click();assert.equal(x.page.url(),'https://portal.test/games/fixture')
+  const popup=x.page.waitForEvent('popup',{timeout:400}).catch(()=>null)
+  await frame.locator('#popup').click();assert.equal(await popup,null)
+  const download=x.page.waitForEvent('download',{timeout:400}).catch(()=>null)
+  await frame.locator('#download').click();assert.equal(await download,null)
+  await frame.locator('#fullscreen').click();await frame.locator('body[data-fullscreen="blocked"]').waitFor()
+  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click()
+  await x.page.waitForFunction(()=>document.fullscreenElement?.matches('[aria-label="Jeu Chibasko Games"]'))
+  await x.page.evaluate(()=>document.exitFullscreen())
+  await x.page.waitForFunction(()=>!document.fullscreenElement)
+  await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click();await launcher(x.page).waitFor()
+  assert.equal(await x.page.locator('iframe').count(),0)
+ }finally{await x.context.close()}
+})
+
+test('une URL de lancement dangereuse reste dans le shell sans créer une iframe',async()=>{
+ const x=await setup({kind:'legacy',gameUrl:'javascript:parent.compromised=true'})
+ try{
+  await x.page.getByRole('button',{name:'Jouer',exact:true}).click()
+  await x.page.getByText('Le jeu ne peut pas être chargé pour le moment.').waitFor()
+  assert.equal(await x.page.locator('iframe').count(),0)
+  assert.equal(await x.page.evaluate(()=>window.compromised),undefined)
+ }finally{await x.context.close()}
+})
+
+test('un tiers ne peut pas naviguer vers un document privilégié du portail pour retirer sa sandbox',async()=>{
+ const x=await setup({kind:'legacy',legacyBody:'<button onclick="location.href=\'https://portal.test/privileged\'">Changer de document</button>'})
+ try{
+  await x.page.getByRole('button',{name:'Jouer',exact:true}).click()
+  const navigation=x.page.waitForEvent('framenavigated',{predicate:frame=>frame!==x.page.mainFrame()&&frame.url()!=='https://legacy.test/index.html'})
+  await x.page.frameLocator('iframe').getByRole('button').click()
+  const blockedFrame=await navigation
+  assert.equal(blockedFrame.url(),'chrome-error://chromewebdata/')
+  assert.equal(await x.page.evaluate(()=>window.compromised),undefined)
+  assert.equal(x.page.url(),'https://portal.test/games/fixture')
+ }finally{await x.context.close()}
+})
 test('legacy launcher has exactly one Play action and returns to the identical launcher after quit',async()=>{
  const x=await setup({kind:'legacy'})
  try{
@@ -83,8 +140,8 @@ test('legacy launcher has exactly one Play action and returns to the identical l
   assert.equal(await launcher(x.page).getByRole('button').count(),1)
   await x.page.getByRole('button',{name:'Jouer',exact:true}).click()
   await x.page.frameLocator('iframe').getByText('Legacy HTML5 fixture').waitFor();await oneDock(x.page)
-  assert.equal(await x.page.locator('iframe').getAttribute('allow'),'fullscreen; autoplay; clipboard-write; gamepad')
-  assert.equal(await x.page.locator('iframe').getAttribute('allowfullscreen'),'')
+  assert.match(await x.page.locator('iframe').getAttribute('allow'),/fullscreen 'none'.*clipboard-write 'none'/)
+  assert.equal(await x.page.locator('iframe').getAttribute('allowfullscreen'),null)
   assert.ok(!x.calls.some(call=>call.path.startsWith('/api/game-launches')))
   await assertPlayerLayout(x.page)
   await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click()

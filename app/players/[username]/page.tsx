@@ -77,7 +77,7 @@ export default async function PublicPlayerPage({
   const stats = await getPublicProfileSummary(profile.id)
 
   return (
-    <main className="space-y-8">
+    <div className="space-y-8">
       <section className="rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(10,15,23,0.98),rgba(10,10,12,0.98))] p-6 md:p-8">
         <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/75">Profil public</p>
         <h1 className="mt-3 text-3xl font-black uppercase text-white md:text-4xl">{profile.username}</h1>
@@ -118,6 +118,6 @@ export default async function PublicPlayerPage({
           </div>
         </section>
       </div>
-    </main>
+    </div>
   )
 }

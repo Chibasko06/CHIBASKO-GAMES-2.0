@@ -1,9 +1,9 @@
-# Validation GO-LIVE-GATES-1
+# Référence de validation GO-LIVE-GATES-1
 
-Relevé du 18 octobre 2026. Les preuves distantes sont limitées à des GET du catalogue
+Relevé historique du 18 octobre 2026, distinct de l’état courant de production.
+Les preuves distantes sont limitées à des GET du catalogue
 exact configuré, d'abord public puis avec autorisation backend pour vérifier
-l'unicité. Aucun corps/valeur de credential n'a été conservé. Aucun accès SQL de
-production, mutation distante, ressource, DNS, upload ou déploiement.
+l'unicité. Ce périmètre ne certifie ni le schéma SQL ni les ressources distantes.
 
 | Validation | Résultat |
 | --- | --- |
@@ -40,64 +40,5 @@ sandbox pour les sockets/fichiers temporaires. Les scripts PostgreSQL filtrent
 les variables PG héritées et créent leur propre cluster. Les fichiers .env ne sont
 pas copiés dans la fixture de build. Les lectures catalogue sont distinctes des tests.
 
-La matrice [production-go-gates.md](production-go-gates.md) reste NO-GO global :
+La matrice historique [production-go-gates.md](production-go-gates.md) indique NO-GO à cette date :
 ces contrôles ne certifient aucune ressource staging/production non créée.
-
-## Inventaire des changements
-
-Plateforme : 33 fichiers ajoutés ou modifiés. Les huit migrations antérieures
-restent inchangées.
-
-```text
-README.md
-cloudflare/session-maintenance.ts
-cloudflare/wrangler.maintenance.example.jsonc
-contracts/production-schema.v1.json
-docs/activation/pong-capabilities.json
-docs/game-content-domain.md
-docs/game-distribution.md
-docs/go-live-gates-validation.md
-docs/production-activation-checklist.md
-docs/production-activation.md
-docs/production-go-gates.md
-docs/production-migrations.md
-docs/production-npm-audit.md
-docs/sql/catalogue-game-id.sql
-docs/sql/production-schema-snapshot.sql
-lib/game-distribution/gateway/gateway.ts
-package-lock.json
-package.json
-scripts/build-distribution.mjs
-scripts/catalogue-game-id.mjs
-scripts/npm-audit-evidence.mjs
-scripts/production-preflight.mjs
-scripts/read-json.mjs
-scripts/release-state.mjs
-scripts/schema-drift.mjs
-supabase/migrations/20261018000400_control_plane_maintenance.sql
-tests/game-artifact-gateway.test.mjs
-tests/game-distribution-db.mjs
-tests/go-live-gates.test.mjs
-tests/production-preflight.test.mjs
-tests/production-schema-reference.mjs
-tests/session-maintenance.test.mjs
-tests/source-map-security.test.mjs
-```
-
-Pong : six fichiers modifiés, sans changement du gameplay.
-
-```text
-.dockerignore
-Dockerfile
-README.md
-server/main.ts
-server/standalone.ts
-tests/admission.test.mjs
-```
-
-SDK : aucun fichier modifié. Les artefacts de recette sont hors des sources
-versionnées. Les scans des sources modifiées ne détectent aucun credential,
-lien local manquant ni formulation conversationnelle. Ces scans par motifs
-complètent la revue des logs et ne constituent pas une preuve exhaustive
-d'absence de secrets. Le contrôle git diff --check est exécuté dans les trois
-dépôts ; aucun commit, tag ou push n'est réalisé.

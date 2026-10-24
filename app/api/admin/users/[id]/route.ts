@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../../_utils'
 import { AvatarUpdateError, updateAvatarForUser } from '@/lib/server/avatarStorage'
+import {requestAccountDeletion} from '@/lib/server/accountDeletion'
 
 export async function PATCH(
   request: NextRequest,
@@ -51,13 +52,5 @@ export async function DELETE(
   }
 
   const { id } = await params
-  const { supabaseAdmin } = adminCheck
-
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
-
-  if (error) {
-    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
-  }
-
-  return adminJson({ success: true })
+  return requestAccountDeletion(adminCheck.user.id,id)
 }

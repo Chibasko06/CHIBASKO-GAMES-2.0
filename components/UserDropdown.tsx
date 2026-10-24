@@ -5,6 +5,7 @@ import { useId,useLayoutEffect,useRef,useState } from 'react'
 import Link from 'next/link'
 import {createPortal} from 'react-dom'
 import type { User } from '@supabase/supabase-js'
+import {withTimeout} from '@/lib/asyncOperation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function UserDropdown({
@@ -39,7 +40,16 @@ export default function UserDropdown({
     }
     const schedule=()=>{if(!frame)frame=view.requestAnimationFrame(update)}
     const outside=(event:Event)=>{if(event.target instanceof Node && !button.contains(event.target) && !menu.current?.contains(event.target))setOpen(false)}
-    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){setOpen(false);button.focus({preventScroll:true})}}
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){setOpen(false);button.focus({preventScroll:true})}
+      if(event.key==='Tab'){
+        const items=menu.current?.querySelectorAll<HTMLElement>('a,button')
+        if(items?.length&&((event.shiftKey&&document.activeElement===items[0])||(!event.shiftKey&&document.activeElement===items[items.length-1]))){
+          if(event.shiftKey)event.preventDefault()
+          setOpen(false);button.focus({preventScroll:true})
+        }
+      }
+    }
     const observer=new ResizeObserver(schedule)
     observer.observe(button)
     if(menu.current)observer.observe(menu.current)
@@ -66,8 +76,11 @@ export default function UserDropdown({
   },[open])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/'
+    try {
+      const result = await withTimeout(supabase.auth.signOut())
+      if (result?.error) throw new Error('sign_out_failed')
+      window.location.href = '/'
+    } catch { window.alert('La déconnexion n’a pas pu être confirmée. Réessaie dans un instant.') }
   }
 
   return (

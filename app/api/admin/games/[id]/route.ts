@@ -1,3 +1,4 @@
+import {catalogueFailure, type SavedCatalogueGame} from '@/lib/server/adminCatalogue'
 import { validateGameCatalogue, CatalogueValidationError } from '@/lib/server/gameCatalogueValidation'
 import { NextRequest } from 'next/server'
 import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../../_utils'
@@ -23,49 +24,20 @@ export async function PATCH(
   }
   const { payload, categoryIds } = validated
 
-  const { data: previousGame, error: previousError } = await supabaseAdmin
-    .from('games').select('thumbnail_url').eq('id', id).single()
-  if (previousError) {
-    return adminJson({ error: adminErrorMessage(previousError) }, { status: 500 })
-  }
-
-  let update = supabaseAdmin
-    .from('games')
-    .update(payload)
-    .eq('id', id)
-  // A concurrent thumbnail change must not be overwritten by this request.
-  update = previousGame.thumbnail_url === null
-    ? update.is('thumbnail_url', null)
-    : update.eq('thumbnail_url', previousGame.thumbnail_url)
-  const { data, error } = await update
-    .select('*')
-    .single()
-
-  if (error) {
-    return adminJson({ error: adminErrorMessage(error) }, { status: error.code === 'PGRST116' ? 409 : 500 })
-  }
-
-  const { error: deleteRelationsError } = await supabaseAdmin
-    .from('game_categories')
-    .delete()
-    .eq('game_id', id)
-
-  if (deleteRelationsError) {
-    return adminJson({ error: adminErrorMessage(deleteRelationsError) }, { status: 500 })
-  }
-
-  if (categoryIds.length > 0) {
-    const { error: categoriesError } = await supabaseAdmin
-      .from('game_categories')
-      .insert(categoryIds.map((categoryId: string) => ({ game_id: id, category_id: categoryId })))
-
-    if (categoriesError) {
-      return adminJson({ error: adminErrorMessage(categoriesError) }, { status: 500 })
-    }
-  }
-
-  await cleanupReplacedGameThumbnail(previousGame.thumbnail_url, data.thumbnail_url, supabaseAdmin)
-  return adminJson({ game: data })
+  try {
+    const {data: previousGame, error: previousError} = await supabaseAdmin
+      .from('games').select('thumbnail_url').eq('id', id).maybeSingle()
+    if (previousError) throw previousError
+    if (!previousGame) return adminJson({error: 'Jeu introuvable.'}, {status: 404})
+    const {data, error} = await supabaseAdmin.rpc('admin_save_game' as never, {
+      p_actor: adminCheck.user.id, p_id: id, p_game: payload, p_categories: categoryIds,
+      p_expected_thumbnail: previousGame.thumbnail_url,
+    } as never)
+    if (error) throw error
+    const saved = data as unknown as SavedCatalogueGame
+    await cleanupReplacedGameThumbnail(saved.previousThumbnail, saved.game.thumbnail_url, supabaseAdmin)
+    return adminJson({game: saved.game})
+  } catch (error) { return catalogueFailure('admin_game_update', error) }
 }
 
 export async function DELETE(

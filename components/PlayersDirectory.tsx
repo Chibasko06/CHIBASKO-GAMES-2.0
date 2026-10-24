@@ -1,5 +1,6 @@
 "use client";
 
+import FormField from '@/components/ui/FormField'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -7,8 +8,10 @@ import { PublicProfile } from '@/lib/queries/profiles'
 
 export default function PlayersDirectory({
   profiles,
+  hideSearch=false,
 }: {
   profiles: PublicProfile[]
+  hideSearch?:boolean
 }) {
   const [query, setQuery] = useState('')
 
@@ -24,12 +27,12 @@ export default function PlayersDirectory({
 
   return (
     <div className="space-y-6">
-      <input
+      {!hideSearch&&<FormField label="Rechercher un joueur"><input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Rechercher un joueur par pseudo"
         className="w-full rounded-2xl border border-zinc-800 bg-black/50 p-4 text-white outline-none focus:border-cyan-500"
-      />
+      /></FormField>}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {visibleProfiles.map((profile) => (

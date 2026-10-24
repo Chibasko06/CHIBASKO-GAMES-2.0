@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { getOAuthRedirectUrl } from '@/lib/authRedirect'
 import { supabase } from '@/lib/supabaseClient'
+import {withTimeout} from '@/lib/asyncOperation'
 
 function GoogleMark() {
   return (
@@ -40,18 +41,21 @@ export default function SocialAuthButtons({
     setLoading(true)
     onError?.('')
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: getOAuthRedirectUrl(nextPath),
-        scopes: 'email profile',
-      },
-    })
+    try {
+      const { error } = await withTimeout(supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: getOAuthRedirectUrl(nextPath),
+          scopes: 'email profile',
+        },
+      }))
 
-    if (error) {
-      onError?.(error.message)
-      setLoading(false)
-    }
+      if (error) {
+        onError?.('La connexion Google est indisponible. Réessaie dans un instant.')
+        setLoading(false)
+      }
+    } catch { onError?.('La redirection Google a échoué. Réessaie dans un instant.') }
+    finally { setLoading(false) }
   }
 
   return (

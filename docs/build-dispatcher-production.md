@@ -55,7 +55,7 @@ Deux crons concurrents, un crash après send ou un mark perdu peuvent produire d
 doublons. Ils conservent le même uploadId. `distribution_claim` verrouille la ligne
 upload et ne prend que le statut queued ; le validateur ignore un claim absent.
 Les leases clôturent les écritures de validation. La livraison est at-least-once,
-pas exactly-once. Les migrations existantes suffisent et restent inchangées.
+pas exactly-once. Ce mécanisme repose sur les RPC des migrations distribution.
 Un upload queued déjà dispatché redevient éligible après son redispatchSeconds
 (3600 secondes dans la policy actuelle). Le cron ne garantit pas un retry instantané.
 
@@ -83,7 +83,7 @@ brutes, URLs, corps RPC, tokens, credentials et identifiants upload ne sont pas 
 Un cycle partiellement échoué est signalé en échec ; la reprise dépend du cron et
 de l'outbox, pas d'une hypothèse de retry automatique du Cron Trigger.
 
-## Préparation et déploiement futur
+## Validation et déploiement
 
 Depuis la racine du dépôt :
 
@@ -99,7 +99,7 @@ Le preflight existant vérifie les noms/forme Supabase, sans lire Cloudflare ni
 certifier le binding distant. Fournir les variables dans le shell par le mécanisme
 habituel ; ne pas écrire de secrets dans une commande versionnée.
 
-Commande de déploiement future, jamais exécutée pendant cette préparation :
+Commande de déploiement :
 
 ```text
 npx --no-install wrangler deploy --config cloudflare/wrangler.dispatcher.production.jsonc
@@ -107,10 +107,9 @@ npx --no-install wrangler deploy --config cloudflare/wrangler.dispatcher.product
 
 Avant cette commande :
 
-1. Vérifier le compte Cloudflare et le nom du Worker cible ; ce fichier prépare
-   `chibasko-build-dispatcher`, aucune existence distante n'est supposée.
+1. Vérifier le compte Cloudflare et le Worker cible `chibasko-build-dispatcher`.
 2. Configurer la variable Supabase et son secret sur ce Worker, avec accès aux RPC
-   existantes. Aucun secret du Gateway n'est modifié ou automatiquement transféré.
+   existantes. Les secrets sont propres à chaque Worker.
 3. Vérifier la Queue `chibasko-game-builds`, son consumer HTTP Pull existant et son
    association DLQ vers `chibasko-game-builds-dlq`, les retries et la rétention.
    Le fichier déclare uniquement un producteur et ne remplace pas le consumer Pull.
@@ -123,7 +122,8 @@ Avant cette commande :
 
 Après réactivation, alerter sur cycle échoué, aucun succès depuis cinq minutes, backlog croissant ou DLQ
 non vide. Un résultat sans pending est un succès, pas une absence d'exécution.
-Aucune migration, Queue, DLQ, credential ni ressource distante n'est créée ici.
+Le fichier Wrangler déclare le producteur ; vérifier séparément la Queue, la DLQ
+et les secrets nécessaires.
 
 ## Validation locale
 

@@ -1,9 +1,10 @@
 import type {PlayerAudioState} from './audio'
 import { getDomain, parse } from 'tldts'
 import { createGameBridge } from './bridge'
+import {GAME_SANDBOX,gameFramePermissions} from './iframePolicy'
 import { objectWithKeys, safeContext, RuntimeError, RUNTIME_POLICY, runtimePolicy, type RuntimePolicy, type LaunchClient, type LaunchHandle, type LaunchRequest, type RuntimeState } from './contracts'
 
-export const IFRAME_SANDBOX='allow-scripts allow-same-origin allow-pointer-lock'
+export const IFRAME_SANDBOX=GAME_SANDBOX
 export function validateLaunchHandle(value:unknown,request:LaunchRequest,parentOrigin:string):LaunchHandle {
   if(!objectWithKeys(value,['descriptor','controlToken']) || typeof value.controlToken!=='string' || !/^[a-f0-9]{64}$/.test(value.controlToken))throw new RuntimeError('invalid_descriptor')
   const h=value as LaunchHandle,d=h.descriptor
@@ -67,7 +68,7 @@ export function mountGameRuntime(options:Options) {
     iframe=container.ownerDocument.createElement('iframe')
     iframe.title='Jeu Chibasko Games';iframe.setAttribute('sandbox',IFRAME_SANDBOX)
     // Only the host container may fullscreen, keeping its exit control visible.
-    iframe.setAttribute('allow',`fullscreen 'none'; autoplay ${d.contentOrigin}; gamepad ${d.contentOrigin}; cross-origin-isolated ${d.contentOrigin}`)
+    iframe.setAttribute('allow',gameFramePermissions(d.contentOrigin,d.iframeProfile==='web-isolated-v1'))
     iframe.referrerPolicy='no-referrer';iframe.style.cssText='width:100%;height:100%;border:0;display:block;min-width:0'
     const src=new URL(d.entrypointUrl)
     src.hash=new URLSearchParams({cgLaunch:d.launchId,cgGeneration:d.generation,cgParent:host.location.origin}).toString()

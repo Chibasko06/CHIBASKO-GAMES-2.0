@@ -1,6 +1,9 @@
-# Inventaire PONG-MIGRATION-1
+# Référence historique des fichiers PONG-MIGRATION-1
 
-État de travail non commité. M = modifié, D = supprimé, A = ajouté.
+Inventaire de transition vers les artifacts et le serveur gameplay autonome.
+M = fichier adapté, D = fichier retiré, A = fichier introduit. Les chemins retirés
+servent à identifier les anciennes intégrations ; ce tableau n’est pas un état Git
+courant ni une liste de fichiers à modifier.
 
 | État | Fichier |
 | --- | --- |

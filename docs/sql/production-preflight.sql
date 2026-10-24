@@ -32,20 +32,19 @@ select c.relname,c.relrowsecurity,c.relforcerowsecurity,pg_get_userbyid(c.relown
        c.relacl
 from pg_class c join pg_namespace n on n.oid=c.relnamespace
 where n.nspname='public' and c.relkind in ('r','p')
- and (c.relname like 'game\_%' escape '\' or c.relname like 'multiplayer\_%' escape '\'
-      or c.relname in ('games','profiles','admin_users')) order by c.relname;
+ order by c.relname;
 select p.oid::regprocedure::text as signature,p.prosecdef,p.proconfig,p.proacl,
        md5(pg_get_functiondef(p.oid)) as definition_fingerprint
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-where n.nspname='public' and (p.proname like 'distribution\_%' escape '\'
- or p.proname in ('set_active_game_version','guard_game_version','guard_active_game_version','get_published_game_runtimes'))
+where n.nspname='public' and (p.proname like 'catalogue\_%' escape '\' or p.proname like 'contact\_%' escape '\' or p.proname like 'distribution\_%' escape '\'
+ or p.proname in ('admin_save_game','set_active_game_version','guard_game_version','guard_active_game_version','get_published_game_runtimes'))
 order by signature;
 select p.oid::regprocedure::text as signature,r.role_name,
        has_function_privilege(r.role_name,p.oid,'EXECUTE') as can_execute
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
 cross join (values('anon'),('authenticated'),('service_role')) as r(role_name)
 where n.nspname='public' and p.prokind='f'
- and (p.proname like 'distribution\_%' escape '\' or p.proname in ('set_active_game_version','get_published_game_runtimes'))
+ and (p.proname like 'catalogue\_%' escape '\' or p.proname like 'contact\_%' escape '\' or p.proname like 'distribution\_%' escape '\' or p.proname in ('admin_save_game','set_active_game_version','get_published_game_runtimes'))
 order by signature,role_name;
 select schemaname,tablename,policyname,roles,cmd,qual,with_check from pg_policies
 where schemaname='public' order by tablename,policyname;
@@ -58,12 +57,15 @@ order by column_name,grantee,privilege_type;
 select c.conrelid::regclass::text as table_name,c.conname,c.contype,c.convalidated,
        pg_get_constraintdef(c.oid) as definition
 from pg_constraint c join pg_namespace n on n.oid=c.connamespace
-where n.nspname='public' and (c.conrelid::regclass::text like '%game%'
- or c.conrelid::regclass::text like '%multiplayer%') order by table_name,c.conname;
+where n.nspname='public' order by table_name,c.conname;
 select t.tgrelid::regclass::text as table_name,t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) as definition
 from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace
 where n.nspname='public' and not t.tgisinternal order by table_name,t.tgname;
 select tablename,indexname,indexdef from pg_indexes where schemaname='public'
- and (tablename like 'game\_%' escape '\' or tablename like 'multiplayer\_%' escape '\')
 order by tablename,indexname;
+-- Inventorie aussi les dépendances gérées par Supabase ou par un schéma externe.
+select c.conrelid::regclass::text as source_table,c.conname,c.confrelid::regclass::text as target_table,
+       pg_get_constraintdef(c.oid) as definition,c.convalidated
+from pg_constraint c where c.contype='f' and c.confrelid in (to_regclass('auth.users'),to_regclass('public.profiles'))
+order by source_table,c.conname;
 rollback;

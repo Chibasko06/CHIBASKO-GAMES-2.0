@@ -1,10 +1,9 @@
 # Portail développeur et audit juridique — 22 octobre 2026
 
-## Périmètre et résultat
+## Périmètre
 
 Guide public /developpeurs, navigation depuis le footer et les deux états de
 /publier-un-jeu, pages /mentions-legales, /confidentialite et /cookies.
-Aucune migration, modification SDK, Pong, Gateway ou intégration de traceurs.
 Les conditions de publication restent un projet interne, non opposable en l’état.
 La mise en ligne de ces textes ne constitue pas une validation juridique complète.
 
@@ -13,21 +12,18 @@ L’activation d’un serveur online, des origines réseau, l’examen des build
 publication, la correction de métadonnées d’une mise à jour et les retraits restent
 administrés. Aucun provisioning multijoueur ni CLI officiel de packaging n’est promis.
 
-## État antérieur
+## Informations à compléter
 
-Une seule page juridique existait : app/mentions-legales/page.tsx. Aucune page
-confidentialité, cookies ou CGU distincte n’a été trouvée. La page ne décrivait que
-le contact et affirmait l’absence de cookies commerciaux sans consentement.
-Cette affirmation ne correspond pas au chargement actuel des scripts. Les
-exclusions générales de responsabilité et la clause globale de juridiction ont
-été retirées ; elles ne peuvent remplacer les obligations applicables.
-Aucune identité légale ou donnée d’immatriculation vérifiable n’a été trouvée.
+Les pages publiques couvrent les mentions légales, la confidentialité et les
+cookies. L’identité légale et les données d’immatriculation applicables restent
+à vérifier avant finalisation. Les mentions ne doivent pas affirmer l’absence
+de traceurs sans tenir compte des scripts Google et des jeux tiers.
 
 ## Références techniques inspectées
 
 | Sujet | Preuve versionnée |
 | --- | --- |
-| SDK | Version publique 0.4.0 installée dans la référence Pong : package.json, exports et declarations client/browser/connection, server/client, react/index. Le portail reste dépendant de 0.3.0 ; aucune dépendance n’est changée. |
+| SDK | Version publique 0.4.0 : exports et declarations client/browser/connection, server/client, react/index. Le portail utilise les contrats 0.3.0. |
 | Manifest | lib/game-distribution/chibasko.schema.v1.json et manifest.ts ; exemple construit depuis les constantes du schéma puis validé à l’import. |
 | Limites ZIP | lib/game-distribution/uploads/policy.ts : 524288000 octets ; 16 Gio extraits ; paths.ts, zip.ts et validator. |
 | Revue | SubmitGamePageClient, NewGameDraftEditor, UpdateGamePublication, adminBuilds et RPC distribution de soumission/publication. |
@@ -35,7 +31,7 @@ Aucune identité légale ou donnée d’immatriculation vérifiable n’a été 
 | Auth | lib/supabaseClient.ts, lib/server/supabaseSession.ts, proxy.ts ; cookies Supabase et migration depuis ancien localStorage. |
 | Historique | components/PlaySessionTracker.tsx : play_history pour les comptes connectés, compteurs et marqueurs sessionStorage. |
 | Audio | components/game-runtime/usePlayerAudio.ts : chibasko.player.audio.v1 en localStorage. |
-| Contact | components/ContactPageClient.tsx envoie prénom, nom, e-mail et message à FormSubmit, destination chibasko06@gmail.com. Ce n’est pas le flux Resend. |
+| Contact | components/ContactPageClient.tsx utilise /api/contact ; Resend reçoit le message côté serveur. Les reçus techniques ne stockent que des empreintes temporaires. |
 | Audience | components/SiteAnalytics.tsx : raccord CMP Google / Consent Mode, chargement après accord Analytics explicite ; exclusion des lobbies privés. |
 | Publicité | app/layout.tsx : script AdSense inconditionnel dans head. |
 | Hébergement | Wrangler/OpenNext portail, Worker Artifact Gateway et bindings R2 ; Supabase Auth/Postgres ; Resend pour e-mails transactionnels. |
@@ -55,7 +51,7 @@ Le Gateway de launch utilise une capability, sans autorisation par cookie.
 | E-mails | Contact, sujet, corps, snapshot de soumission et boîte admin | Notifications du service / réponse aux demandes | Retry borné à huit claims/23 h ≠ délai de suppression ; définir purge outbox, logs Resend et messagerie. |
 | Sécurité/control plane | Launch/session/lobby, identifiants opaques, correspondances privées, hashes tickets/credentials, traces bornées ; réseau/IP chez l’hébergeur | Exécution de partie et intérêt légitime de sécurité | TTL des tickets/sessions et cleanup existants ne constituent pas une politique RGPD complète ; fixer logs et historiques durables. |
 | Analytics/publicité | Données réseau/navigation/traceurs éventuels chez Google | Consentement préalable sauf exemption démontrée | CMP Google active ; raccord Consent Mode ajouté. Écart bloquant pour Analytics tant que Google retourne NOT_CONFIGURED ; conservation Google non confirmée. |
-| Contact FormSubmit | Prénom, nom, e-mail, message, puis boîte destinataire | Répondre selon la demande | DPA, destinataires, transferts et conservation non vérifiés. |
+| Contact Resend | Prénom, nom, e-mail, message, puis boîte destinataire | Répondre selon la demande | DPA, destinataires, transferts et conservation non vérifiés. |
 
 Ne pas inventer des délais dans les pages publiques. Leur absence est signalée
 explicitement ; elle doit être résolue avant de présenter l’information comme
@@ -78,24 +74,21 @@ statut de l’éditeur et la qualification juridique du service.
 - **À DÉFINIR : conservation**, purge/anonymisation par catégorie, sauvegardes,
   procédure d’exercice des droits, gestion des mineurs et signalements.
 - **À VÉRIFIER : entités contractantes, régions, DPA, sous-traitants, garanties de
-  transfert et accès support** Cloudflare, Supabase, Resend, FormSubmit et Google.
+  transfert et accès support** Cloudflare, Supabase, Resend et Google.
 
-Ces marqueurs restent dans ce rapport, pas comme fausses mentions dans les pages.
-L’hébergement Cloudflare est décrit selon la configuration réelle ; ses coordonnées
-publiques ont été vérifiées sur ses documents officiels, pas inventées pour le projet.
+Les informations manquantes doivent être vérifiées avant leur publication.
+Les coordonnées des prestataires doivent provenir de leurs documents officiels.
 
 ## Consentement et traceurs — action requise
 
-La CMP Google AdSense est active en production. L’audit a confirmé que GA était
-chargé séparément avant tout accord et que Google retournait NOT_CONFIGURED.
+La CMP Google AdSense gère les choix de consentement.
 Le raccord décrit dans docs/analytics-consent.md définit les defaults denied,
 attend les valeurs officielles et ne charge GA qu’après accord Analytics explicite.
 Le paramétrage Google doit fournir ces valeurs ; NOT_CONFIGURED reste bloquant
-pour Analytics. Aucun second gestionnaire de consentement n’est ajouté.
-Avant publication des changements comme dispositif complet : conditionner les
-scripts non nécessaires à un choix valide (refus aussi accessible que l’accord,
-retrait possible), ou suspendre ces scripts ; auditer aussi les iframes legacy.
-Aucun de ces scripts n’est modifié par cet audit.
+pour Analytics. La CMP Google est l’unique gestionnaire de consentement.
+Vérifier que les scripts non nécessaires dépendent d’un choix valide, avec refus
+accessible et retrait possible. Sans choix valide, suspendre ces scripts ;
+auditer aussi les iframes legacy.
 Les noms/durées réels des cookies Google, Cloudflare et jeux tiers restent à
 mesurer en navigateur par environnement ; ne pas les déduire des seuls scripts.
 
@@ -106,8 +99,7 @@ La case actuelle ne confirme que les droits ; elle n’enregistre pas une accept
 versionnée d’un contrat d’hébergement/distribution. Ne pas lui attribuer cette portée
 rétroactivement. Après validation juridique, décider du texte public, de son
 acceptation explicite et de la preuve versionnée ; une évolution de stockage peut
-alors être nécessaire. Aucune migration anticipée n’est ajoutée ici.
-Aucune CGU globale n’est inventée : son besoin et son contenu restent à examiner.
+alors être nécessaire. Le besoin et le contenu de CGU globales restent à examiner.
 
 ## Sources officielles consultées le 22 octobre 2026
 

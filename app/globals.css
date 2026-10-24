@@ -53,3 +53,16 @@ a {
 .site-content{position:relative;z-index:var(--layer-page);min-width:0}
 .account-dropdown{z-index:var(--layer-dropdown)}
 .floating-control{z-index:var(--layer-floating)}
+
+:where(a,button,input,textarea,select,summary,[tabindex]):focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 3px;
+}
+.skip-link{position:fixed;top:8px;left:8px;z-index:var(--layer-modal);padding:12px;background:#0d1119;color:#67e8f9;transform:translateY(-160%)}
+.skip-link:focus{transform:translateY(0)}
+label:has(input[type="file"]:focus-visible){outline:2px solid #67e8f9;outline-offset:3px}
+/* Le texte secondaire doit rester lisible sur les surfaces sombres. */
+.text-zinc-500{color:#858591}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}
+}

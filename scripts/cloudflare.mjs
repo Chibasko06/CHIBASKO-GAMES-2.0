@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises'
 
 const command = process.argv[2]
 if (!['build', 'preview', 'deploy'].includes(command)) throw new Error('Unknown Cloudflare command')
-// Keep the normal Next.js commands and Vercel configuration untouched.
+// Runs OpenNext separately from the standard Next.js commands.
 const cli = fileURLToPath(new URL('../node_modules/@opennextjs/cloudflare/dist/cli/index.js', import.meta.url))
 const args = [cli, command, ...process.argv.slice(3)]
 if (command === 'deploy') args.push('--keep-vars')

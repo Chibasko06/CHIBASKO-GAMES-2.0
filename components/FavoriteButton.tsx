@@ -18,6 +18,8 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [reload, setReload] = useState(0)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -31,6 +33,7 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
       }
 
       if (!user) {
+        setLoadError(false)
         setUserId(null)
         setIsGameFavorite(false)
         setLoading(authLoading)
@@ -41,16 +44,24 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
         return
       }
 
-      await ensureProfile(session)
-      const favorite = await isFavorite(user.id, gameId)
+      try {
+        setLoading(true)
+        setLoadError(false)
+        await ensureProfile(session)
+        const favorite = await isFavorite(user.id, gameId)
 
-      if (!mounted || requestId !== requestIdRef.current) {
-        return
+        if (!mounted || requestId !== requestIdRef.current) {
+          return
+        }
+
+        setUserId(user.id)
+        setIsGameFavorite(favorite)
+        setLoading(false)
+      } catch {
+        if (mounted && requestId === requestIdRef.current) setLoadError(true)
+      } finally {
+        if (mounted && requestId === requestIdRef.current) setLoading(false)
       }
-
-      setUserId(user.id)
-      setIsGameFavorite(favorite)
-      setLoading(false)
     }
 
     void checkFavorite()
@@ -58,7 +69,7 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
     return () => {
       mounted = false
     }
-  }, [authLoading, gameId, session, user])
+  }, [authLoading, gameId, session, user, reload])
 
   const notifyFavoriteChange = (favorite: boolean) => {
     window.dispatchEvent(
@@ -69,6 +80,7 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
   }
 
   const toggleFavorite = async () => {
+    if (loadError) { setLoading(true); setReload(value => value + 1); return }
     if (pending) {
       return
     }
@@ -83,39 +95,43 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
     const nextValue = !previousValue
     setIsGameFavorite(nextValue)
 
-    const profileSync = await ensureProfile()
+    try {
+      const profileSync = await ensureProfile()
 
-    if (!profileSync.ok) {
+      if (!profileSync.ok) {
+        setIsGameFavorite(previousValue)
+        alert('Impossible de preparer ton profil joueur pour les favoris.')
+        setPending(false)
+        return
+      }
+
+      if (isGameFavorite) {
+        const { error } = await removeFavorite(userId, gameId)
+
+        if (error) {
+          setIsGameFavorite(previousValue)
+          alert('Impossible de modifier les favoris. Réessaie dans un instant.')
+        } else {
+          notifyFavoriteChange(false)
+        }
+      } else {
+        const { error } = await addFavorite(userId, gameId)
+
+        if (error) {
+          setIsGameFavorite(previousValue)
+          alert(error.message)
+        } else {
+          notifyFavoriteChange(true)
+        }
+      }
+
+    } catch {
       setIsGameFavorite(previousValue)
-      alert('Impossible de preparer ton profil joueur pour les favoris.')
-      setPending(false)
-      return
-    }
-
-    if (isGameFavorite) {
-      const { error } = await removeFavorite(userId, gameId)
-
-      if (error) {
-        setIsGameFavorite(previousValue)
-        alert(error.message)
-      } else {
-        notifyFavoriteChange(false)
-      }
-    } else {
-      const { error } = await addFavorite(userId, gameId)
-
-      if (error) {
-        setIsGameFavorite(previousValue)
-        alert(error.message)
-      } else {
-        notifyFavoriteChange(true)
-      }
-    }
-
-    setPending(false)
+      alert('Impossible de modifier les favoris. Réessaie dans un instant.')
+    } finally { setPending(false) }
   }
 
-  if(compact)return <button type="button" className={playerStyles.iconButton} aria-label="Favori" aria-pressed={isGameFavorite} disabled={loading || pending} title={loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'} onClick={()=>void toggleFavorite()}><PlayerIcon name="favorite"/><span className={playerStyles.tooltip} aria-hidden="true">{loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'}</span></button>
+  if(compact)return <button type="button" className={playerStyles.iconButton} aria-label="Favori" aria-pressed={loadError ? undefined : isGameFavorite} disabled={loading || pending} title={loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'} onClick={()=>void toggleFavorite()}><PlayerIcon name="favorite"/><span className={playerStyles.tooltip} aria-hidden="true">{loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'}</span></button>
 
   if (loading) {
     return <div className="w-10 h-10 bg-zinc-900 animate-pulse border border-zinc-800" />
@@ -130,7 +146,7 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
           ? 'bg-cyan-500 border-cyan-400 text-black'
           : 'bg-transparent border-zinc-700 text-zinc-500 hover:border-cyan-500'
       }`}
-      title={isGameFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+      title={loadError ? 'Favoris indisponibles · Réessayer' : isGameFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

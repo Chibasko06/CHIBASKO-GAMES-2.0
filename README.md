@@ -11,8 +11,8 @@ par Artifact Gateway puis chargés dans le GameRuntime générique isolé.
 
 Le control plane multijoueur PostgreSQL gère les salons public/privé, le roster,
 la readiness et les rounds. Les serveurs gameplay sont des deployments séparés.
-Chibasko Pong produit son build et son serveur dans son propre dépôt ; le dossier
-serveur historique de ce portail et les registres de code jeu sont supprimés.
+Chibasko Pong produit son build et son serveur dans son propre dépôt ; son
+serveur gameplay n'appartient pas à ce portail.
 
 L'installation ne demande aucun accès GitHub privé. Aucune authentification Git
 n'est nécessaire pour construire le portail. L'activation production reste une
@@ -25,10 +25,10 @@ Voir [PONG-MIGRATION-1](docs/pong-migration.md),
 et [Control plane multijoueur](docs/multiplayer-sessions.md).
 
 Le [plan d'activation production](docs/production-activation.md) fixe l'ordre des
-migrations et ressources, les prérequis du domaine/PSL, les contrôles de sécurité
-et le rollback. La [checklist](docs/production-activation-checklist.md) reste à
-exécuter pendant une activation distincte ; aucune infrastructure n'est activée
-par les builds ou le préflight local.
+migrations et ressources, les contrôles de sécurité et le rollback. Pour le
+domaine actuel, consulter [l'isolation sans PRIVATE PSL](docs/artifact-gateway-production.md#isolation-sans-private-psl).
+La [checklist](docs/production-activation-checklist.md) accompagne les opérations
+d'infrastructure ; les builds et le préflight local ne les exécutent pas.
 
 La [matrice GO-LIVE](docs/production-go-gates.md) consigne les preuves locales,
 les gates externes, le contrôle de drift read-only et les opérations restant à
@@ -46,7 +46,7 @@ npm run build
 npm start
 ```
 
-Les tests Node utilisent `registerHooks` : Node 24 est recommande (version utilisee pour la validation). Aucune nouvelle dependance de test n'est installee. `npm test` utilise des doubles Supabase/Resend ; il n'envoie aucun email et ne touche aucune base distante.
+Les tests Node utilisent `registerHooks` : Node 24 est recommande. `npm test` utilise des doubles Supabase/Resend ; il n'envoie aucun email et ne touche aucune base distante.
 
 ## Variables d'environnement
 
@@ -62,11 +62,9 @@ Configurer `.env.local` pour le developpement et les secrets correspondants dans
 | `RESEND_FROM_EMAIL` | Expediteur autorise et verifie dans Resend |
 | `PASSWORD_RESET_CODE_SECRET` | Secret aleatoire d'au moins 32 caracteres pour les HMAC |
 
-Toutes ces variables restent utiles. Aucune suppression de variable n'est necessaire pour retirer l'import historique ou la progression.
+## Migrations de securite et compatibilite
 
-## Phase 0 : application des migrations
-
-Les trois nouvelles migrations correctives se trouvent dans `supabase/migrations/` :
+Les migrations correctives du 7 octobre 2026 se trouvent dans `supabase/migrations/` :
 
 1. `20261007000100_retire_time_based_progression.sql`
 2. `20261007000200_secure_password_reset.sql`
@@ -109,26 +107,35 @@ POST confirm -> consommation SQL atomique -> Supabase Auth
 - Le code expire meme sans nettoyage. Les demandes expirees et compteurs de plus de 24 heures sont purges lors des nouvelles reservations ; en l'absence de trafic, leur purge attend la prochaine demande. `cleanup_password_reset_requests()` peut etre appelee par une maintenance avec `service_role`, sans nouveau service obligatoire.
 - Tables et RPC de reset sont inaccessibles aux roles `anon`/`authenticated` ; les protections ne reposent pas sur la memoire d'une fonction serverless.
 
-## Propositions de jeux
+## Soumissions developpeur
 
-```text
-Formulaire public -> /api/game-submissions -> validation -> service_role -> table
-Admin -> utilisateur Supabase validé + admin_users -> service_role serveur -> table
-```
+Le parcours `/publier-un-jeu` nécessite un compte et une fiche développeur.
+Il enregistre les brouillons privés, téléverse le ZIP dans R2 staging et transmet
+la soumission à la revue admin. La validation technique ne publie pas le jeu.
+Voir [le workflow de soumission](docs/developer-submissions.md) et
+[la revue manuelle](docs/manual-build-review.md).
 
-La migration active RLS, retire les anciennes policies ainsi que les droits de table/colonnes publics, et reserve le CRUD au backend. Ni un visiteur ni un membre ordinaire ne peuvent lire, inserer, modifier ou supprimer directement une proposition via Supabase.
+### Compatibilite avec les anciennes propositions
 
-L'API publique accepte un objet JSON de 32 Kio maximum, valide les types, longueurs, email, URLs HTTPS sans identifiants, categories (8 maximum), options et confirmation de propriete booleenne. Elle construit une liste explicite de champs autorises. `status='pending'` et `admin_notes=null` sont imposes cote serveur ; les identifiants, horodatages et champs de revue envoyes par le client sont ignores. Les erreurs internes de base ne sont pas exposees.
+L’ancien endpoint anonyme `POST /api/game-submissions` répond HTTP 410 et
+n’écrit plus en base. Les nouvelles soumissions utilisent le parcours authentifié
+`/publier-un-jeu`. Les anciennes propositions restent accessibles aux admins.
 
-Le formulaire reste accessible sans compte. L'administration continue de consulter, annoter, changer les statuts et supprimer via ses API existantes. Le rate limiting anti-spam du formulaire est un durcissement distinct a envisager si necessaire ; ce changement n'ajoute pas de CAPTCHA/service externe.
+### Sauvegarde du catalogue admin
+
+La migration `20261023000100_atomic_admin_catalogue.sql` fournit la RPC
+transactionnelle `admin_save_game`, réservée au backend après vérification admin.
+Vérifier son application avant de déployer les routes qui l’utilisent. Un échec
+annule ensemble les modifications du jeu et de ses catégories. La suppression
+éventuelle de l’ancienne miniature intervient seulement après réussite SQL.
 
 ## Retraits et conservation des donnees
 
-- Le mecanisme d'import V1 (route et utilitaire `fs`/`vm`) est supprime. Aucun jeu, categorie, lien du catalogue ou fichier de `public/games/` n'est supprime.
-- L'XP, les niveaux, le tri par XP, les controles admin, les appels RPC et le heartbeat ont ete retires de l'application.
+- Le portail ne propose pas d'import V1 par execution de fichiers `fs`/`vm`.
+- L'application ne propose pas de progression XP, de niveaux ou de tri par XP.
 - `profiles.xp_points` et `profiles.last_xp_tick_at` restent en base pour conserver les donnees historiques. L'application ne les selectionne plus et ils ne figurent plus dans son contrat TypeScript. La RPC de gain est supprimee ; le trigger de creation de profil est conserve sans initialisation explicite de ces champs. Leurs anciens defaults restent pour compatibilite, sans gain d'XP.
 - Les utilisateurs ne peuvent plus modifier ces deux anciennes colonnes. Les mises a jour autorisees du profil (dont l'avatar) restent soumises aux RLS existantes.
-- Historique, vues, favoris, avis, reactions, profils, Google Auth, catalogue, iframes, SEO et stockage actuel sont conserves.
+- L'historique, les favoris, les avis et les reactions restent lies au compte ; les autorisations propres a chaque table s'appliquent.
 
 ## Tests SQL locaux
 
@@ -148,16 +155,42 @@ npm run test:db
 
 Le script prepare le schema minimal, simule d'anciens droits permissifs, applique deux fois les trois migrations et verifie : compte/profil preserve, avatar modifiable, progression bloquee, RLS/droits/RPC, CRUD backend, expiration, cinq essais, quotas, ancien code invalide et nettoyage. Il lance aussi 12 connexions concurrentes pour tester reservation, consommation unique et plafond de tentatives. Repartir d'un cluster jetable neuf pour un nouvel execution complete.
 
-## Preview Cloudflare (Phase 1)
+## Hebergement Cloudflare
 
 Voir [le guide de preview](docs/cloudflare-preview.md) pour OpenNext, les commandes
 `build:cloudflare`, `preview:cloudflare`, `deploy:cloudflare`, les variables runtime,
-Supabase Auth et la protection contre l'indexation. Vercel reste la production ;
-aucun DNS, domaine ou asset existant n'est migre.
+Supabase Auth et la distinction entre domaines publics et preview. Le Worker
+`chibasko-games-preview` sert le domaine public ; son nom ne détermine pas
+l'indexation des réponses.
 
-## Points restant avant bascule du domaine
+## Controles d'exploitation
 
 Valider les parcours complets sur l'URL Cloudflare distante et ses limites de runtime.
-L'audit des dependances transitives, la strategie de rafraichissement du sitemap,
-les erreurs Supabase masquees et les requetes de catalogue globales restent des
-points distincts. L'historique SQL initial reste a regulariser sans reecriture silencieuse.
+La stratégie de rafraîchissement du sitemap et les limites de runtime se vérifient
+avec la charge réelle. L'historique SQL initial reste à régulariser sans réécriture silencieuse.
+
+### Lecture du catalogue
+
+La migration `20261024000400_catalogue_pagination.sql` fournit une projection
+publique paginée. Le catalogue filtre en base avant de trier et paginer : 24 jeux
+par page, 24 profils, 24 favoris, 20 avis et 50 lignes par liste admin. Les tris
+utilisent l'identifiant comme dernier critère. Les compteurs et la moyenne des
+avis portent sur le jeu entier, indépendamment de la page affichée.
+
+La home charge huit jeux populaires, dix jeux par catégorie, les classements et
+dix jeux multijoueurs. Les fiches chargent leur slug et des recommandations
+bornées, sans charger tout le catalogue. Le sitemap sélectionne uniquement les
+identifiants, slugs et catégories nécessaires. Aucun cache partagé de données
+personnelles n'est ajouté ; les lectures de page restent actuelles et les données
+de fiche sont dédupliquées au sein de la requête React.
+L'historique sélectionne les derniers jeux distincts en base, avec un index sur
+le compte, le jeu et la date. La RPC conserve les RLS et refuse la lecture d'un
+autre compte ; les parties répétées ne multiplient pas les requêtes du navigateur.
+
+La pagination numérotée conserve des liens HTML et des URL partageables. Une
+modification du catalogue ou d'un classement entre deux pages peut déplacer des
+résultats ; il ne s'agit pas d'un instantané de consultation. Les exports lisent
+des lots de cent lignes et échouent si le total change, si une page est tronquée
+ou si le plafond de 50 000 lignes est dépassé. Ils ne garantissent pas un instantané
+transactionnel d'une base modifiée pendant l'export. Au-delà de ce volume, les
+exports doivent devenir des traitements différés et le sitemap doit être partitionné.

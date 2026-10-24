@@ -1,7 +1,8 @@
 "use client";
 
+import FormField from '@/components/ui/FormField'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import SocialAuthButtons from '@/components/SocialAuthButtons'
 import { ensureProfile } from '@/lib/profileSync'
@@ -9,8 +10,15 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useAuthNext } from '@/lib/useAuthNext'
 import { getOAuthRedirectUrl } from '@/lib/authRedirect'
+import {withTimeout} from '@/lib/asyncOperation'
 
 export default function RegisterPage() {
+  const attemptRef = useRef({mounted: false, id: 0})
+  useEffect(() => {
+    const attempt = attemptRef.current
+    attempt.mounted = true
+    return () => { attempt.mounted = false; attempt.id++ }
+  }, [])
   const next = useAuthNext()
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -24,40 +32,49 @@ export default function RegisterPage() {
 
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault()
+    const id = ++attemptRef.current.id
+    const current = () => attemptRef.current.mounted && attemptRef.current.id === id
     setLoading(true)
     setMessage(null)
 
     const trimmedUsername = username.trim()
     const trimmedBio = bio.trim()
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: getOAuthRedirectUrl(next),
-        data: {
-          user_name: trimmedUsername,
-          username: trimmedUsername,
-          bio: trimmedBio,
-          onboarding_bio: trimmedBio,
+    try {
+      const { data, error } = await withTimeout(supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: getOAuthRedirectUrl(next),
+          data: {
+            user_name: trimmedUsername,
+            username: trimmedUsername,
+            bio: trimmedBio,
+            onboarding_bio: trimmedBio,
+          },
         },
-      },
-    })
+      }))
 
-    if (error) {
-      setMessage(error.message)
+      if (!current()) return
+      if (error) {
+        setMessage('Inscription impossible. Vérifie les informations et réessaie dans un instant.')
+        setLoading(false)
+        return
+      }
+
+      if (data.session) {
+        await ensureProfile(data.session)
+        if (!current()) return
+        router.replace(next)
+        return
+      }
+
+      setMessage('Compte cree. Verifie ton email pour confirmer ton inscription, puis connecte-toi quand tu veux.')
       setLoading(false)
-      return
-    }
-
-    if (data.session) {
-      await ensureProfile(data.session)
-      router.replace(next)
-      return
-    }
-
-    setMessage('Compte cree. Verifie ton email pour confirmer ton inscription, puis connecte-toi quand tu veux.')
-    setLoading(false)
+    } catch {
+      if (!current()) return
+      setMessage('La réponse d’inscription n’a pas pu être reçue. Vérifie tes e-mails ou essaie de te connecter avant de recommencer.')
+    } finally { if (current()) setLoading(false) }
   }
 
   if (!authLoading && user) {
@@ -122,30 +139,30 @@ export default function RegisterPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            <input
+            <FormField label="Pseudo" descriptionId="auth-feedback"><input
               type="text"
               required
               value={username}
               placeholder="Pseudo"
               className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-sm text-white outline-none focus:border-cyan-500"
               onChange={(event) => setUsername(event.target.value)}
-            />
-            <input
+            /></FormField>
+            <FormField label="Email" descriptionId="auth-feedback"><input
               type="email"
               required
               value={email}
               placeholder="Email"
               className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-sm text-white outline-none focus:border-cyan-500"
               onChange={(event) => setEmail(event.target.value)}
-            />
-            <input
+            /></FormField>
+            <FormField label="Mot de passe" descriptionId="auth-feedback"><input
               type="password"
               required
               value={password}
               placeholder="Mot de passe"
               className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-sm text-white outline-none focus:border-cyan-500"
               onChange={(event) => setPassword(event.target.value)}
-            />
+            /></FormField>
           </div>
         </div>
 
@@ -153,6 +170,8 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={() => setShowOptional((current) => !current)}
+            aria-expanded={showOptional}
+            aria-controls="register-optional"
             className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left sm:px-6"
           >
             <div>
@@ -168,14 +187,14 @@ export default function RegisterPage() {
           </button>
 
           {showOptional ? (
-            <div className="border-t border-zinc-800 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+            <div id="register-optional" className="border-t border-zinc-800 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                <textarea
+                <FormField label="Bio courte optionnelle" descriptionId="auth-feedback"><textarea
                   value={bio}
                   placeholder="Bio courte optionnelle"
                   className="min-h-28 w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-sm text-white outline-none focus:border-cyan-500"
                   onChange={(event) => setBio(event.target.value)}
-                />
+                /></FormField>
                 <div className="rounded-2xl border border-dashed border-cyan-900/70 bg-cyan-950/10 p-4">
                   <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Avatar</p>
                   <p className="mt-3 text-sm leading-6 text-zinc-400">
@@ -194,7 +213,7 @@ export default function RegisterPage() {
           {loading ? 'Inscription...' : "S'inscrire"}
         </button>
 
-        {message ? <p className="text-sm leading-6 text-cyan-300">{message}</p> : null}
+        {message ? <p id="auth-feedback" role="status" className="text-sm leading-6 text-cyan-300">{message}</p> : null}
 
         <p className="text-sm leading-6 text-zinc-400">
           Tu pourras toujours modifier ton pseudo, ta bio ou ton avatar plus tard depuis ton profil.

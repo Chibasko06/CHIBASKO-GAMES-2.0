@@ -73,7 +73,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-zinc-900/80 px-4 py-4 text-center text-[11px] uppercase tracking-[0.3em] text-zinc-600">
+      <div className="border-t border-zinc-900/80 px-4 py-4 text-center text-[11px] uppercase tracking-[0.3em] text-zinc-400">
         © {new Date().getFullYear()} Chibasko Games
       </div>
     </footer>

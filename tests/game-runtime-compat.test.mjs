@@ -108,7 +108,7 @@ test('renewal timeout aborts, retries, and ignores a late response from its time
 })
 test('a renewed lease for another generation fails closed and revokes this launch',async t=>{
   const {states,h,dom,revoked}=await mounted(t,'published',base=>({...base,async renew(...args){return {...await base.renew(...args),generation:randomUUID()}}}),{leaseRenewMs:1000})
-  t.mock.timers.tick(1000);await flush();await flush();assert.equal(states.at(-1).error,'invalid_lease');assert.equal(dom.window.document.querySelector('iframe'),null)
+  t.mock.timers.tick(1000);await waitFor(() => states.at(-1).error === 'invalid_lease');assert.equal(states.at(-1).error,'invalid_lease');assert.equal(dom.window.document.querySelector('iframe'),null)
   await revoked;assert.equal(h.released.length,1)
 })
 

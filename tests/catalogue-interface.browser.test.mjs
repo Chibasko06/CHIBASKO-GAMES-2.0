@@ -17,7 +17,7 @@ before(async()=>{
  auth:"const user={id:'fixture-user',email:'fixture@example.test'},session={access_token:'fixture-only',user};export function useAuth(){return {user,session,loading:false}}",
  supabase:"export const supabase={auth:{async signOut(){}},from(){return {select(){return this},eq(){return this},abortSignal(){return this},async maybeSingle(){return {data:null,error:null}}}},async rpc(){return {data:[],error:null}}}",
  profile:"export async function ensureProfile(){return {ok:true}}",
- navigation:"export function useRouter(){return {push(){}}} export function useSearchParams(){return new URLSearchParams(window.location.search)}",
+ navigation:"export function useRouter(){return {push(){},replace(path){window.catalogueNavigation=path}}} export function useSearchParams(){return new URLSearchParams(window.location.search)}",
  link:"import {createElement} from 'react';export default function Link(props){return createElement('a',props)}",
  image:"import {createElement} from 'react';export default function Image({fill,priority,unoptimized,...props}){return createElement('img',{...props,style:fill?{position:'absolute',inset:0,width:'100%',height:'100%'}:props.style})}",
  }[path]}))
@@ -142,4 +142,22 @@ for(const width of [1920,1366,768])test('catalogue and home share card geometry 
  for(const card of await home.page.locator('[data-popular] article').all())assert.deepEqual(await card.evaluate(geometry),reference);
  console.log('CARD REFERENCE '+width+' '+JSON.stringify(reference));
  }finally{await catalogue.context.close();await home.context.close()}
+})
+
+for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,height:1024},{width:1366,height:768},{width:1920,height:1080}])test('recherche du catalogue et images stables '+viewport.width,async()=>{
+ const x=await setup('catalogue',viewport)
+ try{
+  await x.page.evaluate(()=>window.catalogueFixture.render({page:'catalogue',total:1205,cataloguePage:2}))
+  const pagination=x.page.getByRole('navigation',{name:'Pages du catalogue'})
+  assert.equal(await pagination.getByRole('link',{name:'Précédent'}).getAttribute('href'),'/games')
+  assert.equal(await pagination.getByRole('link',{name:'Suivant'}).getAttribute('href'),'/games?page=3')
+  const before=await x.page.locator('article').first().boundingBox()
+  await x.page.getByPlaceholder('Titre, categorie, studio, techno...').fill('Pong')
+  assert.equal(await x.page.evaluate(()=>window.catalogueNavigation),undefined)
+  await x.page.getByRole('button',{name:'Rechercher',exact:true}).click()
+  assert.equal(await x.page.evaluate(()=>window.catalogueNavigation),'/games?search=Pong')
+  const after=await x.page.locator('article').first().boundingBox()
+  assert.equal(after.width,before.width);assert.equal(after.height,before.height)
+  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ }finally{await x.context.close()}
 })

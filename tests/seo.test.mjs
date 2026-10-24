@@ -12,6 +12,13 @@ import GamePage,{generateMetadata as detailMetadata} from '../app/games/[slug]/p
 import Home from '../app/page.tsx'
 import config from '../next.config.ts'
 
+test('les pages suivantes du catalogue conservent leur canonical propre',async()=>{
+ fixture()
+ const metadata=await catalogueMetadata({searchParams:Promise.resolve({category:'action',page:'2',utm_source:'fixture'})})
+ assert.equal(metadata.alternates.canonical,absoluteUrl('/games?category=action&page=2'))
+ assert.match(String(metadata.title),/Page 2/)
+})
+
 const category={id:'category-action',name:'Action',slug:'action'}
 export const game={id:'game-public',title:'Jeu de précision',slug:'jeu-de-precision',description:'Place la balle et vise les cibles dans ce jeu de précision.',is_published:true,game_type:'classic',active_version_id:null,thumbnail_url:null,game_url:'https://legacy.test/game',developer_name:'Studio de test',technology:'HTML5',views_count:12,play_count:0,created_at:'2026-10-01T12:00:00Z',categories:[category],likes_count:0,dislikes_count:0,ratings_count:0,average_rating:0,favorites_count:0,comments_count:0}
 export function fixture(){
@@ -97,7 +104,8 @@ test('private routes have noindex without changing public indexing or preview pr
  assert.equal(rules.allow,'/')
  assert.ok(!rules.disallow.includes('/'))
  assert.ok(!rules.disallow.includes('/login'))
- assert.deepEqual((await config.headers())[0],{source:'/api/:path*',headers:[{key:'X-Robots-Tag',value:'noindex, nofollow'}]})
+ const apiHeaders=(await config.headers()).find(rule=>rule.source==='/api/:path*').headers
+ assert.ok(apiHeaders.some(header=>header.key==='X-Robots-Tag'&&header.value==='noindex, nofollow'))
  const root=await readFile(new URL('../app/layout.tsx',import.meta.url),'utf8')
  assert.match(root,/index: true/)
  assert.doesNotMatch(root,/canonical: siteConfig.url/)

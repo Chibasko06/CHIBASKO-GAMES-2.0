@@ -1,10 +1,11 @@
 import { uploadRepository } from '../lib/game-distribution/uploads/repository'
 import { dispatchUploads } from '../services/build-validator/queue'
 
-type Environment={SUPABASE_URL:string;SUPABASE_SERVICE_ROLE_KEY:string;BUILD_VALIDATIONS:{send(body:string,options:{contentType:'text'}):Promise<unknown>}}
+type Environment={GAME_BUILD_DISPATCHER_ENABLED?:string;SUPABASE_URL:string;SUPABASE_SERVICE_ROLE_KEY:string;BUILD_VALIDATIONS:{send(body:string,options:{contentType:'text'}):Promise<unknown>}}
 /** Separate scheduled Worker, never executes ZIP/game content. No public HTTP API. */
 const dispatcher = {
   async scheduled(_event: unknown,env: Environment) {
+    if(env.GAME_BUILD_DISPATCHER_ENABLED!=='1')return
     const started=Date.now()
     try {
       const result=await dispatchUploads(uploadRepository(env.SUPABASE_URL,env.SUPABASE_SERVICE_ROLE_KEY),

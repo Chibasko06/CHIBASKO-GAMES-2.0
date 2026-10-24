@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/components/AuthProvider'
+import {withTimeout} from '@/lib/asyncOperation'
+import {readData} from '@/lib/dataAccess'
 import { supabase } from '@/lib/supabaseClient'
 import UserDropdown from '@/components/UserDropdown'
 import ChibaskoLogo from '@/components/ChibaskoLogo'
@@ -18,7 +20,15 @@ export function Navbar() {
   const [adminUserId, setAdminUserId] = useState<string | null>(null)
   const isAdmin = !!user && adminUserId === user.id
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [profileUnavailable, setProfileUnavailable] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileTrigger=useRef<HTMLButtonElement>(null)
+  useEffect(()=>{
+    if(!mobileMenuOpen)return
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){setMobileMenuOpen(false);mobileTrigger.current?.focus()}}
+    document.addEventListener('keydown',escape)
+    return()=>document.removeEventListener('keydown',escape)
+  },[mobileMenuOpen])
 
   useEffect(() => {
     let mounted = true
@@ -29,18 +39,19 @@ export function Navbar() {
       if (userId) {
         // Avatar availability must not delay the independent admin status check.
         const profileRequest = async () => {
-          const { data: profile } = await supabase
+          const { data: profile } = await readData('navigation_profile', supabase
             .from('profiles')
             .select('avatar_url')
             .eq('id', userId)
             .abortSignal(controller.signal)
-            .maybeSingle()
+            .maybeSingle())
 
           if (mounted) {
             setAvatarUrl(profile?.avatar_url ?? null)
+            setProfileUnavailable(false)
           }
         }
-        void profileRequest().catch(() => { if (mounted) setAvatarUrl(null) })
+        void profileRequest().catch(() => { if (mounted) setProfileUnavailable(true) })
 
         if (token) {
           const response = await fetch('/api/admin/status', {
@@ -60,6 +71,7 @@ export function Navbar() {
       } else if (mounted) {
         setAdminUserId(null)
         setAvatarUrl(null)
+        setProfileUnavailable(false)
       }
     }
 
@@ -73,8 +85,11 @@ export function Navbar() {
   }, [token, userId])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/'
+    try {
+      const result = await withTimeout(supabase.auth.signOut())
+      if (result?.error) throw new Error('sign_out_failed')
+      window.location.href = '/'
+    } catch { window.alert('La déconnexion n’a pas pu être confirmée. Réessaie dans un instant.') }
   }
 
   const handleCloseMobileMenu = () => {
@@ -86,6 +101,7 @@ export function Navbar() {
       <nav className="mx-auto w-full max-w-[2200px] px-4 py-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <div className="flex items-center justify-between gap-4">
           <ChibaskoLogo />
+          {profileUnavailable && <span role="status" className="sr-only">Le profil est temporairement indisponible.</span>}
 
           <div className="hidden items-center gap-2 text-zinc-300 lg:flex xl:gap-3">
             <Link href="/games" className={sharedLinkClass}>
@@ -126,7 +142,9 @@ export function Navbar() {
             onClick={() => setMobileMenuOpen((current) => !current)}
             className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-cyan-900 bg-zinc-950 text-cyan-200 transition-colors hover:bg-zinc-900 lg:hidden"
             aria-expanded={mobileMenuOpen}
-            aria-label="Ouvrir le menu"
+            ref={mobileTrigger}
+            aria-controls="navigation-mobile"
+            aria-label={mobileMenuOpen?'Fermer le menu':'Ouvrir le menu'}
           >
             {mobileMenuOpen ? (
               <span className="relative block h-[14px] w-[14px]">
@@ -144,7 +162,7 @@ export function Navbar() {
         </div>
 
         {mobileMenuOpen ? (
-          <div className="mt-4 rounded-[24px] border border-zinc-800 bg-zinc-950/95 p-4 lg:hidden">
+          <div id="navigation-mobile" className="mt-4 rounded-[24px] border border-zinc-800 bg-zinc-950/95 p-4 lg:hidden">
             <div className="grid gap-2 text-zinc-200">
             <Link href="/games" onClick={handleCloseMobileMenu} className="rounded-2xl border border-zinc-800 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em]">
               Jeux

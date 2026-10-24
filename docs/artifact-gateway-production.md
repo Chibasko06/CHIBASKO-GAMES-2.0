@@ -33,9 +33,8 @@ Cloudflare ciblé, le DNS wildcard proxifié et la couverture TLS réelle.
 Les URL workers.dev et les URL de preview Wrangler sont désactivées.
 
 Le Cron Trigger de quinze minutes reprend le handler existant de nettoyage des
-previews et launches. Il ne travaille que lorsque le flag vaut `1`. Le futur
-déploiement synchronisera aussi ce trigger ; aucun cron distant n'est créé pendant
-la préparation. Les logs d'invocation et les traces automatiques sont désactivés ;
+previews et launches. Il ne travaille que lorsque le flag vaut `1`. Le
+déploiement synchronise aussi ce trigger. Les logs d'invocation et les traces automatiques sont désactivés ;
 seuls les logs structurés expurgés du gateway sont activés. Vérifier également
 les règles de logs/analytics de zone qui pourraient enregistrer les capabilities.
 
@@ -71,7 +70,7 @@ aucune règle Cloudflare forçant le cache ou supprimant l'hôte de la clé. L'a
 reste limité au prefix client validé ; archives, inventory et staging restent exclus.
 Les capabilities de hostname sont sensibles et doivent rester absentes des logs amont.
 
-Avant activation :
+Contrôles de déploiement :
 
 1. Vérifier le domaine dédié, les origines portail exactes et l'absence de règle
    CDN forçant le cache ; tester que les cookies parent-domain n'autorisent aucun accès.
@@ -81,7 +80,7 @@ Avant activation :
 3. Vérifier le secret backend, le binding R2, les objets validés et leurs métadonnées
    SHA-256, les lignes game_versions et leurs prefixes immuables.
 4. Aligner les quatre variables domaine/origines du portail avec ce Worker lors de
-   l'activation du runtime ; aucun changement du portail n'est effectué ici.
+   l'activation du runtime.
 5. Valider DNS/TLS, réponses HEAD/Range, preview autorisée, version publiée, expiration
    et refus service worker sur une recette réelle.
 6. Vérifier le flag versionné à `1` avant le déploiement.
@@ -101,14 +100,14 @@ npx --no-install wrangler deploy --config cloudflare/wrangler.artifacts.producti
 npm run test:game-artifacts
 ```
 
-Le preflight existant peut contrôler les noms et la frontière PSL avec les variables
+Le preflight existant contrôle les noms de configuration et la séparation des domaines avec les variables
 déjà gérées dans le shell, sans afficher leurs valeurs ni lire le dashboard :
 
 ```text
 node scripts/production-preflight.mjs --component=gateway
 ```
 
-Commande du futur déploiement, avec une authentification Wrangler autorisée sur
+Commande de déploiement, avec une authentification Wrangler autorisée sur
 le compte contenant le Worker et la zone :
 
 ```text
@@ -117,16 +116,16 @@ npx --no-install wrangler deploy --config cloudflare/wrangler.artifacts.producti
 
 Ne pas utiliser `npm run deploy:cloudflare` pour ce Worker : cette commande cible
 le portail. Le flag à `1` activera le Gateway et son nettoyage planifié au prochain
-déploiement. Aucune commande de déploiement réel n'est exécutée dans cette préparation.
+déploiement.
 
 Référence : [configuration Wrangler](https://developers.cloudflare.com/workers/wrangler/configuration/).
 
 ## Validation locale du 18 octobre 2026
 
-Après adaptation sans PRIVATE PSL : 26 tests gateway/runtime, quatre tests preflight
-et 17 tests Chrome passent. Le nouveau test navigateur constate qu'un cookie parent
+Relevé du 18 octobre : 26 tests gateway/runtime, quatre tests preflight
+et 17 tests Chrome réussis. Le test navigateur constate qu'un cookie parent
 est effectivement partagé, puis vérifie qu'il n'autorise pas une launch révoquée et
 que localStorage reste séparé. TypeScript est validé. Le dry-run Wrangler produit
-237,55 KiB (gzip 64,22 KiB). Aucun changement Next/OpenNext ni de dépendance.
+237,55 KiB (gzip 64,22 KiB).
 Le dry-run ne vérifie pas la présence distante des secrets, la DB, les objets R2,
-le DNS ou TLS. Le flag est désormais à `1` dans la configuration, sans déploiement effectué.
+le DNS ou TLS. La configuration versionnée utilise le flag `1`.

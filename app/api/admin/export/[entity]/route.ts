@@ -1,22 +1,9 @@
+import {readAuthUsers} from '@/lib/server/adminRead'
+import {readAllRows} from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, adminJson, adminErrorMessage } from '../../_utils'
 
-function toCsv(rows: Record<string, unknown>[]) {
-  if (!rows.length) {
-    return ''
-  }
-
-  const headers = Object.keys(rows[0])
-  const escapeCell = (value: unknown) =>
-    `"${String(value ?? '').replaceAll('"', '""')}"`
-
-  const lines = [
-    headers.join(','),
-    ...rows.map((row) => headers.map((header) => escapeCell(row[header])).join(',')),
-  ]
-
-  return lines.join('\n')
-}
+import {toCsv} from '@/lib/server/csv'
 
 export async function GET(
   request: NextRequest,
@@ -32,7 +19,7 @@ export async function GET(
   const { supabaseAdmin } = adminCheck
 
   if (entity === 'games') {
-    const { data, error } = await supabaseAdmin.from('games').select('*').order('created_at', { ascending: false })
+    const { data, error } = await readAllRows('export_games',(from,to)=>supabaseAdmin.from('games').select('*',{count:'exact'}).order('created_at',{ascending:false}).order('id').range(from,to)).then(data=>({data,error:null}),error=>({data:null,error}))
 
     if (error) {
       return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
@@ -51,8 +38,8 @@ export async function GET(
   if (entity === 'users') {
     const [{ data: profiles, error: profilesError }, { data: authUsers, error: authError }] =
       await Promise.all([
-        supabaseAdmin.from('profiles').select('id, username, display_name, avatar_url, bio, created_at').order('created_at', { ascending: false }),
-        supabaseAdmin.auth.admin.listUsers(),
+        readAllRows('export_profiles',(from,to)=>supabaseAdmin.from('profiles').select('id, username, display_name, avatar_url, bio, created_at',{count:'exact'}).order('created_at',{ascending:false}).order('id').range(from,to)).then(data=>({data,error:null}),error=>({data:[],error})),
+        readAuthUsers(supabaseAdmin).then(users=>({data:{users},error:null}),error=>({data:{users:[]},error})),
       ])
 
     if (profilesError) {

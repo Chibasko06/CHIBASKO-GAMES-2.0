@@ -1,10 +1,10 @@
-# ONLINE-SESSION-1 — validation et périmètre
+# Sessions online — contrat et validation
 
-## Contrat livré
+## Contrat
 
-SDK 0.3.0 préparé, Bridge v2 et integrationVersion 1. SDK npm 0.2.0 reste
-immuable et son Bridge v1 fonctionne avec le même runtime. La licence SDK est
-inchangée. Aucun SDK source n'est réintroduit dans le repository plateforme.
+SDK 0.3.0, Bridge v2 et integrationVersion 1 définissent le contexte online.
+Le runtime conserve la compatibilité Bridge v1 avec SDK 0.2.0. Le SDK est
+distribué séparément du portail.
 
 Le navigateur reçoit le bootstrap uniquement au START après READY. Le control
 plane conserve les identités Auth, sélectionne le deployment et vérifie les
@@ -18,7 +18,7 @@ Le serveur gameplay conserve l'unicité de l'admission et gère son reconnect.
 Voir `online-sessions.md` et `sdk-browser-bridge-v2.md` pour les API, ressources,
 permissions, limites, erreurs, révocation, nettoyage et transitions.
 
-## Recette exécutée
+## Référence de validation du 17 octobre 2026
 
 - SDK : npm ci, build, compilation serveur sans DOM, typecheck et 25 tests
   core/client/server/React/release ; aucun nouveau runtime dependency.
@@ -40,85 +40,18 @@ permissions, limites, erreurs, révocation, nettoyage et transitions.
   Pong legacy, également hors sandbox Windows. Aucune correction Pong associée.
 - Les tests de temps virtuel utilisent une base d'horloge backend fixe pour éviter
   une dérive avec le temps mural du runner. Aucune policy de bail n'est relâchée.
-- git diff --check et scans de credentials/convention de rédaction passent.
+- Contrôles de formatage et de credentials réussis sur le périmètre testé.
 
 Archive SDK préparatoire : `chibaskogames-sdk-0.3.0.tgz`, 30 fichiers, 29033 octets.
 SHA-256 : `18cac82210d4fc3af2250da16adbe98da97d9700f00d9fb2af0d28ebed6c180c`.
 Le tarball contient JS/déclarations, standalone/intégrité, README/CHANGELOG, licence,
 FAQ et documentation publique online. Aucun test, source TS ou script interne.
 
-## Activation et suite
+## Prérequis d'exploitation
 
-Les migrations sont seulement préparées et testées sur PostgreSQL jetable.
-Les flags d'activation et l'ancien parcours produit restent en place. Avant
-PONG-MIGRATION : relier l'adaptateur lobby au port backend de préparation,
-configurer un deployment compatible et sa policy réseau approuvée, intégrer
-l'exchange dans le serveur gameplay et le contexte START dans le build Pong.
-La publication séparée du SDK 0.3.0 et l'activation d'infrastructure suivent leur
-procédure de release/déploiement. Le pipeline client universel est conservé.
-
-Pong est en lecture seule pendant cette phase. Aucun tag, commit, push,
-publication npm, déploiement, secret réel ou changement d'infrastructure.
-Les credentials et tickets utilisés par la recette sont exclusivement des fixtures.
-Les anciens accès Git privés et leur blocage Cloudflare ne sont pas contournés.
-
-## Fichiers plateforme
-
-```text
-app/api/game-launches/[launchId]/start/route.ts
-app/api/game-server/v1/tickets/exchange/route.ts
-docs/game-runtime.md
-docs/online-session-1-validation.md
-docs/online-sessions.md
-docs/sdk-browser-bridge-v1.md
-docs/sdk-browser-bridge-v2.md
-lib/game-distribution/gateway/launch.ts
-lib/game-distribution/uploads/repository.ts
-lib/game-runtime/bridge.ts
-lib/game-runtime/client.ts
-lib/game-runtime/contracts.ts
-lib/game-runtime/controller.ts
-lib/online-session/contracts.ts
-lib/online-session/service.ts
-lib/server/gameLaunches.ts
-lib/server/onlineSessions.ts
-package.json
-supabase/migrations/20261018000100_online_sessions.sql
-tests/game-distribution-db.mjs
-tests/game-runtime.browser.test.mjs
-tests/game-runtime.test.mjs
-tests/helpers/runtime-harness.mjs
-tests/online-session-db.sql
-tests/online-session.browser.test.mjs
-tests/online-session.test.mjs
-```
-
-## Fichiers SDK
-
-```text
-CHANGELOG.md
-README.md
-docs/online-sessions.md
-docs/sdk-browser-1.md
-package-lock.json
-package.json
-scripts/release-policy.mjs
-scripts/test-consumer.mjs
-src/browser-contracts.ts
-src/client/browser/connection.ts
-src/client/browser/errors.ts
-src/client/browser/protocol.ts
-src/client/index.ts
-src/index.ts
-src/online-contracts.ts
-src/server/client.ts
-src/server/index.ts
-tests/browser.test.mjs
-tests/client.test.mjs
-tests/core.test.mjs
-tests/fixtures/game-app.js
-tests/fixtures/host.js
-tests/helpers/fake-window.mjs
-tests/release.test.mjs
-tests/server.test.mjs
-```
+Le lobby utilise le port backend de préparation de session. Un mode online
+nécessite un deployment compatible, une policy réseau approuvée, l’exchange
+côté serveur gameplay et le contexte START dans le build client.
+Vérifier séparément les migrations et les flags de l’environnement cible.
+Les résultats de la référence ci-dessus utilisent uniquement des credentials
+et tickets de fixtures ; ils ne certifient pas l’infrastructure distante.

@@ -9,7 +9,7 @@ import {NextRequest} from './admin-next.mjs'
 const ids={normal:'00000000-0000-4000-8000-000000000001',admin:'00000000-0000-4000-8000-000000000002'}
 const token=role=>Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')+'.'+Buffer.from(JSON.stringify({sub:ids[role],exp:Math.floor(Date.now()/1000)+3600,aud:'authenticated'})).toString('base64url')+'.fixture-signature'
 let calls,queries,membershipFailure
-const privileged={from(table){calls.push(table);let payload={};const q={select(){return q},order(){return q},eq(){return q},is(){return q},delete(){return q},insert(p){payload=p;return q},update(p){payload=p;return q},async single(){return{data:{id:'fixture',thumbnail_url:null,...payload},error:null}},then(resolve){return Promise.resolve({data:[],error:null}).then(resolve)}};return q},auth:{admin:{async listUsers(){calls.push('auth-users');return{data:{users:[]},error:null}}}}}
+const privileged={async rpc(name,args){calls.push(name);return {data:{game:{id:'fixture',thumbnail_url:null,...args.p_game},previousThumbnail:null},error:null}},from(table){calls.push(table);let payload={};const q={select(){return q},order(){return q},range(){return q},eq(){return q},is(){return q},delete(){return q},insert(p){payload=p;return q},update(p){payload=p;return q},async single(){return{data:{id:'fixture',thumbnail_url:null,...payload},error:null}},async maybeSingle(){return{data:{id:'fixture',thumbnail_url:null,...payload},error:null}},then(resolve){return Promise.resolve({data:[],count:0,error:null}).then(resolve)}};return q},auth:{admin:{async listUsers(){calls.push('auth-users');return{data:{users:[]},error:null}}}}}
 beforeEach(t=>{
   calls=[];queries=[];membershipFailure=false
   process.env.NEXT_PUBLIC_SUPABASE_URL='https://mock.supabase.co';process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY='public-test-key'
@@ -87,9 +87,9 @@ test('admin creates, edits and publishes through real guard; unsafe identifiers,
   const before=calls.length
   for(const change of [{multiplayer_game_id:'../engine'},{roomType:'evil'},{game_url:'https://evil.example'}])assert.equal((await PATCH(req({...multi,...change}),{params:Promise.resolve({id:'fixture'})})).status,400)
   assert.equal(calls.length,before)
-  t.mock.method(privileged,'from',()=>({insert(){return this},select(){return this},async single(){return {data:null,error:{code:'XX000',message:'private SQL detail'}}}}))
+  t.mock.method(privileged,'rpc',async()=>({data:null,error:{code:'XX000',message:'private SQL detail'}}))
   const failed=await POST(request('admin','POST'))
-  assert.equal(failed.status,500);assert.doesNotMatch(await failed.text(),/private SQL detail|XX000/)
+  assert.equal(failed.status,503);assert.doesNotMatch(await failed.text(),/private SQL detail|XX000/)
 })
 
 test('malformed JSON and invalid profile field types return safe errors before privileged writes',async()=>{

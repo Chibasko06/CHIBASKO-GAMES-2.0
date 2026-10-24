@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from 'react'
+import FormField from '@/components/ui/FormField'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
 import SocialAuthButtons from '@/components/SocialAuthButtons'
@@ -8,8 +9,15 @@ import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useAuthNext } from '@/lib/useAuthNext'
+import {withTimeout} from '@/lib/asyncOperation'
 
 export default function LoginPage() {
+  const attemptRef = useRef({mounted: false, id: 0})
+  useEffect(() => {
+    const attempt = attemptRef.current
+    attempt.mounted = true
+    return () => { attempt.mounted = false; attempt.id++ }
+  }, [])
   const next = useAuthNext()
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -23,19 +31,22 @@ export default function LoginPage() {
   }, [email])
 
   const handleLogin = async () => {
+    const id = ++attemptRef.current.id
+    const current = () => attemptRef.current.mounted && attemptRef.current.id === id
     setMessage(null)
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setMessage(error.message)
-      setLoading(false)
-      return
-    }
-
-    await ensureProfile(data.session)
-    router.replace(next)
+    try {
+      const {data, error} = await withTimeout(supabase.auth.signInWithPassword({email, password}))
+      if (!current()) return
+      if (error) { setMessage('Connexion refusée. Vérifie tes identifiants et la confirmation de ton adresse e-mail.'); return }
+      await ensureProfile(data.session)
+      if (!current()) return
+      router.replace(next)
+    } catch {
+      if (!current()) return
+      setMessage('La connexion a été interrompue ou a pris trop de temps. Réessaie dans un instant.')
+    } finally { if (current()) setLoading(false) }
   }
 
   if (!authLoading && user) {
@@ -68,7 +79,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <div className="space-y-4">
+      <form className="space-y-4" onSubmit={event=>{event.preventDefault();if(!loading)void handleLogin()}}>
         <SocialAuthButtons
           nextPath={next}
           onError={(nextMessage) => setMessage(nextMessage || null)}
@@ -80,20 +91,20 @@ export default function LoginPage() {
           <div className="h-px flex-1 bg-zinc-800" />
         </div>
 
-        <input
+        <FormField label="Email" descriptionId="auth-feedback"><input
           type="email"
           value={email}
           placeholder="Email"
           className="w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
           onChange={(event) => setEmail(event.target.value)}
-        />
-        <input
+        /></FormField>
+        <FormField label="Mot de passe" descriptionId="auth-feedback"><input
           type="password"
           value={password}
           placeholder="Mot de passe"
           className="w-full rounded-2xl bg-black/60 border border-zinc-800 p-4 text-white outline-none focus:border-cyan-500"
           onChange={(event) => setPassword(event.target.value)}
-        />
+        /></FormField>
 
         <div className="flex justify-end">
           <Link
@@ -105,14 +116,14 @@ export default function LoginPage() {
         </div>
 
         <button
-          onClick={handleLogin}
+          type="submit"
           disabled={loading}
           className="w-full rounded-full bg-cyan-400 py-4 text-sm font-black uppercase tracking-[0.2em] text-black disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? 'Connexion...' : 'Connexion'}
         </button>
 
-        {message ? <p className="text-sm text-cyan-300">{message}</p> : null}
+        {message ? <p id="auth-feedback" role="status" className="text-sm text-cyan-300">{message}</p> : null}
 
         <p className="text-sm text-zinc-400">
           Pas encore de compte ?{' '}
@@ -120,7 +131,7 @@ export default function LoginPage() {
             Cree ton profil joueur
           </Link>
         </p>
-      </div>
+      </form>
     </div>
   )
 }

@@ -66,3 +66,5 @@ do $$ declare r text;t text;p text; begin
   if has_column_privilege(r,'public.games','is_published','UPDATE') or has_column_privilege(r,'public.game_submissions','admin_notes','UPDATE') then raise exception 'Column grants survived';end if;
  end loop;
 end $$;
+
+\ir admin-catalogue-db.sql

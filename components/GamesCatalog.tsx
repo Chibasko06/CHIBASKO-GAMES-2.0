@@ -1,9 +1,9 @@
 "use client";
 
-import { useDeferredValue } from 'react'
-import { useSearchParams } from 'next/navigation'
+import {useTransition} from 'react'
+import { useSearchParams,useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { readCatalogueFilters, catalogueQueryString, filterCatalogue, type CatalogueFilters, type CatalogueType, type SortOption, type DeviceFilter } from '@/lib/catalogueFilters'
+import { readCatalogueFilters, catalogueQueryString, type CatalogueFilters, type CatalogueType, type SortOption, type DeviceFilter } from '@/lib/catalogueFilters'
 import { GameCard } from '@/components/GameCard'
 import collectionStyles from '@/components/GameCardCollection.module.css'
 import type { Category, GameWithCategoriesAndStats } from '@/lib/queries/games'
@@ -14,24 +14,30 @@ import type { Category, GameWithCategoriesAndStats } from '@/lib/queries/games'
 type Props = {
   games: GameWithCategoriesAndStats[]
   categories: Category[]
+  total?:number
+  page?:number
 }
 
 export default function GamesCatalog({
   games,
   categories,
+  total=games.length,
+  page=1,
 }: Props) {
   const params = useSearchParams()
   const filters = readCatalogueFilters(params)
   const { search, category: selectedCategory, sort, device: deviceFilter } = filters
-  const deferredSearch = useDeferredValue(search)
+  const router=useRouter()
+  const [pending,startTransition]=useTransition()
   const updateFilters = (patch: Partial<CatalogueFilters>) => {
     const current = readCatalogueFilters(new URLSearchParams(window.location.search))
-    window.history.replaceState(null, '', catalogueQueryString({ ...current, ...patch }))
+    startTransition(()=>router.replace(catalogueQueryString({ ...current, ...patch }),{scroll:false}))
   }
-  const setSearch = (search: string) => updateFilters({ search })
   const setSort = (sort: SortOption) => updateFilters({ sort })
   const setDeviceFilter = (device: DeviceFilter) => updateFilters({ device })
-  const visibleGames = filterCatalogue(games, { ...filters, search: deferredSearch })
+  const visibleGames = games
+  const deferredSearch=search
+  const pageHref=(value:number)=>{const url=new URL(catalogueQueryString(filters),'https://chibaskogames.fr');if(value>1)url.searchParams.set('page',String(value));return url.pathname+url.search}
 
   return (
     <div className="space-y-6">
@@ -43,17 +49,19 @@ export default function GamesCatalog({
           </div>
         </fieldset>
         <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.4fr)_240px_240px]">
-          <label className="block">
+          <form onSubmit={event=>{event.preventDefault();updateFilters({search:String(new FormData(event.currentTarget).get('search')??'')})}}><label className="block">
             <span className="mb-2 block text-[10px] uppercase tracking-[0.35em] text-zinc-500">
               Recherche
             </span>
             <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              key={search}
+              name="search"
+              defaultValue={search}
+              maxLength={200}
               placeholder="Titre, categorie, studio, techno..."
               className="w-full border border-zinc-800 bg-black px-4 py-3 text-white outline-none focus:border-cyan-500"
             />
-          </label>
+          </label><button type="submit" className="mt-2 text-sm text-cyan-300">Rechercher</button></form>
 
           <label className="block">
             <span className="mb-2 block text-[10px] uppercase tracking-[0.35em] text-zinc-500">
@@ -132,7 +140,7 @@ export default function GamesCatalog({
 
         <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-400">
           <span>
-            {visibleGames.length} jeu{visibleGames.length > 1 ? 'x' : ''} affiche{visibleGames.length > 1 ? 's' : ''}
+            {total} jeu{total > 1 ? 'x' : ''} — page {page}{pending?' — Chargement…':''}
           </span>
           {selectedCategory !== 'all' ? (
             <span className="border border-cyan-900 px-2 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
@@ -163,6 +171,10 @@ export default function GamesCatalog({
           ))}
         </div>
       )}
+      <nav aria-label="Pages du catalogue" className="flex items-center justify-center gap-6">
+        {page>1&&<Link href={pageHref(page-1)} prefetch={false}>Précédent</Link>}
+        {page*24<total&&<Link href={pageHref(page+1)} prefetch={false}>Suivant</Link>}
+      </nav>
     </div>
   )
 }

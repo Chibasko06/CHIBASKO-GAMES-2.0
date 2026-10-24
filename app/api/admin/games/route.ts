@@ -1,3 +1,5 @@
+import {pageNumber} from '@/lib/pagination'
+import {catalogueFailure, type SavedCatalogueGame} from '@/lib/server/adminCatalogue'
 import { validateGameCatalogue, CatalogueValidationError } from '@/lib/server/gameCatalogueValidation'
 import { NextRequest } from 'next/server'
 import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../_utils'
@@ -11,16 +13,14 @@ export async function GET(request: NextRequest) {
 
   const { supabaseAdmin } = adminCheck
 
-  const { data, error } = await supabaseAdmin
-    .from('games')
-    .select('*, game_categories(category_id)')
-    .order('created_at', { ascending: false })
+  const page=pageNumber(new URL(request.url).searchParams.get('page'))
+  const {data,error,count}=await supabaseAdmin.from('games').select('*, game_categories(category_id)',{count:'exact'}).order('created_at',{ascending:false}).order('id').range((page-1)*50,page*50-1)
 
-  if (error) {
+  if (error||count===null) {
     return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
   }
 
-  return adminJson({ games: data })
+  return adminJson({ games: data,total:count,page,pageSize:50 })
 }
 
 export async function POST(request: NextRequest) {
@@ -39,26 +39,12 @@ export async function POST(request: NextRequest) {
   }
   const { payload, categoryIds } = validated
 
-  const { data, error } = await supabaseAdmin
-    .from('games')
-    .insert(payload)
-    .select('*')
-    .single()
-
-  if (error) {
-    return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
-  }
-
-  if (categoryIds.length > 0) {
-    const { error: categoriesError } = await supabaseAdmin
-      .from('game_categories')
-      .insert(categoryIds.map((categoryId: string) => ({ game_id: data.id, category_id: categoryId })))
-
-    if (categoriesError) {
-      await supabaseAdmin.from('games').delete().eq('id', data.id)
-      return adminJson({ error: adminErrorMessage(categoriesError) }, { status: 500 })
-    }
-  }
-
-  return adminJson({ game: data })
+  try {
+    const {data, error} = await supabaseAdmin.rpc('admin_save_game' as never, {
+      p_actor: adminCheck.user.id, p_game: payload, p_categories: categoryIds, p_id: null,
+      p_expected_thumbnail: null,
+    } as never)
+    if (error) throw error
+    return adminJson({game: (data as unknown as SavedCatalogueGame).game})
+  } catch (error) { return catalogueFailure('admin_game_create', error) }
 }

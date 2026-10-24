@@ -51,7 +51,8 @@ export function createGameBridge(options:Options) {
     if(pending && Date.now()>=deadline){fail('bridge_lost');return}
     if(!pending){pending=++sequence;deadline=Date.now()+policy.pongMs;send('PLATFORM_PING',{documentId,sequence:pending})}}
   function receive(event:MessageEvent) {
-    if(disposed || event.source!==options.source() || event.origin!==d.contentOrigin || !validGameMessage(event.data))return
+    const source=options.source()
+    if(disposed || !source || event.source!==source || event.origin!==d.contentOrigin || !validGameMessage(event.data))return
     const message=event.data
     if(message.launchId!==d.launchId || message.generation!==d.generation || !active())return
     const doc=String(message.payload.documentId)

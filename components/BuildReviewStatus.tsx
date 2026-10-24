@@ -14,8 +14,8 @@ function Status({id,token}:{id:string;token?:string}) {
       .catch(()=>{if(!controller.signal.aborted){setData(null);setError('Build introuvable ou accès refusé.')}})
     return()=>controller.abort()
   },[id,token,reload])
-  return <main className="mx-auto max-w-3xl space-y-4 p-6"><h1 className="text-2xl">Suivi du build</h1><p>{REVIEW_NOTICE}</p>
+  return <div className="mx-auto max-w-3xl space-y-4 p-6"><h1 className="text-2xl">Suivi du build</h1><p>{REVIEW_NOTICE}</p>
     {!token&&<p>Connexion requise pour consulter ce build.</p>}{error&&<p role="alert">{error}</p>}
     {data&&<><p>{reviewLabel(data)}</p>{data.reason&&<p>{data.reason}</p>}</>}
-    <button onClick={()=>setReload(n=>n+1)}>Actualiser le statut</button></main>
+    <button onClick={()=>setReload(n=>n+1)}>Actualiser le statut</button></div>
 }

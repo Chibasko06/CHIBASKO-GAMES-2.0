@@ -60,7 +60,7 @@ test('batch and concurrency are bounded with durable deferred work',async()=>{
 })
 test('Worker uses the native text producer, has no public mutation and redacts transport failures',async()=>{
   const originalFetch=globalThis.fetch,originalLog=console.log,originalError=console.error,logs=[],id=randomUUID(),calls=[]
-  const env={SUPABASE_URL:'https://database.example',SUPABASE_SERVICE_ROLE_KEY:'fixture-service-role',BUILD_VALIDATIONS:{async send(body,options){
+  const env={GAME_BUILD_DISPATCHER_ENABLED:'1',SUPABASE_URL:'https://database.example',SUPABASE_SERVICE_ROLE_KEY:'fixture-service-role',BUILD_VALIDATIONS:{async send(body,options){
     assert.deepEqual(JSON.parse(body),{type:'validate_game_build',uploadId:id});assert.deepEqual(options,{contentType:'text'})
     throw new Error('fixture-queue-token malformed Cloudflare response')
   }}}

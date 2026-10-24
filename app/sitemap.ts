@@ -1,15 +1,15 @@
 import type { MetadataRoute } from 'next'
 import { absoluteUrl } from '@/lib/seo'
-import { getGamesCatalog, getCategories } from '@/lib/queries/games'
+import { getSitemapGames, getCategories } from '@/lib/queries/games'
 import {categoryPath} from '@/lib/seoCatalogue'
-import { getPublicProfiles } from '@/lib/queries/profiles'
+import { getPublicProfileIds } from '@/lib/queries/profiles'
 
 export const dynamic='force-dynamic'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [games, profiles, categories] = await Promise.all([
-    getGamesCatalog(),
-    getPublicProfiles(),
+    getSitemapGames(),
+    getPublicProfileIds(),
     getCategories(),
   ])
 
@@ -74,7 +74,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   const categoryRoutes:MetadataRoute.Sitemap=categories
-    .filter(category=>publishedGames.some(game=>game.categories.some(entry=>entry.id===category.id)))
+    .filter(category=>publishedGames.some(game=>game.game_categories.some(entry=>entry.category_id===category.id)))
     .map(category=>({url:absoluteUrl(categoryPath(category.slug)),changeFrequency:'weekly',priority:0.7}))
 
   // No editorial update timestamp exists for games; do not fabricate lastModified.

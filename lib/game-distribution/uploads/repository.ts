@@ -1,7 +1,7 @@
 import { UploadError } from './policy'
 import type { UploadRepository } from './contracts'
 
-const statuses: Record<string,number> = {developer_profile_required:409,draft_not_found:404,draft_conflict:409,draft_submitted:409,lobby_not_found:404,lobby_expired:410,lobby_full:409,not_ready:409,request_conflict:409,version_unavailable:409,deployment_unavailable:409,game_not_available:404,unsupported_access:400,rate_limited:429,invalid_request:400,unauthorized:401,forbidden:403,game_not_found:404,upload_not_found:404,
+const statuses: Record<string,number> = {account_deletion_pending:409,last_admin:409,account_not_found:404,asset_retired:409,developer_profile_required:409,draft_not_found:404,draft_conflict:409,draft_submitted:409,lobby_not_found:404,lobby_expired:410,lobby_full:409,not_ready:409,request_conflict:409,version_unavailable:409,deployment_unavailable:409,game_not_available:404,unsupported_access:400,rate_limited:429,invalid_request:400,unauthorized:401,forbidden:403,game_not_found:404,upload_not_found:404,
   upload_expired:410,invalid_state:409,version_conflict:409,idempotency_conflict:409,quota_exceeded:429,lease_lost:409,validation_failed:422,
   version_not_found:404,version_not_previewable:409,preview_forbidden:403,preview_expired:403,preview_replayed:409,unsupported_execution:400,
   launch_expired:403,invalid_launch_request:400,online_session_required:409,online_session_unavailable:409,invalid_online_roster:400,invalid_deployment:409,ticket_replayed:409,invalid_credential:401}
@@ -22,7 +22,7 @@ function permissionDenied(message: unknown): RpcDiagnostic['permissionDenied'] {
 export function uploadRepository(url: string, serviceKey: string, fetcher: typeof fetch = fetch, options: RepositoryOptions = {}): UploadRepository {
   if (!url || !serviceKey || serviceKey.startsWith('sb_publishable_')) throw new UploadError('service_unavailable',503)
   return {async call<T>(name: string, args: Record<string,unknown>): Promise<T> {
-    if (!/^distribution_[a-z_]+$/.test(name)) throw new UploadError('invalid_operation',500)
+    if (!/^distribution_[a-z_]+$/.test(name) && !['contact_reserve','contact_finish','contact_cleanup'].includes(name)) throw new UploadError('invalid_operation',500)
     const started = Date.now(), signal = AbortSignal.timeout(15_000)
     let received = false
     const record = (details: Pick<RpcDiagnostic,'kind'|'upstreamStatus'|'upstreamCode'|'permissionDenied'>) => {

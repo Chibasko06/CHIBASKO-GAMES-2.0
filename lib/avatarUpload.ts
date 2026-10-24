@@ -1,10 +1,11 @@
+import {withTimeout} from '@/lib/asyncOperation'
 import { supabase } from '@/lib/supabaseClient'
 import type { Tables } from '@/types/database'
 
 async function uploadAvatarViaRoute(endpoint: string, file: File) {
   const {
     data: { session },
-  } = await supabase.auth.getSession()
+  } = await withTimeout(supabase.auth.getSession())
 
   if (!session?.access_token) {
     throw new Error('Session introuvable pour l envoi de l avatar.')
@@ -14,7 +15,7 @@ async function uploadAvatarViaRoute(endpoint: string, file: File) {
   formData.append('file', file)
 
   const response = await fetch(endpoint, {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(30_000),
     headers: {
       Authorization: `Bearer ${session.access_token}`,
     },
@@ -41,10 +42,10 @@ export async function uploadAdminAvatar(userId: string, file: File) {
 }
 
 export async function removeOwnAvatar() {
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { session } } = await withTimeout(supabase.auth.getSession())
   if (!session?.access_token) throw new Error('Session introuvable pour supprimer l avatar.')
   const response = await fetch('/api/profile/avatar', {
-    method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}` },
+    method: 'DELETE', signal: AbortSignal.timeout(30_000), headers: { Authorization: `Bearer ${session.access_token}` },
   })
   const payload = await response.json().catch(() => null)
   if (!response.ok || !payload?.profile) throw new Error(payload?.error || 'Suppression avatar impossible.')
@@ -54,7 +55,7 @@ export async function removeOwnAvatar() {
 export async function uploadAdminGameThumbnail(file: File, slug?: string) {
   const {
     data: { session },
-  } = await supabase.auth.getSession()
+  } = await withTimeout(supabase.auth.getSession())
 
   if (!session?.access_token) {
     throw new Error('Session introuvable pour l envoi de la miniature.')
@@ -68,7 +69,7 @@ export async function uploadAdminGameThumbnail(file: File, slug?: string) {
   }
 
   const response = await fetch('/api/admin/games/thumbnail', {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(30_000),
     headers: {
       Authorization: `Bearer ${session.access_token}`,
     },

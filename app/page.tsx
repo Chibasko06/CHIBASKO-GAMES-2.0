@@ -8,7 +8,7 @@ import {withHomeImage} from '@/lib/server/homeImages'
 import { GameCard } from '@/components/GameCard'
 import collectionStyles from '@/components/GameCardCollection.module.css'
 import HomeHeroActions from '@/components/HomeHeroActions'
-import { getFeaturedGames, getGamesByCategory, getHomepageHighlights, getGamesCatalog } from '@/lib/queries/games'
+import { getFeaturedGames, getGamesByCategory, getHomepageHighlights, getCataloguePage } from '@/lib/queries/games'
 import { buildPageMetadata } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
@@ -24,12 +24,12 @@ export default async function Home() {
     getFeaturedGames(8),
     getGamesByCategory(10),
     getHomepageHighlights(),
-    getGamesCatalog('multiplayer_chibasko'),
+    getCataloguePage({type:'multiplayer',limit:10}),
   ])
   const featuredGames=featuredRows.map(withHomeImage)
   const categorySections=categoryRows.map(section=>({...section,games:section.games.map(withHomeImage)}))
   const homepageHighlights=highlightRows.map(highlight=>({...highlight,game:withHomeImage(highlight.game)}))
-  const multiplayerGames=multiplayerRows.map(withHomeImage)
+  const multiplayerGames=multiplayerRows.items.map(withHomeImage)
 
   return (
     <div className="space-y-12 xl:space-y-14">

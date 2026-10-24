@@ -1,6 +1,7 @@
 # GO-LIVE-GATES-1
 
-Relevé du 18 octobre 2026. **NO-GO global** : les preuves locales ne remplacent
+Référence historique du 18 octobre 2026, **NO-GO à cette date**. Cette matrice ne
+décrit pas l’état actuel des ressources déployées. Les preuves locales ne remplacent
 ni le snapshot production ni les ressources et recettes d'infrastructure.
 Les états sont : PASS (preuve obtenue sur le périmètre indiqué), BLOCKED_EXTERNAL
 (accès, décision externe ou runtime absent), REQUIRES_ACTION (opération identifiée
@@ -11,11 +12,11 @@ restant à exécuter). Aucun état ne signifie qu'une ressource distante a été
 | Gate | Status | Evidence | Action |
 | --- | --- | --- | --- |
 | Architecture universelle | PASS | Aucun package gameplay/Git privé ; SDK public exact ; tests artefacts/runtime/control plane | Conserver ces frontières au déploiement |
-| Migrations préparées | PASS | Huit fichiers existants inchangés + neuvième maintenance ; tests PostgreSQL jetable et référence par préfixe | Appliquer seulement après drift et sauvegarde, dans une phase distincte |
+| Migrations de référence | PASS | Neuf migrations couvertes par les tests PostgreSQL jetables et la référence par préfixe | Vérifier le drift et la sauvegarde avant application |
 | Schema drift production | BLOCKED_EXTERNAL | Pas de connexion PostgreSQL de production configurée ; GET catalogue ne permet pas de lire FK/RLS/triggers | Exécuter le snapshot READ ONLY et le comparateur ci-dessous |
 | npm runtime security | PASS | `npm ci`, audit production : 0 ; correctif source-map-js testé ; Resend patch et chaîne nettoyée | Refaire audit + empreinte lock à la release |
 | Outils npm de développement | REQUIRES_ACTION | 12 alertes restantes : 11 high, 1 low, hors graphe npm de production | Ne pas exposer Miniflare/dev servers ; maintenance compatible des outils séparée, aucune rétrogradation Next automatique |
-| SDK | PASS | npm exact 0.3.0, Bridge inchangé, dépôt SDK non modifié | Ne pas modifier les versions publiées |
+| SDK | PASS | npm exact 0.3.0 et compatibilité Bridge | Ne pas remplacer les versions publiées |
 | Pong build | PASS | Build/validate/ZIP 0.3.0 avec UUID officiel, 9 fichiers ; tests moteur/admission | Vérifier conflit de version avant upload réel |
 | Docker | BLOCKED_EXTERNAL | Binaire Docker absent ; aucune image construite/exécutée | Recette Docker Linux complète ci-dessous |
 | Linux réel | BLOCKED_EXTERNAL | Aucune distribution WSL installée ; source et chemins audités seulement | Exécuter build/tests/container sur Linux |
@@ -300,7 +301,7 @@ Le restart se surveille via Docker/superviseur et remise à zéro de l'uptime.
 Audit des logs : gateway projection sûre sans host/URL/cookies et chemin demandé
 remplacé par son SHA-256 (même un secret placé dans un path ne doit pas être loggé), exchange codes
 bornés, upload/validator erreurs génériques, maintenance sans détails d'exception,
-Colyseus logger privé désactivé. Aucun nouveau log de ticket/JWT/credential ajouté.
+Colyseus logger privé désactivé. Les logs ne doivent contenir aucun ticket/JWT/credential.
 Les logs HTTP automatiques du gateway doivent rester désactivés/expurgés ; les
 logs DNS/CDN/proxy sont un gate d'infrastructure. Le hostname l- est une capability,
 et la query de réservation WebSocket Colyseus est également sensible : ne pas les
@@ -308,18 +309,17 @@ enregistrer. Désactiver capture bodies/Authorization et analytics sur ces chemi
 
 ## 7. Release state et contrôles reproductibles
 
-Relevé sur les refs locales, sans fetch ni push :
+Référence Git locale du 18 octobre 2026, sans actualisation des refs distantes :
 
 | Dépôt | Branch / HEAD | Ahead / behind | Tags existants | Working tree |
 | --- | --- | --- | --- | --- |
 | Plateforme | main / 7ed34aee4d4d34dec18ac8d098df79580f54c1ea | 2 / 0 | aucun | Modifications GO-LIVE-GATES-1 |
 | SDK | main / 861dad6db9d9a7b389029658b363055f43ea009d | 0 / 0 | v0.1.0, v0.2.0, v0.3.0 | Propre, non modifié |
-| Pong | main / ab09544c9b8e8ecdbaf86fad90e66d72f42d530d | 1 / 0 | v0.1.0 | Docker/metrics/tests de cette phase |
+| Pong | main / ab09544c9b8e8ecdbaf86fad90e66d72f42d530d | 1 / 0 | v0.1.0 | Docker/metrics/tests |
 
 Commits plateforme non présents dans son upstream local : 97a0aa341c081b1fed4c445ad6ea43112adbc241,
 7ed34aee4d4d34dec18ac8d098df79580f54c1ea. Pong : ab09544c9b8e8ecdbaf86fad90e66d72f42d530d.
 Les refs distantes peuvent évoluer : ce relevé n'est pas un fetch de l'état GitHub.
-Aucun commit ni tag créé/modifié pendant cette phase.
 
 ```powershell
 npm ci
@@ -336,7 +336,6 @@ sans réseau/subprocess/écriture ; les commandes npm et Git de collecte sont s�
 Le relevé d'audit est une preuve opératoire à dater, pas une attestation signée de npm.
 La présence des env/bindings n'autorise aucune création ni activation automatique.
 
-Les commandes de validation du [runbook](production-activation.md) restent valables,
-avec neuf migrations et le composant maintenance supplémentaire. Aucun push,
-migration distante, ressource Cloudflare, DNS, credential créée, upload ou déploiement.
-Les seules lectures distantes de données projet sont les GET catalogue décrits ici.
+Les commandes du [runbook](production-activation.md) doivent être confrontées aux
+migrations et configurations de la release cible. Le référentiel décrit ici
+couvre neuf migrations ; il ne certifie pas les migrations ultérieures.

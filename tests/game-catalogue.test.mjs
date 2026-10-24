@@ -53,42 +53,27 @@ test('form switching clears incompatible launch fields and preserves categories/
   assert.equal(changeGameFormType(initial, 'multiplayer_chibasko', true).is_published, true)
 })
 
-test('admin routes validate before writes, preserve PATCH thumbnail concurrency and categories', async () => {
-  const writes = []
-  let previous = { thumbnail_url: null }
-  const client = { from(table) {
-    const chain = {
-      select() { return chain }, eq() { return chain }, is() { writes.push(['thumbnail-condition']); return chain },
-      insert(payload) { writes.push(['insert', table, payload]); chain.result = { ...payload, id: 'existing-id' }; return chain },
-      update(payload) { writes.push(['update', table, payload]); chain.result = { ...payload, id: 'existing-id' }; return chain },
-      delete() { writes.push(['delete-relations', table]); return chain },
-      async single() { return { data: chain.result ?? previous, error: null } },
-      then(resolve) { return Promise.resolve({ error: null }).then(resolve) },
-    }
-    return chain
-  } }
-  globalThis.__r2 = { adminCheck: async () => ({ supabaseAdmin: client }) }
-  const req = body => new Request('https://example.com/api/admin/games', { method: 'POST', body: JSON.stringify(body) })
-  globalThis.__r2.adminCheck = async () => ({ error: new Response(null, { status: 403 }) })
-  assert.equal((await POST(req(multi))).status, 403)
-  assert.equal((await PATCH(req(multi), { params: Promise.resolve({ id: 'existing-id' }) })).status, 403)
-  assert.equal(writes.length, 0)
-  globalThis.__r2.adminCheck = async () => ({ supabaseAdmin: client })
-  const created = await POST(req(classic))
-  assert.equal(created.status, 200)
-  assert.equal(writes[0][2].game_type, 'classic')
-  assert.equal((await POST(req(multi))).status, 200)
-  assert.equal(writes.at(-1)[2].is_published, false)
-  const before = writes.length
-  assert.equal((await POST(req({ ...multi, maxPlayers: 99 }))).status, 400)
-  assert.equal(writes.length, before)
-  assert.equal((await PATCH(req({ ...multi, is_published: true }), { params: Promise.resolve({ id: 'existing-id' }) })).status, 200)
-  const update = writes.find(entry => entry[0] === 'update')
-  assert.equal(update[2].is_beta, true)
-  assert.equal(update[2].game_url, null)
-  assert.equal((await PATCH(req(classic), { params: Promise.resolve({ id: 'existing-id' }) })).status, 200)
-  assert.equal(writes.filter(entry => entry[0] === 'update').at(-1)[2].multiplayer_game_id, null)
-  assert.ok(writes.some(entry => entry[0] === 'thumbnail-condition'))
-  assert.ok(writes.every(entry => entry[0] !== 'delete-relations' || entry[1] === 'game_categories'))
-  previous = { thumbnail_url: null }
+test('admin routes validate before the transactional RPC and preserve thumbnail preconditions and categories', async () => {
+  const writes=[]
+  const client={from(){return {select(){return this},eq(){return this},async maybeSingle(){return {data:{thumbnail_url:null},error:null}}}},
+    async rpc(name,args){assert.equal(name,'admin_save_game');writes.push(args);return {data:{game:{id:'existing-id',...args.p_game},previousThumbnail:null},error:null}}}
+  const req=body=>new Request('https://example.com/api/admin/games',{method:'POST',body:JSON.stringify(body)})
+  globalThis.__r2={adminCheck:async()=>({error:new Response(null,{status:403})})}
+  assert.equal((await POST(req(multi))).status,403)
+  assert.equal((await PATCH(req(multi),{params:Promise.resolve({id:'existing-id'})})).status,403)
+  assert.equal(writes.length,0)
+  globalThis.__r2.adminCheck=async()=>({supabaseAdmin:client,user:{id:'admin'}})
+  assert.equal((await POST(req(classic))).status,200)
+  assert.equal(writes[0].p_game.game_type,'classic')
+  assert.equal((await POST(req(multi))).status,200)
+  assert.equal(writes.at(-1).p_game.is_published,false)
+  const before=writes.length
+  assert.equal((await POST(req({...multi,maxPlayers:99}))).status,400)
+  assert.equal(writes.length,before)
+  assert.equal((await PATCH(req({...multi,is_published:true}),{params:Promise.resolve({id:'existing-id'})})).status,200)
+  assert.equal(writes.at(-1).p_game.is_beta,true)
+  assert.equal(writes.at(-1).p_game.game_url,null)
+  assert.equal((await PATCH(req(classic),{params:Promise.resolve({id:'existing-id'})})).status,200)
+  assert.equal(writes.at(-1).p_game.multiplayer_game_id,null)
+  assert.ok(writes.every(args=>args.p_actor==='admin'&&'p_expected_thumbnail' in args&&Array.isArray(args.p_categories)))
 })

@@ -1,16 +1,19 @@
 "use client";
 
+import FormField from '@/components/ui/FormField'
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import ProfileCard from '@/components/ProfileCard'
-import { getFavoriteGames } from '@/lib/queries/favorites'
+import { getFavoriteGames, getFavoriteGamesPage } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
 import { removeOwnAvatar, uploadOwnAvatar } from '@/lib/avatarUpload'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
+import {readData} from '@/lib/dataAccess'
+import {fetchJson, withTimeout} from '@/lib/asyncOperation'
 import { Tables } from '@/types/database'
 
 type Profile = Tables<'profiles'>
@@ -36,6 +39,7 @@ export default function DashboardPage() {
   const [recentHistory, setRecentHistory] = useState<HistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -56,35 +60,43 @@ export default function DashboardPage() {
         return
       }
 
-      await ensureProfile(session)
+      try {
+        setLoadError(null)
+        setLoading(true)
+        await ensureProfile(session)
 
-      const [
-        { data: profileData },
-        favoriteEntries,
-        historyEntries,
-        { count: favoritesTotal },
-        { count: reviewsTotal },
-      ] = await Promise.all([
-        supabase.from('profiles').select('id, username, display_name, avatar_url, bio, created_at').eq('id', user.id).single(),
-        getFavoriteGames(user.id),
-        getRecentPlayHistory(user.id, 6),
-        supabase.from('favorites').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('game_reviews').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      ])
+        const [
+          { data: profileData },
+          favoriteEntries,
+          historyEntries,
+          { count: favoritesTotal },
+          { count: reviewsTotal },
+        ] = await withTimeout(Promise.all([
+          readData('dashboard_profile', supabase.from('profiles').select('id, username, display_name, avatar_url, bio, created_at').eq('id', user.id).single()),
+          getFavoriteGamesPage(user.id,1).then(page=>page.entries),
+          getRecentPlayHistory(user.id, 6),
+          readData('dashboard_favorites_count', supabase.from('favorites').select('*', { count: 'exact', head: true }).eq('user_id', user.id)),
+          readData('dashboard_reviews_count', supabase.from('game_reviews').select('*', { count: 'exact', head: true }).eq('user_id', user.id)),
+        ]))
 
-      if (mounted && requestId === requestIdRef.current) {
-        setNeedsAuth(false)
-        setProfile(profileData)
-        setSavedProfile(profileData)
-        setDraftProfile({
-          username: profileData?.username || '',
-          bio: profileData?.bio || '',
-        })
-        setFavoriteCount(favoritesTotal ?? 0)
-        setCommentCount(reviewsTotal ?? 0)
-        setRecentFavorites(favoriteEntries.slice(0, 4))
-        setRecentHistory(historyEntries)
-        setLoading(false)
+        if (mounted && requestId === requestIdRef.current) {
+          setNeedsAuth(false)
+          setProfile(profileData)
+          setSavedProfile(profileData)
+          setDraftProfile({
+            username: profileData?.username || '',
+            bio: profileData?.bio || '',
+          })
+          setFavoriteCount(favoritesTotal ?? 0)
+          setCommentCount(reviewsTotal ?? 0)
+          setRecentFavorites(favoriteEntries.slice(0, 4))
+          setRecentHistory(historyEntries)
+          setLoading(false)
+        }
+      } catch {
+        if (mounted && requestId === requestIdRef.current) setLoadError('Impossible de charger le profil et ses données. Réessaie dans un instant.')
+      } finally {
+        if (mounted && requestId === requestIdRef.current) setLoading(false)
       }
     }
 
@@ -116,37 +128,39 @@ export default function DashboardPage() {
     setProfileMessage(null)
     const normalizedUsername = draftProfile.username.trim()
 
-    const response = await fetch('/api/profile/public', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        username: normalizedUsername,
-        bio: draftProfile.bio.trim(),
-      }),
-    })
+    try {
+      const {response, payload} = await fetchJson('/api/profile/public', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          username: normalizedUsername,
+          bio: draftProfile.bio.trim(),
+        }),
+      })
 
-    const payload = await response.json().catch(() => null)
 
-    if (!response.ok || !payload?.profile) {
-      setProfileMessage(payload?.error || 'Impossible de mettre a jour ton profil.')
-      setSavingProfile(false)
-      return
-    }
+      if (!response.ok || !payload?.profile) {
+        setProfileMessage(payload?.error || 'Impossible de mettre a jour ton profil.')
+        setSavingProfile(false)
+        return
+      }
 
-    const data = payload.profile as Profile
+      const data = payload.profile as Profile
 
-    setProfile(data)
-    setSavedProfile(data)
-    setDraftProfile({
-      username: data.username || '',
-      bio: data.bio || '',
-    })
-    setIsEditingProfile(false)
-    setProfileMessage('Profil mis a jour.')
-    setSavingProfile(false)
+      setProfile(data)
+      setSavedProfile(data)
+      setDraftProfile({
+        username: data.username || '',
+        bio: data.bio || '',
+      })
+      setIsEditingProfile(false)
+      setProfileMessage('Profil mis a jour.')
+    } catch {
+      setProfileMessage('La sauvegarde n’a pas pu être confirmée. Recharge le profil avant de réessayer.')
+    } finally { setSavingProfile(false) }
   }
 
   const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -204,13 +218,17 @@ export default function DashboardPage() {
     }
   }
 
+  if (loadError && !authLoading && user) return <div role="alert" className="space-y-4 rounded-2xl border border-zinc-800 p-6">
+    <p>{loadError}</p><button type="button" className="text-cyan-300 underline" onClick={() => window.dispatchEvent(new Event('focus'))}>Réessayer</button>
+  </div>
+
   if (!loading && needsAuth) {
     return (
-      <main className="min-h-screen p-2">
+      <div className="min-h-screen p-2">
         <div className="max-w-2xl rounded-[28px] border border-zinc-800 bg-zinc-950 p-6 space-y-4">
           <h1 className="text-2xl font-black uppercase text-white">Dashboard joueur</h1>
           <p className="text-zinc-400">
-            Le dashboard est reserve aux membres connectes sur leur compte ChibaskoGames.
+            Le dashboard est reserve aux membres connectes sur leur compte Chibasko Games.
           </p>
           <div className="flex gap-4">
             <Link href="/login" className="rounded-full bg-cyan-400 px-5 py-3 font-bold text-black">
@@ -218,12 +236,12 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="space-y-8">
+    <div className="space-y-8">
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="space-y-6">
           <ProfileCard profile={profile} stats={{ favoriteCount, commentCount }} />
@@ -315,15 +333,15 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_0.8fr]">
-                    <input
+                    <FormField label="Pseudo"><input
                       value={draftProfile.username}
                       onChange={(event) => setDraftProfile((current) => ({ ...current, username: event.target.value }))}
                       placeholder="Pseudo"
                       className="rounded-[22px] border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-                    />
+                    /></FormField>
                     <label className="flex min-h-[60px] cursor-pointer items-center justify-between rounded-[22px] border border-zinc-800 bg-black/60 px-4 text-sm text-zinc-300 transition hover:border-cyan-700">
                       <span>{uploadingAvatar ? 'Envoi de l avatar...' : 'Importer un avatar'}</span>
-                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon" disabled={uploadingAvatar} className="hidden" onChange={handleAvatarUpload} />
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon" disabled={uploadingAvatar} className="sr-only" onChange={handleAvatarUpload} />
                       <span className="rounded-full border border-cyan-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
                         Choisir
                       </span>
@@ -336,12 +354,12 @@ export default function DashboardPage() {
                     ) : null}
                   </div>
 
-                  <textarea
+                  <FormField label="Bio"><textarea
                     value={draftProfile.bio}
                     onChange={(event) => setDraftProfile((current) => ({ ...current, bio: event.target.value }))}
                     placeholder="Bio"
                     className="min-h-36 rounded-[22px] border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-                  />
+                  /></FormField>
 
                   <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                     <div className="text-zinc-400">
@@ -517,6 +535,6 @@ export default function DashboardPage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

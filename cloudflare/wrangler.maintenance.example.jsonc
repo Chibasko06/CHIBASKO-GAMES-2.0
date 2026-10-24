@@ -1,4 +1,4 @@
-// Inactive template: no route, resource or schedule is installed by building it.
+// Modèle inactif : sa compilation n'installe ni route, ni ressource, ni cron.
 {
   "name": "chibasko-session-maintenance-example",
   "main": "../.distribution/session-maintenance.mjs",
@@ -6,5 +6,10 @@
   "workers_dev": false,
   "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "logs": { "enabled": true, "invocation_logs": false } },
-  "vars": { "GAME_SESSION_MAINTENANCE_ENABLED": "0", "GAME_SUBMISSION_NOTIFICATIONS_ENABLED": "0" }
+  "vars": { "GAME_UPLOAD_MAINTENANCE_ENABLED": "0", "CONTACT_RECEIPTS_MAINTENANCE_ENABLED": "0", "GAME_SESSION_MAINTENANCE_ENABLED": "0", "GAME_SUBMISSION_NOTIFICATIONS_ENABLED": "0", "GAME_ACCOUNT_DELETIONS_ENABLED": "0" },
+  "r2_buckets": [
+    { "binding": "CHIBASKO_ASSETS", "bucket_name": "chibasko-assets" },
+    { "binding": "GAME_BUILDS_STAGING", "bucket_name": "chibasko-game-staging" },
+    { "binding": "GAME_BUILDS_ARTIFACTS", "bucket_name": "chibasko-game-artifacts" }
+  ]
 }

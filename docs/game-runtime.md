@@ -1,9 +1,9 @@
 # GameRuntime — GAME-RUNTIME-1 / RUNTIME-COMPAT-1
 
-> État après PONG-MIGRATION-1 : le portail ne contient plus de package jeu,
-> player source ni serveur gameplay. Les sections de bilan des phases antérieures
-> décrivent leur état historique. Le parcours courant et les prérequis production
-> sont documentés dans [pong-migration.md](pong-migration.md).
+Le portail charge les builds de jeu sans importer leur code source ni leur serveur
+gameplay. Les recettes datées constituent des références de validation, pas une
+attestation de l’état distant. Voir aussi [la distribution Pong](pong-migration.md)
+et [le Gateway production](artifact-gateway-production.md).
 
 Les garde-fous restent fermés en l'absence de `GAME_RUNTIME_LAUNCHES_ENABLED=1`
 côté portail et `GAME_ARTIFACT_GATEWAY_ENABLED=1` côté Gateway. La configuration
@@ -65,11 +65,10 @@ URL de launch, message SQL ou stack n'est journalisé. Les échecs de logging ne
 modifient jamais l'autorisation ou les réponses. Les tests de diagnostic sont
 inclus dans `npm run test:game-runtime` avec des fixtures uniquement.
 
-Le nouveau player `components/game-runtime/GameRuntime.tsx` consomme uniquement des
-builds Web via le gateway. Il n'importe aucun jeu, registre de modules, SDK installé,
-auth provider ou code réseau gameplay. Le player historique `components/multiplayer/`
-reste branché pour Pong jusqu'à PONG-MIGRATION. Le nouveau player est éprouvé avec
-des fixtures ; aucune nouvelle action du catalogue n'est activée ici.
+Le player `components/game-runtime/GameRuntime.tsx` consomme des builds Web via le
+Gateway. Il ne charge ni code gameplay ni registre de modules de jeu dans le
+portail. Le catalogue et les lobbies lui fournissent les références de version
+et de session autorisées.
 
 ## Lancement sans cookies tiers
 
@@ -88,8 +87,8 @@ Le hostname contient 192 bits aléatoires (48 caractères hexadécimaux). Il ne 
 ni gameId, userId, roomId, JWT, ni UUID d'authentification. La DB conserve son SHA-256,
 pas le hostname brut. Un second secret aléatoire de contrôle est conservé seulement
 par le portail, jamais par le jeu ; son hash permet DELETE/idempotent au teardown.
-Ce sont des capabilities éphémères, pas des credentials d'infrastructure créés
-dans cette phase. Pas de cookie, exchange cookie, session Supabase ou query token
+Ces capabilities éphémères sont distinctes des credentials d'infrastructure.
+Pas de cookie, exchange cookie, session Supabase ou query token
 nécessaire pour charger HTML/assets. Aucun service worker.
 
 Le hostname **est un bearer capability** : le copier permet d'accéder au build
@@ -100,8 +99,8 @@ La gateway ne journalise ni URL, hostname, Cookie, Authorization ni secrets de c
 Les journaux amont doivent aussi être configurés avant activation.
 
 Chaque lancement, y compris retry, possède une origine nouvelle, jamais réutilisée.
-Les objets R2 restent les mêmes, immuables. Les anciens hosts `v-` publics et `p-`
-preview top-level de phase 3 restent disponibles, sans être utilisés par ce player.
+Les objets R2 restent les mêmes, immuables. Les anciens hosts publics `v-` et
+les previews top-level `p-` ne sont pas utilisés par ce player.
 
 ## Domaine de contenu et frontière de cookies
 
@@ -210,8 +209,8 @@ version publique ni tag existant n'est remplacé.
 Une progression de chargement pourra ultérieurement être un message télémétrique
 optionnel dédié, validé/borné et ignoré par les anciens hosts, sans changer les
 messages existants. Elle ne devra pas être requise pour le handshake, ni contenir
-des champs libres secrets, ni prolonger automatiquement les budgets. Aucun message
-de progression n'est ajouté dans cette phase.
+des champs libres secrets, ni prolonger automatiquement les budgets. Le protocole
+actuel ne définit pas de message de progression.
 
 ## Parties longues et assets chargés tardivement
 
@@ -314,12 +313,10 @@ brancher lors de PONG-MIGRATION. Un lancement local anonyme n'en dépend pas.
 
 ## SDK séparé et moteurs
 
-Voir [spécification SDK proposée](sdk-browser-bridge-v1.md). Aucun fichier du repo SDK
-n'est modifié ici et aucune copie de son source n'est réintroduite. Le jeu fixture
-est un mock de protocole, pas une distribution cachée d'un second SDK.
-Un SDK publié pourra exposer la même intégration via npm et script IIFE/CDN ;
-Unity JS interop/Godot JSBridge/Construct appelleront ces mêmes primitives JS.
-Les wrappers et le gameplay réseau ne sont pas implémentés dans cette phase.
+Voir la [spécification du bridge](sdk-browser-bridge-v1.md). Le SDK est distribué
+séparément ; le jeu fixture simule le protocole sans embarquer un second SDK.
+L’intégration navigateur utilise les primitives JS publiques. Un export Unity,
+Godot ou Construct doit les relier à son propre moteur.
 Les vrais exports Unity/Godot, le multithread COOP/COEP côté parent, Safari/Firefox et
 les appareils physiques nécessitent une recette dédiée avant support annoncé.
 
@@ -332,98 +329,38 @@ le vrai bridge, consomme API/service/gateway avec DB/R2 simulés, teste trois bu
 IDB/localStorage/BroadcastChannel/cookies, reload/navigation/top-navigation, absence
 de SDK et layouts 390×844, 768×1024, 844×390. Ce n'est pas un vrai bucket/domaine/phone.
 Les service workers sont désactivés dans le runner pour garantir zéro appel externe ;
-le refus gateway de leurs requêtes est couvert par les tests artifact de phase 3.
+le refus gateway de leurs requêtes est couvert par les tests artifact.
 
-Nouvelle migration `20261017000100_game_launch_sessions.sql`, préparée uniquement.
-RUNTIME-COMPAT-1 ajoute `20261017000200_game_launch_renewals.sql` : plafond absolu
-et RPC privé de renouvellement. Les migrations précédentes ne sont pas réécrites.
-Le harness PostgreSQL applique phases 1–4 sur cluster jetable local. Les migrations
-précédentes restent intactes. Aucun compte, DNS, secret, bucket ou domaine configuré.
-Les anciennes dépendances Git SDK/Pong restent présentes, blocage Cloudflare connu.
+`20261017000100_game_launch_sessions.sql` définit les launches ;
+`20261017000200_game_launch_renewals.sql` définit le plafond absolu et la RPC privée
+de renouvellement. Le harness PostgreSQL les applique sur un cluster jetable local.
 
-## Plan PONG-MIGRATION
+## Intégration d’un jeu distribué
 
-1. Appliquer séparément la proposition SDK et distribuer une version utilisable sans
-   Git privé (package public ou build JS distribué), sans exposer les internals.
-2. Dans le repo Pong : produire un build Web client online/local, intégrer le bridge,
-   conserver le moteur partagé et le serveur autoritaire ; tester sans portail.
-3. Préparer côté plateforme l'adaptateur de session online vérifié : pseudonymes,
-   contexte/ticket de connexion limité au serveur gameplay, sans JWT Supabase ni
-   réservation interne. Conserver public/private dans l'orchestration du lobby.
-4. Configurer domaine de contenu dédié, TLS, buckets/queue/gateway, migrations
-   et politiques réseau après autorisation distincte ; recette moteurs/navigateurs.
-5. Uploader le même build officiel par le pipeline générique, valider une DRAFT,
-   tester preview avec ce player, local anonyme et online à deux comptes.
-6. Publier/activer explicitement la version après recette humaine ; basculer les
-   lancements catalogue/lobby vers ce runtime unique. Tester score/results/replay,
-   forfeit, deuxième partie, renouvellement/longues sessions et rollback.
-7. Retirer imports/registres legacy côté client et dépendance package Pong du portail.
-   Le module serveur Pong doit alors être distribué/chargé hors build du portail ;
-   conserver un adaptateur serveur sûr, sans présenter le build client comme serveur.
-8. Retirer enfin les dépendances Git privées du SDK/Pong restantes et valider install
-   Cloudflare sans accès aux repos des jeux. Aucun PAT/deploy key/App en contournement.
+Le build Web utilise le SDK public et le serveur gameplay est déployé séparément.
+La plateforme fournit au START un contexte limité, sans JWT Supabase ni réservation
+interne. Les salons public/privé restent dans le control plane.
 
-Aucune de ces migrations produit, SDK, Pong ou production n'est exécutée ici.
+Avant publication, vérifier le domaine, TLS, les buckets et les policies réseau,
+valider le build en draft, puis tester sa preview et ses modes disponibles.
+La revue humaine porte sur la version immuable exacte ; tester aussi résultats,
+replay, longues sessions et rollback. Aucun import de code jeu n’est nécessaire
+pour ajouter une version au portail.
 
-## Fichiers et validation locale
+## Recette navigateur et PostgreSQL
 
-Nouveaux fichiers plateforme :
+`npm test` inclut les tests runtime purs. Exécuter séparément
+`npm run test:game-runtime-browser` et `npm run test:game-runtime-db` pour les
+scénarios navigateur et PostgreSQL. Le navigateur utilise Chrome installé ;
+`RUNTIME_BROWSER_CHANNEL` sélectionne un autre channel disponible.
 
-```text
-app/api/game-launches/route.ts
-app/api/game-launches/[launchId]/route.ts
-components/game-runtime/GameRuntime.tsx
-components/game-runtime/GameRuntime.module.css
-lib/game-runtime/contracts.ts
-lib/game-runtime/client.ts
-lib/game-runtime/bridge.ts
-lib/game-runtime/controller.ts
-lib/game-distribution/gateway/launch.ts
-lib/server/gameLaunches.ts
-supabase/migrations/20261017000100_game_launch_sessions.sql
-tests/game-runtime.test.mjs
-tests/game-runtime.browser.test.mjs
-tests/game-launch-db.sql
-tests/helpers/runtime-harness.mjs
-tests/fixtures/runtime-host.tsx
-tests/fixtures/runtime-builds/bridge-fixture.js
-tests/fixtures/runtime-builds/pong-like/{chibasko.json,index.html}
-tests/fixtures/runtime-builds/solo/{chibasko.json,play/start.html}
-tests/fixtures/runtime-builds/online/{chibasko.json,index.html}
-docs/game-runtime.md
-docs/sdk-browser-bridge-v1.md
-```
+## Couverture de compatibilité
 
-Adaptations : gateway/{contracts,gateway,resolver}.ts, uploads/repository.ts,
-cloudflare/artifact-gateway.ts et configuration d'exemple non active, package.json /
-lockfile, harness DB et docs/game-distribution.md. Les adaptations de distribution
-de phase 3 sont conservées. Aucun fichier SDK/Pong ni source gameplay changé.
-
-Recette réalisée : Chrome headless 155.0.8059.80, 11 scénarios navigateur réels,
-12 tests runtime/API/bridge, 8 tests distribution + 22 upload + 13 gateway : 66 tests.
-PostgreSQL jetable valide les quatre migrations, RLS, permissions, expiration,
-révocation, quotas et nettoyage, en conservant les courses des phases précédentes.
-TypeScript, build Next Webpack et compilation Worker browser passent. Les fichiers
-générés restent ignorés. Aucun bucket réel ni moteur Unity/Godot réel testé.
-
-Le script navigateur utilise Chrome installé par défaut ; `RUNTIME_BROWSER_CHANNEL`
-peut sélectionner un autre channel installé, notamment chromium après une installation
-Playwright explicite en CI. `npm test` inclut les tests runtime purs ; exécuter
-séparément `npm run test:game-runtime-browser` et `npm run test:game-runtime-db` pour
-la recette navigateur et PostgreSQL. Aucun téléchargement de navigateur ni profil
-personnel n'est requis/utilisé par la recette réalisée avec Chrome déjà installé.
-
-## Bilan RUNTIME-COMPAT-1
-
-Validations : 26 tests runtime/API/compatibilité, 16 scénarios Chrome réels avec
-horloge simulée pour les longues durées, 13 tests gateway et bundle Worker,
-TypeScript, lint ciblé et build Next Webpack. PostgreSQL jetable applique aussi
-la nouvelle migration et teste les droits RPC, la limite absolue, l'expiration,
-les permissions preview et la course renouvellement/révocation. Aucun SQL exécuté
-sur Supabase production. Le SDK séparé passe 17 tests core/client/React et
-10 scénarios navigateur, dont le bridge réel et READY à 90 secondes ; le test
-optionnel de fixture tarball externe est explicitement skipped dans cette recette.
-Son tarball préparatoire a été reconstruit, sans publication.
+Les tests runtime/API/compatibilité couvrent les longues durées avec une horloge
+simulée, les budgets READY et le renouvellement. PostgreSQL jetable vérifie les
+droits RPC, la limite absolue, l’expiration, les permissions preview et la course
+renouvellement/révocation. Les tests consommateurs externes nécessitent leurs
+fixtures SDK ; leur absence ne vaut pas validation de compatibilité.
 
 Les fixtures simulent un chargement applicatif long, pas plusieurs Gio réels.
 Le R2 et l'API backend du test navigateur sont simulés ; les vrais exports
@@ -432,34 +369,6 @@ prolongées nécessitent toujours des recettes dédiées. Les tests unitaires co
 la panne transitoire de renouvellement, son timeout, la réponse tardive, une mauvaise
 génération et le teardown. Aucun résultat ne promet une session infinie ou maintenue
 pendant une suspension arbitraire du navigateur.
-
-Fichiers plateforme créés/modifiés pour cette correction :
-
-```text
-app/api/game-launches/[launchId]/route.ts
-components/game-runtime/GameRuntime.tsx
-lib/game-runtime/{contracts,bridge,controller,client}.ts
-lib/game-distribution/gateway/launch.ts
-lib/server/gameLaunches.ts
-supabase/migrations/20261017000200_game_launch_renewals.sql
-package.json
-tests/game-runtime.test.mjs
-tests/game-runtime-compat.test.mjs
-tests/game-runtime.browser.test.mjs
-tests/game-launch-renewal-db.sql
-tests/game-distribution-db.mjs
-tests/helpers/runtime-harness.mjs
-tests/fixtures/runtime-builds/bridge-fixture.js
-docs/game-runtime.md
-docs/sdk-browser-bridge-v1.md
-```
-
-Dans le SDK séparé : `src/client/browser/connection.ts`, `tests/client.test.mjs`,
-`tests/browser.test.mjs`, `README.md`, `CHANGELOG.md`, `docs/sdk-browser-1.md`.
-Le tag v0.1.0 reste inchangé ; aucun nouveau tag. Aucune modification Pong,
-dépendance Git, auth Cloudflare, DNS, secret ou publication. Aucune copie du SDK
-réintroduite dans la plateforme. Aucun commit, push ou déploiement.
-
 
 ## ONLINE-SESSION-1
 
@@ -505,16 +414,18 @@ Le lecteur utilise la largeur du conteneur de page et une hauteur liée au viewp
 `GamePlayerShell` fournit la surface commune aux iframes legacy et à GameRuntime.
 Son dock appartient au portail : logo, réactions, favoris, audio, toggle plein
 écran et sortie. Il occupe une ligne de layout sous la surface, sans overlay ni
-recouvrement des pixels de l’iframe, y compris en plein écran. Une bordure et une
+recouvrement des pixels de l’iframe. En plein écran, le dock est masqué et la
+surface de jeu remplit l’écran. Une bordure et une
 ombre légères séparent le player du site. Les composants de réactions/favoris existants sont réutilisés en
-version compacte pour les jeux publiés ; leur accès authentifié reste
-inchangé. Le jeu conserve son propre ratio et ses contrôles.
+version compacte pour les jeux publiés et vérifient l’authentification.
+Le jeu conserve ses propres contrôles.
 
-Le Bridge actuel ne fournit pas de commande audio. Sans adaptateur audio réel,
-le mute est désactivé avec une explication accessible. Le prop optionnel
-`audioControl` décrit un état muted et un callback fourni par un futur adaptateur ;
-il ne donne aucun accès au DOM ou aux médias de l’iframe cross-origin et ne
-modifie pas le protocole. Chargement, erreurs et retry restent des overlays
+Le bouton audio est désactivé avant lancement, avec « Disponible pendant la partie ».
+Après lancement, il devient actif seulement si le jeu s’abonne au contrat audio SDK.
+Sans support détecté, il indique « Ce jeu ne prend pas en charge le contrôle audio ».
+La préférence reste gérée par le portail ; le jeu l’applique à ses sources sonores,
+sans accès du parent au DOM cross-origin. Voir [le contrat audio](audio-and-developer-submissions.md).
+Chargement, erreurs et retry restent des overlays
 temporaires, sans statut permanent pendant la partie.
 
 ## Fiche orientée player
@@ -544,8 +455,8 @@ restent identiques. Le shell ne transporte aucune donnée d’admission.
 
 `GameViewport` commence sur le même launcher, avec une seule action « Jouer ».
 L’iframe legacy n’est créée qu’au clic, sans descriptor, sans bridge artificiel et
-sans accès au DOM cross-origin. Ses permissions existantes sont conservées ;
-elles ne deviennent pas celles des artifacts. Quitter démonte l’iframe et revient
+sans accès au DOM cross-origin. Les permissions sont définies par la politique
+du portail, séparément du moteur artifact. Quitter démonte l’iframe et revient
 au launcher, sans écran intermédiaire ni bouton de relecture distinct.
 
 Le flux UI est launcher → lancement → jeu → launcher. Les erreurs utilisent la
@@ -553,3 +464,39 @@ surface commune avec Réessayer et, pour les parcours intégrés, Retour au laun
 Chaque nouveau lancement repart avec une iframe et un launch neufs ; les leases,
 générations et nettoyages restent gérés par le moteur. Le contrôle audio reste
 désactivé sans adaptateur réel, pour les deux moteurs.
+
+## Isolation des contenus HTML5
+
+Les URL legacy sont absolues et HTTPS, sans identifiants intégrés. Les protocoles
+actifs, chemins relatifs et adresses IP sont refusés. HTTP sur loopback reste
+réservé à un portail lui-même exécuté sur loopback pour le développement local.
+
+Un legacy situé sur un site distinct conserve son origine et son stockage propre.
+Un legacy du même site que le portail reçoit une origine opaque : il ne peut pas
+accéder au DOM, aux cookies ou au stockage du portail. Si ce jeu dépend de son
+stockage d'origine, son hébergement doit migrer vers un site dédié ; ajouter
+`allow-same-origin` sur le portail n'est pas une solution.
+
+La sandbox autorise les scripts et le pointer lock. Elle ne permet ni navigation
+du parent, ni popup, ni téléchargement, ni soumission de formulaire. Les droits
+caméra, microphone, géolocalisation, presse-papiers, paiement et USB sont refusés.
+Le plein écran est piloté par le shell, pas par le document du jeu. Aucun referrer
+du portail n'est transmis. Les pages du portail restent non intégrables grâce aux
+en-têtes `frame-ancestors 'none'` et `X-Frame-Options: DENY`, y compris lors d'une
+navigation de l'iframe tierce vers le portail.
+
+Les artifacts gardent leurs origines de lancement distinctes et leurs politiques
+CSP propres. Le bridge vérifie la fenêtre source, l'origine exacte, le document,
+le protocole, le launch et la génération. Le jeton de contrôle reste dans le
+portail. Une nouvelle capacité navigateur nécessite une politique hôte explicite
+et des tests ; un manifeste ou un message ne peut pas ajouter des permissions.
+
+Les jeux tiers peuvent toujours contacter leurs propres services et effectuer
+des navigations internes dans leur frame. Leur contenu, leurs traceurs et leurs
+redirections ne sont pas contrôlés par le portail. Les URL DNS privées et les
+changements de résolution ne constituent pas une liste réseau filtrée.
+
+Une application WebView doit conserver cette séparation d'origines, vérifier
+chaque navigation et refuser les schémas externes non approuvés. Aucun bridge
+natif privilégié ne doit être exposé aux frames de jeux. Les permissions natives,
+le stockage et le plein écran nécessitent des tests Android et iOS dédiés.

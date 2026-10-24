@@ -1,3 +1,4 @@
+import {pageNumber} from '@/lib/pagination'
 import { NextRequest } from 'next/server'
 import { requireAdmin, adminJson, adminErrorMessage } from '../_utils'
 
@@ -10,31 +11,12 @@ export async function GET(request: NextRequest) {
 
   const { supabaseAdmin } = adminCheck
 
-  const [{ data: profiles, error: profilesError }, { data: authUsers, error: authError }] =
-    await Promise.all([
-      supabaseAdmin
-        .from('profiles')
-        .select('id, username, display_name, avatar_url, bio, created_at')
-        .order('created_at', { ascending: false }),
-      supabaseAdmin.auth.admin.listUsers(),
-    ])
+  const page=pageNumber(new URL(request.url).searchParams.get('page'))
+  const {data,error:profilesError}=await supabaseAdmin.rpc('catalogue_admin_users' as never,{p_actor:adminCheck.user.id,p_offset:(page-1)*50,p_limit:50} as never)
 
   if (profilesError) {
     return adminJson({ error: adminErrorMessage(profilesError) }, { status: 500 })
   }
 
-  if (authError) {
-    return adminJson({ error: adminErrorMessage(authError) }, { status: 500 })
-  }
-
-  const emailById = new Map(
-    (authUsers.users || []).map((user) => [user.id, user.email ?? null])
-  )
-
-  const users = (profiles || []).map((profile) => ({
-    ...profile,
-    email: emailById.get(profile.id) ?? null,
-  }))
-
-  return adminJson({ users })
+  return adminJson({...data as object,page,pageSize:50})
 }

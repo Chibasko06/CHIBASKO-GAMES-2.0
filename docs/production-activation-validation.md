@@ -1,7 +1,7 @@
 # Validation locale de la préparation d'activation
 
-Relevé du 18 octobre 2026. Aucun contrôle distant Supabase/Cloudflare, aucune
-création de ressource, credential, DNS, migration, upload ou promotion effectués.
+Référence historique du 18 octobre 2026 : validations locales sur fixtures.
+Les résultats ne décrivent pas l’état actuel des ressources Supabase/Cloudflare.
 
 | Contrôle | Résultat |
 | --- | --- |
@@ -21,7 +21,7 @@ création de ressource, credential, DNS, migration, upload ou promotion effectu�
 | Audit npm complet | 17 alertes : 12 high, 4 moderate, 1 low ; rapport dédié, aucune mise à jour de dépendance |
 | Audit npm --omit=dev | 5 alertes : 1 high et 4 moderate ; exposition à lever avant GO |
 | Docker/Linux | NON EXÉCUTÉ : Docker indisponible sur ce poste ; checklist obligatoire avant activation |
-| Diff, secrets, rédaction et liens | PASS sur les fichiers ajoutés/modifiés ; aucun motif de credential, lien local manquant, formulation méta ou espace final détecté ; diff --check des trois dépôts sans erreur |
+| Intégrité des sources | Contrôles de credentials, liens locaux et formatage réussis sur le périmètre testé |
 
 Le premier build Next sous sandbox a échoué lors du lancement du sous-processus
 CSS Turbopack ; le cache généré a été retiré dans la copie isolée. Le build propre
@@ -37,10 +37,7 @@ build local ne constitue pas cette validation.
 ZIP fixture uniquement : SHA-256
 `55d834be8bb63d3b1cae65d6975b912269aa8963c8eb6b617f64a80c0455e0a6`.
 Ce fichier n'est pas un artefact production et n'a pas été uploadé. Le build réel
-0.3.0 attend encore PONG_GAME_ID officiel.
+de production doit utiliser le PONG_GAME_ID officiel et non cette fixture.
 
-Les fichiers runtime applicatifs, migrations existantes, dépendances et références
-SDK/Pong restent inchangés. Les ajouts sont le runbook, les inventaires/checklists,
-le préflight read-only et ses tests. L'application de production n'a pas été interrogée.
 Le [runbook](production-activation.md) et sa [checklist](production-activation-checklist.md)
 restent la source des gates d'activation ; aucun succès local ne les coche à distance.

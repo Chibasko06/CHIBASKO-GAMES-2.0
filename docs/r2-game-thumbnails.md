@@ -45,8 +45,8 @@ Ne pas réaffecter simultanément une miniature en cours de remplacement. Une
 garantie plus forte nécessiterait un protocole partagé de gestion des références.
 
 Les uploads abandonnés et les objets conservés par prudence peuvent rester
-orphelins. Aucun job de purge, lifecycle automatique ou suppression à la
-suppression d'un jeu n'est ajouté dans cette phase.
+orphelins. Ce parcours ne dispose pas de job de purge ni de suppression automatique
+des objets lors de la suppression d'un jeu ; vérifier séparément le lifecycle du bucket.
 
 ## Environnements et vérification
 
@@ -61,19 +61,18 @@ d'un test manuel local. Les tests automatisés utilisent des réponses SQL simul
 
 Si Vercel reste le fallback avec une base partagée, sa version déployée doit aussi
 autoriser `assets.chibaskogames.fr/game-thumbnails/**` dans next/image avant les
-premiers uploads R2 persistés. La modification de configuration est présente
-ici, mais aucun déploiement Vercel n'est réalisé par ce changement.
+premiers uploads R2 persistés.
 
-Le domaine public R2 doit être associé au même bucket que le binding. Sa
-configuration est déclarée active par l'utilisateur ; elle n'est pas modifiée
-ni validée par un upload distant pendant ce changement.
+Le domaine public R2 doit être associé au même bucket que le binding. Vérifier
+cette association avec un objet de test : la configuration locale ne prouve pas
+la disponibilité du domaine distant.
 
 `npm test` couvre les validations, le binding absent, les erreurs d'écriture,
 l'autorisation admin, les URLs non possédées, objets partagés, erreurs SQL/R2,
 conflits et l'ordre sauvegarde/nettoyage. Un test utilise un binding R2 local
 workerd avec persist:false et remote:false, sans credentials de production.
 
-Après un futur déploiement autorisé, tester manuellement un upload admin, son URL
+Après déploiement, tester manuellement un upload admin, son URL
 publique, l'enregistrement du jeu, le remplacement R2 et le remplacement d'une
 ancienne URL Supabase. Vérifier l'affichage des anciennes miniatures et les
-avatars inchangés. Aucune migration de données n'est requise.
+avatars existants. Aucune migration de données n'est requise.

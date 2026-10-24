@@ -10,7 +10,7 @@ export function isEmail(value: string) {
   return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
-export async function readJsonObject(request: Request, maxBytes = 16_384): Promise<Record<string, unknown>> {
+export async function readJsonObject(request: Request, maxBytes = 16_384, timeoutMs?:number): Promise<Record<string, unknown>> {
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
     throw new InputError('Format JSON requis.', 415)
   }
@@ -18,9 +18,12 @@ export async function readJsonObject(request: Request, maxBytes = 16_384): Promi
   if (!reader) throw new InputError()
   const chunks: Uint8Array[] = []
   let size = 0
+  let expired=false
+  const timer=timeoutMs?setTimeout(()=>{expired=true;void reader.cancel().catch(()=>{})},timeoutMs):undefined
   try {
     while (true) {
       const { done, value } = await reader.read()
+      if(expired)throw new InputError('Délai de lecture dépassé.',408)
       if (done) break
       size += value.byteLength
       if (size > maxBytes) {
@@ -30,6 +33,7 @@ export async function readJsonObject(request: Request, maxBytes = 16_384): Promi
       chunks.push(value)
     }
   } finally {
+    clearTimeout(timer)
     reader.releaseLock()
   }
   try {

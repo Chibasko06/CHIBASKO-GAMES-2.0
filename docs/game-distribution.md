@@ -1,37 +1,19 @@
 # Game Distribution v1 — architecture, fondation et pipeline d'upload
 
-> État après PONG-MIGRATION-1 : le portail ne contient plus de package jeu,
-> player source ni serveur gameplay. Les sections de bilan des phases antérieures
-> décrivent leur état historique. Le parcours courant et les prérequis production
-> sont documentés dans [pong-migration.md](pong-migration.md).
+Le portail ne contient ni code source de jeu ni serveur gameplay. Les builds Web
+sont distribués séparément. Les contrats de preview top-level des sections 27–29
+sont historiques : ils ne sont pas le parcours du Worker de production. Le
+[Gateway production](artifact-gateway-production.md) décrit le domaine, les hosts
+de launch et les règles d’autorisation actuels.
 
-**Décision : ARCHITECTURE APPROUVÉE**, avec deux précisions : un serveur hébergé
-chez nous n'est pas automatiquement un jeu honnête, et les exports Web multithreadés
-nécessitent un profil d'isolation testé, pas seulement une iframe.
+## 1. Architecture actuelle
 
-## 1. Audit réel
-
-Audit du code et du SQL versionnés dans ce dépôt, sans introspection de la base
-de production. Une vérification de dérive du schéma réel précédera toute migration.
-
-- `games/clientRegistry.ts` importe encore le package React Pong par deux loaders.
-  `GameRuntime`/`LocalGameRuntime` sont génériques mais résolvent du code installé au
-  build du portail. L'ajout d'un module exige donc aujourd'hui un rebuild.
-- Le game-server installe la définition/driver Pong dans son registre Colyseus.
-  LobbyRoom, Coordinator, admission et réservations appartiennent à la plateforme.
-- Le manifeste technique du catalogue est généré depuis ce registre au build.
-  L'admin contrôle ses gameIds grâce à cette projection statique.
-- SDK/Pong sont encore des dépendances Git privées des manifests web/backend.
-  Leur extraction a validé la séparation du code, pas la distribution finale.
-- `games.id` est un UUID. `game_type` distingue classic/multiplayer_chibasko,
-  avec une contrainte conditionnelle URL ou multiplayer_game_id. Ni version,
-  ownership développeur fiable, déploiement serveur ni artifact n'existe en DB.
-  `developer_name` est du texte d'affichage, jamais une autorisation.
-- `game_submissions` est un workflow éditorial, pas un registre de versions.
-- R2 actuel : binding d'images `CHIBASKO_ASSETS`, origine publique assets, écritures
-  conditionnelles. Ce bucket et son helper ne doivent pas héberger du HTML tiers.
-- L'admin est autorisé via admin_users et endpoints serveur. Les écritures catalogue
-  directes d'un JWT navigateur sont déjà interdites. Ce modèle n'est pas relâché.
+Le portail ne contient ni code gameplay ni dépendance Git privée de jeu. Il
+référence des versions Web immuables dans R2 et des deployments serveur autonomes.
+`games.id` identifie le jeu ; `developer_name` est un texte public, jamais une
+autorisation. Les memberships et les RPC contrôlent les droits de publication.
+Le bucket de médias `CHIBASKO_ASSETS` est distinct du staging et des artifacts ;
+il ne sert pas de stockage HTML pour les jeux tiers.
 
 ## 2. Cible : source distincte du build
 
@@ -112,7 +94,7 @@ dans le manifest. Les propriétés inconnues sont refusées.
 
 ## 6. Base : game_versions et active_version
 
-Migration **préparée seulement**, à auditer avant application production :
+Migration à vérifier dans l’historique de l’environnement cible :
 
 - game_versions : id, game_id, version, schema_version, integration_version,
   status, manifest, artifact_sha256/size, file_count, archive_sha256/size optionnels,
@@ -136,15 +118,13 @@ Migration **préparée seulement**, à auditer avant application production :
 Les contraintes DB protègent le tuple/immutabilité/lifecycle ; elles ne remplacent
 pas le validateur complet. Aucun endpoint ne permet aujourd'hui ces insertions.
 
-Les contraintes game_type/URL actuelles restent inchangées. Avant lancement du
-nouveau runtime, il faudra faire évoluer cette représentation vers une livraison
-`managed_build` ou `external_url`, distincte des capacités local/online. Le seul
-ajout de game_versions ne rend pas encore un build solo natif publiable.
+La livraison `managed_build` ou `external_url` est distincte des capacités
+local/online. La projection catalogue doit utiliser la version active validée.
 
 ## 7. Lifecycle
 
-Upload/job : receiving → validating → failed/completed. À gérer séparément du
-catalogue ; pas de table/job backend construit dans cette phase.
+Les uploads et leurs jobs possèdent un état mutable distinct du catalogue.
+Voir le pipeline multipart ci-dessous et les RPC de `game_build_uploads`.
 
 Version créée seulement après validation structurelle :
 `draft → in_review → approved → published → archived` ; review peut produire
@@ -373,82 +353,32 @@ Pas de classement, récompense ou persistance de résultat ajouté par la fondat
 | Serveur externe | Possible | Oui | Non |
 | Serveur Chibasko | Oui | Non | Oui |
 
-Les colonnes restent des cibles ; ni iframe player ni serveurs tiers/hosting ne
-sont déclarés opérationnels par cette phase. SDK est un contrat facultativement
+Les offres d’hébergement serveur de cette matrice sont des cibles, pas un service
+de provisioning en libre-service. Le SDK est un contrat facultativement
 consommé par une bibliothèque : le wire protocol documenté peut aussi être implémenté
 par un moteur ne sachant pas charger npm.
 
-## 16. Migration ordonnée et impact Cloudflare
+## 16. Déploiement et vérification
 
-1. **GAME-DISTRIBUTION-1 ici** : contrat, validateurs, fixtures, clés/port de stockage,
-   migration additive préparée et tests locaux ; aucun routage/jeu migré.
-2. Ownership/API uploads/jobs, stockage privé/gateway, revue/publication atomiques,
-   previews autorisées et gestion d'erreurs/reprises. Appliquer la migration seulement
-   après revue et validation humaine de l'environnement réel.
-3. SDK public de bridge (npm + JS), player isolé, profils CSP/sandbox, tests réels
-   HTML/Unity/Godot ; décision de domaine, threading et fonctionnalités approuvées.
-4. Catalogue : active_version et capacités depuis une projection DB à runtime,
-   remplacement du registre client/manifeste compilé. Livraison ≠ local/online.
-5. Control plane online : provider de sessions générique. Lobby/Coordinator restent
-   internes, mais ne chargent plus de constructeurs de jeux. Handshake, tickets et
-   provenance sont fournis par une interface de déploiement, pas par gameId hardcodé.
-6. Pong fournit son export Web autonome (online/local, SDK bridge) et un artifact
-   serveur indépendant avec son transport. La physique/UI existantes sont conservées.
-   Le processus gameplay Pong est déployé à part du processus lobby plateforme.
-7. Preview/recette public/privé/local + résultats/replay, puis sélection de la version.
-   Retirer enfin les dépendances Pong **web ET game-server**, les registres source
-   et scripts Git spécifiques. Distribuer le SDK par un registre accessible sans
-   Git privé. Le simple remplacement du client ne suffit pas à découpler le backend.
+Les migrations, le staging, les artifacts et le Gateway ont des prérequis distincts.
+Vérifier les droits développeur, les quotas, les profils CSP et les politiques réseau
+avant de soumettre un build. La validation technique crée une version draft ; une
+revue humaine précède sa publication. La visibilité de la fiche reste un contrôle
+séparé. Un mode online nécessite un deployment serveur compatible.
 
-Les dépendances Git actuelles restent fonctionnelles jusqu'au remplacement réel.
-**Aucun PAT, deploy key ou GitHub App à configurer pour contourner Cloudflare.**
-L'échec d'installation cloud lié aux Git privés n'est volontairement pas corrigé
-ici. La cible est qu'un build du portail n'accède plus à aucun repo de jeu, et
-que le SDK soit distribué sans Git privé. Ajouter/mettre à jour un jeu n'affectera
-alors ni ce build, ni ses credentials.
+L’installation du portail utilise npm public, sans accès Git privé aux jeux.
+L’ajout d’un jeu ou d’une version ne nécessite pas de reconstruire son gameplay
+dans le portail. Voir [la revue manuelle](manual-build-review.md) et
+[le runbook production](production-activation.md).
 
-## 17. Portée et décisions ouvertes
+## 17. Politiques d’exploitation
 
-Fondation livrée : schema/types, validation de manifest et vrais ZIP, hash/inventaire,
-clés et port R2 sans binding réel, fixtures Pong contractuelle et solo générique,
-tests unitaires et PostgreSQL jetable (RLS/immutabilité/rollback/concurrence).
-La fixture Pong ne contient pas le jeu ni sa simulation.
+Les quotas, la rétention, le nettoyage, la review et les origines réseau autorisées
+sont des politiques de service. Elles ne changent pas le format du build selon
+son moteur ou son propriétaire. Les fixtures contractuelles ne contiennent pas
+le gameplay des jeux représentés.
 
-Avant exposition : domaine de contenu, profils par moteur/threading, canal des
-grants preview et révocation, ownership des éditeurs, quotas/offres, rétention/GC,
-jobs isolés/streaming, audit de publication et licence/distribution SDK publique.
-Ces décisions n'introduisent aucune propriété Git/moteur/hébergement dans le format.
-Elles sont des politiques de service, à valider avant mise en production.
-
-Aucune migration production, écriture R2/Supabase, iframe finale, portail développeur,
-CLI complète, hosting, protocole tiers ou changement de gameplay implémenté ici.
-
-## 18. Fichiers et vérification de GAME-DISTRIBUTION-1
-
-```text
-lib/game-distribution/
-  chibasko.schema.v1.json             contrat de distribution canonique
-  types.ts                           types portables, sans SDK runtime
-  manifest.ts                        validation et cohérence de la cible
-  manifest-validator.generated.mjs   sortie reproductible, nécessaire au runtime
-  paths.ts                           chemins et MIME/Content-Encoding
-  build.ts                           inventaire, limites et hash de contenu
-  zip.ts                             validation de vrais ZIP, sans extraction disque
-  keys.ts                            namespace R2 immuable
-  storage.ts                         port conditionnel privé, sans binding réel
-scripts/generate-distribution-validator.mjs
-supabase/migrations/20261016000100_game_distribution_versions.sql
-tests/game-distribution.test.mjs
-tests/game-distribution-db.mjs
-tests/game-distribution-db.sql
-tests/fixtures/game-builds/{pong,solo}/
-```
-
-Scripts et lockfile racine adaptés ; README, anciennes notes d'extraction SDK/Pong
-et guide production signalent le changement de cible. Aucun registre, route,
-runtime, SDK ou package Pong modifié. Les types Supabase générés ne sont pas
-modifiés pour prétendre que la migration est déjà appliquée : les régénérer après
-application validée dans l'environnement choisi.
+## 18. Vérification du contrat de distribution
 
 Commandes de vérification ciblée :
 
@@ -457,8 +387,7 @@ npm run test:game-distribution
 npm run test:game-distribution-db
 npx tsc --noEmit
 npx eslint lib/game-distribution scripts/generate-distribution-validator.mjs tests/game-distribution.test.mjs tests/game-distribution-db.mjs
-node --import ./tests/register.mjs --test tests/game-sdk.test.mjs tests/game-catalogue.test.mjs tests/product-session.test.mjs
-npm run check:game-manifest
+node --import ./tests/register.mjs --test tests/game-sdk.test.mjs tests/game-catalogue.test.mjs
 npm run check:game-boundaries
 git diff --check
 ```
@@ -470,24 +399,17 @@ nécessiter une exécution hors bac à sable. Les refus SQL, la conservation du
 catalogue, le rollback et la concurrence activation/archivage sont exécutés, pas
 seulement vérifiés par recherche textuelle.
 
-Résultats de cette phase : 8 tests distribution et 22 tests SDK/catalogue/session
-réussis, scénario PostgreSQL réussi, TypeScript/lint ciblé/manifeste/boundaries
-réussis. Les tests distribution sont aussi inclus dans la suite racine.
-Les tests R2 utilisent exclusivement un faux bucket ; aucun objet distant créé.
-Le test bundle exécute le validateur manifest avec génération de code interdite,
-sans prétendre valider un futur worker complet ou tous les exports moteur.
-
-Next/Cloudflare, jeu réseau et téléphones n'ont pas été recettés à nouveau : cette
-fondation n'est branchée à aucun parcours. Les dépendances Git et le blocage
-d'installation Cloudflare actuel restent inchangés. Une recette complète sera
-requise lors du branchement du player, du pipeline et des serveurs gameplay.
+Les tests storage utilisent des doubles R2 ; les vérifications de droits et
+d’immuabilité utilisent PostgreSQL jetable. Les tests locaux ne certifient pas
+les permissions des buckets ni les ressources distantes.
 
 ## 19. GAME-DISTRIBUTION-2 : pipeline client générique
 
-La phase 2 ajoute les routes API, une session/job mutable, l'upload R2 multipart,
-un dispatcher d'outbox, un consumer de validation isolé et le nettoyage. Aucun jeu
-n'est migré. Le flag `GAME_DISTRIBUTION_UPLOADS_ENABLED` est désactivé par défaut.
-Rien n'est créé/configuré/appliqué à distance par le code ou les tests.
+Le pipeline comprend les routes développeur, une session/job mutable, l’upload R2
+multipart, l’outbox, la validation isolée et le nettoyage. Le flag
+`GAME_DISTRIBUTION_UPLOADS_ENABLED` contrôle l’accès. Le dispatcher planifié est
+actuellement désactivé ; la commande de revue locale réutilise le même validator.
+Voir [le workflow manuel](manual-build-review.md).
 
 ```text
 Bearer vérifié → permission DB par jeu → session created
@@ -504,7 +426,6 @@ Bearer vérifié → permission DB par jeu → session created
 
 Le payload reste identique pour un jeu officiel, tiers, local, online ou mixte.
 Ni Git, npm, SDK JS, React ni technologie de moteur ne sont requis pour l'upload.
-Le game-server, les règles et l'UX actuels restent inchangés.
 
 ## 20. API développeur exacte
 
@@ -543,8 +464,7 @@ une future couche d'auth, pas un nouveau format d'upload.
 
 ## 21. Permissions, migration et session transitoire
 
-Migration séparée `20261016000200_game_build_uploads.sql`, après la phase 1, sans
-modifier la migration déjà poussée. Elle ajoute :
+`20261016000200_game_build_uploads.sql` dépend de la migration des versions. Elle définit :
 
 - `game_developer_members(game_id,user_id,role)` : owner/editor ; collaborateurs
   par jeu dès maintenant, extension équipes possible, aucun grant automatique.
@@ -655,16 +575,11 @@ concurrence de création : un draft et un version_conflict. Les tests storage ut
 des adapters mémoire et un transport S3 simulé ; un vrai processus parser enfant
 est exécuté. Les ZIP malveillants sont réellement construits et refusés.
 
-La phase 2 prépare les fichiers finaux pour le gateway décrit ci-dessous en phase 3.
-La phase 3 ajoute la preview et les profils CSP, sans player React, SDK bridge,
-portail, CLI, artifact serveur ni migration Pong. Aucune publication automatique
-ou modification de gameplay.
+Les fichiers validés sont destinés au Gateway. La publication nécessite une
+revue distincte ; aucun artifact client ne remplace un serveur gameplay.
+Le portail s’installe depuis le registre npm public sans accès aux dépôts des jeux.
 
-Cloudflare : **blocage existant, destiné à disparaître lors de PONG-MIGRATION +
-SDK distribution**. Les dépendances Git privées restent provisoirement inchangées.
-Aucun PAT, deploy key ou GitHub App ne sera configuré pour les contourner.
-
-## 25. Fichiers de phase 2 et résultat local
+## 25. Modules du pipeline d’upload
 
 ```text
 app/api/developer/games/[gameId]/uploads/route.ts
@@ -680,13 +595,11 @@ tests/game-upload.test.mjs
 tests/game-upload-db.sql
 ```
 
-Adaptations : zip.ts partage ses contrôles avec le reader sur disque, storage.ts
-accepte les flux via le même port conditionnel ; le harness PostgreSQL sait tester
-les deux phases ; package/scripts/lockfile, ignores et cette documentation changent.
-La seule dépendance runtime déclarée est aws4fetch 1.0.20, déjà présente auparavant
-dans l'outillage transitif. Aucun changement des packages SDK/Pong ou du game-server.
-La migration phase 1 est intacte. `.distribution/` est généré et ignoré, jamais
-une source/fixture à versionner.
+`zip.ts` partage les contrôles de structure avec le lecteur sur disque.
+`storage.ts` accepte les flux via le port conditionnel. `.distribution/` contient
+les sorties générées, ignorées par Git.
+
+Référence de validation du 16 octobre 2026 :
 
 Résultats locaux : 8 tests phase 1, 22 tests phase 2, typecheck, lint ciblé,
 scénarios PostgreSQL sur cluster jetable, build Next Webpack et build OpenNext
@@ -695,12 +608,11 @@ du dispatcher compile également ; Wrangler a signalé un refus d'écriture de s
 journal hors workspace par le bac à sable, sans échec du bundle ni déploiement.
 Les avertissements OpenNext Windows/middleware sont ceux de l'outillage existant.
 
-Ces validations ne sont pas un upload sur un vrai bucket ni un test de charge
-4/16 GiB. Aucun compte réel, queue cloud, CORS cloud, credential, migration distante
-ou service distant n'a été utilisé/créé/configuré pour la recette du pipeline.
-L'activation future exige ces préparations, un hôte isolé dimensionné,
-supervision/DLQ/GC et une recette réelle. Le pipeline reste volontairement désactivé ;
-aucune version ni fiche publiée.
+Ces validations ne certifient ni les permissions du bucket distant ni la charge
+maximale de 16 Gio extraits. Avant un traitement automatique continu, vérifier
+buckets/CORS/credentials, Queue HTTP Pull, supervision/DLQ/GC et le service
+validator permanent. Le dispatcher planifié est volontairement désactivé ;
+la validation manuelle reste disponible.
 
 ## 26. GAME-DISTRIBUTION-3 : Artifact Gateway
 
@@ -725,13 +637,13 @@ capabilities et contentOrigin. Ni clé R2, jeton, schéma DB complet ni identit�
 Supabase. Le chemin vient du manifest, y compris `play/start.html` ; les entrypoints
 local et online peuvent différer. Ceci n'est pas le bridge SDK.
 
-## 27. Origines, cookies et service workers
+## 27. Origines historiques de version et preview
 
 Choisir un **site enregistrable distinct** du portail. Un simple sous-domaine
 `games.chibaskogames.fr` resterait same-site et recevrait d'éventuels cookies
 `Domain=chibaskogames.fr`. La configuration refuse ce cas à l'aide de la Public
 Suffix List (`tldts`, suffixes privés compris), plutôt qu'une comparaison naïve
-des deux dernières composantes DNS. Aucun domaine réel n'est créé ici.
+des deux dernières composantes DNS.
 
 Format retenu (domaine d'exemple à remplacer avant activation) :
 
@@ -764,7 +676,7 @@ de chemins. Ne jamais réutiliser un ancien domaine ayant déjà hébergé des j
 ou un service worker non contrôlé : celui-ci pourrait intercepter avant le réseau.
 Les hosts `v-`/`p-` ne doivent avoir aucun autre handler ni accès R2 public direct.
 
-## 28. Preview privée : API, ticket, échange
+## 28. Preview privée historique : API, ticket, échange
 
 API générique (sans UI obligatoire) :
 
@@ -804,7 +716,7 @@ Les outils réseau du navigateur et un éventuel historique de formulaire peuven
 conserver le corps POST : expiration courte et consommation unique restent utiles.
 Ne jamais capturer les corps/cookies dans un outil analytics ou un proxy amont.
 
-Cette phase fournit une **preview top-level**. SameSite=Lax n'est pas une promesse
+Ce contrat historique utilise une **preview top-level**. SameSite=Lax n'est pas une promesse
 de fonctionnement dans une iframe cross-site. Avant un player privé intégré,
 choisir/tester CHIPS/cookies partitionnés ou un autre mécanisme dédié, avec les
 restrictions Safari/Firefox/Chrome et une ouverture top-level de secours. Aucun
@@ -819,10 +731,10 @@ pourra être ajoutée au futur orchestrateur. Le build lui-même est du code non
 une preview autorisée ne constitue pas un DRM empêchant l'auteur/visiteur d'en copier
 ou divulguer les octets reçus.
 
-## 29. Autorisation et tables de phase 3
+## 29. Autorisation du contrat preview historique
 
-Migration nouvelle : `20261016000300_game_artifact_previews.sql`, **préparée uniquement**.
-Les migrations 1/2 restent intactes. Aucun compte ne reçoit de nouveau rôle.
+Migration du contrat preview : `20261016000300_game_artifact_previews.sql`.
+L’attribution des rôles de revue nécessite une opération privilégiée explicite.
 
 - `game_preview_sessions` : génération UUID unique, version, execution, issued_by,
   hashes ticket/cookie, timestamps de consommation/expiration. Durée 15 minutes,
@@ -857,7 +769,7 @@ Single byte ranges : 206 pour bornée/ouverte/suffixe, Content-Range/Length exac
 416 (bytes */taille) pour range invalide ou multiple. If-Range avec ETag fort pris
 en charge ; une date ou un ETag différent donne la réponse complète. Les ranges
 comptent les octets de la représentation stockée (y compris gzip/br). HEAD ignore
-Range. Pas de multipart/byteranges dans cette phase, ni Last-Modified inventé.
+Range. Les réponses ne prennent pas en charge multipart/byteranges et n’ajoutent pas de Last-Modified sans source fiable.
 
 Cache :
 
@@ -865,7 +777,7 @@ Cache :
 - Published assets : `public, max-age=31536000, immutable`.
 - Published HTML : `public, no-cache`, revalidation, afin de vérifier à nouveau le
   statut avant chaque nouveau lancement ; l'ETag peut produire 304 après autorisation.
-- Le gateway ne met pas les réponses en cache partagé via Cache API dans cette phase.
+- Le gateway ne met pas les réponses en cache partagé via Cache API.
   Toute requête qui l'atteint vérifie le statut avant R2/304. Ne pas ajouter une règle
   Cloudflare « cache everything » qui court-circuiterait ces contrôles.
 
@@ -953,37 +865,24 @@ tests/game-artifact-gateway.test.mjs
 tests/game-artifact-db.sql
 ```
 
-Adaptations : storage.ts (lecture), uploads/repository.ts (codes stables), scripts
-de build/test et harness DB, package.json/lockfile (tldts déjà transitif, désormais
-runtime explicite), cette documentation. Aucune modification gameplay/game-server.
-Avant GAME-RUNTIME-1 : valider le domaine réel et wildcard TLS, recettes moteurs,
-politique réseau/review et droits opérationnels, preview iframe/cookies, puis
-orchestration iframe/SDK bridge et intégration COOP/COEP côté parent.
-Le blocage Cloudflare Git privé demeure une dette existante, à supprimer lors de
-SDK distribution/PONG-MIGRATION. Aucun accès Git privé supplémentaire n'est configuré.
+Les tests du Gateway couvrent les profils de sécurité, les chemins, les
+autorisations et les réponses HTTP. Les fixtures locales ne valident ni DNS/TLS,
+ni les permissions R2 distantes, ni les exports réels de tous les moteurs.
 
-Résultat local phase 3 : 8 tests phase 1 + 22 tests phase 2 + 13 tests gateway,
-scénarios SQL des trois phases avec concurrence réelle, TypeScript, lint ciblé,
-build Next Webpack, bundle Worker browser et git diff --check réussis. Scan des
-fichiers modifiés sans signature de credential. Les tests n'utilisent ni vrai R2,
-ni domaine/TLS public, ni session navigateur réelle, ni export Unity/Godot réel.
-Ces recettes opérationnelles restent nécessaires avant activation ; la configuration
-est volontairement désactivée. Aucun commit, push, déploiement ou migration production.
+## 33. Lancement iframe sans cookies tiers
 
-## 33. GAME-RUNTIME-1 : lancement iframe sans cookies tiers
+Le [GameRuntime](game-runtime.md) utilise un host aléatoire `l-<48 hex>` sur
+`chibaskogames-play.fr`. Le Gateway résout son hash vers une launch session
+autorisée, puis vers les objets client de la version. Preview/published et
+local/online empruntent le même chemin, sans cookie d’autorisation.
 
-Le player générique et les launch sessions sont décrits dans [game-runtime.md](game-runtime.md).
-Le player ne réutilise pas les sessions cookie top-level de phase 3. Il crée un host
-éphémère `l-<capability>` et le gateway résout son hash vers une launch session
-autorisée, puis vers les mêmes objets R2. Aucun cookie requis sur ce chemin,
-preview/published et local/online utilisant le même player. Le vieux parcours Pong
-reste branché jusqu'à sa migration.
+La base est un domaine enregistrable distinct du portail ; PRIVATE PSL constitue
+un durcissement facultatif. Deux launches ont des origins distinctes mais peuvent
+partager des cookies Domain. Ces cookies ne doivent contenir aucune donnée sensible
+et ne participent jamais à l’autorisation. Les contrôles serveur, CSP/sandbox et
+bridge restent nécessaires. Les hosts de version `v-` et preview `p-` historiques
+ne sont pas acceptés par le Worker production.
 
-Important : des origines différentes sous une base ordinaire n'interdisent pas
-à un build tiers de poser un cookie Domain partagé. Pour assurer l'isolation entre jeux et lancements,
-le nouveau chemin de lancement exige une base dédiée reconnue comme suffixe PRIVATE
-dans la PSL, vérifiée aussi dans les navigateurs supportés avant activation. Aucun
-domaine n'est choisi ou configuré par cette phase ; l'exemple demeure désactivé.
-Les profils de phase 3 et son preview top-level sont conservés, sans devenir un
-prérequis cookie du futur player. Migration supplémentaire préparée uniquement :
-`20261017000100_game_launch_sessions.sql`.
+Les launches et renouvellements sont définis par les migrations
+`20261017000100_game_launch_sessions.sql` et
+`20261017000200_game_launch_renewals.sql`.

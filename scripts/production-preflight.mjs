@@ -5,6 +5,27 @@ import { resolve } from 'node:path'
 import { parse, getDomain } from 'tldts'
 import { readJson } from './read-json.mjs'
 
+// Les fins de ligne du checkout ne changent pas le contrat SQL.
+export const sqlSha256 = bytes => createHash('sha256').update(bytes.toString('utf8').replaceAll('\r\n','\n')).digest('hex')
+
+export const baselineMigrations = Object.freeze([
+  '20260430_create_avatars_bucket.sql',
+  '20260430_game_reviews_and_stats.sql',
+  '20260430_sync_profiles_and_backfill.sql',
+  '20260505_profiles_reactions_and_xp.sql',
+  '20260506_password_reset_codes.sql',
+  '20260507_faq_entries.sql',
+  '20260508_game_submissions.sql',
+  '20260508_game_submissions_workflow_upgrade.sql',
+  '20260512_profile_public_handles.sql',
+  '20260512_remove_profile_public_handles.sql',
+  '20261007000100_retire_time_based_progression.sql',
+  '20261007000200_secure_password_reset.sql',
+  '20261007000300_secure_game_submissions.sql',
+  '20261008000100_catalogue_game_types.sql',
+  '20261013000100_secure_admin.sql',
+])
+
 export const migrations = Object.freeze([
   '20261016000100_game_distribution_versions.sql',
   '20261016000200_game_build_uploads.sql',
@@ -15,6 +36,16 @@ export const migrations = Object.freeze([
   '20261018000200_multiplayer_lobbies.sql',
   '20261018000300_artifact_catalogue_and_server_roster.sql',
   '20261018000400_control_plane_maintenance.sql',
+  '20261019000100_manual_build_reviews.sql.sql',
+  '20261020000200_developer_submissions.sql',
+  '20261020000300_submission_catalogue.sql',
+  '20261020000400_game_submission_drafts.sql',
+  '20261021000100_developer_contacts_notifications.sql',
+  '20261023000100_atomic_admin_catalogue.sql',
+  '20261024000100_account_deletion.sql',
+  '20261024000200_contact_dispatches.sql',
+  '20261024000300_maintenance_reliability.sql',
+  '20261024000400_catalogue_pagination.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']
@@ -34,12 +65,24 @@ export function environmentChecks(component, env) {
   if (!Object.hasOwn(environments, component)) throw new Error('unknown_component')
   const checks = environments[component].map(name => ({ check: name, ok: typeof env[name] === 'string' && env[name].trim().length > 0 }))
   const add = (check, ok) => checks.push({ check, ok: Boolean(ok) })
+  if(env.CONTACT_FORM_ENABLED!==undefined)add('CONTACT_FORM_ENABLED:boolean',['0','1'].includes(env.CONTACT_FORM_ENABLED))
+  if(component==='portal'&&env.CONTACT_FORM_ENABLED==='1'){
+    for(const name of ['CONTACT_NOTIFY_EMAIL','RESEND_FROM_EMAIL'])add(name+':contact_email',/^[^\s@<>]+@[^\s@<>]+[.][^\s@<>]+$/.test(env[name]??''))
+    add('CONTACT_HASH_SECRET:length',typeof env.CONTACT_HASH_SECRET==='string'&&env.CONTACT_HASH_SECRET.length>=32)
+    add('RESEND_API_KEY:contact',Boolean(env.RESEND_API_KEY?.trim()))
+  }
+  if(env.GAME_ACCOUNT_DELETIONS_ENABLED!==undefined)add('GAME_ACCOUNT_DELETIONS_ENABLED:boolean',['0','1'].includes(env.GAME_ACCOUNT_DELETIONS_ENABLED))
+  if(component==='maintenance'&&env.GAME_ACCOUNT_DELETIONS_ENABLED==='1'){
+    for(const name of ['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'])add(name+':account_deletions',Boolean(env[name]?.trim()))
+    add('GAME_UPLOAD_MAINTENANCE_ENABLED:account_recovery',env.GAME_UPLOAD_MAINTENANCE_ENABLED==='1')
+  }
   if (component === 'portal' || (component === 'maintenance' && env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED === '1')) {
     for (const name of ['RESEND_API_KEY', 'RESEND_FROM_EMAIL', 'GAME_SUBMISSION_NOTIFY_EMAIL']) add(name + ':submission_notifications', typeof env[name] === 'string' && env[name].trim().length > 0)
     add('GAME_SUBMISSION_NOTIFY_EMAIL:email', /^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(env.GAME_SUBMISSION_NOTIFY_EMAIL?.trim() ?? ''))
     add('RESEND_FROM_EMAIL:no_newline', Boolean(env.RESEND_FROM_EMAIL?.trim()) && !/[\r\n]/.test(env.RESEND_FROM_EMAIL))
   }
   if (component === 'maintenance') add('GAME_SUBMISSION_NOTIFICATIONS_ENABLED:boolean', ['0', '1'].includes(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED))
+  if (component === 'maintenance') for(const name of ['GAME_UPLOAD_MAINTENANCE_ENABLED','CONTACT_RECEIPTS_MAINTENANCE_ENABLED']) add(name+':boolean',['0','1'].includes(env[name]))
   for (const name of environments[component].filter(name => name.endsWith('_ENABLED'))) add(name + ':boolean', ['0', '1'].includes(env[name]))
   for (const name of ['SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SITE_URL'].filter(name => environments[component].includes(name))) {
     let valid = false
@@ -83,16 +126,23 @@ export async function localChecks(root) {
     add(field + ':registry_only', Object.entries(packageJson[field] ?? {}).every(([name, spec]) => !/^(?:git|github:|file:|workspace:)|github\.com/i.test(spec) && !name.includes('chibasko-pong')))
   }
   add('lock_registry_only', Object.values(lock.packages ?? {}).every(entry => !entry.link && (!entry.resolved || /^https:\/\/registry\.npmjs\.org\//.test(entry.resolved))))
-  const names = (await readdir(resolve(root, 'supabase/migrations'))).filter(name => /^202610(?:16|17|18)/.test(name)).sort()
-  add('migration_order', JSON.stringify(names) === JSON.stringify(migrations))
+  const names = (await readdir(resolve(root, 'supabase/migrations'))).filter(name => name.endsWith('.sql')).sort()
+  add('migration_order', JSON.stringify(names) === JSON.stringify([...baselineMigrations, ...migrations]))
   const inventory = []
-  for (const name of migrations) {
+  const baselineInventory = []
+  for (const name of [...baselineMigrations, ...migrations]) {
     const bytes = await readFile(resolve(root, 'supabase/migrations', name))
     const sql = bytes.toString('utf8')
-    add(name + ':transaction', /\bbegin\s*;/i.test(sql) && /\bcommit\s*;\s*$/i.test(sql))
-    inventory.push({ name, sha256: createHash('sha256').update(bytes).digest('hex') })
+    if(migrations.includes(name))add(name + ':transaction', /\bbegin\s*;/i.test(sql) && /\bcommit\s*;\s*$/i.test(sql))
+    const target=migrations.includes(name)?inventory:baselineInventory
+    target.push({ name, sha256: sqlSha256(bytes) })
   }
-  return { checks, migrations: inventory }
+  const reference=JSON.parse(await readFile(resolve(root,'contracts/production-schema.v1.json'),'utf8'))
+  add('schema_reference_migrations',JSON.stringify(reference.migrations)===JSON.stringify(inventory)
+    && JSON.stringify(reference.baselineMigrations)===JSON.stringify(baselineInventory))
+  const snapshot=await readFile(resolve(root,'docs/sql/production-schema-snapshot.sql'))
+  add('schema_reference_snapshot',reference.snapshotSha256===sqlSha256(snapshot))
+  return { checks, migrations: inventory, baselineMigrations: baselineInventory }
 }
 
 export async function main(args = process.argv.slice(2)) {

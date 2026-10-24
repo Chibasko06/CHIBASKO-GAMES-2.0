@@ -38,6 +38,6 @@ for (const path of ['/api/game-submissions', '/api/auth/password-reset/request']
   const response = await fetch(new URL(path, origin), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
   })
-  assert.equal(response.status, 400, path)
-  console.log(`PASS ${path}: invalid request rejected before DB write`)
+  assert.equal(response.status, path === '/api/game-submissions' ? 410 : 400, path)
+  console.log(`PASS ${path}: request rejected before DB write`)
 }

@@ -2,7 +2,7 @@
 
 ## Audio
 
-Bridge v2 et integrationVersion 1 restent inchangés. L’extension est négociée
+L’audio utilise Bridge v2 et integrationVersion 1. L’extension est négociée
 par document : GAME_AUDIO_SUPPORT {documentId,supported} apparaît uniquement
 lorsqu’un jeu utilisant le SDK audio s’abonne à audio.onChange(). Le parent
 répond avec PLATFORM_AUDIO_STATE {documentId,state:{muted,volume}}. Les mêmes
@@ -15,11 +15,10 @@ la réémet à chaque nouveau lancement. Le volume ne dépend pas du fullscreen.
 Les iframes legacy ne sont jamais présentées comme contrôlables. Le SDK ne
 permet pas au jeu de modifier la préférence parent.
 
-SDK 0.4.0 est préparé localement, sans publication. Le SDK npm 0.3.0 du portail
-reste inchangé. Pong garde sa dépendance npm publiée : le bus audio détecte
-l’API facultative, et n’annonce rien avec 0.3.0. Après publication manuelle du
-SDK audio et validation, mettre à jour la dépendance npm exacte de Pong et son
-lockfile avant de construire 0.3.1. Aucun ZIP Pong n’est généré dans cette phase.
+Le contrat audio public est disponible dans le SDK 0.4.0. Le portail utilise les
+contrats npm 0.3.0 et son extension audio hôte. Le support est facultatif : un jeu
+sans abonnement audio conserve son fonctionnement normal et ne rend pas le bouton
+du dock actif. Chaque jeu applique l’état reçu à ses propres sources sonores.
 
 ## Fiche privée et soumission
 
@@ -54,8 +53,8 @@ interruption laisse l’outbox récupérable et ne garantit pas l’envoi imméd
 La maintenance partagée peut reprendre les entrées
 échouées, par lots bornés de cinq. Le dispatcher de builds reste désactivé.
 Le worker de maintenance existant dispose d’un flag indépendant :
-GAME_SUBMISSION_NOTIFICATIONS_ENABLED=1. Ne pas activer de scheduler distant
-pendant cette préparation ; utiliser la configuration de maintenance séparée.
+GAME_SUBMISSION_NOTIFICATIONS_ENABLED=1. Utiliser la configuration de maintenance
+séparée pour les reprises périodiques.
 
 Configurer le cron existant toutes les cinq minutes (*/5 * * * *), avec le flag
 notifications à 1 et ses secrets serveur. Le modèle reste inactif dans Git :
@@ -117,61 +116,9 @@ npm run test:game-runtime-browser
 Les tests PostgreSQL créent leur propre cluster jetable. Les envois Resend et
 les jeux navigateur utilisent uniquement des fixtures.
 
-## Fichiers de la plateforme
+## Points d’entrée
 
-- cloudflare/session-maintenance.ts
-- cloudflare/wrangler.maintenance.example.jsonc
-- components/DeveloperContactForm.tsx
-- components/SubmitGamePageClient.tsx
-- components/admin/BuildReviews.tsx
-- components/game-runtime/ArtifactGamePlayer.tsx
-- components/game-runtime/GameRuntime.tsx
-- components/game-runtime/usePlayerAudio.ts
-- components/multiplayer/DurableLobby.tsx
-- lib/game-distribution/developer-profile.ts
-- lib/game-distribution/submission-notifications.ts
-- lib/game-distribution/browser-upload.ts
-- lib/game-distribution/review.ts
-- lib/game-distribution/uploads/repository.ts
-- lib/game-runtime/audio.ts
-- lib/game-runtime/bridge.ts
-- lib/game-runtime/contracts.ts
-- lib/game-runtime/controller.ts
-- lib/server/developerProfile.ts
-- lib/server/adminBuilds.ts
-- lib/server/developerSubmissions.ts
-- app/api/developer/profile/route.ts
-- supabase/migrations/20261021000100_developer_contacts_notifications.sql
-- package.json
-- tests/developer-contact.test.mjs
-- tests/developer-contact-db.sql
-- tests/game-distribution-db.mjs
-- tests/game-player.browser.test.mjs
-- tests/game-runtime.test.mjs
-- tests/submission-browser.test.mjs
-- tests/fixtures/game-player-host.tsx
-- tests/fixtures/runtime-builds/bridge-fixture.js
-
-## Fichiers SDK et Pong
-
-Dans chibasko-games-sdk :
-
-- package.json et package-lock.json
-- src/audio-contracts.ts
-- src/client/browser/connection.ts et src/client/browser/protocol.ts
-- src/client/index.ts et src/index.ts
-- scripts/release-policy.mjs et scripts/test-consumer.mjs
-- README.md et CHANGELOG.md
-- tests/client.test.mjs, tests/core.test.mjs, tests/release.test.mjs
-- tests/browser.test.mjs et tests/fixtures/host.js
-
-Dans chibasko-pong, pour l’audio :
-
-- client/pongAudio.ts
-- web/mount.ts
-- tests/audio.test.mjs
-- README.md
-
-Les modifications UI déjà présentes dans Pong sont conservées. Aucun moteur,
-backend gameplay, dépendance npm Pong, Gateway ou migration historique n’est
-modifié par cette fonction audio.
+Le contrat audio hôte se trouve dans `lib/game-runtime/audio.ts` et le bridge.
+`usePlayerAudio` conserve la préférence du dock ; le jeu gère ses sources sonores.
+La fiche privée passe par `developerProfile` ; les notifications utilisent
+`submission-notifications` et le Worker de maintenance partagé.

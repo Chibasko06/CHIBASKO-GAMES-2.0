@@ -53,6 +53,8 @@ test('guide, legal pages and navigation expose valid internal links without oper
  assert.match(pages[2],/plateforme de gestion du consentement Google/)
  assert.doesNotMatch(pages[2],/Aucun gestionnaire de consentement/)
  assert.doesNotMatch(pages[3],/ne peut etre tenu responsable|SIRET :|capital de/)
+ assert.doesNotMatch(pages[3],/FormSubmit/)
+ assert.match(pages[3],/Après activation, le formulaire de contact transmet les messages côté serveur via Resend/)
 })
 
 test('documented JavaScript executes READY, START/STOP, exit, resize, initial audio, changes and cleanup',async()=>{
@@ -74,6 +76,6 @@ test('documented JavaScript executes READY, START/STOP, exit, resize, initial au
 
 test('missing legal identity and consent gaps stay explicit in the audit; publication terms remain an internal draft',async()=>{
  const report=await readFile(new URL('../docs/developer-portal-legal-audit.md',import.meta.url),'utf8'),terms=await readFile(new URL('../docs/conditions-publication.projet.md',import.meta.url),'utf8')
- assert.match(report,/À FOURNIR : statut exact/);assert.match(report,/Écart bloquant/);assert.match(report,/FormSubmit/)
+ assert.match(report,/À FOURNIR : statut exact/);assert.match(report,/Écart bloquant/);assert.match(report,/Contact Resend/)
  assert.match(terms,/Brouillon de travail/);assert.match(terms,/aucune\s+propriété intellectuelle/)
 })

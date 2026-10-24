@@ -48,15 +48,11 @@ beforeEach(() => {
   }
 })
 
-test('public submission cannot inject review fields or ids', async () => {
-  const response = await submitGame(req({ ...validSubmission, status: 'accepted', admin_notes: 'injected', id: 'injected', created_at: '2000' }))
-  assert.equal(response.status, 200)
-  const payload = globalThis.__phase0.calls[0][2]
-  assert.equal(payload.status, 'pending')
-  assert.equal(payload.admin_notes, null)
-  assert.equal(payload.email, 'dev@example.com')
-  assert.equal('id' in payload, false)
-  assert.equal('created_at' in payload, false)
+test('retired public submission never inserts even with valid or injected fields', async () => {
+  const response = await submitGame(req({...validSubmission, status: 'accepted', admin_notes: 'injected'}))
+  assert.equal(response.status, 410)
+  assert.equal((await response.json()).error.code, 'submission_endpoint_retired')
+  assert.deepEqual(globalThis.__phase0.calls, [])
 })
 
 test('submission rejects bad types, URLs, lengths and enums before writing', () => {

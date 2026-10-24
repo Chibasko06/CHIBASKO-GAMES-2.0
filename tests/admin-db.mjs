@@ -40,8 +40,20 @@ try {
   const args = [...base, '-d', 'chibasko_catalogue_test']
   await run('psql', [...args, '-f', fileURLToPath(new URL('./admin-db.sql', import.meta.url))])
   await assert.rejects(run('psql', [...args, '-f', fileURLToPath(new URL('../supabase/migrations/20261013000100_secure_admin.sql', import.meta.url))]))
-  const check = await run('psql', [...args, '-Atc', "SELECT count(*) FROM public.games WHERE game_type = 'classic'"])
+  const check = await run('psql', [...args, '-Atc', "SELECT count(*) FROM public.games WHERE game_type = 'classic' and slug not like 'atomic-%'"])
   assert.equal(check.stdout.trim(), '81')
+  const actor='00000000-0000-4000-8000-000000000002'
+  const mutate = color => "select public.admin_save_game('"+actor+"',public.catalogue_fixture_payload('Concurrent','atomic-admin')||jsonb_build_object('thumbnail_url','"+color+"'),'{}',(select id from public.games where slug='atomic-admin'),null)"
+  const races=await Promise.allSettled([
+    run('psql',[...args,'-c','begin;'+mutate('first')+';select pg_sleep(0.2);commit;']),
+    run('psql',[...args,'-c','begin;'+mutate('second')+';select pg_sleep(0.2);commit;']),
+  ])
+  assert.equal(races.filter(result=>result.status==='fulfilled').length,1)
+  const conflict=races.find(result=>result.status==='rejected')
+  assert.match(conflict.reason.stderr,/game_changed/)
+  const relations=await run('psql',[...args,'-Atc',"select count(*) from public.game_categories where game_id=(select id from public.games where slug='atomic-admin')"])
+  assert.equal(relations.stdout.trim(),'0')
+  console.log('Atomic catalogue: reapplication, grants/search_path, invalid categories, full rollback, service-only access and concurrent thumbnail fencing passed.')
   console.log('Admin SQL: own membership, denied elevation/DML, private submissions, preserved catalogue, server CRUD and safe reapplication refusal passed.')
 } finally {
   if (started) await run('pg_ctl', ['-D', data, '-m', 'fast', '-w', 'stop'])

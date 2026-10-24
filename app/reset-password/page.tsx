@@ -1,19 +1,20 @@
 "use client";
 
+import FormField from '@/components/ui/FormField'
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import {fetchJson} from '@/lib/asyncOperation'
 
 type ResetStep = 'request' | 'verify' | 'confirm' | 'success'
 
 async function submitReset(step: 'request' | 'verify' | 'confirm', body: Record<string, string>) {
   try {
-    const response = await fetch(`/api/auth/password-reset/${step}`, {
+    const {response, payload} = await fetchJson(`/api/auth/password-reset/${step}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const payload = await response.json().catch(() => null)
     if (!response.ok || !payload?.ok) {
       return { ok: false, message: String(payload?.error || 'Requete impossible. Reessaie plus tard.') }
     }
@@ -127,14 +128,14 @@ export default function ResetPasswordPage() {
 
       {step === 'request' ? (
         <form onSubmit={handleRequestCode} className="space-y-4">
-          <input
+          <FormField label="Email" descriptionId="auth-feedback"><input
             type="email"
             value={email}
             placeholder="Email"
             className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
             onChange={(event) => setEmail(event.target.value)}
             disabled={submitting}
-          />
+          /></FormField>
           <button
             type="submit"
             disabled={submitting}
@@ -142,21 +143,21 @@ export default function ResetPasswordPage() {
           >
             {submitting ? 'Envoi du code...' : 'Recevoir le code'}
           </button>
-          {message ? <p className="text-sm text-cyan-300">{message}</p> : null}
+          {message ? <p id="auth-feedback" role="status" className="text-sm text-cyan-300">{message}</p> : null}
         </form>
       ) : null}
 
       {step === 'verify' ? (
         <form onSubmit={handleVerifyCode} className="space-y-4">
-          <input
+          <FormField label="Email" descriptionId="auth-feedback"><input
             type="email"
             value={email}
             placeholder="Email"
             className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
             onChange={(event) => setEmail(event.target.value)}
             disabled={submitting}
-          />
-          <input
+          /></FormField>
+          <FormField label="Code a 6 chiffres" descriptionId="auth-feedback"><input
             type="text"
             inputMode="numeric"
             maxLength={6}
@@ -165,7 +166,7 @@ export default function ResetPasswordPage() {
             className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
             onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
             disabled={submitting}
-          />
+          /></FormField>
           <button
             type="submit"
             disabled={submitting}
@@ -184,13 +185,13 @@ export default function ResetPasswordPage() {
           >
             Renvoyer un autre code
           </button>
-          {message ? <p className="text-sm text-cyan-300">{message}</p> : null}
+          {message ? <p id="auth-feedback" role="status" className="text-sm text-cyan-300">{message}</p> : null}
         </form>
       ) : null}
 
       {step === 'confirm' ? (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
+          <FormField label="Nouveau mot de passe" descriptionId="auth-feedback"><input
             type="password"
             value={nextPassword}
             maxLength={128}
@@ -199,8 +200,8 @@ export default function ResetPasswordPage() {
             className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
             onChange={(event) => setNextPassword(event.target.value)}
             disabled={submitting}
-          />
-          <input
+          /></FormField>
+          <FormField label="Confirmer le nouveau mot de passe" descriptionId="auth-feedback"><input
             type="password"
             value={confirmPassword}
             maxLength={128}
@@ -209,7 +210,7 @@ export default function ResetPasswordPage() {
             className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
             onChange={(event) => setConfirmPassword(event.target.value)}
             disabled={submitting}
-          />
+          /></FormField>
 
           <button
             type="submit"
@@ -232,7 +233,7 @@ export default function ResetPasswordPage() {
           >
             Demander un nouveau code
           </button>
-          {message ? <p className="text-sm text-cyan-300">{message}</p> : null}
+          {message ? <p id="auth-feedback" role="status" className="text-sm text-cyan-300">{message}</p> : null}
         </form>
       ) : null}
 

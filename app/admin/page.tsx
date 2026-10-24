@@ -1,5 +1,6 @@
 "use client";
 import { changeGameFormType, gameFormPayload, type GameType } from '@/lib/multiplayer/catalogue'
+import FormField from '@/components/ui/FormField'
 
 import GameTypeFields from '@/components/admin/GameTypeFields'
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react'
@@ -156,6 +157,8 @@ function AdminPanel() {
   const { status: accessStatus, checking, retry } = useAdminAccess()
   const router = useRouter()
   const [games, setGames] = useState<Game[]>([])
+  const [gamesPage,setGamesPage]=useState(1),[gamesTotal,setGamesTotal]=useState(0)
+  const [usersPage,setUsersPage]=useState(1),[usersTotal,setUsersTotal]=useState(0)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [faqEntries, setFaqEntries] = useState<FaqEntry[]>([])
@@ -178,6 +181,7 @@ function AdminPanel() {
   const [uploadingGameThumbnail, setUploadingGameThumbnail] = useState(false)
   const [uploadingUserAvatar, setUploadingUserAvatar] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [deletionNotice,setDeletionNotice]=useState<string|null>(null)
 
   const authorizedFetch = useCallback(async (input: string, init?: RequestInit) => {
     if (!sessionToken) {
@@ -197,13 +201,13 @@ function AdminPanel() {
   const loadGames = useCallback(async (signal?: AbortSignal) => {
     setLoadingGames(true)
     try {
-      const response = await authorizedFetch('/api/admin/games', { signal })
+      const response = await authorizedFetch(`/api/admin/games?page=${gamesPage}`, { signal })
       const payload = await response.json()
       if (signal?.aborted) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
-      setGames(payload.games || [])
+      setGames(payload.games || []);setGamesTotal(payload.total??payload.games?.length??0)
       setErrorMessage(null)
     } catch (error) {
       if (signal?.aborted) return
@@ -212,18 +216,18 @@ function AdminPanel() {
     } finally {
       if (!signal?.aborted) setLoadingGames(false)
     }
-  }, [authorizedFetch])
+  }, [authorizedFetch, gamesPage])
 
   const loadUsers = useCallback(async (signal?: AbortSignal) => {
     setLoadingUsers(true)
     try {
-      const response = await authorizedFetch('/api/admin/users', { signal })
+      const response = await authorizedFetch(`/api/admin/users?page=${usersPage}`, { signal })
       const payload = await response.json()
       if (signal?.aborted) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
-      setUsers(payload.users || [])
+      setUsers(payload.users || []);setUsersTotal(payload.total??payload.users?.length??0)
       setErrorMessage(null)
     } catch (error) {
       if (signal?.aborted) return
@@ -232,7 +236,7 @@ function AdminPanel() {
     } finally {
       if (!signal?.aborted) setLoadingUsers(false)
     }
-  }, [authorizedFetch])
+  }, [authorizedFetch, usersPage])
 
   const loadCategories = useCallback(async (signal?: AbortSignal) => {
     setLoadingCategories(true)
@@ -283,10 +287,23 @@ function AdminPanel() {
     const controller = new AbortController()
     // Cancelled mounts (including Strict Mode) must not launch duplicate requests.
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void Promise.all([loadGames(controller.signal), loadUsers(controller.signal), loadCategories(controller.signal), loadFaq(controller.signal)])
+      if (!controller.signal.aborted) void Promise.all([loadCategories(controller.signal), loadFaq(controller.signal)])
     })
     return () => controller.abort()
-  }, [accessStatus, loadGames, loadUsers, loadCategories, loadFaq])
+  }, [accessStatus, loadCategories, loadFaq])
+
+  useEffect(()=>{
+    if(accessStatus!=='allowed')return
+    const controller=new AbortController()
+    queueMicrotask(()=>{if(!controller.signal.aborted)void loadGames(controller.signal)})
+    return()=>controller.abort()
+  },[accessStatus,loadGames])
+  useEffect(()=>{
+    if(accessStatus!=='allowed')return
+    const controller=new AbortController()
+    queueMicrotask(()=>{if(!controller.signal.aborted)void loadUsers(controller.signal)})
+    return()=>controller.abort()
+  },[accessStatus,loadUsers])
 
   const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
     setGameForm((current) => ({ ...current, [field]: value }))
@@ -493,6 +510,7 @@ function AdminPanel() {
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la suppression de l utilisateur.')
       }
+      setDeletionNotice(payload.success?'Suppression terminée.':'Demande enregistrée. Consultez les suppressions de comptes pour suivre le traitement ou vérifier les conditions applicables.')
       if (editingUserId === id) {
         resetUserForm()
       }
@@ -623,14 +641,14 @@ function AdminPanel() {
     }
   }
 
-  if (accessStatus !== 'allowed') return <main className="mx-auto max-w-xl rounded-2xl border border-zinc-800 p-6">
+  if (accessStatus !== 'allowed') return <div className="mx-auto max-w-xl rounded-2xl border border-zinc-800 p-6">
     <p role={accessStatus === 'error' || accessStatus === 'denied' ? 'alert' : 'status'}>
       {accessStatus === 'checking' ? 'Vérification de l’accès administrateur…' : accessStatus === 'unauthenticated' ? 'Connexion requise. Redirection vers la connexion…' : accessStatus === 'denied' ? 'Accès administrateur refusé.' : 'Impossible de vérifier l’accès administrateur. Réessaie.'}
     </p>
     {accessStatus === 'error' && <button type="button" onClick={retry} className="mt-4 rounded-xl bg-cyan-400 px-4 py-2 font-bold text-black focus-visible:outline focus-visible:outline-cyan-300">Réessayer</button>}
-  </main>
+  </div>
   return (
-    <main className="space-y-8">
+    <div className="space-y-8">
       {checking && <p role="status" className="text-sm text-zinc-400">Vérification de l’accès en cours…</p>}
       <section className="border border-zinc-800 bg-zinc-950 p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -659,6 +677,8 @@ function AdminPanel() {
           </div>
         </div>
         {errorMessage ? <p className="mt-4 text-sm text-red-400">{errorMessage}</p> : null}
+        {deletionNotice&&<p role="status" className="mt-4 text-sm text-cyan-200">{deletionNotice}</p>}
+        <Link href="/admin/account-deletions" className="mt-4 inline-block text-sm text-cyan-300 underline">Suivre les suppressions de comptes</Link>
       </section>
 
       <Link href="/admin/game-builds" className="block rounded-2xl border border-cyan-800 bg-cyan-950/20 p-6 transition hover:border-cyan-400 focus-visible:outline-2 focus-visible:outline-cyan-300"><h2 className="text-xl font-bold text-cyan-200">Publications de jeux</h2><p className="mt-2 text-sm text-zinc-300">Consulter les soumissions, vérifier les jeux et décider de leur publication.</p><span className="mt-3 inline-block text-sm font-semibold text-cyan-300">Ouvrir les publications →</span></Link>
@@ -682,23 +702,23 @@ function AdminPanel() {
               onUrl={url => handleGameChange('game_url', url)} onGameId={id => handleGameChange('multiplayer_game_id', id)} />
             {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu et ses données. Les anciens champs de lancement sont effacés ; renseigne ceux du nouveau type.</p>}
             <label className="flex items-center gap-3 md:col-span-2"><input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Bêta</label>
-            <input aria-label="Titre" value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <input aria-label="Slug" value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <input aria-label="Miniature" value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
+            <FormField label="Titre"><input aria-label="Titre" value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
+            <FormField label="Slug"><input aria-label="Slug" value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
+            <FormField className="md:col-span-2" label="Miniature"><input aria-label="Miniature" value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
             <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300 md:col-span-2">
               <span>{uploadingGameThumbnail ? 'Upload miniature...' : 'Importer une image de jeu (optimisee auto)'}</span>
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" className="hidden" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" className="sr-only" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
               <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
             </label>
-            <input value={gameForm.developer_name} onChange={(e) => handleGameChange('developer_name', e.target.value)} placeholder="Developpeur" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <input value={gameForm.release_date_text} onChange={(e) => handleGameChange('release_date_text', e.target.value)} placeholder="Date de sortie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <input value={gameForm.mobile_compatible} onChange={(e) => handleGameChange('mobile_compatible', e.target.value)} placeholder="Compatibilite mobile" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <input value={gameForm.technology} onChange={(e) => handleGameChange('technology', e.target.value)} placeholder="Technologie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <FormField label="Developpeur"><input value={gameForm.developer_name} onChange={(e) => handleGameChange('developer_name', e.target.value)} placeholder="Developpeur" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
+            <FormField label="Date de sortie"><input value={gameForm.release_date_text} onChange={(e) => handleGameChange('release_date_text', e.target.value)} placeholder="Date de sortie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
+            <FormField label="Compatibilite mobile"><input value={gameForm.mobile_compatible} onChange={(e) => handleGameChange('mobile_compatible', e.target.value)} placeholder="Compatibilite mobile" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
+            <FormField label="Technologie"><input value={gameForm.technology} onChange={(e) => handleGameChange('technology', e.target.value)} placeholder="Technologie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
             {gameForm.game_type === 'classic' && <>
-            <input value={gameForm.provider_name} onChange={(e) => handleGameChange('provider_name', e.target.value)} placeholder="Provider" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
-            <input value={gameForm.source_page_url} onChange={(e) => handleGameChange('source_page_url', e.target.value)} placeholder="Source page URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <FormField label="Provider"><input value={gameForm.provider_name} onChange={(e) => handleGameChange('provider_name', e.target.value)} placeholder="Provider" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
+            <FormField label="Source page URL"><input value={gameForm.source_page_url} onChange={(e) => handleGameChange('source_page_url', e.target.value)} placeholder="Source page URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
             </>}
-            <textarea aria-label="Description" value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500 md:col-span-2" />
+            <FormField className="md:col-span-2" label="Description"><textarea aria-label="Description" value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
 
             <div className="border border-zinc-800 bg-black/40 p-4 md:col-span-2">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -738,7 +758,7 @@ function AdminPanel() {
           <div className="border border-zinc-800 bg-zinc-950 p-6">
             <div className="mb-6 flex items-center justify-between gap-4">
               <h2 className="text-lg font-black uppercase text-white">Catalogue admin</h2>
-              <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{games.length} jeux</span>
+              <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{gamesTotal} jeux</span><nav aria-label="Pages des jeux administrés" className="flex gap-3"><button disabled={loadingGames||savingGame||gamesPage===1} onClick={()=>setGamesPage(p=>p-1)}>Précédent</button><span>{gamesPage}</span><button disabled={loadingGames||savingGame||gamesPage*50>=gamesTotal} onClick={()=>setGamesPage(p=>p+1)}>Suivant</button></nav>
             </div>
 
             {loadingGames ? (
@@ -792,7 +812,7 @@ function AdminPanel() {
             </div>
 
             <form onSubmit={handleCategorySubmit} className="space-y-4">
-              <input
+              <FormField label="Nom de categorie"><input
                 value={categoryForm.name}
                 onChange={(event) => {
                   const nextName = event.target.value
@@ -805,14 +825,14 @@ function AdminPanel() {
                 placeholder="Nom de categorie"
                 className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
                 required
-              />
-              <input
+              /></FormField>
+              <FormField label="Slug categorie"><input
                 value={categoryForm.slug}
                 onChange={(event) => setCategoryForm((current) => ({ ...current, slug: slugifyCategory(event.target.value) }))}
                 placeholder="Slug categorie"
                 className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
                 required
-              />
+              /></FormField>
               <button type="submit" disabled={savingCategory} className="w-full bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
                 {savingCategory ? 'SAUVEGARDE...' : editingCategoryId ? 'METTRE A JOUR LA CATEGORIE' : 'AJOUTER LA CATEGORIE'}
               </button>
@@ -865,14 +885,14 @@ function AdminPanel() {
           </div>
 
           <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4">
-            <input value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <input value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="Avatar public URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <FormField label="Pseudo"><input value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
+            <FormField label="Avatar public URL"><input value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="Avatar public URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
             <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300">
               <span>{uploadingUserAvatar ? 'Upload avatar...' : 'Importer une image avatar'}</span>
-              <input type="file" accept="image/*,.ico" className="hidden" onChange={handleUserAvatarUpload} disabled={!editingUserId || uploadingUserAvatar} />
+              <input type="file" accept="image/*,.ico" className="sr-only" onChange={handleUserAvatarUpload} disabled={!editingUserId || uploadingUserAvatar} />
               <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
             </label>
-            <textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <FormField label="Bio"><textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
             <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
               {savingUser ? 'MISE A JOUR...' : 'METTRE A JOUR LE JOUEUR'}
             </button>
@@ -881,8 +901,8 @@ function AdminPanel() {
 
         <div className="border border-zinc-800 bg-zinc-950 p-6">
           <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">Utilisateurs</h2>
-            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{users.length} comptes</span>
+            <h2 className="text-lg font-black uppercase text-white">Utilisateurs</h2><nav aria-label="Pages des comptes" className="flex gap-3"><button disabled={loadingUsers||savingUser||usersPage===1} onClick={()=>setUsersPage(p=>p-1)}>Précédent</button><span>{usersPage}</span><button disabled={loadingUsers||savingUser||usersPage*50>=usersTotal} onClick={()=>setUsersPage(p=>p+1)}>Suivant</button></nav>
+            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{usersTotal} comptes</span>
           </div>
 
           {loadingUsers ? (
@@ -932,9 +952,9 @@ function AdminPanel() {
           </div>
 
           <form onSubmit={handleFaqSubmit} className="grid grid-cols-1 gap-4">
-            <input value={faqForm.question} onChange={(event) => setFaqForm((current) => ({ ...current, question: event.target.value }))} placeholder="Question" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} placeholder="Reponse" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
-            <input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Ordre d affichage" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <FormField label="Question"><input value={faqForm.question} onChange={(event) => setFaqForm((current) => ({ ...current, question: event.target.value }))} placeholder="Question" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
+            <FormField label="Reponse"><textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} placeholder="Reponse" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
+            <FormField label="Ordre d affichage"><input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Ordre d affichage" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
             <label className="flex items-center gap-3 text-sm text-zinc-300">
               <input type="checkbox" checked={faqForm.is_published} onChange={(event) => setFaqForm((current) => ({ ...current, is_published: event.target.checked }))} />
               Entree publiee sur la page FAQ
@@ -988,6 +1008,6 @@ function AdminPanel() {
         </div>
       </section>
 
-    </main>
+    </div>
   )
 }

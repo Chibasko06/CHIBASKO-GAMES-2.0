@@ -1,7 +1,25 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { localChecks, environmentChecks, environments } from '../scripts/production-preflight.mjs'
+import { localChecks, environmentChecks, environments, sqlSha256 } from '../scripts/production-preflight.mjs'
+import {mkdtemp,mkdir,cp,writeFile,rm} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
+import {join,dirname} from 'node:path'
+
+test('la suppression des comptes exige la reprise technique des uploads',()=>{
+ const checks=environmentChecks('maintenance',{GAME_ACCOUNT_DELETIONS_ENABLED:'1',GAME_UPLOAD_MAINTENANCE_ENABLED:'0'})
+ assert.equal(checks.find(item=>item.check==='GAME_UPLOAD_MAINTENANCE_ENABLED:account_recovery').ok,false)
+ assert.equal(environmentChecks('maintenance',{GAME_ACCOUNT_DELETIONS_ENABLED:'1',GAME_UPLOAD_MAINTENANCE_ENABLED:'1'}).find(item=>item.check==='GAME_UPLOAD_MAINTENANCE_ENABLED:account_recovery').ok,true)
+})
+
+test('le contact reste optionnel et exige une configuration serveur complète à son activation',()=>{
+ assert.equal(environmentChecks('portal',{}).some(item=>item.check==='CONTACT_HASH_SECRET:length'),false)
+ const checks=environmentChecks('portal',{CONTACT_FORM_ENABLED:'1'})
+ assert.equal(checks.find(item=>item.check==='CONTACT_HASH_SECRET:length').ok,false)
+ const complete=environmentChecks('portal',{CONTACT_FORM_ENABLED:'1',CONTACT_NOTIFY_EMAIL:'contact@example.test',CONTACT_HASH_SECRET:'s'.repeat(32),RESEND_FROM_EMAIL:'from@example.test',RESEND_API_KEY:'fixture'})
+ assert.equal(complete.filter(item=>item.check.includes('contact')||item.check==='CONTACT_HASH_SECRET:length').every(item=>item.ok),true)
+ assert.ok(!JSON.stringify(complete).includes('contact@example.test'))
+})
 
 test('production notifications require server configuration on portal and enabled maintenance only',()=>{
  const base={GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'1'}
@@ -18,8 +36,24 @@ test('production notifications require server configuration on portal and enable
 test('local inventory checks registry dependencies and ordered transactional migrations', async () => {
   const result = await localChecks(fileURLToPath(new URL('../', import.meta.url)))
   assert.equal(result.checks.every(check => check.ok), true)
-  assert.equal(result.migrations.length, 9)
+  assert.equal(result.migrations.length, 19)
+  assert.equal(result.baselineMigrations.length, 15)
   assert.equal(result.migrations.every(item => /^[a-f0-9]{64}$/.test(item.sha256)), true)
+})
+test('les empreintes SQL restent identiques entre les checkouts Windows et Linux',()=>{
+ assert.equal(sqlSha256(Buffer.from('begin;\r\ncommit;\r\n')),sqlSha256(Buffer.from('begin;\ncommit;\n')))
+ assert.notEqual(sqlSha256(Buffer.from('select 1;')),sqlSha256(Buffer.from('select 2;')))
+})
+test('une migration hors de l’ancien intervalle de dates bloque le préflight',async()=>{
+ const root=fileURLToPath(new URL('../',import.meta.url)),directory=await mkdtemp(join(tmpdir(),'chibasko-preflight-'))
+ try{
+  for(const path of ['package.json','package-lock.json','supabase/migrations','contracts/production-schema.v1.json','docs/sql/production-schema-snapshot.sql']){
+   const target=join(directory,path);await mkdir(dirname(target),{recursive:true});await cp(join(root,path),target,{recursive:true})
+  }
+  assert.equal((await localChecks(directory)).checks.every(check=>check.ok),true)
+  await writeFile(join(directory,'supabase/migrations/20261024000100_unknown.sql'),'begin;\ncommit;\n')
+  assert.equal((await localChecks(directory)).checks.find(check=>check.check==='migration_order').ok,false)
+ }finally{await rm(directory,{recursive:true,force:true})}
 })
 test('missing environment fails without printing secret values', () => {
   const checks = environmentChecks('portal', { SUPABASE_SERVICE_ROLE_KEY: 'fixture-not-a-credential' })

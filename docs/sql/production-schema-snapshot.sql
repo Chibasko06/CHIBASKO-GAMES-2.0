@@ -9,7 +9,7 @@ set local search_path=pg_catalog,public;
 with managed as (
  select c.* from pg_class c join pg_namespace n on n.oid=c.relnamespace
  where n.nspname='public' and c.relkind in ('r','p') and c.relname ~
- '^(game_versions$|game_developer_members$|game_build_|game_reviewers$|game_version_delivery_policies$|game_preview_sessions$|game_launch_sessions$|game_server_|game_online_|game_connection_tickets$|game_exchange_limits$|multiplayer_)'
+ '^(contact_dispatches$|games$|profiles$|categories$|game_categories$|favorites$|play_history$|game_reviews$|game_reactions$|faq_entries$|admin_users$|password_reset_|developer_contacts$|game_account_|game_management_authorities$|game_platform_management$|game_submissions$|game_submission_|game_developer_|game_versions$|game_build_|game_reviewers$|game_version_delivery_policies$|game_preview_sessions$|game_launch_sessions$|game_server_|game_online_|game_connection_tickets$|game_exchange_limits$|multiplayer_)'
 ), objects as (
  select 'table:'||c.relname as key,jsonb_build_object(
   'owner',pg_get_userbyid(c.relowner),'rls',c.relrowsecurity,'forceRls',c.relforcerowsecurity,
@@ -35,16 +35,32 @@ with managed as (
     from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) g where g.grantee<>p.proowner),'[]'::jsonb),
   'execute',(select jsonb_object_agg(role_name,has_function_privilege(role_name,p.oid,'EXECUTE')) from (values('anon'),('authenticated'),('service_role')) r(role_name))
  ) from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
- where n.nspname='public' and p.prokind='f' and (p.proname like 'distribution\_%' escape '\'
- or p.proname in ('guard_game_version','guard_active_game_version','set_active_game_version','get_published_game_runtimes'))
+ where n.nspname='public' and p.prokind='f' and (p.proname like 'distribution\_%' escape '\' or p.proname like 'contact\_%' escape '\'
+ or p.proname in ('catalogue_recent_history','catalogue_admin_users','catalogue_game_stats','catalogue_device','catalogue_page','catalogue_home','admin_save_game','guard_game_version','guard_active_game_version','set_active_game_version','get_published_game_runtimes',
+ 'normalize_profile_username','handle_new_user','slugify_profile_handle','touch_game_review_updated_at','touch_game_reaction_updated_at',
+ 'increment_game_view','record_game_play','get_game_public_stats','get_game_reviews','set_game_submissions_updated_at',
+ 'reserve_password_reset','check_password_reset','cleanup_password_reset_requests'))
  union all
- select 'index:'||i.indexname,to_jsonb(i.indexdef) from pg_indexes i
+ select 'index:'||i.indexname,jsonb_build_object('definition',i.indexdef,'valid',x.indisvalid,'ready',x.indisready)
+ from pg_indexes i join pg_class c on c.oid=to_regclass(format('%I.%I',i.schemaname,i.indexname))
+ join pg_index x on x.indexrelid=c.oid
  where i.schemaname='public' and i.tablename in (select relname from managed)
+ union all
+ select 'sequence:'||c.relname,jsonb_build_object('parameters',to_jsonb(s)-'seqrelid',
+  'grants',coalesce((select jsonb_agg(jsonb_build_object('role',case when g.grantee=0 then 'PUBLIC' else pg_get_userbyid(g.grantee) end,
+   'privilege',g.privilege_type,'grantable',g.is_grantable) order by case when g.grantee=0 then 'PUBLIC' else pg_get_userbyid(g.grantee) end,g.privilege_type)
+   from aclexplode(coalesce(c.relacl,acldefault('S',c.relowner))) g where g.grantee<>c.relowner),'[]'::jsonb),
+  'access',(select jsonb_object_agg(role_name,jsonb_build_object('usage',has_sequence_privilege(role_name,c.oid,'USAGE'),
+   'select',has_sequence_privilege(role_name,c.oid,'SELECT'),'update',has_sequence_privilege(role_name,c.oid,'UPDATE')))
+   from (values('anon'),('authenticated'),('service_role')) r(role_name)))
+ from pg_class c join pg_sequence s on s.seqrelid=c.oid
+ where exists(select 1 from pg_depend d where d.objid=c.oid and d.classid='pg_class'::regclass
+  and d.refclassid='pg_class'::regclass and d.refobjid in (select oid from managed) and d.deptype in ('a','i'))
  union all
  select 'trigger:'||c.relname||':'||t.tgname,jsonb_build_object('definition',pg_get_triggerdef(t.oid),'enabled',t.tgenabled)
  from pg_trigger t join pg_class c on c.oid=t.tgrelid
  where not t.tgisinternal and (t.tgrelid in (select oid from managed)
- or (c.oid=to_regclass('public.games') and t.tgname='guard_active_game_version'))
+ or (c.oid=to_regclass('auth.users') and t.tgname in ('on_auth_user_created','account_deletion_guard')))
  union all
  select 'column:games.active_version_id',jsonb_build_object('type',format_type(a.atttypid,a.atttypmod),'notNull',a.attnotnull)
  from pg_attribute a where a.attrelid=to_regclass('public.games') and a.attname='active_version_id' and not a.attisdropped
@@ -57,7 +73,7 @@ with managed as (
   'columns',coalesce((select jsonb_object_agg(n.nspname||'.'||c.relname||'.'||a.attname,t.typname)
     from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace join pg_type t on t.oid=a.atttypid
     where a.attnum>0 and not a.attisdropped and (n.nspname,c.relname,a.attname) in
-    (('auth','users','id'),('public','games','id'),('public','games','slug'),('public','games','title'),('public','games','is_published'),
+    (('auth','users','id'),('auth','users','email'),('auth','users','raw_user_meta_data'),('auth','users','created_at'),('public','games','id'),('public','games','slug'),('public','games','title'),('public','games','is_published'),
      ('public','games','game_type'),('public','games','multiplayer_game_id'),('public','profiles','id'),('public','profiles','username'),('public','admin_users','user_id'))),'{}'::jsonb),
   'roles',(select jsonb_object_agg(rolname,jsonb_build_object('superuser',rolsuper,'bypassRls',rolbypassrls)) from pg_roles where rolname in ('anon','authenticated','service_role')),
   'uuidGenerator',to_regprocedure('gen_random_uuid()') is not null,
@@ -75,7 +91,7 @@ with managed as (
     and i.indnkeyatts=1 and i.indkey[0]=(select attnum from pg_attribute where attrelid=i.indrelid and attname='slug')),
   'serviceProfileRead',case when to_regclass('public.profiles') is null then false else has_table_privilege('service_role','public.profiles','SELECT') end,
   'legacyTriggers',coalesce((select jsonb_agg(jsonb_build_object('name',t.tgname,'definition',pg_get_triggerdef(t.oid),'enabled',t.tgenabled) order by t.tgname)
-    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname<>'guard_active_game_version'),'[]'::jsonb),
+    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname not in ('guard_active_game_version','account_asset_guard')),'[]'::jsonb),
   'gamesRls',(select relrowsecurity from pg_class where oid=to_regclass('public.games')),
   'adminRls',(select relrowsecurity from pg_class where oid=to_regclass('public.admin_users')),
   'browserCatalogueWrites',coalesce((select bool_or(has_column_privilege(r.role_name,c.oid,a.attnum,'INSERT') or has_column_privilege(r.role_name,c.oid,a.attnum,'UPDATE')

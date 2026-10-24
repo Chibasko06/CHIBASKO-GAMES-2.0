@@ -1,8 +1,7 @@
 import {readFile} from 'node:fs/promises'
 import {fileURLToPath} from 'node:url'
 import {resolve} from 'node:path'
-import {createHash} from 'node:crypto'
-import {migrations} from './production-preflight.mjs'
+import {migrations, baselineMigrations, sqlSha256} from './production-preflight.mjs'
 import {readJson} from './read-json.mjs'
 
 function canonical(value) {
@@ -14,10 +13,11 @@ const equal=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b))
 export function compareSchema(snapshot,reference) {
   if(snapshot?.format!==1 || snapshot.readOnly!==true || !snapshot.objects || !snapshot.prerequisites || reference?.format!==1)throw Error('invalid_snapshot')
   const rows=[],add=(object,ok)=>rows.push({object,status:ok?'PASS':'BLOCKING_DRIFT'})
-  const required={'auth.users.id':'uuid','public.games.id':'uuid','public.games.slug':'text','public.games.title':'text',
+  const required={'auth.users.id':'uuid','auth.users.email':['text','varchar'],'auth.users.raw_user_meta_data':'jsonb','auth.users.created_at':'timestamptz',
+    'public.games.id':'uuid','public.games.slug':'text','public.games.title':'text',
     'public.games.is_published':'bool','public.games.game_type':'text','public.games.multiplayer_game_id':'text',
     'public.profiles.id':'uuid','public.profiles.username':'text','public.admin_users.user_id':'uuid'}
-  for(const [name,type] of Object.entries(required))add('prerequisite:'+name,snapshot.prerequisites.columns?.[name]===type)
+  for(const [name,type] of Object.entries(required))add('prerequisite:'+name,[type].flat().includes(snapshot.prerequisites.columns?.[name]))
   const p=snapshot.prerequisites
   add('prerequisite:uuid_generator',p.uuidGenerator===true)
   for(const name of ['auth.users','games','profiles','admin_users'])add('primary_key:'+name,equal(p.primaryKeys?.[name],[name==='admin_users'?'user_id':'id']))
@@ -34,7 +34,7 @@ export function compareSchema(snapshot,reference) {
   const allowedAdminQual=new Set(['(auth.uid() = user_id)','(user_id = auth.uid())'])
   add('prerequisite:catalogue_admin_policies',Array.isArray(p.legacyPolicies) && p.legacyPolicies.every(policy=>
     policy.command==='SELECT' && policy.check===null && (policy.table==='games'?allowedGameQual.has(policy.using):allowedAdminQual.has(policy.using))))
-  // Match an entire known prefix; individually plausible objects must not hide a partial migration.
+  // Un préfixe cohérent indique une migration possible, pas un schéma prêt à servir.
   const stage=reference.stages.findIndex(candidate=>equal(candidate,snapshot.objects))
   add('migration_prefix_consistent',stage>=0)
   const final=reference.stages.at(-1),keys=new Set([...Object.keys(final),...Object.keys(snapshot.objects)])
@@ -44,17 +44,23 @@ export function compareSchema(snapshot,reference) {
     else add(object,reference.stages.some(candidate=>Object.hasOwn(candidate,object) && equal(candidate[object],actual)))
   }
   const blocking=rows.filter(row=>row.status==='BLOCKING_DRIFT').length
-  return {status:blocking?'BLOCKING_DRIFT':'PASS',matchedMigrationCount:stage<0?null:stage,
+  return {status:blocking?'BLOCKING_DRIFT':stage<migrations.length?'MIGRATIONS_REQUIRED':'PASS',matchedMigrationCount:stage<0?null:stage,
     pendingMigrations:stage<0?null:reference.migrations.slice(stage).map(item=>item.name),rows,
+    schemaScope:'modeled_public_application_schema',supabaseManagedSchemas:'not_checked',
     remoteAuthorization:'not_checked',dataIntegrity:'not_checked'}
 }
 export async function readReference() {
   const ref=JSON.parse(await readFile(new URL('../contracts/production-schema.v1.json',import.meta.url),'utf8'))
   if(ref.migrations.length!==migrations.length)throw Error('reference_outdated')
-  for(const [index,name] of migrations.entries()) {
+  for(const [names,entries] of [[migrations,ref.migrations],[baselineMigrations,ref.baselineMigrations]]) {
+   if(!Array.isArray(entries)||entries.length!==names.length)throw Error('reference_outdated')
+   for(const [index,name] of names.entries()) {
     const bytes=await readFile(new URL('../supabase/migrations/'+name,import.meta.url))
-    if(ref.migrations[index].name!==name || ref.migrations[index].sha256!==createHash('sha256').update(bytes).digest('hex'))throw Error('reference_outdated')
+    if(entries[index].name!==name || entries[index].sha256!==sqlSha256(bytes))throw Error('reference_outdated')
+   }
   }
+  const snapshot=await readFile(new URL('../docs/sql/production-schema-snapshot.sql',import.meta.url))
+  if(ref.snapshotSha256!==sqlSha256(snapshot))throw Error('reference_outdated')
   return ref
 }
 export async function main(args=process.argv.slice(2)) {

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import {readAllRows} from '@/lib/pagination'
 import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../_utils'
 
 function slugifyCategory(value: string) {
@@ -19,10 +20,7 @@ export async function GET(request: NextRequest) {
 
   const { supabaseAdmin } = adminCheck
 
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .select('*, game_categories(game_id)')
-    .order('name', { ascending: true })
+  const {data,error}=await readAllRows('admin_categories',(from,to)=>supabaseAdmin.from('categories').select('*, game_categories(count)',{count:'exact'}).order('name').order('id').range(from,to)).then(data=>({data,error:null}),error=>({data:[],error}))
 
   if (error) {
     return adminJson({ error: adminErrorMessage(error) }, { status: 500 })
@@ -30,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   const categories = (data ?? []).map((category) => ({
     ...category,
-    games_count: Array.isArray(category.game_categories) ? category.game_categories.length : 0,
+    games_count: category.game_categories?.[0]?.count??0,
   }))
 
   return adminJson({ categories })

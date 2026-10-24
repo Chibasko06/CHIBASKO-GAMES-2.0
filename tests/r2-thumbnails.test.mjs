@@ -18,6 +18,14 @@ const validImage = () => new File([png], 'ignored.jpg', { type: 'image/png' })
 
 function database(options = {}) {
   return {
+    async rpc(name,args) {
+      assert.equal(name,'admin_save_game')
+      globalThis.__r2.events.push(['eq','thumbnail_url',args.p_expected_thumbnail])
+      if (options.saveError) return {data:null,error:options.saveError}
+      if (options.categoryError) return {data:null,error:options.categoryError}
+      globalThis.__r2.events.push('save-game','save-categories')
+      return {data:{game:{id:'game-id',...args.p_game},previousThumbnail:options.previous??oldUrl},error:null}
+    },
     from(table) {
       return {
         select(_columns, selection) {
@@ -25,7 +33,7 @@ function database(options = {}) {
             globalThis.__r2.events.push(`reference-check:${table}`)
             return options.references?.[table] || { count: 0, error: null }
           } }
-          return { eq: () => ({ single: async () => ({
+          return { eq: () => ({ maybeSingle: async () => ({
             data: { thumbnail_url: options.previous ?? oldUrl }, error: options.readError || null,
           }) }) }
         },
@@ -161,9 +169,9 @@ test('PATCH never deletes on read failure, save failure, concurrent conflict or 
     { categoryError: { message: 'category failed' } },
   ]) {
     globalThis.__r2.events = []
-    globalThis.__r2.adminCheck = async () => ({ supabaseAdmin: database(options) })
+    globalThis.__r2.adminCheck = async () => ({ supabaseAdmin: database(options), user:{id:'admin'} })
     const response = await patchGame(saveRequest(), params)
-    assert.equal(response.status, options.saveError?.code === 'PGRST116' ? 409 : 500)
+    assert.equal(response.status, options.saveError?.code === 'PGRST116' ? 409 : 503)
     assert.ok(!globalThis.__r2.events.some(event => event[0] === 'delete'))
   }
 })

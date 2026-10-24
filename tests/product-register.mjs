@@ -47,8 +47,18 @@ registerHooks({
       'product:tracker': 'export default function Tracker(){return null}',
       'product:supabase': `export const supabase = {
         auth:{signOut:async()=>{},getSession:async()=>globalThis.__productGetSession ? globalThis.__productGetSession() : ({data:{session:globalThis.__productSession ?? null}}),onAuthStateChange:cb=>globalThis.__productSubscribe ? globalThis.__productSubscribe(cb) : ({data:{subscription:{unsubscribe(){}}}}),signInWithPassword:async()=>({data:{session:{user:{id:'A'}}},error:null}),signUp:async input=>{globalThis.__productSignUp=input;return {data:{session:globalThis.__productSession ?? null},error:null}},signInWithOAuth:async input=>{globalThis.__productOAuth=input;return {error:null}}},
-        from(table) { const filters=[]; const chain={select(){return chain},eq(key,value){filters.push([key,value]);return chain},order(){return chain},abortSignal(){return chain},maybeSingle:async()=>({data:null}),then(resolve){const data=table==='games' ? (globalThis.__productRows ?? []).filter(row=>filters.every(([key,value])=>row[key]===value)) : table==='categories' ? (globalThis.__productCategories??[]) : table==='game_categories' ? (globalThis.__productCategoryLinks??[]) : [];return Promise.resolve({data,error:null}).then(resolve)}};return chain },
-        rpc:async name=>({data:name==='get_published_game_runtimes'?(globalThis.__productRuntimes??[]):[],error:null})
+        from(table) { const filters=[];let start=0,end=99; const chain={select(){return chain},range(a,b){start=a;end=b;return chain},eq(key,value){filters.push([key,value]);return chain},order(){return chain},abortSignal(){return chain},maybeSingle:async()=>({data:null}),then(resolve){const rows=table==='games' ? (globalThis.__productRows ?? []).filter(row=>filters.every(([key,value])=>row[key]===value)) : table==='categories' ? (globalThis.__productCategories??[]) : table==='game_categories' ? (globalThis.__productCategoryLinks??[]) : [];return Promise.resolve({data:rows.slice(start,end+1).map(row=>({...row,game_categories:row.game_categories??row.categories?.map(category=>({category_id:category.id}))??[]})),count:rows.length,error:null}).then(resolve)}};return chain },
+        rpc:async(name,args)=>{
+         if(name==='catalogue_home')return {data:(globalThis.__productCategories??[]).map(category=>({category,games:(globalThis.__productRows??[]).filter(row=>row.is_published&&(row.categories??[]).some(c=>c.id===category.id)).slice(0,args.p_limit)})).filter(section=>section.games.length),error:null}
+         if(name==='catalogue_page'){
+          let rows=(globalThis.__productRows??[]).filter(row=>row.is_published&&(!args.p_slug||row.slug===args.p_slug)).map(row=>{const runtime=(globalThis.__productRuntimes??[]).find(r=>r.game_id===row.id&&r.version_id===row.active_version_id);return {...row,runtime_capabilities:runtime?.capabilities,categories:row.categories??(globalThis.__productCategoryLinks??[]).filter(link=>link.game_id===row.id).map(link=>link.categories)}})
+          if(args.p_category!=='all')rows=rows.filter(row=>row.categories.some(c=>c.slug===args.p_category))
+          if(args.p_type!=='all')rows=rows.filter(row=>row.game_type===(args.p_type==='multiplayer'?'multiplayer_chibasko':'classic'))
+          if(args.p_search)rows=rows.filter(row=>row.title.toLowerCase().includes(args.p_search.toLowerCase()))
+          return {data:{items:rows.slice(args.p_offset,args.p_offset+args.p_limit),total:rows.length},error:null}
+         }
+         return {data:name==='get_published_game_runtimes'?(globalThis.__productRuntimes??[]):[],error:null}
+        }
       }; export async function restoreBrowserSession(){return globalThis.__productRestore ? globalThis.__productRestore() : (await supabase.auth.getSession()).data.session}`,
     }
     if (url === 'server-only') return { format:'module', source:'', shortCircuit:true }

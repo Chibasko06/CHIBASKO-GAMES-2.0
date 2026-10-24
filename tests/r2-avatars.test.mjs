@@ -218,7 +218,7 @@ test('admin upload and profile PATCH preserve the admin guard; clearing the URL 
 test('R2 upload failures and DB conflicts return errors without deleting existing avatars', async () => {
   const bucket = globalThis.__r2.bucket
   globalThis.__r2.bucket = undefined
-  assert.equal((await ownUpload(request())).status, 500)
+  assert.equal((await ownUpload(request())).status, 503)
   globalThis.__r2.bucket = bucket
   globalThis.__phase0.admin = database({ saveError: { code: 'PGRST116' } })
   assert.equal((await ownUpload(request())).status, 409)

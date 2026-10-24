@@ -44,7 +44,7 @@
     "pretest": "npm run build:sdk && npm run check:distribution-schema",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs tests/cloudflare.test.mjs tests/r2-thumbnails.test.mjs tests/r2-avatars.test.mjs tests/game-catalogue.test.mjs tests/game-sdk.test.mjs tests/game-distribution.test.mjs && npm run test:game-uploads && npm run test:game-artifacts && npm run test:game-runtime && npm run test:online-session && npm run test:multiplayer && npm run test:product && npm run test:admin && npm run test:go-live",
+    "test": "node --import ./tests/register.mjs --test tests/security.test.mjs tests/cloudflare.test.mjs tests/http-security.test.mjs tests/r2-thumbnails.test.mjs tests/r2-avatars.test.mjs tests/game-catalogue.test.mjs tests/game-sdk.test.mjs tests/game-distribution.test.mjs && npm run test:game-uploads && npm run test:game-artifacts && npm run test:game-runtime && npm run test:online-session && npm run test:multiplayer && npm run test:product && npm run test:admin && npm run test:go-live && npm run test:reliability && npm run test:account-deletion && npm run test:game-isolation && npm run test:contact && npm run test:maintenance",
     "test:go-live": "node --test tests/production-preflight.test.mjs tests/go-live-gates.test.mjs tests/source-map-security.test.mjs && node --import ./tests/register.mjs --test tests/session-maintenance.test.mjs",
     "test:go-live-db": "node tests/production-schema-reference.mjs",
     "test:db": "node tests/database-security.mjs",
@@ -63,7 +63,15 @@
     "test:multiplayer-db": "node tests/game-distribution-db.mjs --multiplayer",
     "test:pong-e2e": "node tests/game-distribution-db.mjs --pong",
     "test:catalogue-interface": "node --import ./tests/product-register.mjs --test tests/catalogue-recommendations.test.mjs && node --test tests/catalogue-interface.browser.test.mjs",
-    "test:developer-contacts": "node --import ./tests/register.mjs --test tests/developer-contact.test.mjs"
+    "test:developer-contacts": "node --import ./tests/register.mjs --test tests/developer-contact.test.mjs",
+    "test:http-security-browser": "node --test tests/http-security.browser.test.mjs",
+    "test:reliability": "node --import ./tests/reliability-register.mjs --test tests/application-reliability.test.mjs tests/auth-reliability.test.mjs tests/catalogue-pagination.test.mjs",
+    "test:cloudflare-dependencies": "node --test tests/cloudflare-dependencies.test.mjs",
+    "test:account-deletion": "node --import ./tests/register.mjs --test tests/account-deletion.test.mjs && node --test tests/account-cleanup.r2.test.mjs",
+    "test:game-isolation": "node --import ./tests/register.mjs --test tests/game-isolation.test.mjs",
+    "test:contact": "node --import ./tests/register.mjs --test tests/contact.test.mjs",
+    "test:maintenance": "node --import ./tests/register.mjs --test tests/maintenance-notifications.test.mjs tests/developer-contact.test.mjs && node --test tests/maintenance-worker.test.mjs",
+    "test:accessibility-browser": "node --test tests/contact-accessibility.browser.test.mjs"
   },
   "dependencies": {
     "@chibaskogames/sdk": "0.3.0",
@@ -73,7 +81,7 @@
     "@zip.js/zip.js": "2.23.0",
     "aws4fetch": "1.0.20",
     "image-size": "2.0.4",
-    "next": "16.3.8",
+    "next": "16.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "6.12.4",
@@ -90,11 +98,16 @@
     "ajv": "8.20.0",
     "esbuild": "0.25.4",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.3",
     "jsdom": "^29.1.1",
     "sharp": "0.35.5",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "wrangler": "4.148.0"
+    "wrangler": "4.152.0"
+  },
+  "overrides": {
+    "miniflare": {
+      "undici": "7.30.1"
+    }
   }
 }
