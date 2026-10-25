@@ -1,5 +1,6 @@
 import collectionStyles from '../../components/GameCardCollection.module.css'
 import GamesCatalog from '../../components/GamesCatalog'
+import FavoritesPage from '../../app/favorites/page'
 import {createRoot} from 'react-dom/client'
 import {Navbar} from '../../components/Navbar'
 import HorizontalScroller from '../../components/HorizontalScroller'
@@ -16,12 +17,13 @@ const games=Array.from({length:16},(_,i):FixtureGame=>({
  developer_name:i===4?'Chibasko Games':i%2?'Studio de développement avec un nom long':undefined,technology:i%2?'HTML5':undefined,
 }))
 
-type Options={page:'home'|'catalogue'|'game'|'admin';count?:number;total?:number;cataloguePage?:number}
+type Options={page:'home'|'catalogue'|'favorites'|'game'|'admin';count?:number;total?:number;cataloguePage?:number}
 declare global{interface Window{catalogueFixture:{render(options:Options):void}}}
 const root=createRoot(document.getElementById('root')!)
 window.catalogueFixture={render({page,count=12,total,cataloguePage}){root.render(<><Navbar/><main className="site-content mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">
  <div data-stacking-probe style={{position:'relative',zIndex:4,transform:'translateZ(0)',minHeight:100,background:'#111827',padding:16}}>Catalogue Chibasko Games · {page}</div>
  {page==='home'?<>{['Action','Arcade'].map(label=><section key={label}><h2>{label}</h2><HorizontalScroller className={collectionStyles.row} label={label}>{games.slice(0,Math.min(count,10)).map(game=><GameCard key={game.id} game={game}/>)}</HorizontalScroller></section>)}<section data-popular><h2>Jeux populaires</h2><div className={collectionStyles.grid}>{games.slice(0,8).map(game=><GameCard key={game.id} game={game}/>)}</div></section></>
+ :page==='favorites'?<FavoritesPage/>
  :page==='catalogue'?<GamesCatalog games={games as import('../../lib/queries/games').GameWithCategoriesAndStats[]} categories={[]} total={total} page={cataloguePage}/>
  :page==='game'?<GamePagePlayerLayout recommendations={games.slice(0,5)}><GameViewport gameId="fixture" title="Stickman Fights" developerName="Fixture Studio" gameUrl="https://legacy.test/" initialLikes={0} initialDislikes={0}/></GamePagePlayerLayout>
  :<section style={{position:'relative',zIndex:10}}>Administration</section>}

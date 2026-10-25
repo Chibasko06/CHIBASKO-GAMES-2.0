@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import GamePagination from '@/components/GamePagination'
+import { pageNumber } from '@/lib/pagination'
 import { useAuth } from '@/components/AuthProvider'
 import { GameCard } from '@/components/GameCard'
 import collectionStyles from '@/components/GameCardCollection.module.css'
@@ -14,14 +16,21 @@ type Game = Tables<'games'>
 
 export default function FavoritesPage() {
   const {user}=useAuth()
-  return <FavoritesPanel key={user?.id??'anonymous'} />
+  return <Suspense fallback={<p role="status" className="text-zinc-400">Chargement des favoris…</p>}><FavoritesPanel key={user?.id??'anonymous'} /></Suspense>
 }
 
 function FavoritesPanel(){
   const pathname = usePathname()
   const { loading: authLoading, user } = useAuth()
   const [games, setGames] = useState<Game[]>([])
-  const [page,setPage]=useState(1)
+  const params = useSearchParams()
+  const page = pageNumber(params.get('page'))
+  const pageHref = (value: number) => {
+    const query = new URLSearchParams(params.toString())
+    query.delete('page')
+    if (value > 1) query.set('page', String(value))
+    return '/favorites' + (query.size ? '?' + query.toString() : '')
+  }
   const [total,setTotal]=useState(0)
   const [loading, setLoading] = useState(true)
   const [needsAuth, setNeedsAuth] = useState(false)
@@ -88,7 +97,6 @@ function FavoritesPanel(){
           Les jeux que tu as mis de cote pour les retrouver rapidement.
         </p>
       </div>
-      {user&&<nav aria-label="Pages des favoris" className="flex justify-center gap-6"><button disabled={loading||page===1} onClick={()=>setPage(value=>value-1)}>Précédent</button><span>Page {page}</span><button disabled={loading||page*24>=total} onClick={()=>setPage(value=>value+1)}>Suivant</button></nav>}
 
       {loading ? (
         <div className={collectionStyles.grid}>
@@ -138,6 +146,7 @@ function FavoritesPanel(){
           </div>
         </>
       )}
+      {user && !loading && !loadError && <GamePagination page={page} total={total} pageHref={pageHref} label="Pages des favoris" />}
     </div>
   )
 }

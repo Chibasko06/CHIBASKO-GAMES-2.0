@@ -12,12 +12,14 @@ before(async()=>{
  build.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}))
  build.onResolve({filter:/supabaseClient$/},()=>({path:'supabase',namespace:'fixture'}))
  build.onResolve({filter:/^@\/lib\/profileSync$/},()=>({path:'profile',namespace:'fixture'}))
+ build.onResolve({filter:/^@\/lib\/queries\/favorites$/},()=>({path:'favorites',namespace:'fixture'}))
  build.onResolve({filter:/^next\/(link|image|navigation)$/},({path})=>({path:path.split('/')[1],namespace:'fixture'}))
  build.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({resolveDir:process.cwd(),loader:'js',contents:{
  auth:"const user={id:'fixture-user',email:'fixture@example.test'},session={access_token:'fixture-only',user};export function useAuth(){return {user,session,loading:false}}",
  supabase:"export const supabase={auth:{async signOut(){}},from(){return {select(){return this},eq(){return this},abortSignal(){return this},async maybeSingle(){return {data:null,error:null}}}},async rpc(){return {data:[],error:null}}}",
  profile:"export async function ensureProfile(){return {ok:true}}",
- navigation:"export function useRouter(){return {push(){},replace(path){window.catalogueNavigation=path}}} export function useSearchParams(){return new URLSearchParams(window.location.search)}",
+ favorites:"export async function isFavorite(){return false} export async function addFavorite(){} export async function removeFavorite(){} export async function getFavoriteGamesPage(user,page){window.favoriteRead={user,page};return {items:[{id:'favorite',slug:'favorite',title:'Favori',thumbnail_url:'/cover.svg',categories:[]}],total:1205}}",
+ navigation:"export function usePathname(){return window.location.pathname} export function useRouter(){return {push(){},replace(path){window.catalogueNavigation=path}}} export function useSearchParams(){return new URLSearchParams(window.location.search)}",
  link:"import {createElement} from 'react';export default function Link(props){return createElement('a',props)}",
  image:"import {createElement} from 'react';export default function Image({fill,priority,unoptimized,...props}){return createElement('img',{...props,style:fill?{position:'absolute',inset:0,width:'100%',height:'100%'}:props.style})}",
  }[path]}))
@@ -159,6 +161,32 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
   const after=await x.page.locator('article').first().boundingBox()
   assert.equal(after.width,before.width);assert.equal(after.height,before.height)
   assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ }finally{await x.context.close()}
+})
+
+for(const width of [390,1366])test('favoris : page URL, pagination partagée et changement de page '+width,async()=>{
+ const x=await setup('favorites',{width,height:844})
+ try{
+  const render=async(page)=>{
+   await x.page.evaluate(page=>{
+    history.replaceState(null,'','/favorites?page='+page)
+    window.catalogueFixture.render({page:'favorites'})
+   },page)
+   await x.page.waitForFunction(page=>window.favoriteRead?.page===page,page)
+   await x.page.getByRole('navigation',{name:'Pages des favoris'}).getByText('Page '+page+' sur 51',{exact:true}).waitFor()
+  }
+  await render(25)
+  const nav=x.page.getByRole('navigation',{name:'Pages des favoris'})
+  assert.equal(await nav.locator('[aria-current="page"]').innerText(),'25')
+  assert.equal(await nav.getByRole('link',{name:'Page 24',exact:true}).getAttribute('href'),'/favorites?page=24')
+  assert.equal(await nav.getByRole('link',{name:'Page 1',exact:true}).isVisible(),width>=640)
+  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+  await render(1)
+  assert.equal(await nav.getByRole('button',{name:'Précédent',exact:true}).isDisabled(),true)
+  await render(51)
+  assert.equal(await nav.getByRole('button',{name:'Suivant',exact:true}).isDisabled(),true)
+  await render(2)
+  assert.equal(await nav.getByRole('link',{name:'Précédent',exact:true}).getAttribute('href'),'/favorites')
  }finally{await x.context.close()}
 })
 
