@@ -1,10 +1,17 @@
 "use client";
 import { changeGameFormType, gameFormPayload, type GameType } from '@/lib/multiplayer/catalogue'
 import FormField from '@/components/ui/FormField'
+import AdminShell, { type AdminSection } from '@/components/admin/AdminShell'
+import AdminOverview from '@/components/admin/AdminOverview'
+import AdminEditor from '@/components/admin/AdminEditor'
+import AdminUserTable from '@/components/admin/AdminUserTable'
+import AdminGameTable from '@/components/admin/AdminGameTable'
+import AdminPagination from '@/components/admin/AdminPagination'
+import type { ProfileRoles } from '@/lib/profileRoles'
 
 import GameTypeFields from '@/components/admin/GameTypeFields'
-import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
 import { useAdminAccess } from '@/components/admin/useAdminAccess'
@@ -14,7 +21,7 @@ import { Tables } from '@/types/database'
 type Game = Tables<'games'> & {
   game_categories?: { category_id: string }[]
 }
-type AdminUser = Tables<'profiles'> & { email: string | null }
+type AdminUser = Tables<'profiles'> & { email: string | null; roles?: ProfileRoles }
 type Category = Tables<'categories'> & { games_count?: number; game_categories?: { game_id: string }[] }
 type FaqEntry = Tables<'faq_entries'>
 type GameFormState = {
@@ -156,13 +163,27 @@ function AdminPanel() {
   const sessionToken = session?.access_token ?? null
   const { status: accessStatus, checking, retry } = useAdminAccess()
   const router = useRouter()
+  const query = useSearchParams(), requestedSection = query.get('section')
+  const section: AdminSection = ['games', 'users', 'categories', 'faq'].includes(requestedSection ?? '') ? requestedSection as AdminSection : 'overview'
+  const requestedGameStatus=query.get('status')
+  const routeGameStatus=requestedGameStatus==='published'||requestedGameStatus==='hidden'?requestedGameStatus:'all'
+  const [gameEditorOpen, setGameEditorOpen] = useState(false)
+  const [categoryEditorOpen,setCategoryEditorOpen]=useState(false),[faqEditorOpen,setFaqEditorOpen]=useState(false)
+  const [gameSearchDraft, setGameSearchDraft] = useState(''), [gameSearch, setGameSearch] = useState('')
+  const [gameStatus, setGameStatus] = useState<string>(routeGameStatus), [gameTypeFilter, setGameTypeFilter] = useState('all')
+  const [userSearchDraft, setUserSearchDraft] = useState(''), [userSearch, setUserSearch] = useState(''), [userRoleFilter, setUserRoleFilter] = useState('all')
   const [games, setGames] = useState<Game[]>([])
-  const [gamesPage,setGamesPage]=useState(1),[gamesTotal,setGamesTotal]=useState(0)
-  const [usersPage,setUsersPage]=useState(1),[usersTotal,setUsersTotal]=useState(0)
+  const [gamesPage, setGamesPage] = useState(1), [gamesTotal, setGamesTotal] = useState(0)
+  const [usersPage, setUsersPage] = useState(1), [usersTotal, setUsersTotal] = useState(0)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [faqEntries, setFaqEntries] = useState<FaqEntry[]>([])
   const [gameForm, setGameForm] = useState<GameFormState>(emptyGameForm)
+  const userMutationLocked = useRef(false)
+  const userRead = useRef(0)
+  const gameRead = useRef(0)
+  const [usersError, setUsersError] = useState<string | null>(null)
+  const [expectedUser, setExpectedUser] = useState<{ username: string; bio: string | null; avatar_url: string | null } | null>(null)
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm)
   const [faqForm, setFaqForm] = useState<FaqFormState>(emptyFaqForm)
@@ -181,7 +202,15 @@ function AdminPanel() {
   const [uploadingGameThumbnail, setUploadingGameThumbnail] = useState(false)
   const [uploadingUserAvatar, setUploadingUserAvatar] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [deletionNotice,setDeletionNotice]=useState<string|null>(null)
+  const [deletionNotice, setDeletionNotice] = useState<string | null>(null)
+  const navigationKey=section+':'+routeGameStatus
+  const [previousNavigation,setPreviousNavigation]=useState(navigationKey)
+  // Les raccourcis de la vue d’ensemble peuvent imposer un filtre de visibilité.
+  if(previousNavigation!==navigationKey){
+    setPreviousNavigation(navigationKey)
+    if(section==='games'){setGameStatus(routeGameStatus);setGamesPage(1)}
+  }
+
 
   const authorizedFetch = useCallback(async (input: string, init?: RequestInit) => {
     if (!sessionToken) {
@@ -199,44 +228,48 @@ function AdminPanel() {
   }, [sessionToken])
 
   const loadGames = useCallback(async (signal?: AbortSignal) => {
+    const attempt = ++gameRead.current
     setLoadingGames(true)
     try {
-      const response = await authorizedFetch(`/api/admin/games?page=${gamesPage}`, { signal })
+      const response = await authorizedFetch('/api/admin/games?' + new URLSearchParams({ page: String(gamesPage), search: gameSearch, status: gameStatus, type: gameTypeFilter }), { signal })
       const payload = await response.json()
-      if (signal?.aborted) return
+      if (signal?.aborted || attempt !== gameRead.current) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
-      setGames(payload.games || []);setGamesTotal(payload.total??payload.games?.length??0)
+      if(gamesPage>Math.max(1,Math.ceil(payload.total/50))){setGamesPage(Math.max(1,Math.ceil(payload.total/50)));return}
+      setGames(payload.games || []); setGamesTotal(payload.total ?? payload.games?.length ?? 0)
       setErrorMessage(null)
     } catch (error) {
-      if (signal?.aborted) return
+      if (signal?.aborted || attempt !== gameRead.current) return
       setGames([])
       setErrorMessage(error instanceof Error ? error.message : 'Erreur admin.')
     } finally {
-      if (!signal?.aborted) setLoadingGames(false)
+      if (!signal?.aborted && attempt === gameRead.current) setLoadingGames(false)
     }
-  }, [authorizedFetch, gamesPage])
+  }, [authorizedFetch, gamesPage, gameSearch, gameStatus, gameTypeFilter])
 
   const loadUsers = useCallback(async (signal?: AbortSignal) => {
+    const attempt = ++userRead.current
     setLoadingUsers(true)
     try {
-      const response = await authorizedFetch(`/api/admin/users?page=${usersPage}`, { signal })
+      const response = await authorizedFetch('/api/admin/users?' + new URLSearchParams({ page: String(usersPage), search: userSearch, role: userRoleFilter }), { signal })
       const payload = await response.json()
-      if (signal?.aborted) return
+      if (signal?.aborted || attempt !== userRead.current) return
       if (!response.ok) {
         throw new Error(payload.error || 'Acces admin refuse.')
       }
-      setUsers(payload.users || []);setUsersTotal(payload.total??payload.users?.length??0)
-      setErrorMessage(null)
-    } catch (error) {
-      if (signal?.aborted) return
+      if(usersPage>Math.max(1,Math.ceil(payload.total/50))){setUsersPage(Math.max(1,Math.ceil(payload.total/50)));return}
+      setUsers(payload.users || []); setUsersTotal(payload.total ?? payload.users?.length ?? 0)
+      setUsersError(null)
+    } catch {
+      if (signal?.aborted || attempt !== userRead.current) return
       setUsers([])
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur admin.')
+      setUsersError('Impossible de charger les utilisateurs. Réessayez.')
     } finally {
-      if (!signal?.aborted) setLoadingUsers(false)
+      if (!signal?.aborted && attempt === userRead.current) setLoadingUsers(false)
     }
-  }, [authorizedFetch, usersPage])
+  }, [authorizedFetch, usersPage, userSearch, userRoleFilter])
 
   const loadCategories = useCallback(async (signal?: AbortSignal) => {
     setLoadingCategories(true)
@@ -283,27 +316,32 @@ function AdminPanel() {
   }, [accessStatus, router])
 
   useEffect(() => {
-    if (accessStatus !== 'allowed') return
+    if (accessStatus !== 'allowed' || !(section === 'games')) return
     const controller = new AbortController()
-    // Cancelled mounts (including Strict Mode) must not launch duplicate requests.
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void Promise.all([loadCategories(controller.signal), loadFaq(controller.signal)])
-    })
+    queueMicrotask(() => { if (!controller.signal.aborted) void loadGames(controller.signal) })
     return () => controller.abort()
-  }, [accessStatus, loadCategories, loadFaq])
+  }, [accessStatus, loadGames, section])
 
-  useEffect(()=>{
-    if(accessStatus!=='allowed')return
-    const controller=new AbortController()
-    queueMicrotask(()=>{if(!controller.signal.aborted)void loadGames(controller.signal)})
-    return()=>controller.abort()
-  },[accessStatus,loadGames])
-  useEffect(()=>{
-    if(accessStatus!=='allowed')return
-    const controller=new AbortController()
-    queueMicrotask(()=>{if(!controller.signal.aborted)void loadUsers(controller.signal)})
-    return()=>controller.abort()
-  },[accessStatus,loadUsers])
+  useEffect(() => {
+    if (accessStatus !== 'allowed' || !(section === 'users')) return
+    const controller = new AbortController()
+    queueMicrotask(() => { if (!controller.signal.aborted) void loadUsers(controller.signal) })
+    return () => controller.abort()
+  }, [accessStatus, loadUsers, section])
+
+  useEffect(() => {
+    if (accessStatus !== 'allowed' || !(section === 'games' || section === 'categories')) return
+    const controller = new AbortController()
+    queueMicrotask(() => { if (!controller.signal.aborted) void loadCategories(controller.signal) })
+    return () => controller.abort()
+  }, [accessStatus, loadCategories, section])
+
+  useEffect(() => {
+    if (accessStatus !== 'allowed' || !(section === 'faq')) return
+    const controller = new AbortController()
+    queueMicrotask(() => { if (!controller.signal.aborted) void loadFaq(controller.signal) })
+    return () => controller.abort()
+  }, [accessStatus, loadFaq, section])
 
   const handleGameChange = (field: keyof GameFormState, value: string | boolean | string[]) => {
     setGameForm((current) => ({ ...current, [field]: value }))
@@ -325,9 +363,11 @@ function AdminPanel() {
   const resetGameForm = () => {
     setGameForm(emptyGameForm)
     setEditingGameId(null)
+    setGameEditorOpen(false)
   }
 
   const resetUserForm = () => {
+    setExpectedUser(null)
     setUserForm(emptyUserForm)
     setEditingUserId(null)
   }
@@ -335,11 +375,13 @@ function AdminPanel() {
   const resetCategoryForm = () => {
     setCategoryForm(emptyCategoryForm)
     setEditingCategoryId(null)
+    setCategoryEditorOpen(false)
   }
 
   const resetFaqForm = () => {
     setFaqForm(emptyFaqForm)
     setEditingFaqId(null)
+    setFaqEditorOpen(false)
   }
 
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -369,26 +411,30 @@ function AdminPanel() {
 
   const handleUserSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (userMutationLocked.current) return
     if (!editingUserId) {
       setErrorMessage('Selectionne un utilisateur a modifier.')
       return
     }
+    userMutationLocked.current = true
     setSavingUser(true)
     try {
       const response = await authorizedFetch(`/api/admin/users/${editingUserId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userForm),
+        body: JSON.stringify({ ...userForm, expected: expectedUser }),
       })
       const payload = await response.json()
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la mise a jour de l utilisateur.')
       }
+      if (payload.user) { setExpectedUser({ username: payload.user.username, bio: payload.user.bio, avatar_url: payload.user.avatar_url }); setUserForm(toUserFormState(payload.user)) }
       await loadUsers()
       setErrorMessage(null)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur lors de la mise a jour de l utilisateur.')
     } finally {
+      userMutationLocked.current = false
       setSavingUser(false)
     }
   }
@@ -447,24 +493,29 @@ function AdminPanel() {
   }
 
   const startEditGame = (game: Game) => {
+    setGameEditorOpen(true)
     setEditingGameId(game.id)
     setGameForm(toGameFormState(game))
     setErrorMessage(null)
   }
 
   const startEditUser = (user: AdminUser) => {
+    if (userMutationLocked.current) return
+    setExpectedUser({ username: user.username, bio: user.bio, avatar_url: user.avatar_url })
     setEditingUserId(user.id)
     setUserForm(toUserFormState(user))
     setErrorMessage(null)
   }
 
   const startEditCategory = (category: Category) => {
+    setCategoryEditorOpen(true)
     setEditingCategoryId(category.id)
     setCategoryForm(toCategoryFormState(category))
     setErrorMessage(null)
   }
 
   const startEditFaq = (entry: FaqEntry) => {
+    setFaqEditorOpen(true)
     setEditingFaqId(entry.id)
     setFaqForm(toFaqFormState(entry))
     setErrorMessage(null)
@@ -499,10 +550,13 @@ function AdminPanel() {
   }
 
   const handleDeleteUser = async (id: string) => {
-    if (!confirmDeletion('cet utilisateur')) {
+    if (userMutationLocked.current) return
+    if (id === session?.user.id) { setErrorMessage('Utilisez le tableau de bord pour votre propre compte.'); return }
+    if (window.prompt('Pour demander la suppression de ' + (users.find(user => user.id === id)?.username ?? id) + ', saisissez SUPPRIMER.') !== 'SUPPRIMER') {
       return
     }
 
+    userMutationLocked.current = true
     setSavingUser(true)
     try {
       const response = await authorizedFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
@@ -510,15 +564,16 @@ function AdminPanel() {
       if (!response.ok) {
         throw new Error(payload.error || 'Erreur lors de la suppression de l utilisateur.')
       }
-      setDeletionNotice(payload.success?'Suppression terminée.':'Demande enregistrée. Consultez les suppressions de comptes pour suivre le traitement ou vérifier les conditions applicables.')
+      setDeletionNotice(payload.success ? 'Suppression terminée.' : 'Demande enregistrée. Consultez les suppressions de comptes pour suivre le traitement ou vérifier les conditions applicables.')
       if (editingUserId === id) {
         resetUserForm()
       }
       await loadUsers()
       setErrorMessage(null)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur lors de la suppression de l utilisateur.')
+    } catch {
+      setErrorMessage('Le résultat de la demande doit être vérifié dans les suppressions de comptes avant de recommencer.')
     } finally {
+      userMutationLocked.current = false
       setSavingUser(false)
     }
   }
@@ -577,13 +632,15 @@ function AdminPanel() {
 
   const handleUserAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !editingUserId) {
+    if (!file || !editingUserId || userMutationLocked.current) {
       return
     }
 
+    userMutationLocked.current = true
     setUploadingUserAvatar(true)
     try {
       const avatarUrl = await uploadAdminAvatar(editingUserId, file)
+      setExpectedUser(current => current ? { ...current, avatar_url: avatarUrl } : null)
       setUserForm((current) => ({
         ...current,
         avatar_url: avatarUrl,
@@ -593,6 +650,7 @@ function AdminPanel() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Erreur upload avatar admin.')
     } finally {
+      userMutationLocked.current = false
       setUploadingUserAvatar(false)
       event.target.value = ''
     }
@@ -648,366 +706,245 @@ function AdminPanel() {
     {accessStatus === 'error' && <button type="button" onClick={retry} className="mt-4 rounded-xl bg-cyan-400 px-4 py-2 font-bold text-black focus-visible:outline focus-visible:outline-cyan-300">Réessayer</button>}
   </div>
   return (
-    <div className="space-y-8">
-      {checking && <p role="status" className="text-sm text-zinc-400">Vérification de l’accès en cours…</p>}
-      <section className="border border-zinc-800 bg-zinc-950 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="mb-2 text-2xl font-black uppercase text-cyan-500">Admin Chibasko Games</h1>
-
-            <p className="text-zinc-400">
-              Gere le catalogue, les categories, la FAQ et les profils joueurs.
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => void exportCsv('games')}
-              className="border border-cyan-700 px-4 py-2 text-xs font-bold text-cyan-300"
-            >
-              EXPORT CSV JEUX
-            </button>
-            <button
-              type="button"
-              onClick={() => void exportCsv('users')}
-              className="border border-cyan-700 px-4 py-2 text-xs font-bold text-cyan-300"
-            >
-              EXPORT CSV USERS
-            </button>
-          </div>
-        </div>
-        {errorMessage ? <p className="mt-4 text-sm text-red-400">{errorMessage}</p> : null}
-        {deletionNotice&&<p role="status" className="mt-4 text-sm text-cyan-200">{deletionNotice}</p>}
-        <Link href="/admin/account-deletions" className="mt-4 inline-block text-sm text-cyan-300 underline">Suivre les suppressions de comptes</Link>
-      </section>
-
-      <Link href="/admin/game-builds" className="block rounded-2xl border border-cyan-800 bg-cyan-950/20 p-6 transition hover:border-cyan-400 focus-visible:outline-2 focus-visible:outline-cyan-300"><h2 className="text-xl font-bold text-cyan-200">Publications de jeux</h2><p className="mt-2 text-sm text-zinc-300">Consulter les soumissions, vérifier les jeux et décider de leur publication.</p><span className="mt-3 inline-block text-sm font-semibold text-cyan-300">Ouvrir les publications →</span></Link>
-
-      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">
-              {editingGameId ? 'Modifier un jeu' : 'Ajouter un jeu'}
-            </h2>
-            {editingGameId ? (
-              <button type="button" onClick={resetGameForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
-                Annuler
-              </button>
-            ) : null}
-          </div>
-
-          <form onSubmit={handleGameSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <GameTypeFields type={gameForm.game_type} gameUrl={gameForm.game_url} gameId={gameForm.multiplayer_game_id}
-              onType={type => setGameForm(current => changeGameFormType(current, type, !!editingGameId))}
-              onUrl={url => handleGameChange('game_url', url)} onGameId={id => handleGameChange('multiplayer_game_id', id)} />
-            {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu et ses données. Les anciens champs de lancement sont effacés ; renseigne ceux du nouveau type.</p>}
-            <label className="flex items-center gap-3 md:col-span-2"><input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Bêta</label>
-            <FormField label="Titre"><input aria-label="Titre" value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
-            <FormField label="Slug"><input aria-label="Slug" value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
-            <FormField className="md:col-span-2" label="Miniature"><input aria-label="Miniature" value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300 md:col-span-2">
-              <span>{uploadingGameThumbnail ? 'Upload miniature...' : 'Importer une image de jeu (optimisee auto)'}</span>
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" className="sr-only" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
-              <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
-            </label>
-            <FormField label="Developpeur"><input value={gameForm.developer_name} onChange={(e) => handleGameChange('developer_name', e.target.value)} placeholder="Developpeur" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <FormField label="Date de sortie"><input value={gameForm.release_date_text} onChange={(e) => handleGameChange('release_date_text', e.target.value)} placeholder="Date de sortie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <FormField label="Compatibilite mobile"><input value={gameForm.mobile_compatible} onChange={(e) => handleGameChange('mobile_compatible', e.target.value)} placeholder="Compatibilite mobile" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <FormField label="Technologie"><input value={gameForm.technology} onChange={(e) => handleGameChange('technology', e.target.value)} placeholder="Technologie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            {gameForm.game_type === 'classic' && <>
-            <FormField label="Provider"><input value={gameForm.provider_name} onChange={(e) => handleGameChange('provider_name', e.target.value)} placeholder="Provider" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <FormField label="Source page URL"><input value={gameForm.source_page_url} onChange={(e) => handleGameChange('source_page_url', e.target.value)} placeholder="Source page URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            </>}
-            <FormField className="md:col-span-2" label="Description"><textarea aria-label="Description" value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-
-            <div className="border border-zinc-800 bg-black/40 p-4 md:col-span-2">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-300">Categories du jeu</p>
-                <span className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-                  {gameForm.category_ids.length} selection
-                </span>
+    <AdminShell active={section} actions={<>{section==='categories'&&<button disabled={savingCategory} className="admin-action text-cyan-200" onClick={()=>{resetCategoryForm();setCategoryEditorOpen(true)}}>Ajouter une catégorie</button>}{section==='faq'&&<button disabled={savingFaq} className="admin-action text-cyan-200" onClick={()=>{resetFaqForm();setFaqEditorOpen(true)}}>Ajouter une question</button>}{section === 'users' && <button className="admin-action" disabled={loadingUsers || savingUser || uploadingUserAvatar} onClick={() => void loadUsers()}>Actualiser</button>}{section === 'games' && <button className="admin-action" disabled={loadingGames || savingGame || uploadingGameThumbnail} onClick={() => void loadGames()}>Actualiser</button>}{section === 'games' && <>
+      <button className="admin-action" onClick={() => void exportCsv('games')}>Exporter CSV</button>
+      <button disabled={savingGame || uploadingGameThumbnail} className="admin-action border-cyan-700 text-cyan-200" onClick={() => { resetGameForm(); setGameEditorOpen(true) }}>Ajouter un jeu</button>
+    </>}{section === 'users' && <button className="admin-action" onClick={() => void exportCsv('users')}>Exporter CSV</button>}</>}>
+      {checking && <p role="status" className="text-sm text-zinc-400">Vérification de l’accès…</p>}
+      {errorMessage && <p role="alert" className="rounded-lg border border-rose-900 bg-rose-950/20 p-4 text-sm text-rose-200">{errorMessage}</p>}
+      {deletionNotice && <p role="status" className="rounded-lg border border-cyan-900 p-4 text-sm text-cyan-200">{deletionNotice} <Link href="/admin/account-deletions" className="underline">Suivre les demandes</Link>
+      </p>}
+      {section === 'overview' && <AdminOverview token={sessionToken} />}
+      {section === 'games' && <div className="space-y-4">
+        <form onSubmit={event => { event.preventDefault(); setGamesPage(1); setGameSearch(gameSearchDraft) }} className="grid items-end gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+          <FormField label="Rechercher un jeu">
+            <input type="search" value={gameSearchDraft} maxLength={80} onChange={event => setGameSearchDraft(event.target.value)} className="border border-zinc-700 bg-black px-3" />
+          </FormField>
+          <FormField label="Visibilité">
+            <select value={gameStatus} onChange={event => { setGameStatus(event.target.value); setGamesPage(1) }} className="border border-zinc-700 bg-black px-3">
+              <option value="all">Tous les statuts</option>
+              <option value="published">Publiés</option>
+              <option value="hidden">Masqués</option>
+            </select>
+          </FormField>
+          <FormField label="Type de jeu">
+            <select value={gameTypeFilter} onChange={event => { setGameTypeFilter(event.target.value); setGamesPage(1) }} className="border border-zinc-700 bg-black px-3">
+              <option value="all">Tous les types</option>
+              <option value="classic">HTML5 legacy</option>
+              <option value="multiplayer_chibasko">SDK / multijoueur</option>
+            </select>
+          </FormField>
+          <button type="submit" className="admin-action bg-cyan-400 !text-black">Rechercher</button>
+        </form>
+        <div className={gameEditorOpen ? 'grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]' : 'min-w-0'}>
+          {gameEditorOpen && <AdminEditor identity={editingGameId ?? 'new-game'}>{!editingGameId && <div className="mb-3 text-right">
+            <button className="admin-action" disabled={savingGame || uploadingGameThumbnail} onClick={resetGameForm}>Fermer le formulaire</button>
+          </div>}<div className="min-w-0">
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <h2 className="text-lg font-black uppercase text-white">
+                  {editingGameId ? 'Modifier un jeu' : 'Ajouter un jeu'}
+                </h2>
+                {editingGameId ? (
+                  <button type="button" disabled={savingGame || uploadingGameThumbnail} onClick={resetGameForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
+                    Annuler
+                  </button>
+                ) : null}
               </div>
-              {loadingCategories ? (
-                <p className="text-sm text-zinc-500">Chargement des categories...</p>
-              ) : categories.length === 0 ? (
-                <p className="text-sm text-zinc-500">Ajoute d abord une categorie plus bas.</p>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {categories.map((category) => (
-                    <label key={category.id} className="flex items-center gap-3 border border-zinc-800 px-3 py-2 text-sm text-zinc-300">
-                      <input type="checkbox" checked={gameForm.category_ids.includes(category.id)} onChange={() => handleCategoryToggle(category.id)} />
-                      <span>{category.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            <label className="flex items-center gap-3 text-sm text-zinc-300 md:col-span-2">
-              <input type="checkbox" checked={gameForm.is_published} onChange={(e) => handleGameChange('is_published', e.target.checked)} />
-              Jeu publie sur le site
-            </label>
-            <p className="text-sm text-zinc-400 md:col-span-2">{!gameForm.is_published ? 'Non publié : invisible dans le catalogue public.' : gameForm.is_beta ? 'Publié en Bêta : visible avec le badge Bêta.' : 'Publié : visible dans le catalogue public.'}</p>
-            <button type="submit" disabled={savingGame} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2">
-              {savingGame ? 'SAUVEGARDE...' : editingGameId ? 'METTRE A JOUR LE JEU' : 'AJOUTER LE JEU'}
-            </button>
-          </form>
-        </div>
+              <form onSubmit={handleGameSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <GameTypeFields type={gameForm.game_type} gameUrl={gameForm.game_url} gameId={gameForm.multiplayer_game_id}
+                  onType={type => setGameForm(current => changeGameFormType(current, type, !!editingGameId))}
+                  onUrl={url => handleGameChange('game_url', url)} onGameId={id => handleGameChange('multiplayer_game_id', id)} />
+                {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu et ses données. Les anciens champs de lancement sont effacés ; renseigne ceux du nouveau type.</p>}
+                <label className="flex items-center gap-3 md:col-span-2">
+                  <input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Bêta</label>
+                <FormField label="Titre">
+                  <input aria-label="Titre" value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+                </FormField>
+                <FormField label="Slug">
+                  <input aria-label="Slug" value={gameForm.slug} onChange={(e) => handleGameChange('slug', e.target.value)} placeholder="Slug" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+                </FormField>
+                <FormField className="md:col-span-2" label="Miniature">
+                  <input aria-label="Miniature" value={gameForm.thumbnail_url} onChange={(e) => handleGameChange('thumbnail_url', e.target.value)} placeholder="Miniature" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
+                <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300 md:col-span-2">
+                  <span>{uploadingGameThumbnail ? 'Envoi de la miniature…' : 'Importer une miniature'}</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" className="sr-only" onChange={handleGameThumbnailUpload} disabled={uploadingGameThumbnail} />
+                  <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
+                </label>
+                <FormField label="Développeur">
+                  <input value={gameForm.developer_name} onChange={(e) => handleGameChange('developer_name', e.target.value)} placeholder="Développeur" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
+                <FormField label="Date de sortie">
+                  <input value={gameForm.release_date_text} onChange={(e) => handleGameChange('release_date_text', e.target.value)} placeholder="Date de sortie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
+                <FormField label="Compatibilite mobile">
+                  <input value={gameForm.mobile_compatible} onChange={(e) => handleGameChange('mobile_compatible', e.target.value)} placeholder="Compatibilite mobile" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
+                <FormField label="Technologie">
+                  <input value={gameForm.technology} onChange={(e) => handleGameChange('technology', e.target.value)} placeholder="Technologie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
+                {gameForm.game_type === 'classic' && <>
+                  <FormField label="Provider">
+                    <input value={gameForm.provider_name} onChange={(e) => handleGameChange('provider_name', e.target.value)} placeholder="Provider" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                  </FormField>
+                  <FormField label="Source page URL">
+                    <input value={gameForm.source_page_url} onChange={(e) => handleGameChange('source_page_url', e.target.value)} placeholder="Source page URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                  </FormField>
+                </>}
+                <FormField className="md:col-span-2" label="Description">
+                  <textarea aria-label="Description" value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
 
-        <div className="space-y-8">
-          <div className="border border-zinc-800 bg-zinc-950 p-6">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <h2 className="text-lg font-black uppercase text-white">Catalogue admin</h2>
-              <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{gamesTotal} jeux</span><nav aria-label="Pages des jeux administrés" className="flex gap-3"><button disabled={loadingGames||savingGame||gamesPage===1} onClick={()=>setGamesPage(p=>p-1)}>Précédent</button><span>{gamesPage}</span><button disabled={loadingGames||savingGame||gamesPage*50>=gamesTotal} onClick={()=>setGamesPage(p=>p+1)}>Suivant</button></nav>
-            </div>
-
-            {loadingGames ? (
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="h-20 animate-pulse border border-zinc-800 bg-zinc-900" />
-                ))}
-              </div>
-            ) : (
-              <div className="max-h-[560px] space-y-3 overflow-y-auto pr-1">
-                {games.map((game) => (
-                  <article key={game.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-bold text-white">{game.title}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">{game.slug}</p>
-                      </div>
-                      <span className={`text-[10px] uppercase tracking-[0.3em] ${game.is_published ? 'text-cyan-400' : 'text-zinc-500'}`}>
-                        {game.is_published ? (game.is_beta ? 'Bêta' : 'Publie') : 'Brouillon'}
-                      </span>
-                    </div>
-                    <div className="space-y-1 text-xs text-zinc-400">
-                      <p>{game.developer_name || 'Developpeur non renseigne'}</p>
-                      <p>{game.game_type === 'multiplayer_chibasko' ? `Multijoueur Chibasko Games : ${game.multiplayer_game_id}` : (game.technology || 'Technologie non renseignee')}</p>
-                      <p>Categories: {(game.game_categories ?? []).length > 0 ? `${(game.game_categories ?? []).length} liees` : 'Aucune'}</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => startEditGame(game)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
-                        Editer
-                      </button>
-                      <button type="button" onClick={() => void handleDeleteGame(game.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
-                        Supprimer
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="border border-zinc-800 bg-zinc-950 p-6">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <h2 className="text-lg font-black uppercase text-white">
-                {editingCategoryId ? 'Modifier une categorie' : 'Ajouter une categorie'}
-              </h2>
-              {editingCategoryId ? (
-                <button type="button" onClick={resetCategoryForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
-                  Annuler
-                </button>
-              ) : null}
-            </div>
-
-            <form onSubmit={handleCategorySubmit} className="space-y-4">
-              <FormField label="Nom de categorie"><input
-                value={categoryForm.name}
-                onChange={(event) => {
-                  const nextName = event.target.value
-                  setCategoryForm((current) => ({
-                    ...current,
-                    name: nextName,
-                    slug: current.slug ? current.slug : slugifyCategory(nextName),
-                  }))
-                }}
-                placeholder="Nom de categorie"
-                className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
-                required
-              /></FormField>
-              <FormField label="Slug categorie"><input
-                value={categoryForm.slug}
-                onChange={(event) => setCategoryForm((current) => ({ ...current, slug: slugifyCategory(event.target.value) }))}
-                placeholder="Slug categorie"
-                className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
-                required
-              /></FormField>
-              <button type="submit" disabled={savingCategory} className="w-full bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
-                {savingCategory ? 'SAUVEGARDE...' : editingCategoryId ? 'METTRE A JOUR LA CATEGORIE' : 'AJOUTER LA CATEGORIE'}
-              </button>
-            </form>
-
-            <div className="mt-6 space-y-3">
-              {loadingCategories ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-16 animate-pulse border border-zinc-800 bg-zinc-900" />
-                ))
-              ) : categories.length === 0 ? (
-                <p className="text-sm text-zinc-500">Aucune categorie pour le moment.</p>
-              ) : (
-                categories.map((category) => (
-                  <article key={category.id} className="border border-zinc-800 bg-black/30 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-bold text-white">{category.name}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">{category.slug}</p>
-                        <p className="mt-2 text-xs text-zinc-400">{category.games_count ?? 0} jeux rattaches</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => startEditCategory(category)} className="border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
-                          Editer
-                        </button>
-                        <button type="button" onClick={() => void handleDeleteCategory(category.id)} className="border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
-                          Supprimer
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">
-              {editingUserId ? 'Modifier un joueur' : 'Selectionne un joueur'}
-            </h2>
-            {editingUserId ? (
-              <button type="button" onClick={resetUserForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
-                Annuler
-              </button>
-            ) : null}
-          </div>
-
-          <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4">
-            <FormField label="Pseudo"><input value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
-            <FormField label="Avatar public URL"><input value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="Avatar public URL" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300">
-              <span>{uploadingUserAvatar ? 'Upload avatar...' : 'Importer une image avatar'}</span>
-              <input type="file" accept="image/*,.ico" className="sr-only" onChange={handleUserAvatarUpload} disabled={!editingUserId || uploadingUserAvatar} />
-              <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
-            </label>
-            <FormField label="Bio"><textarea value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
-              {savingUser ? 'MISE A JOUR...' : 'METTRE A JOUR LE JOUEUR'}
-            </button>
-          </form>
-        </div>
-
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">Utilisateurs</h2><nav aria-label="Pages des comptes" className="flex gap-3"><button disabled={loadingUsers||savingUser||usersPage===1} onClick={()=>setUsersPage(p=>p-1)}>Précédent</button><span>{usersPage}</span><button disabled={loadingUsers||savingUser||usersPage*50>=usersTotal} onClick={()=>setUsersPage(p=>p+1)}>Suivant</button></nav>
-            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{usersTotal} comptes</span>
-          </div>
-
-          {loadingUsers ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="h-24 animate-pulse border border-zinc-800 bg-zinc-900" />
-              ))}
-            </div>
-          ) : (
-            <div className="max-h-[900px] space-y-3 overflow-y-auto pr-1">
-              {users.map((user) => (
-                <article key={user.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
-                  <div>
-                    <p className="font-bold text-white">{user.username}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{user.email || 'Email non disponible'}</p>
-                  </div>
-                  <div className="space-y-1 text-xs text-zinc-400">
-                    <p>Pseudo: {user.username}</p>
-                    <p>Bio: {user.bio || 'Aucune bio'}</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={() => startEditUser(user)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
-                      Gerer
-                    </button>
-                    <button type="button" onClick={() => void handleDeleteUser(user.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
-                      Supprimer
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">
-              {editingFaqId ? 'Modifier une entree FAQ' : 'Ajouter une entree FAQ'}
-            </h2>
-            {editingFaqId ? (
-              <button type="button" onClick={resetFaqForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
-                Annuler
-              </button>
-            ) : null}
-          </div>
-
-          <form onSubmit={handleFaqSubmit} className="grid grid-cols-1 gap-4">
-            <FormField label="Question"><input value={faqForm.question} onChange={(event) => setFaqForm((current) => ({ ...current, question: event.target.value }))} placeholder="Question" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
-            <FormField label="Reponse"><textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} placeholder="Reponse" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required /></FormField>
-            <FormField label="Ordre d affichage"><input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Ordre d affichage" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" /></FormField>
-            <label className="flex items-center gap-3 text-sm text-zinc-300">
-              <input type="checkbox" checked={faqForm.is_published} onChange={(event) => setFaqForm((current) => ({ ...current, is_published: event.target.checked }))} />
-              Entree publiee sur la page FAQ
-            </label>
-            <button type="submit" disabled={savingFaq} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
-              {savingFaq ? 'SAUVEGARDE...' : editingFaqId ? 'METTRE A JOUR LA FAQ' : 'AJOUTER LA FAQ'}
-            </button>
-          </form>
-        </div>
-
-        <div className="border border-zinc-800 bg-zinc-950 p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black uppercase text-white">FAQ publique</h2>
-            <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">{faqEntries.length} entrees</span>
-          </div>
-
-          {loadingFaq ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="h-24 animate-pulse border border-zinc-800 bg-zinc-900" />
-              ))}
-            </div>
-          ) : faqEntries.length === 0 ? (
-            <p className="text-sm text-zinc-500">Aucune entree FAQ pour le moment.</p>
-          ) : (
-            <div className="max-h-[760px] space-y-3 overflow-y-auto pr-1">
-              {faqEntries.map((entry) => (
-                <article key={entry.id} className="space-y-3 border border-zinc-800 bg-black/30 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-bold text-white">{entry.question}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">Ordre {entry.sort_order}</p>
-                    </div>
-                    <span className={`text-[10px] uppercase tracking-[0.3em] ${entry.is_published ? 'text-cyan-400' : 'text-zinc-500'}`}>
-                      {entry.is_published ? 'Publiee' : 'Masquee'}
+                <div className="border border-zinc-800 bg-black/40 p-4 md:col-span-2">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-300">Categories du jeu</p>
+                    <span className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+                      {gameForm.category_ids.length} selection
                     </span>
                   </div>
-                  <p className="text-sm leading-6 text-zinc-400">{entry.answer}</p>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={() => startEditFaq(entry)} className="flex-1 border border-cyan-800 px-3 py-2 text-xs font-bold text-cyan-300">
-                      Editer
-                    </button>
-                    <button type="button" onClick={() => void handleDeleteFaq(entry.id)} className="flex-1 border border-red-900 px-3 py-2 text-xs font-bold text-red-400">
-                      Supprimer
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+                  {loadingCategories ? (
+                    <p className="text-sm text-zinc-500">Chargement des categories...</p>
+                  ) : categories.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Ajoute d abord une categorie plus bas.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {categories.map((category) => (
+                        <label key={category.id} className="flex items-center gap-3 border border-zinc-800 px-3 py-2 text-sm text-zinc-300">
+                          <input type="checkbox" checked={gameForm.category_ids.includes(category.id)} onChange={() => handleCategoryToggle(category.id)} />
+                          <span>{category.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-    </div>
+                <label className="flex items-center gap-3 text-sm text-zinc-300 md:col-span-2">
+                  <input type="checkbox" checked={gameForm.is_published} onChange={(e) => handleGameChange('is_published', e.target.checked)} />
+                  Visible dans le catalogue
+                </label>
+                <p className="text-sm text-zinc-400 md:col-span-2">{!gameForm.is_published ? 'Non publié : invisible dans le catalogue public.' : gameForm.is_beta ? 'Publié en Bêta : visible avec le badge Bêta.' : 'Publié : visible dans le catalogue public.'}</p>
+                <button type="submit" disabled={savingGame} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2">
+                  {savingGame ? 'SAUVEGARDE...' : editingGameId ? 'Enregistrer le jeu' : 'Créer le jeu'}
+                </button>
+              </form>
+            </div>
+          </AdminEditor>}
+          <section className="admin-table-container min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">{loadingGames ? <p role="status" className="p-5 text-sm text-zinc-400">Chargement des jeux…</p> : games.length ? <AdminGameTable games={games} busy={savingGame || uploadingGameThumbnail} onEdit={startEditGame} onDelete={id => void handleDeleteGame(id)} /> : !errorMessage&&<p className="p-6 text-sm text-zinc-400">Aucun jeu dans cette sélection.</p>}{!loadingGames&&!errorMessage&&<AdminPagination label="Pages des jeux administrés" page={gamesPage} total={gamesTotal} busy={loadingGames || savingGame} onPage={setGamesPage} />}
+          </section>
+
+        </div>
+      </div>}
+      {section === 'users' && <div className="space-y-4">
+        <form onSubmit={event => { event.preventDefault(); if (userMutationLocked.current) return; setUsersPage(1); setUserSearch(userSearchDraft) }} className="grid items-end gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <FormField label="Rechercher un utilisateur">
+            <input type="search" maxLength={80} disabled={savingUser || uploadingUserAvatar} value={userSearchDraft} onChange={event => setUserSearchDraft(event.target.value)} className="border border-zinc-700 bg-black px-3" />
+          </FormField>
+          <FormField label="Rôle du membre">
+            <select disabled={savingUser || uploadingUserAvatar} value={userRoleFilter} onChange={event => { setUserRoleFilter(event.target.value); setUsersPage(1) }} className="border border-zinc-700 bg-black px-3">
+              <option value="all">Tous les membres</option>
+              <option value="admin">Administrateurs</option>
+              <option value="developer">Développeurs</option>
+            </select>
+          </FormField>
+          <button disabled={savingUser || uploadingUserAvatar} type="submit" className="admin-action bg-cyan-400 !text-black">Rechercher</button>
+        </form>
+        {usersError && <p role="alert" className="rounded-lg border border-rose-900 p-4 text-sm text-rose-200">{usersError} <button className="underline" onClick={() => void loadUsers()}>Réessayer</button>
+        </p>}
+        <div className={editingUserId ? 'grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]' : 'min-w-0'}>
+          {editingUserId && <AdminEditor identity={editingUserId}>
+            <div className="min-w-0">
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <h2 className="text-lg font-black uppercase text-white">
+                  {editingUserId ? 'Modifier le profil' : 'Sélectionnez un utilisateur'}
+                </h2>
+                {editingUserId ? (
+                  <button type="button" disabled={savingUser || uploadingUserAvatar} onClick={resetUserForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
+                    Annuler
+                  </button>
+                ) : null}
+              </div>
+
+              <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4">
+                <FormField label="Pseudo">
+                  <input disabled={savingUser || uploadingUserAvatar} maxLength={32} value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+                </FormField>
+                <FormField label="URL de l’avatar">
+                  <input disabled={savingUser || uploadingUserAvatar} maxLength={2048} value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="URL de l’avatar" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
+                <label className="flex min-h-[56px] cursor-pointer items-center justify-between border border-zinc-800 bg-black px-3 text-sm text-zinc-300">
+                  <span>{uploadingUserAvatar ? 'Envoi de l’avatar…' : 'Importer un avatar'}</span>
+                  <input type="file" accept="image/*,.ico" className="sr-only" onChange={handleUserAvatarUpload} disabled={!editingUserId || uploadingUserAvatar || savingUser} />
+                  <span className="border border-cyan-700 px-3 py-1 text-xs font-bold text-cyan-300">Choisir</span>
+                </label>
+                <FormField label="Biographie">
+                  <textarea disabled={savingUser || uploadingUserAvatar} maxLength={16384} value={userForm.bio} onChange={(e) => handleUserChange('bio', e.target.value)} placeholder="Bio" className="min-h-32 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                </FormField>
+                <button type="submit" disabled={savingUser || !editingUserId || uploadingUserAvatar} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
+                  {savingUser ? 'Enregistrement…' : 'Enregistrer le profil'}
+                </button>
+              </form>
+            </div>
+          </AdminEditor>}
+          <section className="admin-table-container min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">{loadingUsers ? <p role="status" className="p-5 text-sm text-zinc-400">Chargement des utilisateurs…</p> : users.length ? <AdminUserTable users={users} actor={session?.user.id} busy={savingUser || uploadingUserAvatar} onEdit={startEditUser} onDelete={id => void handleDeleteUser(id)} /> : !usersError && <p className="p-6 text-sm text-zinc-400">Aucun utilisateur dans cette sélection.</p>}{!loadingUsers&&!usersError&&<AdminPagination label="Pages des comptes" page={usersPage} total={usersTotal} busy={loadingUsers || savingUser || uploadingUserAvatar} onPage={setUsersPage} />}
+          </section>
+
+        </div>
+      </div>}
+      {section==='categories'&&<div className={categoryEditorOpen?'grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]':'min-w-0'}>
+ {categoryEditorOpen&&<AdminEditor identity={editingCategoryId??'new-category'}><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-bold">{editingCategoryId?'Modifier la catégorie':'Ajouter une catégorie'}</h2><button type="button" disabled={savingCategory} className="admin-action" onClick={resetCategoryForm}>Fermer</button></div><form onSubmit={handleCategorySubmit} className="space-y-4">
+          <FormField label="Nom de catégorie">
+            <input
+              value={categoryForm.name}
+              onChange={(event) => {
+                const nextName = event.target.value
+                setCategoryForm((current) => ({
+                  ...current,
+                  name: nextName,
+                  slug: !editingCategoryId&&(!current.slug||current.slug===slugifyCategory(current.name))?slugifyCategory(nextName):current.slug,
+                }))
+              }}
+              placeholder="Nom de catégorie"
+              className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
+              required
+            />
+          </FormField>
+          <FormField label="Slug de catégorie">
+            <input
+              value={categoryForm.slug}
+              onChange={(event) => setCategoryForm((current) => ({ ...current, slug: slugifyCategory(event.target.value) }))}
+              placeholder="Slug de catégorie"
+              className="w-full bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500"
+              required
+            />
+          </FormField>
+          <button type="submit" disabled={savingCategory} className="w-full bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
+            {savingCategory ? 'SAUVEGARDE...' : editingCategoryId ? 'Enregistrer la catégorie' : 'Créer la catégorie'}
+          </button>
+        </form></AdminEditor>}
+ <section className="admin-table-container min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">{loadingCategories?<p role="status" className="p-5 text-sm text-zinc-400">Chargement des catégories…</p>:categories.length?<table className="admin-table"><caption className="sr-only">Catégories du catalogue</caption><thead><tr><th scope="col">Catégorie</th><th scope="col">Jeux</th><th scope="col">Actions</th></tr></thead><tbody>{categories.map(category=><tr key={category.id}><td><p className="font-semibold text-white">{category.name}</p><p className="text-xs text-zinc-500">{category.slug}</p></td><td className="text-sm text-zinc-400">{category.games_count??0} jeux</td><td><div className="flex flex-wrap gap-2"><button type="button" disabled={savingCategory} className="admin-action" onClick={()=>startEditCategory(category)}>Modifier<span className="sr-only"> {category.name}</span></button><button type="button" disabled={savingCategory} className="admin-action text-rose-300" onClick={()=>void handleDeleteCategory(category.id)}>Supprimer<span className="sr-only"> {category.name}</span></button></div></td></tr>)}</tbody></table>:!errorMessage&&<p className="p-6 text-sm text-zinc-400">Aucune catégorie.</p>}</section>
+</div>}
+      {section==='faq'&&<div className={faqEditorOpen?'grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]':'min-w-0'}>
+ {faqEditorOpen&&<AdminEditor identity={editingFaqId??'new-question'}><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-bold">{editingFaqId?'Modifier la question':'Ajouter une question'}</h2><button type="button" disabled={savingFaq} className="admin-action" onClick={resetFaqForm}>Fermer</button></div><form onSubmit={handleFaqSubmit} className="grid grid-cols-1 gap-4">
+            <FormField label="Question">
+              <input value={faqForm.question} onChange={(event) => setFaqForm((current) => ({ ...current, question: event.target.value }))} placeholder="Question" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            </FormField>
+            <FormField label="Réponse">
+              <textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} placeholder="Reponse" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            </FormField>
+            <FormField label="Ordre d’affichage">
+              <input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Ordre d affichage" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            </FormField>
+            <label className="flex items-center gap-3 text-sm text-zinc-300">
+              <input type="checkbox" checked={faqForm.is_published} onChange={(event) => setFaqForm((current) => ({ ...current, is_published: event.target.checked }))} />
+              Question publiée sur la page FAQ
+            </label>
+            <button type="submit" disabled={savingFaq} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
+              {savingFaq ? 'SAUVEGARDE...' : editingFaqId ? 'Enregistrer la question' : 'Créer la question'}
+            </button>
+          </form></AdminEditor>}
+ <section className="admin-table-container min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">{loadingFaq?<p role="status" className="p-5 text-sm text-zinc-400">Chargement des questions…</p>:faqEntries.length?<table className="admin-table"><caption className="sr-only">Questions fréquentes</caption><thead><tr><th scope="col">Question</th><th scope="col">Ordre</th><th scope="col">Statut</th><th scope="col">Actions</th></tr></thead><tbody>{faqEntries.map(entry=><tr key={entry.id}><td><p className="font-semibold text-white">{entry.question}</p><details className="mt-2 text-xs text-zinc-400"><summary className="cursor-pointer text-cyan-300">Voir la réponse</summary><p className="mt-2 whitespace-pre-wrap break-words">{entry.answer}</p></details></td><td><span className="admin-cell-label text-zinc-500">Ordre : </span>{entry.sort_order}</td><td><span className={'text-xs '+(entry.is_published?'text-emerald-300':'text-zinc-500')}>{entry.is_published?'Publiée':'Masquée'}</span></td><td><div className="flex flex-wrap gap-2"><button type="button" disabled={savingFaq} className="admin-action" onClick={()=>startEditFaq(entry)}>Modifier<span className="sr-only"> {entry.question}</span></button><button type="button" disabled={savingFaq} className="admin-action text-rose-300" onClick={()=>void handleDeleteFaq(entry.id)}>Supprimer<span className="sr-only"> {entry.question}</span></button></div></td></tr>)}</tbody></table>:!errorMessage&&<p className="p-6 text-sm text-zinc-400">Aucune question.</p>}</section>
+</div>}
+    </AdminShell>
   )
 }

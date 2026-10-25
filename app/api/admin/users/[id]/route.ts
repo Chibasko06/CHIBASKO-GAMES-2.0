@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
-import { requireAdmin, readAdminJson, adminJson, adminErrorMessage } from '../../_utils'
+import { requireAdmin, readAdminJson, adminJson } from '../../_utils'
 import { AvatarUpdateError, updateAvatarForUser } from '@/lib/server/avatarStorage'
 import {requestAccountDeletion} from '@/lib/server/accountDeletion'
+import {adminUserProfile} from '@/lib/server/adminUserProfile'
+import {profileFailure} from '@/lib/server/profileRequest'
 
 export async function PATCH(
   request: NextRequest,
@@ -15,29 +17,18 @@ export async function PATCH(
 
   const { id } = await params
   const { supabaseAdmin } = adminCheck
+  if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))return adminJson({error:'Compte invalide.'},{status:400})
   let body: Record<string, unknown>
-  try { body = await readAdminJson(request) }
+  // Le corps contient les nouvelles valeurs et l’instantané du profil édité.
+  try { body = await readAdminJson(request, 2 * 16_384 + 4096) }
   catch { return adminJson({ error: 'Formulaire invalide.' }, { status: 400 }) }
-  const username = typeof body.username === 'string' ? body.username.trim() : ''
-  if ((body.avatar_url != null && typeof body.avatar_url !== 'string') ||
-      (body.bio != null && typeof body.bio !== 'string')) {
-    return adminJson({ error: 'Formulaire invalide.' }, { status: 400 })
-  }
-
-  const payload = {
-    username,
-    display_name: username || null,
-    avatar_url: typeof body.avatar_url === 'string' ? body.avatar_url || null : null,
-    bio: typeof body.bio === 'string' ? body.bio || null : null,
-  }
-
   try {
-    const { avatar_url, ...fields } = payload
-    const data = await updateAvatarForUser(id, avatar_url, supabaseAdmin, fields)
+    const {fields,avatarUrl,expected}=adminUserProfile(body)
+    const data = await updateAvatarForUser(id, avatarUrl, supabaseAdmin, fields, expected)
     return adminJson({ user: data })
   } catch (error) {
-    return adminJson({ error: adminErrorMessage(error) },
-      { status: error instanceof AvatarUpdateError ? error.status : 500 })
+    if(error instanceof AvatarUpdateError)return adminJson({error:error.message},{status:error.status})
+    return profileFailure('admin_profile_update',error)
   }
 }
 
@@ -52,5 +43,6 @@ export async function DELETE(
   }
 
   const { id } = await params
+  if(id.toLowerCase()===adminCheck.user.id.toLowerCase())return adminJson({error:'Utilisez la suppression personnelle depuis le tableau de bord pour votre propre compte.'},{status:403})
   return requestAccountDeletion(adminCheck.user.id,id)
 }

@@ -63,6 +63,24 @@ a {
 label:has(input[type="file"]:focus-visible){outline:2px solid #67e8f9;outline-offset:3px}
 /* Le texte secondaire doit rester lisible sur les surfaces sombres. */
 .text-zinc-500{color:#858591}
+.admin-console{color:#e4e4e7}
+.admin-console h2:not([data-presentation] h2){font-size:1rem;line-height:1.5rem;text-transform:none;letter-spacing:normal}
+.admin-console input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),.admin-console textarea,.admin-console select{max-width:100%;min-width:0;border-radius:.5rem;min-height:2.75rem}
+.admin-console textarea{min-height:7rem}
+.admin-console button:not([data-presentation] button){min-height:2.5rem;border-radius:.5rem}
+.admin-console button:disabled:not([data-presentation] button){cursor:not-allowed;opacity:.4}
+.admin-console .admin-action{display:inline-flex;align-items:center;justify-content:center;border:1px solid #3f3f46;padding:.4rem .65rem;font-size:.75rem;font-weight:600;white-space:nowrap}
+.admin-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.875rem}
+.admin-table th{padding:.75rem;text-align:left;color:#a1a1aa;font-size:.75rem;font-weight:500;border-bottom:1px solid #27272a}
+.admin-table td{padding:.85rem .75rem;vertical-align:middle;overflow-wrap:anywhere;border-bottom:1px solid #27272a}
+.admin-table th:first-child{width:42%}
+.admin-table tr:last-child td{border-bottom:0}
+.admin-table tbody tr:hover{background:#18181b80}
+.admin-table-container{container-type:inline-size}
+.admin-cell-label{display:none}
+@container(max-width:44rem){.admin-table,.admin-table tbody,.admin-table tr,.admin-table td{display:block;width:100%}.admin-table thead{display:none}.admin-table tr{padding:.75rem;border-bottom:1px solid #27272a}.admin-table td{padding:.35rem;border:0}.admin-table tr:last-child{border:0}.admin-cell-label{display:inline}}
+@media(max-width:767px){.admin-table,.admin-table tbody,.admin-table tr,.admin-table td{display:block;width:100%}.admin-table thead{display:none}.admin-table tr{padding:.75rem;border-bottom:1px solid #27272a}.admin-table td{padding:.35rem;border:0}.admin-table tr:last-child{border:0}}
+@media(max-width:767px){.admin-cell-label{display:inline}}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}
 }

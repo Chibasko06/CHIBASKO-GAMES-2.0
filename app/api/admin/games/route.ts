@@ -14,7 +14,13 @@ export async function GET(request: NextRequest) {
   const { supabaseAdmin } = adminCheck
 
   const page=pageNumber(new URL(request.url).searchParams.get('page'))
-  const {data,error,count}=await supabaseAdmin.from('games').select('*, game_categories(category_id)',{count:'exact'}).order('created_at',{ascending:false}).order('id').range((page-1)*50,page*50-1)
+  const params=new URL(request.url).searchParams,search=params.get('search')??'',status=params.get('status')??'all',type=params.get('type')??'all'
+  if(search.length>80||!['all','published','hidden'].includes(status)||!['all','classic','multiplayer_chibasko'].includes(type))return adminJson({error:'Filtres invalides.'},{status:400})
+  let query=supabaseAdmin.from('games').select('*, game_categories(category_id)',{count:'exact'})
+  if(search)query=query.ilike('title','%'+search.replace(/[\\%_]/g,'\\$&')+'%')
+  if(status!=='all')query=query.eq('is_published',status==='published')
+  if(type!=='all')query=query.eq('game_type',type as 'classic'|'multiplayer_chibasko')
+  const {data,error,count}=await query.order('created_at',{ascending:false}).order('id').range((page-1)*50,page*50-1)
 
   if (error||count===null) {
     return adminJson({ error: adminErrorMessage(error) }, { status: 500 })

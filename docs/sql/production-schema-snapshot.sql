@@ -42,7 +42,7 @@ with managed as (
   'execute',(select jsonb_object_agg(role_name,has_function_privilege(role_name,p.oid,'EXECUTE')) from (values('anon'),('authenticated'),('service_role')) r(role_name))
  ) from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
  where n.nspname='public' and p.prokind='f' and (p.proname like 'distribution\_%' escape '\' or p.proname like 'contact\_%' escape '\'
- or p.proname in ('public_profiles_page','catalogue_recent_history','catalogue_admin_users','catalogue_game_stats','catalogue_device','catalogue_page','catalogue_home','admin_save_game','guard_game_version','guard_active_game_version','set_active_game_version','get_published_game_runtimes',
+ or p.proname in ('admin_console_users','admin_console_overview','admin_console_deletions','public_profiles_page','catalogue_recent_history','catalogue_admin_users','catalogue_game_stats','catalogue_device','catalogue_page','catalogue_home','admin_save_game','guard_game_version','guard_active_game_version','set_active_game_version','get_published_game_runtimes',
  'normalize_profile_username','handle_new_user','slugify_profile_handle','touch_game_review_updated_at','touch_game_reaction_updated_at',
  'increment_game_view','record_game_play','get_game_public_stats','get_game_reviews','set_game_submissions_updated_at',
  'reserve_password_reset','check_password_reset','cleanup_password_reset_requests'))

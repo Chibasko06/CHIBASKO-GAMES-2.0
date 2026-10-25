@@ -1,8 +1,9 @@
 'use client'
 import Link from 'next/link'
+import AdminShell from './AdminShell'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
-import {useEffect,useMemo,useState} from 'react'
+import {useEffect,useMemo,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
 import {httpLaunchClient} from '@/lib/game-runtime/client'
 import {technicalError,type AdminBuild} from '@/lib/game-distribution/review'
@@ -20,38 +21,39 @@ function Panel({id,token}:{id?:string;token?:string}){
  const [reload,setReload]=useState(0),[offset,setOffset]=useState(0),[filter,setFilter]=useState('Tous')
  const [checks,setChecks]=useState<Record<string,boolean>>({}),[reason,setReason]=useState(''),[submission,setSubmission]=useState(''),[decision,setDecision]=useState<'reject'|'archive'|null>(null)
  const [preview,setPreview]=useState<'local'|'online'|null>(null),[onlineSession,setOnlineSession]=useState('')
+ const actionLocked=useRef(false)
  const client=useMemo(()=>httpLaunchClient(async()=>token??null),[token])
  useEffect(()=>{
   const controller=new AbortController()
   if(!token)return()=>controller.abort()
-  fetch(id?'/api/admin/game-builds/'+encodeURIComponent(id):'/api/admin/game-builds?offset='+offset,{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:controller.signal})
+  fetch(id?'/api/admin/game-builds/'+encodeURIComponent(id):'/api/admin/game-builds?offset='+offset,{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])})
    .then(async r=>{if(!r.ok)throw Error('load');return r.json()})
    .then(body=>{if(!controller.signal.aborted){const values=id?[body.data]:body.data;setRows(values);setError('');setLoading(false);setChecks(id?values[0].review.checklist:{});setSubmission(id?(values[0].review.submissionId??''):'')}})
    .catch(()=>{if(!controller.signal.aborted){setRows([]);setLoading(false);setError('Soumission introuvable ou accès indisponible.')}})
   return()=>controller.abort()
  },[id,token,reload,offset])
  async function action(action:string){
-  if(!token||!id)return
+  if(!token||!id||actionLocked.current)return
+  actionLocked.current=true
   setBusy(true);setError('');setNotice('')
   try{
-   const response=await fetch('/api/admin/game-builds/'+encodeURIComponent(id),{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({action,...(action==='review'?{checklist:checks}:{}),...(['reject','archive'].includes(action)?{reason}:{}),...(action==='link_submission'?{submissionId:submission||null}:{})})})
+   const response=await fetch('/api/admin/game-builds/'+encodeURIComponent(id),{method:'POST',signal:AbortSignal.timeout(30000),headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({action,...(action==='review'?{checklist:checks}:{}),...(['reject','archive'].includes(action)?{reason}:{}),...(action==='link_submission'?{submissionId:submission||null}:{})})})
    if(!response.ok)throw Error('action')
    const {data}=await response.json();setRows([data]);setChecks(data.review.checklist);setSubmission(data.review.submissionId??'');setPreview(null);setDecision(null);setReason('')
    setNotice(action==='review'?'Revue enregistrée.':action==='publish'?'Cette version a été publiée.':action==='reject'?'Soumission refusée.':action==='archive'?'Version archivée.':'Association mise à jour.')
-  }catch{setError('Action refusée. Vérifiez le statut, la revue et le motif, puis actualisez.')}finally{setBusy(false)}
+  }catch{setError('Action refusée. Vérifiez le statut, la revue et le motif, puis actualisez.')}finally{actionLocked.current=false;setBusy(false)}
  }
  const build=id?rows[0]:null,presentation=build?reviewPresentation(build,checks):null
  const capabilities=build?.manifest?.capabilities as {local?:unknown;online?:unknown}|undefined
  const field='mt-2 block w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-zinc-100 focus:border-cyan-400'
- return <div className="mx-auto max-w-6xl space-y-6 p-4 text-zinc-100 sm:p-6">
-  <nav aria-label="Administration" className="flex flex-wrap gap-4 text-sm text-cyan-300"><Link href="/admin">Administration</Link><Link href="/admin/game-builds">Publications de jeux</Link></nav>
-  <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-3xl font-bold">{build?(build.submission?.title||build.game):id?'Soumission de jeu':'Publications de jeux'}</h1>{build?<p className="mt-2 text-zinc-400">Version {build.version} · {build.submission?.developer||build.developer||'Développeur non renseigné'}</p>:<HelpText>Vérifier, tester et décider de la publication de chaque version.</HelpText>}{build?.developer&&<HelpText>Soumis par : {build.developer}</HelpText>}</div><button type="button" className={reviewButton} disabled={busy} onClick={()=>{setPreview(null);setReload(n=>n+1)}}>Actualiser</button></div>
+ return <AdminShell active="submissions" title={build?(build.submission?.title||build.game):id?'Soumission de jeu':'Soumissions'} actions={<button type="button" className={reviewButton} disabled={busy} onClick={()=>{setPreview(null);setReload(n=>n+1)}}>Actualiser</button>}>
+  {build&&<p className="text-sm text-zinc-400">Version {build.version} · {build.submission?.developer||build.developer||'Développeur non renseigné'}</p>}
   {error&&<FormFeedback tone="error" title="Opération impossible"><p>{error}</p></FormFeedback>}
   {notice&&<FormFeedback tone="success" title={notice}/>}
   {loading&&<p role="status">Chargement des soumissions…</p>}
   {!id&&<>
-   <label className="block text-sm">Statut sur cette page<select className={field+' max-w-sm'} value={filter} onChange={e=>setFilter(e.target.value)}>{['Tous','À vérifier','Vérification technique réussie','À tester','Revue à compléter','Prêt à publier','Publié','Refusé','Archivé'].map(s=><option key={s}>{s}</option>)}</select></label>
-   <ul className="grid gap-4 md:grid-cols-2">{rows.filter(r=>filter==='Tous'||reviewPresentation(r).label===filter).map(r=>{const status=reviewPresentation(r);return <li className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5" key={r.id}><div className="mb-3"><ReviewBadge tone={status.tone}>{status.label}</ReviewBadge></div><h2 className="text-xl font-semibold"><Link className="text-cyan-200 underline decoration-cyan-900 underline-offset-4" href={'/admin/game-builds/'+r.id}>{r.submission?.title||r.game}</Link></h2><p className="mt-2 text-sm text-zinc-300">Version {r.version} · {r.developer||'Développeur non renseigné'}</p><HelpText>{reviewDate(r.createdAt)} · ZIP {(r.archiveSize/1024**2).toLocaleString('fr-FR',{maximumFractionDigits:1})} Mio</HelpText></li>})}</ul>
+   <div className="text-sm"><label htmlFor="build-status-filter">Statut sur cette page</label><select id="build-status-filter" className={field+' max-w-sm'} value={filter} onChange={e=>setFilter(e.target.value)}>{['Tous','À vérifier','Vérification technique réussie','À tester','Revue à compléter','Prêt à publier','Publié','Refusé','Archivé'].map(s=><option key={s}>{s}</option>)}</select></div>
+   <div className="admin-table-container overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950"><table className="admin-table"><caption className="sr-only">Soumissions de jeux</caption><thead><tr><th scope="col">Jeu / version</th><th scope="col">Statut</th><th scope="col">Développeur</th><th scope="col">Réception</th></tr></thead><tbody>{rows.filter(r=>filter==='Tous'||reviewPresentation(r).label===filter).map(r=>{const status=reviewPresentation(r);return <tr key={r.id}><td><Link className="font-semibold text-cyan-200 underline underline-offset-4" href={'/admin/game-builds/'+r.id}>{r.submission?.title||r.game}</Link><p className="mt-1 text-xs text-zinc-500">Version {r.version} · {(r.archiveSize/1024**2).toLocaleString('fr-FR',{maximumFractionDigits:1})} Mio</p></td><td><ReviewBadge tone={status.tone}>{status.label}</ReviewBadge></td><td className="text-sm text-zinc-400">{r.developer||'Non renseigné'}</td><td className="text-xs text-zinc-500">{reviewDate(r.createdAt)}</td></tr>})}</tbody></table></div>
    {!loading&&!error&&!rows.filter(r=>filter==='Tous'||reviewPresentation(r).label===filter).length&&<HelpText>Aucune soumission dans cette sélection.</HelpText>}
    <div className="flex gap-3"><button className={reviewButton} disabled={!offset||busy} onClick={()=>setOffset(n=>Math.max(0,n-50))}>Précédent</button><button className={reviewButton} disabled={rows.length<50||busy} onClick={()=>setOffset(n=>n+50)}>Suivant</button></div>
    <LegacySubmissions token={token}/>
@@ -86,5 +88,5 @@ function Panel({id,token}:{id?:string;token?:string}){
    </ReviewCard>
    <details className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5"><summary className="cursor-pointer font-semibold text-zinc-300">Détails techniques</summary><div className="mt-5 space-y-5 text-sm"><dl className="grid gap-3 sm:grid-cols-2">{[['Upload UUID',build.id],['gameId',build.gameId],['versionId',build.gameVersionId??'Non créée'],['Statut brut',build.technicalStatus],['Statut version',build.versionStatus??'Non créée'],['Décision enregistrée',build.review.decision],['Tentatives',String(build.attempts)],['Taille ZIP',build.archiveSize.toLocaleString('fr-FR')+' octets'],['Soumission',reviewDate(build.createdAt)],['Mise à jour',reviewDate(build.updatedAt)],['Validation',reviewDate(build.validatedAt)],['Publication',reviewDate(build.publishedAt)]].map(([label,value])=><div key={label}><dt className="text-zinc-400">{label}</dt><dd className="break-all">{value}</dd></div>)}</dl><div><h3 className="font-medium">Commande de validation</h3><pre className="mt-2 overflow-auto rounded-lg bg-black p-3 text-xs">npm run review:game -- {build.id}</pre></div>{build.manifest&&<details><summary className="cursor-pointer text-cyan-300">Manifeste validé</summary><pre className="mt-2 overflow-auto text-xs">{JSON.stringify(build.manifest,null,2)}</pre></details>}<details><summary className="cursor-pointer text-cyan-300">Association d’une ancienne proposition</summary><label className="mt-3 block">Identifiant de proposition<input className={field} value={submission} onChange={e=>setSubmission(e.target.value)}/></label><button type="button" className={reviewButton+' mt-3'} disabled={busy} onClick={()=>action('link_submission')}>Associer / retirer</button></details><div><h3 className="font-medium">Historique détaillé</h3>{build.history.length?<ul className="mt-2 space-y-2">{build.history.map((event,i)=><li key={i}>{reviewDate(event.at)} — {event.action}</li>)}</ul>:<HelpText>Aucun événement de revue.</HelpText>}</div><HelpText>Les tests utilisent l’Artifact Gateway et le GameRuntime existants.</HelpText></div></details>
   </>}
- </div>
+ </AdminShell>
 }

@@ -71,6 +71,18 @@ beforeEach(() => {
 })
 
 const deleted = () => events.filter(event => event[0] === 'delete')
+
+test('un profil édité utilise le pseudo, la bio et l’avatar comme conditions atomiques',async()=>{
+ const expected={username:'Initial',bio:null,avatar_url:oldUrl}
+ await updateAvatarForUser(owner,oldUrl,database(),{username:'Modifié',bio:'Nouvelle bio'},expected)
+ assert.ok(events.some(e=>e[0]==='eq'&&e[1]==='username'&&e[2]==='Initial'))
+ assert.ok(events.some(e=>e[0]==='is'&&e[1]==='bio'))
+ events=[]
+ await assert.rejects(updateAvatarForUser(owner,oldUrl,database({saveError:{code:'PGRST116'}}),{username:'Modifié'},expected),error=>error.status===409)
+ assert.deepEqual(deleted(),[])
+ await assert.rejects(updateAvatarForUser(owner,oldUrl,database(),{}, {...expected,avatar_url:null}),error=>error.status===409)
+ assert.deepEqual(deleted(),[])
+})
 function request(method = 'POST', token = 'test-token') {
   const form = new FormData()
   form.append('file', image())

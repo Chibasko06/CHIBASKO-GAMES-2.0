@@ -73,7 +73,7 @@ test('les pages admin sont bornées après autorisation sans requête Auth par p
  let requested,reads=0
  const profiles=Array.from({length:50},(_,i)=>({id:String(i)}))
  const chain={select(){reads++;return this},order(){return this},range(from,to){requested=[from,to];return this},then(yes,no){return Promise.resolve({data:profiles,count:1205,error:null}).then(yes,no)}}
- const db={from(){return chain},async rpc(name,args){assert.equal(name,'catalogue_admin_users');assert.deepEqual(args,{p_actor:'admin',p_offset:50,p_limit:50});reads++;return {data:{users:profiles,total:1205},error:null}},auth:{admin:{getUserById(){assert.fail('Lecture Auth par profil')}}}}
+ const db={from(){return chain},async rpc(name,args){assert.equal(name,'admin_console_users');assert.deepEqual(args,{p_actor:'admin',p_offset:50,p_limit:50,p_search:'',p_role:'all'});reads++;return {data:{users:profiles,total:1205},error:null}},auth:{admin:{getUserById(){assert.fail('Lecture Auth par profil')}}}}
  globalThis.__r2={adminCheck:async()=>({error:new Response(null,{status:403})})}
  assert.equal((await adminGames(new Request('https://example.test/api/admin/games?page=2'))).status,403);assert.equal(reads,0)
  assert.equal((await adminUsers(new Request('https://example.test/api/admin/users?page=2'))).status,403);assert.equal(reads,0)

@@ -498,6 +498,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_console_users: {
+        Args: {p_actor:string;p_search?:string;p_role?:string;p_offset?:number;p_limit?:number}
+        Returns: Json
+      }
+      admin_console_overview: {
+        Args: {p_actor:string}
+        Returns: Json
+      }
+      admin_console_deletions: {
+        Args: {p_actor:string;p_state?:string;p_offset?:number;p_limit?:number}
+        Returns: Json
+      }
       public_profiles_page: {
         Args: {
           p_search?: string

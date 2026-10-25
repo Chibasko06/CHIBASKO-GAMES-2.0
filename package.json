@@ -77,6 +77,7 @@
     "test:game-isolation": "node --import ./tests/register.mjs --test tests/game-isolation.test.mjs",
     "test:contact": "node --import ./tests/register.mjs --test tests/contact.test.mjs",
     "test:maintenance": "node --import ./tests/register.mjs --test tests/maintenance-notifications.test.mjs tests/developer-contact.test.mjs && node --test tests/maintenance-worker.test.mjs",
+    "test:admin-console-browser": "node --test tests/admin-console.browser.test.mjs tests/admin-build-review.browser.test.mjs",
     "test:dashboard-community-browser": "node --test tests/dashboard-community.browser.test.mjs",
     "test:accessibility-browser": "node --test tests/contact-accessibility.browser.test.mjs"
   },

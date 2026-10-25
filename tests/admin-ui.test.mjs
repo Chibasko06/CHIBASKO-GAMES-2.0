@@ -36,9 +36,58 @@ const visible=async(state)=>{
   Object.defineProperty(document,'visibilityState',{configurable:true,value:state})
   await act(async()=>document.dispatchEvent(new window.Event('visibilitychange')))
 }
-const panel=()=>document.querySelector('input[aria-label="Titre"]')
-async function mounted(run,Component=AdminPage){
-  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:3000/admin'})
+const panel=()=>document.querySelector('[data-admin-console]')
+const mountedUsers=run=>mounted(run,AdminPage,'users')
+
+test('la suppression administrative exige SUPPRIMER, protège le compte courant et bloque les doubles clics',async t=>{
+ const original=globalThis.fetch,requests=[];let finish
+ t.mock.method(globalThis,'fetch',async(input,init)=>{
+  if(String(input).startsWith('/api/admin/users?page='))return Response.json({users:[
+   {id:'admin',username:'Administrateur',bio:null,avatar_url:null,email:'admin@example.test'},
+   {id:'target',username:'Joueur cible',bio:null,avatar_url:null,email:'target@example.test'},
+  ],total:2})
+  if(input==='/api/admin/users/target'&&init.method==='DELETE'){
+   requests.push(input);return new Promise(resolve=>{finish=()=>resolve(Response.json({success:false,deletion:{state:'review_required'}}))})
+  }
+  return original(input,init)
+ })
+ await mountedUsers(async()=>{
+  const articles=Array.from(document.querySelectorAll('tr'))
+  const own=articles.find(article=>article.textContent.includes('Administrateur'))
+  const target=articles.find(article=>article.textContent.includes('Joueur cible'))
+  assert.equal(Array.from(own.querySelectorAll('button')).find(button=>button.textContent.trim().startsWith('Supprimer')).disabled,true)
+  const button=Array.from(target.querySelectorAll('button')).find(button=>button.textContent.trim().startsWith('Supprimer'))
+  window.prompt=()=>null;await act(async()=>button.click());assert.equal(requests.length,0)
+  window.prompt=()=> 'SUPPRIMER';await act(async()=>{button.click();button.click()})
+  assert.equal(requests.length,1);assert.equal(button.disabled,true)
+  await act(async()=>finish());assert.match(document.body.textContent,/Demande enregistrée/)
+  assert.doesNotMatch(document.body.textContent,/Suppression terminée/)
+ })
+})
+
+test('la sauvegarde transmet le profil original et un conflit ne remplace pas le brouillon',async t=>{
+ const original=globalThis.fetch,writes=[]
+ t.mock.method(globalThis,'fetch',async(input,init)=>{
+  if(String(input).startsWith('/api/admin/users?page='))return Response.json({users:[{id:'target',username:'Joueur cible',bio:'Bio initiale',avatar_url:null,email:'target@example.test'}],total:1})
+  if(input==='/api/admin/users/target'){
+   writes.push(JSON.parse(init.body));return Response.json({error:'Le profil a changé.'},{status:409})
+  }
+  return original(input,init)
+ })
+ await mountedUsers(async()=>{
+  const article=Array.from(document.querySelectorAll('tr')).find(article=>article.textContent.includes('Joueur cible'))
+  await act(async()=>Array.from(article.querySelectorAll('button')).find(button=>button.textContent.trim().startsWith('Modifier')).click())
+  const form=document.querySelector('input[value="Joueur cible"]').closest('form')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(writes.length,1)
+  assert.deepEqual(writes[0].expected,{username:'Joueur cible',bio:'Bio initiale',avatar_url:null})
+  assert.match(document.body.textContent,/Le profil a changé/)
+  assert.equal(form.querySelector('button[type="submit"]').disabled,false)
+ })
+})
+async function mounted(run,Component=AdminPage,section='overview'){
+  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:3000/admin?section='+section})
+  dom.window.HTMLElement.prototype.attachEvent=()=>{};dom.window.HTMLElement.prototype.detachEvent=()=>{}
   globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true
   Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'})
   const root=createRoot(document.getElementById('root'))
@@ -159,7 +208,7 @@ test('admin dashboard has one publications entry and no duplicate developer prop
   t.mock.method(globalThis,'fetch',async(input,init)=>{requests.push(input);return original(input,init)})
   await mounted(async()=>{
     const link=document.querySelector('a[href="/admin/game-builds"]')
-    assert.match(link.textContent,/Publications de jeux/)
+    assert.match(link.textContent,/Soumissions/)
     assert.doesNotMatch(document.body.textContent,/Propositions developpeurs/)
     assert.ok(!requests.includes('/api/admin/game-submissions'))
   })

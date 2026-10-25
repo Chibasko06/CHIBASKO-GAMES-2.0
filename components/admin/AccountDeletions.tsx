@@ -1,13 +1,20 @@
 'use client'
 import {useCallback,useEffect,useRef,useState} from 'react'
+import AdminShell from './AdminShell'
+import AdminPagination from './AdminPagination'
 import {useAuth} from '@/components/AuthProvider'
 type Job={id:string;state:string;reason:string|null;attentionRequired:boolean}
 const labels:Record<string,string>={pending:'Préparation en attente',review_required:'Vérification nécessaire',prepared:'Suppression du compte en attente',cleanup_pending:'Nettoyage des fichiers en attente'}
 export default function AccountDeletions(){
- const {session}=useAuth(),token=session?.access_token
+ const {session}=useAuth()
+ return <DeletionPanel key={session?.user.id??'anonymous'} token={session?.access_token}/>
+}
+function DeletionPanel({token}:{token?:string}){
  const [jobs,setJobs]=useState<Job[]>([]),[reference,setReference]=useState(''),[checked,setChecked]=useState(false)
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
  const [loaded,setLoaded]=useState(false)
+ const [page,setPage]=useState(1),[total,setTotal]=useState(0),[filter,setFilter]=useState('all')
+ const mutation=useRef(false)
  const lifetime=useRef<AbortController|null>(null),readVersion=useRef(0)
  const call=useCallback(async(path:string,init?:RequestInit)=>{
   const headers=new Headers(init?.headers);headers.set('Authorization','Bearer '+token)
@@ -18,8 +25,9 @@ export default function AccountDeletions(){
  },[token])
  const load=useCallback(async(signal?:AbortSignal)=>{
   const active=signal??lifetime.current?.signal,version=++readVersion.current
-  const data=await call('',{signal:active});if(!active?.aborted&&version===readVersion.current){setJobs(data.deletions);setLoaded(true)}
- },[call])
+  if(!active?.aborted)setLoaded(false)
+  const data=await call('?'+new URLSearchParams({page:String(page),state:filter}),{signal:active});if(!active?.aborted&&version===readVersion.current){if(page>Math.max(1,Math.ceil(data.total/50))){setPage(Math.max(1,Math.ceil(data.total/50)));return}setJobs(data.deletions);setTotal(data.total??data.deletions.length);setLoaded(true)}
+ },[call,page,filter])
  useEffect(()=>{
   if(!token)return
   const controller=new AbortController()
@@ -28,18 +36,21 @@ export default function AccountDeletions(){
   return ()=>controller.abort()
  },[token,load])
  async function run(job:Job,cancel=false){
+  if(mutation.current)return
+  if(!window.confirm(cancel?'Annuler cette demande de suppression ?':'Poursuivre le traitement de cette demande de suppression ?'))return
+  mutation.current=true
   const active=lifetime.current?.signal
   setBusy(true);setError('');setMessage('')
   try{
    const data=await call('/'+job.id,{method:'POST',signal:active,headers:{'Content-Type':'application/json'},body:JSON.stringify(cancel?{cancel:true}:job.state==='review_required'&&job.reason!=='storage_owned_objects'?{reviewReference:reference}:{retry:true})})
    if(active?.aborted)return
    setMessage(cancel?'La demande a été annulée.':data.success?'Le compte et ses fichiers inutiles ont été supprimés.':'La demande reste en cours ; aucune suppression complète n’est annoncée.')
-   await load()
+   setChecked(false);setReference('');await load()
   }catch{if(!active?.aborted){setError('Le résultat doit être vérifié dans la liste avant toute nouvelle action.');await load().catch(()=>{})}}
-  finally{if(!active?.aborted)setBusy(false)}
+  finally{mutation.current=false;if(!active?.aborted)setBusy(false)}
  }
- return <section className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-  <h1 className="text-2xl font-bold">Suppressions de comptes</h1>
+ return <AdminShell active="deletions"><section className="space-y-4">
+  <div className="text-sm text-zinc-400"><label htmlFor="admin-deletion-status">Statut des demandes</label><select id="admin-deletion-status" className="mt-2 block w-full rounded-lg border border-zinc-700 bg-zinc-950 p-3 sm:max-w-sm" value={filter} disabled={busy} onChange={event=>{setFilter(event.target.value);setPage(1);setLoaded(false)}}><option value="all">Toutes les demandes actives</option><option value="review_required">À vérifier</option><option value="attention">Intervention nécessaire</option><option value="pending">Préparation en attente</option><option value="prepared">Suppression Auth en attente</option><option value="cleanup_pending">Nettoyage en attente</option></select></div>
   <p className="text-sm text-zinc-300">Les jeux déjà publiés gardent leur gestion administrative Chibasko Games. Cela ne transfère aucun droit de propriété intellectuelle.</p>
   <p className="text-sm text-amber-200">Avant de valider une demande concernant des jeux publiés, vérifiez les contrats applicables et les conditions de retrait. La référence ci-dessous consigne cette vérification ; elle ne crée aucune licence.</p>
   <label className="block text-sm">Référence interne du document ou de la décision<input className="mt-2 block w-full rounded border border-zinc-700 bg-black p-3" value={reference} onChange={e=>setReference(e.target.value)} maxLength={160} autoComplete="off"/></label>
@@ -54,8 +65,9 @@ export default function AccountDeletions(){
    {job.reason==='shared_draft'&&<p className="text-sm text-amber-200">Ce brouillon est partagé. La gestion des autres membres doit être résolue avant la suppression.</p>}
    {job.reason==='storage_owned_objects'&&<p className="text-sm text-amber-200">Des ressources Supabase Storage appartiennent encore à ce compte. Vérifiez leurs usages et leur traitement avant de reprendre. Aucune suppression de fichier ni réattribution automatique n’est effectuée.</p>}
    {job.attentionRequired&&<p className="text-sm text-amber-200">La reprise automatique est suspendue après plusieurs échecs. Vérifiez la configuration avant de relancer.</p>}
-   <button type="button" disabled={busy||job.reason==='shared_draft'||(job.state==='review_required'&&job.reason!=='storage_owned_objects'&&(!checked||!/^[A-Za-z0-9_./-]{1,160}$/.test(reference)))} className="rounded bg-cyan-400 px-4 py-2 font-semibold text-black disabled:opacity-40" onClick={()=>void run(job)}>{job.state==='review_required'&&job.reason!=='storage_owned_objects'?'Valider la vérification et poursuivre':'Reprendre le traitement'}</button>
-   {['pending','review_required'].includes(job.state)&&<button type="button" disabled={busy} onClick={()=>void run(job,true)} className="ml-3 rounded border border-zinc-600 px-4 py-2">Annuler la demande</button>}
+   <button type="button" disabled={busy||!loaded||job.reason==='shared_draft'||(job.state==='review_required'&&job.reason!=='storage_owned_objects'&&(!checked||!/^[A-Za-z0-9_./-]{1,160}$/.test(reference)))} className="rounded bg-cyan-400 px-4 py-2 font-semibold text-black disabled:opacity-40" onClick={()=>void run(job)}>{job.state==='review_required'&&job.reason!=='storage_owned_objects'?'Valider la vérification et poursuivre':'Reprendre le traitement'}</button>
+   {['pending','review_required'].includes(job.state)&&<button type="button" disabled={busy||!loaded} onClick={()=>void run(job,true)} className="ml-3 rounded border border-zinc-600 px-4 py-2">Annuler la demande</button>}
   </li>)}</ul>
- </section>
+ {loaded&&!error&&<AdminPagination label="Pages des demandes de suppression" page={page} total={total} busy={busy||!loaded} onPage={setPage}/>}
+ </section></AdminShell>
 }

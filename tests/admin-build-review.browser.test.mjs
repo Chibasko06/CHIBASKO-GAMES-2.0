@@ -14,8 +14,8 @@ if(process.env.ADMIN_REVIEW_VISUAL==='1'){
  styles=(await Promise.all(files.map(file=>readFile(join(root,file),'utf8')))).join('\n');assert.ok(styles)
 }
 const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Reviews from './components/admin/BuildReviews';createRoot(document.getElementById('root')).render(<Reviews id={location.pathname==='/list'?undefined:'${id}'}/>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(api){
- api.onResolve({filter:/^(?:next\/link|next\/image|next\/dynamic|@\/components\/AuthProvider|@\/components\/game-runtime\/GameRuntime)$/},args=>({path:args.path,namespace:'fixture'}))
- api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:args.path==='next/image'?`import React from 'react';export default function Image({unoptimized,...props}){return <img {...props}/>} `:args.path==='@/components/AuthProvider'?`export function useAuth(){return {session:{user:{id:'fixture-admin'},access_token:'fixture-token'}}}`:`import React from 'react';export default function dynamic(){return function Runtime(props){return <p role="status" data-execution={props.execution}>Jeu de test chargé</p>}}`}))
+ api.onResolve({filter:/^(?:next\/link|next\/image|next\/dynamic|next\/navigation|@\/components\/AuthProvider|@\/components\/game-runtime\/GameRuntime)$/},args=>({path:args.path,namespace:'fixture'}))
+ api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/navigation'?`export function useRouter(){return {push(path){location.href=path}}}`:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:args.path==='next/image'?`import React from 'react';export default function Image({unoptimized,...props}){return <img {...props}/>} `:args.path==='@/components/AuthProvider'?`export function useAuth(){return {session:{user:{id:'fixture-admin'},access_token:'fixture-token'}}}`:`import React from 'react';export default function dynamic(){return function Runtime(props){return <p role="status" data-execution={props.execution}>Jeu de test chargé</p>}}`}))
 }}]})
 const server=createServer(async(request,response)=>{
  const url=new URL(request.url,'http://fixture');const json=body=>{response.setHeader('Content-Type','application/json');response.end(JSON.stringify(body))}
@@ -74,7 +74,7 @@ try{
   assert.equal(actions[0].reason,'Contenu incompatible avec le catalogue.')
   await page.getByRole('button',{name:'Archiver',exact:true}).click();await page.getByLabel('Motif de l’archivage',{exact:false}).fill('Dossier clos.')
   await page.getByRole('button',{name:'Confirmer l’archivage',exact:true}).click();await page.getByText('Archivé',{exact:true}).waitFor();assert.equal(actions[1].action,'archive')
-  await page.goto(origin+'/list');await page.getByRole('heading',{name:'Publications de jeux',exact:true}).waitFor();assert.equal(legacyCalls,0)
+  await page.goto(origin+'/list');await page.getByRole('heading',{name:'Soumissions',exact:true}).waitFor();assert.equal(legacyCalls,0)
   await page.getByText('Archives — propositions sans build',{exact:true}).click();await page.getByText('Historical fixture · En attente',{exact:true}).waitFor()
   assert.ok(!(await page.locator('body').innerText()).includes('Linked editorial entry'));assert.equal(legacyCalls,1);await page.close()
  })

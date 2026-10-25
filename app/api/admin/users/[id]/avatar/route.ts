@@ -13,6 +13,7 @@ export async function POST(
   }
 
   const { id } = await params
+  if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))return adminJson({error:'Compte invalide.'},{status:400})
   let formData: FormData
   try { formData = await request.formData() }
   catch { return adminJson({ error: 'Fichier invalide.' }, { status: 400 }) }
@@ -28,7 +29,7 @@ export async function POST(
     return adminJson({ avatarUrl: data.avatar_url, user: data })
   } catch (error) {
     return adminJson(
-      { error: adminErrorMessage(error) },
+      { error: error instanceof AvatarUpdateError ? error.message : adminErrorMessage(error) },
       { status: error instanceof AvatarUpdateError ? error.status : 500 }
     )
   }
