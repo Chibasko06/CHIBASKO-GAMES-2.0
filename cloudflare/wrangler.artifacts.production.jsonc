@@ -18,6 +18,7 @@
   },
   "triggers": { "crons": ["*/15 * * * *"] },
   "vars": {
+    "SUPABASE_URL": "https://oakjtjrzqkoiajmzbdlc.supabase.co",
     "GAME_ARTIFACT_GATEWAY_ENABLED": "1",
     "GAME_CONTENT_PUBLIC_BASE": "chibaskogames-play.fr",
     "GAME_CONTENT_PREVIEW_BASE": "chibaskogames-play.fr",

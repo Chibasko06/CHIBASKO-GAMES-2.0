@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build:maintenance": "node scripts/build-maintenance.mjs",
+    "check:maintenance": "wrangler deploy --config cloudflare/wrangler.maintenance.production.jsonc --dry-run",
+    "deploy:maintenance": "wrangler deploy --config cloudflare/wrangler.maintenance.production.jsonc",
     "test:home-performance": "node --import ./tests/product-register.mjs --test tests/home-performance.test.mjs && node --test tests/catalogue-interface.browser.test.mjs",
     "test:seo": "node --import ./tests/product-register.mjs --test tests/seo.test.mjs",
     "test:seo-browser": "node --test tests/seo.browser.test.mjs",

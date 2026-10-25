@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-07",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "keep_vars": true,
   "routes": [
     {
       "pattern": "chibaskogames.fr",
@@ -39,6 +40,10 @@
     {
       "binding": "GAME_BUILDS_STAGING",
       "bucket_name": "chibasko-game-staging"
+    },
+    {
+      "binding": "GAME_BUILDS_ARTIFACTS",
+      "bucket_name": "chibasko-game-artifacts"
     }
   ],
   "assets": {
@@ -48,6 +53,16 @@
   },
   "vars": {
     "CHIBASKO_CLOUDFLARE": "1",
+    "CONTACT_FORM_ENABLED": "1",
+    "CONTACT_NOTIFY_EMAIL": "chibasko06@gmail.com",
+    "GAME_DISTRIBUTION_UPLOADS_ENABLED": "1",
+    "GAME_ARTIFACT_PREVIEWS_ENABLED": "1",
+    "GAME_SUBMISSION_NOTIFICATIONS_ENABLED": "1",
+    "GAME_SUBMISSION_NOTIFY_EMAIL": "chibasko06@gmail.com",
+    "GAME_ACCOUNT_DELETIONS_ENABLED": "0",
+    "GAME_BUILDS_R2_ACCOUNT_ID": "fba4f99126d01d7ba269728af9af25ff",
+    "GAME_BUILDS_STAGING_BUCKET": "chibasko-game-staging",
+    "GAME_BUILDS_ARTIFACTS_BUCKET": "chibasko-game-artifacts",
     "GAME_RUNTIME_LAUNCHES_ENABLED": "1",
     "GAME_CONTENT_BASE_DOMAIN": "chibaskogames-play.fr",
     "GAME_CONTENT_PUBLIC_BASE": "chibaskogames-play.fr",

@@ -6,8 +6,11 @@
   "workers_dev": false,
   "preview_urls": false,
   "keep_vars": true,
-  "triggers": { "crons": [] },
-  "vars": { "GAME_BUILD_DISPATCHER_ENABLED": "0" },
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": {
+    "SUPABASE_URL": "https://oakjtjrzqkoiajmzbdlc.supabase.co",
+    "GAME_BUILD_DISPATCHER_ENABLED": "0"
+  },
   "queues": {
     "producers": [{ "binding": "BUILD_VALIDATIONS", "queue": "chibasko-game-builds" }]
   },
