@@ -1,6 +1,7 @@
 "use client";
 
 import FormField from '@/components/ui/FormField'
+import AccountDeletion from '@/components/AccountDeletion'
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -534,6 +535,7 @@ export default function DashboardPage() {
             </div>
           </section>
         </div>
+        {session?.access_token&&<AccountDeletion key={user?.id} accessToken={session.access_token} onAccountRemoved={()=>withTimeout(supabase.auth.signOut({scope:'local'}),5000)}/>}
       </div>
     </div>
   )

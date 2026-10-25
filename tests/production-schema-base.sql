@@ -43,7 +43,7 @@ grant select,insert,update,delete on public.favorites,public.play_history to aut
 -- Reproduit les privilèges par défaut historiques de Supabase pour les tables publiques.
 alter default privileges in schema public grant select,insert,update,delete on tables to anon,authenticated,service_role;
 create schema storage;
-create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text);
+create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[],owner uuid references auth.users(id),owner_id text);
+create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,owner uuid references auth.users(id),owner_id text);
 alter table storage.objects enable row level security;
 create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;

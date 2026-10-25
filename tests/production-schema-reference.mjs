@@ -85,6 +85,8 @@ try {
  }
  assert.equal(compareSchema(await snapshot(),reference).status,'PASS')
  for(const [change,restore] of [
+  ['alter table storage.objects disable row level security','alter table storage.objects enable row level security'],
+  ['alter policy chibasko_legacy_storage_no_insert on storage.objects with check(true)',"alter policy chibasko_legacy_storage_no_insert on storage.objects with check(bucket_id not in ('avatars','game-thumbnails'))"],
   ['alter table public.profiles disable row level security','alter table public.profiles enable row level security'],
   ['grant select on public.developer_contacts to anon','revoke select on public.developer_contacts from anon'],
   ['alter table public.categories rename column name to missing_name','alter table public.categories rename column missing_name to name'],
@@ -104,6 +106,7 @@ try {
  assert.match(preflight.stdout,/developer_contacts/)
  for(const name of ['catalogue_page','catalogue_home','catalogue_admin_users','catalogue_recent_history'])assert.match(preflight.stdout,new RegExp(name))
  await run('psql',[...args,'-f',join(root,'tests/account-deletion-db.sql')])
+ await run('psql',[...args,'-f',join(root,'tests/account-storage-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/contact-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/maintenance-db.sql')])
  const catalogueTest=await run('psql',[...args,'-f',join(root,'tests/catalogue-pagination-db.sql')])

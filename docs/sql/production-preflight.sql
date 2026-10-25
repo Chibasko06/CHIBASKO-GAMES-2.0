@@ -68,4 +68,10 @@ select c.conrelid::regclass::text as source_table,c.conname,c.confrelid::regclas
        pg_get_constraintdef(c.oid) as definition,c.convalidated
 from pg_constraint c where c.contype='f' and c.confrelid in (to_regclass('auth.users'),to_regclass('public.profiles'))
 order by source_table,c.conname;
+-- Seules les protections applicatives sont contrôlées ; le schéma Storage reste géré par Supabase.
+select policyname,permissive,roles,cmd,qual,with_check from pg_policies
+where schemaname='storage' and tablename='objects'
+ and policyname in ('chibasko_legacy_storage_no_insert','chibasko_legacy_storage_no_update') order by policyname;
+select bucket_id,count(*) as objects,count(*) filter(where coalesce(nullif(to_jsonb(o)->>'owner_id',''),nullif(to_jsonb(o)->>'owner','')) is not null) as owned
+from storage.objects o group by bucket_id order by bucket_id;
 rollback;

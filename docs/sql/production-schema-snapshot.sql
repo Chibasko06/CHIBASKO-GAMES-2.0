@@ -27,6 +27,12 @@ with managed as (
     'delete',has_table_privilege(role_name,c.oid,'DELETE'))) from (values('anon'),('authenticated'),('service_role')) r(role_name))
  ) as value from managed c
  union all
+ select 'storage:legacy_write_guard',jsonb_build_object(
+  'rls',(select relrowsecurity from pg_class where oid='storage.objects'::regclass),
+  'policies',jsonb_agg(jsonb_build_object('name',policyname,'roles',roles,'command',cmd,'permissive',permissive,'using',qual,'check',with_check) order by policyname))
+ from pg_policies where schemaname='storage' and tablename='objects'
+ and policyname in ('chibasko_legacy_storage_no_insert','chibasko_legacy_storage_no_update') having count(*)>0
+ union all
  select 'function:'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',jsonb_build_object(
   'owner',pg_get_userbyid(p.proowner),'result',pg_get_function_result(p.oid),'language',l.lanname,
   'securityDefiner',p.prosecdef,'strict',p.proisstrict,'volatility',p.provolatile,'configuration',p.proconfig,

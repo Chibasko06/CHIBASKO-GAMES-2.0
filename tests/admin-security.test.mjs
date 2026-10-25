@@ -7,7 +7,8 @@ import AdminLayout from '../app/admin/layout.tsx'
 import {NextRequest} from './admin-next.mjs'
 
 const ids={normal:'00000000-0000-4000-8000-000000000001',admin:'00000000-0000-4000-8000-000000000002'}
-const token=role=>Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')+'.'+Buffer.from(JSON.stringify({sub:ids[role],exp:Math.floor(Date.now()/1000)+3600,aud:'authenticated'})).toString('base64url')+'.fixture-signature'
+const fixtureExpiry=Math.floor(Date.now()/1000)+3600
+const token=role=>Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')+'.'+Buffer.from(JSON.stringify({sub:ids[role],exp:fixtureExpiry,aud:'authenticated'})).toString('base64url')+'.fixture-signature'
 let calls,queries,membershipFailure
 const privileged={async rpc(name,args){calls.push(name);return {data:{game:{id:'fixture',thumbnail_url:null,...args.p_game},previousThumbnail:null},error:null}},from(table){calls.push(table);let payload={};const q={select(){return q},order(){return q},range(){return q},eq(){return q},is(){return q},delete(){return q},insert(p){payload=p;return q},update(p){payload=p;return q},async single(){return{data:{id:'fixture',thumbnail_url:null,...payload},error:null}},async maybeSingle(){return{data:{id:'fixture',thumbnail_url:null,...payload},error:null}},then(resolve){return Promise.resolve({data:[],count:0,error:null}).then(resolve)}};return q},auth:{admin:{async listUsers(){calls.push('auth-users');return{data:{users:[]},error:null}}}}}
 beforeEach(t=>{
@@ -29,6 +30,12 @@ beforeEach(t=>{
   })
 })
 const request=(role,method='GET',path='/api/admin/games',origin)=>new NextRequest('https://site.example'+path,{method,headers:{...(role?{Authorization:'Bearer '+(role==='invalid'?'invalid':token(role))}:{}),...(origin?{Origin:origin}:{}),'Content-Type':'application/json'},...(!['GET','HEAD'].includes(method)?{body:JSON.stringify({title:'Fixture',slug:'fixture',game_url:'https://game.example'})}:{})})
+
+test('les jetons de fixture restent identiques pendant les échanges réseau',t=>{
+ const issued=token('normal'),now=Date.now()
+ t.mock.method(Date,'now',()=>now+2000)
+ assert.equal(token('normal'),issued)
+})
 
 test('real API guard requires validated authentication and DB membership, ignoring email/metadata',async()=>{
   for(const[role,status]of[[null,401],['invalid',401],['normal',403]]){

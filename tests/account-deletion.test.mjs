@@ -5,6 +5,16 @@ import {accountCleanup} from '../lib/game-distribution/account-cleanup.ts'
 import {requestAccountDeletion} from '../lib/server/accountDeletion.ts'
 
 const user='11111111-1111-4111-8111-111111111111',id='22222222-2222-4222-8222-222222222222'
+test('le flag désactivé interdit toute création ou reprise depuis le portail',async()=>{
+ const before=process.env.GAME_ACCOUNT_DELETIONS_ENABLED
+ try{
+  for(const value of ['0',undefined]){
+   if(value===undefined)delete process.env.GAME_ACCOUNT_DELETIONS_ENABLED;else process.env.GAME_ACCOUNT_DELETIONS_ENABLED=value
+   const response=await requestAccountDeletion(user,user,{db:{call(){assert.fail('Aucune RPC autorisée')}},auth:{exists(){assert.fail()},remove(){assert.fail()}},cleanup(){assert.fail()}})
+   assert.equal(response.status,503)
+  }
+ }finally{if(before===undefined)delete process.env.GAME_ACCOUNT_DELETIONS_ENABLED;else process.env.GAME_ACCOUNT_DELETIONS_ENABLED=before}
+})
 function saga(){
  const state={phase:'pending',exists:true,busy:false,transfers:0,authCalls:0,done:false,calls:[],logs:[],failAuth:false,ambiguous:false}
  const deps={db:{async call(name,args){

@@ -6,16 +6,19 @@ create function public.deletion_fixture_fail() returns trigger language plpgsql 
 end $$;
 create trigger deletion_fixture_failure before insert on public.game_platform_management for each row execute function public.deletion_fixture_fail();
 do $$
-declare administrator uuid:=gen_random_uuid(); actor uuid:=gen_random_uuid(); ordinary uuid:=gen_random_uuid();
+declare administrator uuid:=gen_random_uuid(); actor uuid:=gen_random_uuid(); ordinary uuid:=gen_random_uuid(); coowner uuid:=gen_random_uuid();
  first_game uuid; second_game uuid; draft uuid; version_id uuid; upload uuid:=gen_random_uuid(); submission uuid:=gen_random_uuid();
  published_upload uuid:=gen_random_uuid(); private_version uuid:=gen_random_uuid();
  job uuid; lease uuid; row record; payload jsonb; before_game jsonb; task uuid;
 begin
  insert into auth.users(id,email) values(administrator,'deletion-admin@example.test'),(actor,'deletion-actor@example.test'),(ordinary,'deletion-player@example.test');
+ insert into auth.users(id,email) values(coowner,'remaining-owner@example.test');
  insert into public.admin_users(user_id) values(administrator);
  first_game:=public.distribution_register_game(actor,gen_random_uuid(),'Premier jeu');
  second_game:=public.distribution_register_game(actor,gen_random_uuid(),'Second jeu');
  draft:=public.distribution_register_game(actor,gen_random_uuid(),'Brouillon privé');
+ insert into public.game_developer_members(game_id,user_id,role) values(first_game,ordinary,'editor');
+ insert into public.game_developer_members(game_id,user_id,role) values(second_game,coowner,'owner');
  for row in select id from public.games where id in(first_game,second_game) loop
   version_id:=gen_random_uuid();
   insert into public.game_versions(id,game_id,version,schema_version,integration_version,manifest,artifact_sha256,artifact_size,file_count,created_by)
@@ -62,8 +65,12 @@ begin
  drop trigger deletion_fixture_failure on public.game_platform_management;
  if public.distribution_account_prepare(job,lease)<>'prepared' then raise exception 'Préparation non terminée'; end if;
  if (select count(*) from public.game_platform_management where authority_id='chibasko_games')<>2 then raise exception 'Gestion administrative absente'; end if;
+ if not exists(select 1 from public.game_developer_members where game_id=first_game and user_id=ordinary and role='editor') then raise exception 'Autre développeur supprimé'; end if;
+ if not exists(select 1 from public.game_developer_members where game_id=second_game and user_id=coowner and role='owner')
+  or not exists(select 1 from auth.users where id=coowner) then raise exception 'Copropriétaire supprimé'; end if;
  if jsonb_array_length(public.distribution_managed_catalog(administrator))<>2 then raise exception 'Gestion technique admin indisponible'; end if;
- if jsonb_array_length(public.distribution_managed_catalog(ordinary))<>0 then raise exception 'Catalogue géré exposé à un autre compte'; end if;
+ payload:=public.distribution_managed_catalog(ordinary);
+ if jsonb_array_length(payload)<>1 or (payload->0->>'id')::uuid<>first_game then raise exception 'Catalogue partagé incohérent'; end if;
  if (select to_jsonb(g) from public.games g where id=first_game) is distinct from before_game then raise exception 'Jeu publié modifié'; end if;
  if not exists(select 1 from public.game_categories where game_id=first_game) then raise exception 'Catégories supprimées'; end if;
  if exists(select 1 from public.games where id=draft) or exists(select 1 from public.game_submission_drafts where created_by=actor)
@@ -123,6 +130,23 @@ begin
  exception when others then if sqlerrm<>'asset_retired' then raise; end if; end;
  perform public.distribution_account_cleanup_ack(job,lease,task,null,true);
  perform public.distribution_account_release(job,lease,null);
+end $$;
+
+do $$
+declare owner_id uuid:=gen_random_uuid(); editor_id uuid:=gen_random_uuid(); shared_game uuid; job uuid; lease uuid; payload jsonb;
+begin
+ insert into auth.users(id,email) values(owner_id,'shared-owner@example.test'),(editor_id,'shared-editor@example.test');
+ shared_game:=public.distribution_register_game(owner_id,gen_random_uuid(),'Brouillon partagé');
+ insert into public.game_developer_members(game_id,user_id,role) values(shared_game,editor_id,'editor');
+ payload:=public.distribution_account_request(owner_id,owner_id);job:=(payload->>'id')::uuid;
+ payload:=public.distribution_account_claim(job);lease:=(payload->>'lease')::uuid;
+ if public.distribution_account_prepare(job,lease)<>'review_required' then raise exception 'Brouillon partagé purgé'; end if;
+ if not exists(select 1 from public.games where id=shared_game)
+  or (select count(*) from public.game_developer_members m where m.game_id=shared_game)<>2
+  or not exists(select 1 from auth.users where id=owner_id)
+  or exists(select 1 from public.game_account_cleanup where job_id=job) then raise exception 'Préparation partielle du brouillon partagé'; end if;
+ if public.distribution_account_claim(job) is not null then raise exception 'Revue du brouillon contournée'; end if;
+ perform public.distribution_account_cancel(owner_id,job);
 end $$;
 set local role anon;
 do $$begin

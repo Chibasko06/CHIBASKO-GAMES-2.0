@@ -72,6 +72,8 @@
     "test:reliability": "node --import ./tests/reliability-register.mjs --test tests/application-reliability.test.mjs tests/auth-reliability.test.mjs tests/catalogue-pagination.test.mjs",
     "test:cloudflare-dependencies": "node --test tests/cloudflare-dependencies.test.mjs",
     "test:account-deletion": "node --import ./tests/register.mjs --test tests/account-deletion.test.mjs && node --test tests/account-cleanup.r2.test.mjs",
+    "test:account-deletion-browser": "node --test tests/account-deletion.browser.test.mjs",
+    "check:cloudflare-linux": "bash scripts/validate-cloudflare-linux.sh",
     "test:game-isolation": "node --import ./tests/register.mjs --test tests/game-isolation.test.mjs",
     "test:contact": "node --import ./tests/register.mjs --test tests/contact.test.mjs",
     "test:maintenance": "node --import ./tests/register.mjs --test tests/maintenance-notifications.test.mjs tests/developer-contact.test.mjs && node --test tests/maintenance-worker.test.mjs",

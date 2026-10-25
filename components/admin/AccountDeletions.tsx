@@ -31,7 +31,7 @@ export default function AccountDeletions(){
   const active=lifetime.current?.signal
   setBusy(true);setError('');setMessage('')
   try{
-   const data=await call('/'+job.id,{method:'POST',signal:active,headers:{'Content-Type':'application/json'},body:JSON.stringify(cancel?{cancel:true}:job.state==='review_required'?{reviewReference:reference}:{retry:true})})
+   const data=await call('/'+job.id,{method:'POST',signal:active,headers:{'Content-Type':'application/json'},body:JSON.stringify(cancel?{cancel:true}:job.state==='review_required'&&job.reason!=='storage_owned_objects'?{reviewReference:reference}:{retry:true})})
    if(active?.aborted)return
    setMessage(cancel?'La demande a été annulée.':data.success?'Le compte et ses fichiers inutiles ont été supprimés.':'La demande reste en cours ; aucune suppression complète n’est annoncée.')
    await load()
@@ -52,8 +52,9 @@ export default function AccountDeletions(){
   <ul className="space-y-4">{jobs.map(job=><li key={job.id} className="space-y-2 rounded border border-zinc-800 p-4">
    <p className="font-semibold">{labels[job.state]??'Traitement en cours'}</p><p className="break-all text-xs text-zinc-500">Référence : {job.id}</p>
    {job.reason==='shared_draft'&&<p className="text-sm text-amber-200">Ce brouillon est partagé. La gestion des autres membres doit être résolue avant la suppression.</p>}
+   {job.reason==='storage_owned_objects'&&<p className="text-sm text-amber-200">Des ressources Supabase Storage appartiennent encore à ce compte. Vérifiez leurs usages et leur traitement avant de reprendre. Aucune suppression de fichier ni réattribution automatique n’est effectuée.</p>}
    {job.attentionRequired&&<p className="text-sm text-amber-200">La reprise automatique est suspendue après plusieurs échecs. Vérifiez la configuration avant de relancer.</p>}
-   <button type="button" disabled={busy||job.reason==='shared_draft'||(job.state==='review_required'&&(!checked||!/^[A-Za-z0-9_./-]{1,160}$/.test(reference)))} className="rounded bg-cyan-400 px-4 py-2 font-semibold text-black disabled:opacity-40" onClick={()=>void run(job)}>{job.state==='review_required'?'Valider la vérification et poursuivre':'Reprendre le traitement'}</button>
+   <button type="button" disabled={busy||job.reason==='shared_draft'||(job.state==='review_required'&&job.reason!=='storage_owned_objects'&&(!checked||!/^[A-Za-z0-9_./-]{1,160}$/.test(reference)))} className="rounded bg-cyan-400 px-4 py-2 font-semibold text-black disabled:opacity-40" onClick={()=>void run(job)}>{job.state==='review_required'&&job.reason!=='storage_owned_objects'?'Valider la vérification et poursuivre':'Reprendre le traitement'}</button>
    {['pending','review_required'].includes(job.state)&&<button type="button" disabled={busy} onClick={()=>void run(job,true)} className="ml-3 rounded border border-zinc-600 px-4 py-2">Annuler la demande</button>}
   </li>)}</ul>
  </section>

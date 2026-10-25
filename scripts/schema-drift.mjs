@@ -46,7 +46,7 @@ export function compareSchema(snapshot,reference) {
   const blocking=rows.filter(row=>row.status==='BLOCKING_DRIFT').length
   return {status:blocking?'BLOCKING_DRIFT':stage<migrations.length?'MIGRATIONS_REQUIRED':'PASS',matchedMigrationCount:stage<0?null:stage,
     pendingMigrations:stage<0?null:reference.migrations.slice(stage).map(item=>item.name),rows,
-    schemaScope:'modeled_public_application_schema',supabaseManagedSchemas:'not_checked',
+    schemaScope:'modeled_public_application_schema_and_legacy_storage_guards',supabaseManagedSchemas:'legacy_storage_write_guards_only',
     remoteAuthorization:'not_checked',dataIntegrity:'not_checked'}
 }
 export async function readReference() {
