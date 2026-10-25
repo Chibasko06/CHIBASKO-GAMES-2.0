@@ -16,7 +16,7 @@ test('les configurations de production conservent les ressources et les activati
  const portal=await config('wrangler.jsonc')
  for(const cfg of [portal,maintenance]){
   assert.equal(cfg.keep_vars,true)
-  assert.equal(cfg.vars.GAME_ACCOUNT_DELETIONS_ENABLED,'0')
+  assert.equal(cfg.vars.GAME_ACCOUNT_DELETIONS_ENABLED,'1')
   for(const secret of ['SUPABASE_SERVICE_ROLE_KEY','RESEND_API_KEY','PASSWORD_RESET_CODE_SECRET','CONTACT_HASH_SECRET','GAME_BUILDS_R2_ACCESS_KEY_ID','GAME_BUILDS_R2_SECRET_ACCESS_KEY'])assert.equal(Object.hasOwn(cfg.vars,secret),false)
  }
  for(const flag of ['CONTACT_FORM_ENABLED','GAME_DISTRIBUTION_UPLOADS_ENABLED','GAME_ARTIFACT_PREVIEWS_ENABLED','GAME_SUBMISSION_NOTIFICATIONS_ENABLED','GAME_RUNTIME_LAUNCHES_ENABLED'])assert.equal(portal.vars[flag],'1')
