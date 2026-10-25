@@ -161,3 +161,44 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
   assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  }finally{await x.context.close()}
 })
+
+for(const width of [390,1366])test('pagination numérotée, bornes et filtres partageables '+width,async()=>{
+ const x=await setup('catalogue',{width,height:844})
+ try{
+  const render=async(page,total=1205)=>{
+   await x.page.evaluate(({page,total})=>{
+    history.replaceState(null,'','/games?category=action&search=Pong&sort=recent&page='+page)
+    window.catalogueFixture.render({page:'catalogue',total,cataloguePage:page})
+   },{page,total})
+   await x.page.getByRole('navigation',{name:'Pages du catalogue'}).getByText('Page '+page+' sur '+Math.max(1,Math.ceil(total/24)),{exact:true}).waitFor()
+  }
+  const nav=x.page.getByRole('navigation',{name:'Pages du catalogue'})
+  await render(1)
+  assert.equal(await nav.getByRole('button',{name:'Précédent',exact:true}).isDisabled(),true)
+  assert.equal(await nav.locator('[aria-current="page"]').count(),1)
+  await render(25)
+  assert.equal(await nav.locator('[aria-current="page"]').innerText(),'25')
+  for(const number of [24,26]){
+   const link=nav.getByRole('link',{name:'Page '+number,exact:true})
+   assert.equal(await link.isVisible(),true)
+   const url=new URL(await link.getAttribute('href'),'https://portal.test')
+   assert.equal(url.searchParams.get('page'),String(number))
+   assert.equal(url.searchParams.get('search'),'Pong')
+   assert.equal(url.searchParams.get('category'),'action')
+   assert.equal(url.searchParams.get('sort'),'recent')
+  }
+  assert.equal(await nav.getByRole('link',{name:'Page 1',exact:true}).isVisible(),width>=640)
+  assert.equal(await nav.getByText('…',{exact:true}).count(),2)
+  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+  await nav.getByRole('link',{name:'Page 24',exact:true}).focus()
+  assert.equal(await nav.getByRole('link',{name:'Page 24',exact:true}).evaluate(node=>document.activeElement===node),true)
+  await render(51)
+  assert.equal(await nav.getByRole('button',{name:'Suivant',exact:true}).isDisabled(),true)
+  await render(1,0)
+  assert.equal(await nav.getByRole('button',{name:'Précédent',exact:true}).isDisabled(),true)
+  assert.equal(await nav.getByRole('button',{name:'Suivant',exact:true}).isDisabled(),true)
+  await render(2,72)
+  assert.equal(await nav.getByRole('link',{name:/^Page \d+$/}).count(),3)
+  assert.equal(await nav.getByText('…',{exact:true}).count(),0)
+ }finally{await x.context.close()}
+})
