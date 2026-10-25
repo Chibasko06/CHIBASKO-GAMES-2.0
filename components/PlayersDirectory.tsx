@@ -1,71 +1,26 @@
-"use client";
-
-import FormField from '@/components/ui/FormField'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { PublicProfile } from '@/lib/queries/profiles'
-
-export default function PlayersDirectory({
-  profiles,
-  hideSearch=false,
-}: {
-  profiles: PublicProfile[]
-  hideSearch?:boolean
-}) {
-  const [query, setQuery] = useState('')
-
-  const visibleProfiles = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-
-    if (!normalizedQuery) {
-      return profiles
-    }
-
-    return profiles.filter((profile) => profile.username.toLowerCase().includes(normalizedQuery))
-  }, [profiles, query])
-
-  return (
-    <div className="space-y-6">
-      {!hideSearch&&<FormField label="Rechercher un joueur"><input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Rechercher un joueur par pseudo"
-        className="w-full rounded-2xl border border-zinc-800 bg-black/50 p-4 text-white outline-none focus:border-cyan-500"
-      /></FormField>}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {visibleProfiles.map((profile) => (
-          <Link
-            key={profile.id}
-            href={`/players/${profile.id}`}
-            className="rounded-[24px] border border-zinc-800 bg-zinc-950 p-5 transition hover:border-cyan-800"
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-cyan-700 bg-zinc-900">
-                {profile.avatar_url ? (
-                  <Image
-                    src={profile.avatar_url}
-                    alt={profile.username}
-                    width={56}
-                    height={56}
-                    unoptimized
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-lg font-black text-cyan-300">{profile.username[0]?.toUpperCase()}</span>
-                )}
-              </div>
-              <div>
-                <p className="font-black uppercase text-white">{profile.username}</p>
-              </div>
-            </div>
-            <p className="mt-4 line-clamp-3 text-sm leading-6 text-zinc-400">
-              {profile.bio || 'Aucune bio publique pour le moment.'}
-            </p>
-          </Link>
-        ))}
-      </div>
-    </div>
-  )
+import RoleBadges from '@/components/RoleBadges'
+import type { PublicProfile } from '@/lib/queries/profiles'
+export default function PlayersDirectory({ profiles }: { profiles: PublicProfile[]; hideSearch?: boolean }) {
+  if (!profiles.length) return <div className="rounded-2xl border border-dashed border-zinc-700 px-6 py-12 text-center">
+    <h2 className="font-semibold">Aucun membre trouvé</h2>
+    <p className="mt-2 text-sm text-zinc-400">Essayez un autre pseudo ou retirez le filtre de rôle.</p>
+    <Link href="/players" className="mt-4 inline-block rounded-lg px-4 py-3 text-cyan-300 underline">Voir tous les membres</Link>
+  </div>
+  return <ul className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{profiles.map(profile =>
+    <li key={profile.id} className="min-w-0">
+      <Link href={'/players/' + profile.id} className="group flex h-full min-h-48 flex-col rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition-colors hover:border-cyan-700 focus-visible:outline-2 focus-visible:outline-cyan-300">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-cyan-950 text-lg font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} alt="" width={48} height={48} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
+          <h2 className="min-w-0 line-clamp-2 break-words font-bold">{profile.username}</h2>
+        </div>
+        <div className="mt-3 min-h-7">
+          <RoleBadges roles={profile.roles} />
+        </div>
+        <p className="mb-4 line-clamp-2 break-words text-sm leading-6 text-zinc-400">{profile.bio || 'Aucune biographie renseignée.'}</p>
+        <span className="mt-auto text-sm font-medium text-cyan-300">Voir le profil <span aria-hidden="true">↗</span>
+        </span>
+      </Link>
+    </li>)}</ul>
 }

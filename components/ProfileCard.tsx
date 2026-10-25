@@ -1,82 +1,26 @@
 import Image from 'next/image'
-
-type Profile = {
-  username: string
-  avatar_url?: string | null
-  bio?: string | null
-}
-
-type ProfileStats = {
-  favoriteCount: number
-  commentCount: number
-}
-
-export default function ProfileCard({
-  profile,
-  stats,
-}: {
-  profile: Profile | null
-  stats: ProfileStats
-}) {
-  if (!profile) {
-    return (
-      <div className="rounded-[30px] border border-zinc-800 bg-zinc-900 p-6 text-white animate-pulse">
-        Chargement...
+import RoleBadges from '@/components/RoleBadges'
+import type { ProfileRoles } from '@/lib/profileRoles'
+type Profile = { username: string; avatar_url?: string | null; bio?: string | null; roles?: ProfileRoles }
+export default function ProfileCard({ profile, stats, heading = 'h2' }: { profile: Profile | null; stats?: { favoriteCount?: number; commentCount: number }; heading?: 'h1' | 'h2' }) {
+  const Title = heading
+  if (!profile) return <div role="status" className="rounded-2xl border border-zinc-800 p-6">Chargement du profil…</div>
+  return <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6">
+    <div className="flex items-center gap-4">
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cyan-950 text-2xl font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} alt="" width={64} height={64} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
+      <div className="min-w-0 space-y-2">
+        <Title className="break-words text-xl font-bold text-white">{profile.username}</Title>
+        <RoleBadges roles={profile.roles} />
       </div>
-    )
-  }
-
-  const identity = profile.username || 'Joueur'
-
-  return (
-    <aside className="overflow-hidden rounded-[30px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(8,14,24,0.98),rgba(6,8,12,0.98))]">
-      <div className="border-b border-cyan-950/60 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.18),transparent_55%)] p-6">
-        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-300/80">Carte joueur</p>
-        <div className="mt-5 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[26px] border border-cyan-400/60 bg-zinc-900 shadow-[0_0_30px_rgba(34,211,238,0.18)]">
-            {profile.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt={identity}
-                width={96}
-                height={96}
-                unoptimized
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="text-4xl font-black text-cyan-300">
-                {identity[0]?.toUpperCase()}
-              </span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-2xl font-black uppercase text-white">{identity}</h2>
-            <p className="mt-3 text-sm leading-6 text-zinc-400">
-              {profile.bio || 'Profil joueur pret pour de nouvelles sessions arcade.'}
-            </p>
-          </div>
-        </div>
+    </div>
+    {profile.bio && <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">{profile.bio}</p>}
+    {stats && <dl className="mt-5 flex flex-wrap gap-6 border-t border-zinc-800 pt-4 text-sm">{stats.favoriteCount !== undefined && <div>
+      <dt className="text-zinc-400">Favoris</dt>
+      <dd className="mt-1 font-semibold">{stats.favoriteCount}</dd>
+    </div>}<div>
+        <dt className="text-zinc-400">Commentaires</dt>
+        <dd className="mt-1 font-semibold">{stats.commentCount}</dd>
       </div>
-
-      <div className="space-y-5 p-6">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Favoris</p>
-            <p className="mt-2 text-2xl font-black text-white">{stats.favoriteCount}</p>
-          </div>
-          <div className="rounded-[22px] border border-zinc-800 bg-black/35 p-4 sm:col-span-2">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Commentaires publies</p>
-            <p className="mt-2 text-2xl font-black text-white">{stats.commentCount}</p>
-          </div>
-        </div>
-
-        <div className="rounded-[24px] border border-cyan-950/60 bg-cyan-950/10 p-4">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Statut</p>
-          <p className="mt-2 text-sm leading-6 text-zinc-300">
-            Profil public actif et espace joueur pret pour suivre tes jeux preferes.
-          </p>
-        </div>
-      </div>
-    </aside>
-  )
+    </dl>}
+  </section>
 }

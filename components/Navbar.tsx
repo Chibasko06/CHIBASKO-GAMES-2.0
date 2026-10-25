@@ -105,7 +105,7 @@ export function Navbar() {
 
           <div className="hidden items-center gap-2 text-zinc-300 lg:flex xl:gap-3">
             <Link href="/games" className={sharedLinkClass}>
-              Jeux
+              Tous les jeux
             </Link>
             <Link href="/multiplayer" className={sharedLinkClass}>Multijoueur</Link>
             <Link href="/players" className={sharedLinkClass}>
@@ -165,7 +165,7 @@ export function Navbar() {
           <div id="navigation-mobile" className="mt-4 rounded-[24px] border border-zinc-800 bg-zinc-950/95 p-4 lg:hidden">
             <div className="grid gap-2 text-zinc-200">
             <Link href="/games" onClick={handleCloseMobileMenu} className="rounded-2xl border border-zinc-800 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em]">
-              Jeux
+              Tous les jeux
             </Link>
             <Link href="/multiplayer" onClick={handleCloseMobileMenu} className="rounded-2xl border border-cyan-900 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] text-cyan-200">Multijoueur</Link>
             <Link href="/players" onClick={handleCloseMobileMenu} className="rounded-2xl border border-zinc-800 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em]">

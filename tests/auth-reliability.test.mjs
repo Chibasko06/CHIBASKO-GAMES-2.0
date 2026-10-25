@@ -19,7 +19,7 @@ beforeEach(t=>{
     single:async()=>({data:{id:'A',username:'Player',bio:''},error:null}),
     then(resolve){return Promise.resolve({data:[],count:0,error:null}).then(resolve)}}
   globalThis.__reliability={auth:{loading:false,user:null,session:null},router:{replace(path){globalThis.__destination=path}},
-    db:{from(){return chain},rpc:async()=>({data:[],error:null}),auth:{getSession:async()=>({data:{session:null},error:null}),
+    db:{from(){return chain},rpc:async(name)=>({data:name==='public_profiles_page'?{items:[],total:0}:[],error:null}),auth:{getSession:async()=>({data:{session:null},error:null}),
       onAuthStateChange(cb){callbacks.add(cb);return{data:{subscription:{unsubscribe(){callbacks.delete(cb)}}}}},
       signInWithPassword:async()=>{throw new TypeError('private network URL')}}}}
   delete globalThis.__destination
@@ -30,6 +30,7 @@ beforeEach(t=>{
 })
 async function mount(Component,run){
   const dom=new JSDOM('<div id="root"></div>',{url:'https://site.example/auth/callback?next=%2Fdashboard'})
+  dom.window.HTMLElement.prototype.attachEvent=()=>{};dom.window.HTMLElement.prototype.detachEvent=()=>{}
   globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true
   const root=createRoot(document.getElementById('root'))
   try{await act(async()=>root.render(createElement(Component)));await run(root)}
@@ -67,7 +68,7 @@ test('callback network rejection offers an exit rather than permanent finalizati
 test('profile save network failure releases saving state without replacing the saved profile',async()=>{
   globalThis.__reliability.auth={loading:false,user:session.user,session}
   await mount(Dashboard,async()=>{
-    const edit=Array.from(document.querySelectorAll('button')).find(node=>/Editer/.test(node.textContent))
+    const edit=Array.from(document.querySelectorAll('button')).find(node=>/Modifier le profil/.test(node.textContent))
     assert.ok(edit);await act(async()=>edit.click());mode='offline'
     const save=Array.from(document.querySelectorAll('button')).find(node=>/Sauvegarder/.test(node.textContent))
     assert.ok(save);await act(async()=>save.click())

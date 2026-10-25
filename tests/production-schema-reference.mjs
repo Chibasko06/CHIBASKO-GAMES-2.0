@@ -105,6 +105,7 @@ try {
  assert.match(preflight.stdout,/admin_save_game/)
  assert.match(preflight.stdout,/developer_contacts/)
  for(const name of ['catalogue_page','catalogue_home','catalogue_admin_users','catalogue_recent_history'])assert.match(preflight.stdout,new RegExp(name))
+ await run('psql',[...args,'-f',join(root,'tests/public-profile-directory-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/account-deletion-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/account-storage-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/contact-db.sql')])

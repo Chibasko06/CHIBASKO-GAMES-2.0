@@ -498,6 +498,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      public_profiles_page: {
+        Args: {
+          p_search?: string
+          p_page?: number
+          p_role?: string
+          p_id?: string | null
+        }
+        Returns: Json
+      }
       get_game_public_stats: {
         Args: Record<PropertyKey, never>
         Returns: {

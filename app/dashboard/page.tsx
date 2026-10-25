@@ -7,14 +7,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
-import ProfileCard from '@/components/ProfileCard'
+import RoleBadges from '@/components/RoleBadges'
+import { getCommunityProfilesPage } from '@/lib/queries/profiles'
+import { NO_PROFILE_ROLES, type ProfileRoles } from '@/lib/profileRoles'
 import { getFavoriteGames, getFavoriteGamesPage } from '@/lib/queries/favorites'
 import { getRecentPlayHistory } from '@/lib/queries/history'
 import { removeOwnAvatar, uploadOwnAvatar } from '@/lib/avatarUpload'
 import { ensureProfile } from '@/lib/profileSync'
 import { supabase } from '@/lib/supabaseClient'
-import {readData} from '@/lib/dataAccess'
-import {fetchJson, withTimeout} from '@/lib/asyncOperation'
+import { readData } from '@/lib/dataAccess'
+import { fetchJson, withTimeout } from '@/lib/asyncOperation'
 import { Tables } from '@/types/database'
 
 type Profile = Tables<'profiles'>
@@ -25,6 +27,7 @@ export default function DashboardPage() {
   const pathname = usePathname()
   const { loading: authLoading, session, user } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [roles, setRoles] = useState<ProfileRoles>(NO_PROFILE_ROLES)
   const [savedProfile, setSavedProfile] = useState<Profile | null>(null)
   const [draftProfile, setDraftProfile] = useState<{ username: string; bio: string }>({
     username: '',
@@ -72,17 +75,20 @@ export default function DashboardPage() {
           historyEntries,
           { count: favoritesTotal },
           { count: reviewsTotal },
+          publicRoles,
         ] = await withTimeout(Promise.all([
           readData('dashboard_profile', supabase.from('profiles').select('id, username, display_name, avatar_url, bio, created_at').eq('id', user.id).single()),
-          getFavoriteGamesPage(user.id,1).then(page=>page.entries),
+          getFavoriteGamesPage(user.id, 1).then(page => page.entries),
           getRecentPlayHistory(user.id, 6),
           readData('dashboard_favorites_count', supabase.from('favorites').select('*', { count: 'exact', head: true }).eq('user_id', user.id)),
           readData('dashboard_reviews_count', supabase.from('game_reviews').select('*', { count: 'exact', head: true }).eq('user_id', user.id)),
+          getCommunityProfilesPage('', 1, 'all', user.id),
         ]))
 
         if (mounted && requestId === requestIdRef.current) {
           setNeedsAuth(false)
           setProfile(profileData)
+          setRoles(publicRoles.items[0]?.roles ?? NO_PROFILE_ROLES)
           setSavedProfile(profileData)
           setDraftProfile({
             username: profileData?.username || '',
@@ -120,6 +126,10 @@ export default function DashboardPage() {
     }
   }, [authLoading, pathname, session, user])
 
+  useEffect(() => {
+    if (isEditingProfile) document.getElementById('profile-username')?.focus()
+  }, [isEditingProfile])
+
   const handleProfileSave = async () => {
     if (!user || !profile || !session?.access_token) {
       return
@@ -130,7 +140,7 @@ export default function DashboardPage() {
     const normalizedUsername = draftProfile.username.trim()
 
     try {
-      const {response, payload} = await fetchJson('/api/profile/public', {
+      const { response, payload } = await fetchJson('/api/profile/public', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -220,323 +230,116 @@ export default function DashboardPage() {
   }
 
   if (loadError && !authLoading && user) return <div role="alert" className="space-y-4 rounded-2xl border border-zinc-800 p-6">
-    <p>{loadError}</p><button type="button" className="text-cyan-300 underline" onClick={() => window.dispatchEvent(new Event('focus'))}>Réessayer</button>
+    <p>{loadError}</p>
+    <button type="button" className="rounded-lg px-4 py-3 text-cyan-300 underline" onClick={() => window.dispatchEvent(new Event('focus'))}>Réessayer</button>
   </div>
-
-  if (!loading && needsAuth) {
-    return (
-      <div className="min-h-screen p-2">
-        <div className="max-w-2xl rounded-[28px] border border-zinc-800 bg-zinc-950 p-6 space-y-4">
-          <h1 className="text-2xl font-black uppercase text-white">Dashboard joueur</h1>
-          <p className="text-zinc-400">
-            Le dashboard est reserve aux membres connectes sur leur compte Chibasko Games.
-          </p>
-          <div className="flex gap-4">
-            <Link href="/login" className="rounded-full bg-cyan-400 px-5 py-3 font-bold text-black">
-              Connexion
-            </Link>
+  if (!authLoading && (!user || needsAuth)) return <section className="mx-auto max-w-xl rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+    <h1 className="text-2xl font-bold">Tableau de bord</h1>
+    <p className="my-4 text-sm text-zinc-400">Connectez-vous à Chibasko Games pour retrouver votre profil et vos jeux.</p>
+    <Link href="/login" className="inline-block rounded-lg bg-cyan-400 px-5 py-3 font-semibold text-black">Connexion</Link>
+  </section>
+  if (loading || authLoading || !profile || profile.id !== user?.id) return <div role="status" className="space-y-5">
+    <h1 className="text-3xl font-bold">Tableau de bord</h1>
+    <p className="text-zinc-400">Chargement de votre espace…</p>
+    <div aria-hidden="true" className="h-64 rounded-2xl border border-zinc-800 bg-zinc-950 motion-safe:animate-pulse" />
+  </div>
+  const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-cyan-600 focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-40'
+  return <div className="mx-auto w-full max-w-6xl space-y-6">
+    <header className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-800 pb-6">
+      <div>
+        <h1 className="text-3xl font-bold text-white sm:text-4xl">Tableau de bord</h1>
+        <p className="mt-2 text-sm text-zinc-400">Votre profil, vos jeux et les réglages de votre compte Chibasko Games.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={button} onClick={() => setIsEditingProfile(true)}>Modifier le profil</button>
+        <Link href={'/players/' + profile.id} className={button}>Voir mon profil public <span aria-hidden="true" className="ml-2">↗</span>
+        </Link>
+      </div>
+    </header>
+    <dl className="grid grid-cols-2 gap-3">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
+        <dt className="text-sm text-zinc-400">Favoris</dt>
+        <dd className="text-2xl font-bold text-cyan-200">{favoriteCount}</dd>
+      </div>
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
+        <dt className="text-sm text-zinc-400">Commentaires</dt>
+        <dd className="text-2xl font-bold text-white">{commentCount}</dd>
+      </div>
+    </dl>
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6" aria-labelledby="my-profile-title">
+        <h2 id="my-profile-title" className="mb-5 text-lg font-bold">Mon profil</h2>
+        <div className="flex items-center gap-4">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cyan-950 text-3xl font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} alt="" width={80} height={80} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
+          <div className="min-w-0 space-y-2">
+            <p className="break-words text-xl font-bold">{profile.username}</p>
+            <RoleBadges roles={roles} />
           </div>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[0.82fr_1.18fr]">
-        <div className="space-y-6">
-          <ProfileCard profile={profile} stats={{ favoriteCount, commentCount }} />
-
-          <section className="rounded-[30px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(14,18,28,0.96),rgba(9,9,11,0.98))] p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Securite</p>
-                <h2 className="mt-2 text-2xl font-black uppercase text-white">Compte protege</h2>
-              </div>
-              <span className="rounded-full border border-cyan-900 bg-black/25 px-3 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
-                code email
-              </span>
-            </div>
-
-            <div className="mt-5 rounded-[24px] border border-zinc-800 bg-black/35 p-5">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Email du compte</p>
-              <p className="mt-3 text-base font-bold text-white">{user?.email || 'Email indisponible'}</p>
-              <p className="mt-3 text-sm leading-6 text-zinc-400">
-                Si tu oublies ton mot de passe, tu peux maintenant demander un code de confirmation puis definir un nouveau mot de passe directement sur le site.
-              </p>
-              <Link
-                href={user?.email ? `/reset-password?email=${encodeURIComponent(user.email)}` : '/reset-password'}
-                className="mt-5 inline-flex rounded-full border border-cyan-700 bg-cyan-950/20 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-cyan-200"
-              >
-                Ouvrir le reset
-              </Link>
-            </div>
-          </section>
-        </div>
-
-        <div className="space-y-6">
-          <section className="rounded-[30px] border border-zinc-800 bg-[linear-gradient(180deg,rgba(17,24,39,0.92),rgba(9,9,11,0.95))] p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Profil public</p>
-                <h2 className="mt-2 text-2xl font-black uppercase text-white">Identite joueur</h2>
-              </div>
-              {!isEditingProfile && profile ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDraftProfile({
-                      username: profile.username || '',
-                      bio: profile.bio || '',
-                    })
-                    setProfileMessage(null)
-                    setIsEditingProfile(true)
-                  }}
-                  className="rounded-full border border-cyan-800 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-cyan-300"
-                  title="Editer mon profil"
-                >
-                  Editer
-                </button>
-              ) : null}
-            </div>
-
-            {profile ? (
-              isEditingProfile ? (
-                <div className="mt-6 space-y-4">
-                  <div className="rounded-[26px] border border-cyan-950/60 bg-black/30 p-5">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                      <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[24px] border border-cyan-400/60 bg-zinc-900">
-                        {profile.avatar_url ? (
-                          <Image
-                            src={profile.avatar_url}
-                            alt={profile.username}
-                            width={96}
-                            height={96}
-                            unoptimized
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-3xl font-black text-cyan-300">
-                            {(draftProfile.username || profile.username || 'J')[0]?.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Apercu public</p>
-                        <p className="mt-2 truncate text-xl font-black uppercase text-white">
-                          {draftProfile.username || 'Pseudo joueur'}
-                        </p>
-                        <p className="mt-3 text-sm leading-6 text-zinc-400">
-                          {draftProfile.bio || 'Ta bio apparaitra ici une fois enregistree.'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_0.8fr]">
-                    <FormField label="Pseudo"><input
-                      value={draftProfile.username}
-                      onChange={(event) => setDraftProfile((current) => ({ ...current, username: event.target.value }))}
-                      placeholder="Pseudo"
-                      className="rounded-[22px] border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-                    /></FormField>
-                    <label className="flex min-h-[60px] cursor-pointer items-center justify-between rounded-[22px] border border-zinc-800 bg-black/60 px-4 text-sm text-zinc-300 transition hover:border-cyan-700">
-                      <span>{uploadingAvatar ? 'Envoi de l avatar...' : 'Importer un avatar'}</span>
-                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon" disabled={uploadingAvatar} className="sr-only" onChange={handleAvatarUpload} />
-                      <span className="rounded-full border border-cyan-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
-                        Choisir
-                      </span>
-                    </label>
-                    {profile.avatar_url ? (
-                      <button type="button" disabled={uploadingAvatar} onClick={handleAvatarDelete}
-                        className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300 disabled:opacity-50">
-                        Supprimer l avatar
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <FormField label="Bio"><textarea
-                    value={draftProfile.bio}
-                    onChange={(event) => setDraftProfile((current) => ({ ...current, bio: event.target.value }))}
-                    placeholder="Bio"
-                    className="min-h-36 rounded-[22px] border border-zinc-800 bg-black/60 p-4 text-white outline-none focus:border-cyan-500"
-                  /></FormField>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                    <div className="text-zinc-400">
-                      {savingProfile ? 'Sauvegarde du profil...' : profileMessage || 'Ajuste ton profil puis valide quand le rendu te plait.'}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraftProfile({
-                            username: savedProfile?.username || '',
-                            bio: savedProfile?.bio || '',
-                          })
-                          setIsEditingProfile(false)
-                          setProfileMessage('Modifications annulees.')
-                        }}
-                        className="rounded-full border border-zinc-700 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-zinc-200"
-                      >
-                        Annuler
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleProfileSave()}
-                        disabled={savingProfile || !draftProfile.username.trim()}
-                        className="rounded-full bg-cyan-400 px-5 py-2 text-xs font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Sauvegarder
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-                  <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Pseudo public</p>
-                    <p className="mt-3 text-2xl font-black uppercase text-white">{profile.username}</p>
-                    <p className="mt-4 text-sm leading-6 text-zinc-400">
-                      C est ce pseudo qui apparait dans la communaute et sur tes commentaires.
-                    </p>
-                  </div>
-                  <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Avatar actuel</p>
-                    <div className="mt-4 flex items-center gap-4">
-                      <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[18px] border border-cyan-700 bg-zinc-900">
-                        {profile.avatar_url ? (
-                          <Image
-                            src={profile.avatar_url}
-                            alt={profile.username}
-                            width={64}
-                            height={64}
-                            unoptimized
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-lg font-black text-cyan-300">{profile.username[0]?.toUpperCase()}</span>
-                        )}
-                      </div>
-                      <p className="text-sm leading-6 text-zinc-300">
-                        {profile.avatar_url ? 'Avatar personalise actif sur ton compte.' : 'Aucun avatar personnalise pour le moment.'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] border border-zinc-800 bg-black/35 p-5 lg:col-span-2">
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Bio</p>
-                    <p className="mt-3 text-sm leading-7 text-zinc-300">
-                      {profile.bio || 'Aucune bio pour le moment. Donne une petite couleur a ton profil pour le rendre plus vivant.'}
-                    </p>
-                  </div>
-                  {profileMessage ? <div className="lg:col-span-2 text-sm text-cyan-300">{profileMessage}</div> : null}
-                </div>
-              )
-            ) : (
-              <p className="mt-5 text-zinc-500">Chargement du profil...</p>
-            )}
-          </section>
-
-          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-[30px] border border-zinc-800 bg-zinc-950 p-6">
-              <div className="mb-5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Collection</p>
-                  <h2 className="mt-2 text-2xl font-black uppercase text-white">Favoris recents</h2>
-                </div>
-                <Link href="/favorites" className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400 hover:text-cyan-400">
-                  Voir tout
-                </Link>
-              </div>
-
-              {recentFavorites.length > 0 ? (
-                <div className="space-y-3">
-                  {recentFavorites.map((entry) => (
-                    <Link
-                      key={entry.favoriteId}
-                      href={`/games/${entry.game.slug}`}
-                      className="grid grid-cols-[88px_1fr] gap-4 rounded-[22px] border border-zinc-800 bg-black/30 p-3 transition hover:border-cyan-800"
-                    >
-                      {entry.game.thumbnail_url ? (
-                        <Image
-                          src={entry.game.thumbnail_url}
-                          alt={entry.game.title}
-                          width={96}
-                          height={80}
-                          unoptimized
-                          className="h-20 w-24 rounded-[16px] object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-20 w-24 items-center justify-center rounded-[16px] bg-zinc-900 text-cyan-300">
-                          {entry.game.title[0]?.toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-black text-white">{entry.game.title}</p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-cyan-300">Selection perso</p>
-                        <p className="mt-2 text-sm text-zinc-400 line-clamp-2">
-                          {entry.game.description || 'Pret a relancer depuis tes favoris.'}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-500">Aucun favori enregistre pour le moment.</p>
-              )}
-            </div>
-
-            <div className="rounded-[30px] border border-zinc-800 bg-zinc-950 p-6">
-              <div className="mb-5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Activite</p>
-                  <h2 className="mt-2 text-2xl font-black uppercase text-white">Derniers jeux vus</h2>
-                </div>
-                <Link href="/games" className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400 hover:text-cyan-400">
-                  Explorer
-                </Link>
-              </div>
-
-              {recentHistory.length > 0 ? (
-                <div className="space-y-3">
-                  {recentHistory.map((entry) => (
-                    <Link
-                      key={entry.historyId}
-                      href={`/games/${entry.game.slug}`}
-                      className="grid grid-cols-[88px_1fr] gap-4 rounded-[22px] border border-zinc-800 bg-black/30 p-3 transition hover:border-cyan-800"
-                    >
-                      {entry.game.thumbnail_url ? (
-                        <Image
-                          src={entry.game.thumbnail_url}
-                          alt={entry.game.title}
-                          width={96}
-                          height={80}
-                          unoptimized
-                          className="h-20 w-24 rounded-[16px] object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-20 w-24 items-center justify-center rounded-[16px] bg-zinc-900 text-cyan-300">
-                          {entry.game.title[0]?.toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-black text-white">{entry.game.title}</p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-cyan-300">Vu recemment</p>
-                        <p className="mt-2 text-sm text-zinc-400">
-                          {entry.played_at ? new Date(entry.played_at).toLocaleString('fr-FR') : 'Vue enregistree'}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-500">Aucune visite enregistree pour le moment.</p>
-              )}
-            </div>
-          </section>
-        </div>
-        {session?.access_token&&<AccountDeletion key={user?.id} accessToken={session.access_token} onAccountRemoved={()=>withTimeout(supabase.auth.signOut({scope:'local'}),5000)}/>}
-      </div>
+        {isEditingProfile ? <form onSubmit={event => { event.preventDefault(); if (!savingProfile && !uploadingAvatar) void handleProfileSave() }} className="mt-5 space-y-4">
+          <FormField label="Pseudo">
+            <input id="profile-username" value={draftProfile.username} maxLength={32} required onChange={event => setDraftProfile(current => ({ ...current, username: event.target.value }))} className="min-h-11 w-full rounded-lg border border-zinc-700 bg-black px-3 text-white" />
+          </FormField>
+          <FormField label="Biographie">
+            <textarea value={draftProfile.bio} maxLength={16384} rows={4} onChange={event => setDraftProfile(current => ({ ...current, bio: event.target.value }))} className="w-full resize-y rounded-lg border border-zinc-700 bg-black p-3 text-white" />
+          </FormField>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className={button + ' cursor-pointer focus-within:outline-2 focus-within:outline-cyan-300'}>{uploadingAvatar ? 'Envoi de l’avatar…' : 'Importer un avatar'}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon" disabled={uploadingAvatar || savingProfile} className="sr-only" onChange={handleAvatarUpload} />
+            </label>{profile.avatar_url && <button type="button" className={button} disabled={uploadingAvatar || savingProfile} onClick={() => void handleAvatarDelete()}>Supprimer l’avatar</button>}</div>
+          <p className="text-xs text-zinc-500">Votre pseudo, votre avatar et votre biographie sont publics.</p>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-800 pt-4">
+            <button type="button" className={button} disabled={savingProfile || uploadingAvatar} onClick={() => { setDraftProfile({ username: savedProfile?.username || '', bio: savedProfile?.bio || '' }); setIsEditingProfile(false); setProfileMessage(null) }}>Annuler</button>
+            <button type="submit" className={button + ' border-cyan-500 bg-cyan-400 !text-black'} disabled={savingProfile || uploadingAvatar || !draftProfile.username.trim()}>{savingProfile ? 'Sauvegarde…' : 'Sauvegarder'}</button>
+          </div>
+        </form> : <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">{profile.bio || 'Ajoutez une biographie pour vous présenter à la communauté.'}</p>}
+        {profileMessage && <p role="status" className="mt-4 break-words text-sm text-cyan-200">{profileMessage}</p>}
+      </section>
+      <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6" aria-labelledby="security-title">
+        <h2 id="security-title" className="text-lg font-bold">Compte et sécurité</h2>
+        <dl className="my-5 space-y-4 text-sm">
+          <div>
+            <dt className="text-zinc-500">Adresse e-mail privée</dt>
+            <dd className="mt-1 break-all text-zinc-200">{user?.email}</dd>
+          </div>{profile.created_at && <div>
+            <dt className="text-zinc-500">Membre depuis</dt>
+            <dd className="mt-1 text-zinc-200">{new Date(profile.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</dd>
+          </div>}</dl>
+        <Link href="/reset-password" className={button + ' w-full'}>Réinitialiser mon mot de passe</Link>
+      </section>
     </div>
-  )
+    <section aria-labelledby="my-games-title" className="space-y-4">
+      <h2 id="my-games-title" className="text-xl font-bold">Mes jeux</h2>
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h3 className="font-semibold">Favoris récents</h3>
+            <Link href="/favorites" className="rounded px-2 py-3 text-sm text-cyan-300">Tous mes favoris ↗</Link>
+          </div>
+          {recentFavorites.length ? <ul className="space-y-2">{recentFavorites.map(entry =>
+            <li key={entry.favoriteId}>
+              <Link href={'/games/' + entry.game.slug} className="flex min-w-0 items-center gap-3 rounded-xl border border-transparent p-2 hover:border-zinc-700 focus-visible:outline-2 focus-visible:outline-cyan-300">{entry.game.thumbnail_url ? <Image src={entry.game.thumbnail_url} alt="" width={80} height={45} unoptimized className="aspect-video w-20 shrink-0 rounded-md object-cover" /> : <span aria-hidden="true" className="flex aspect-video w-20 shrink-0 items-center justify-center rounded-md bg-zinc-900 text-cyan-300">▶</span>}<div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{entry.game.title}</p>
+                <p className="mt-1 text-xs text-zinc-500">Ajouté le {new Date(entry.created_at).toLocaleDateString('fr-FR')}</p>
+              </div>
+              </Link>
+            </li>)}</ul> : <p className="py-5 text-sm text-zinc-400">Enregistrez des jeux en favoris pour les retrouver ici.</p>}
+        </div>
+        <div className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h3 className="font-semibold">Derniers jeux consultés</h3>
+            <Link href="/games" className="rounded px-2 py-3 text-sm text-cyan-300">Explorer les jeux ↗</Link>
+          </div>
+          {recentHistory.length ? <ul className="space-y-2">{recentHistory.map(entry =>
+            <li key={entry.historyId}>
+              <Link href={'/games/' + entry.game.slug} className="flex min-w-0 items-center gap-3 rounded-xl border border-transparent p-2 hover:border-zinc-700 focus-visible:outline-2 focus-visible:outline-cyan-300">{entry.game.thumbnail_url ? <Image src={entry.game.thumbnail_url} alt="" width={80} height={45} unoptimized className="aspect-video w-20 shrink-0 rounded-md object-cover" /> : <span aria-hidden="true" className="flex aspect-video w-20 shrink-0 items-center justify-center rounded-md bg-zinc-900 text-cyan-300">▶</span>}<div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{entry.game.title}</p>
+                <p className="mt-1 text-xs text-zinc-500">Consulté le {new Date(entry.played_at).toLocaleDateString('fr-FR')}</p>
+              </div>
+              </Link>
+            </li>)}</ul> : <p className="py-5 text-sm text-zinc-400">Les jeux consultés apparaîtront ici.</p>}
+        </div>
+      </div>
+    </section>
+    <div className="border-t border-zinc-800 pt-1">{session?.access_token && <AccountDeletion key={user?.id} accessToken={session.access_token} onAccountRemoved={() => withTimeout(supabase.auth.signOut({ scope: 'local' }), 5000)} />}</div>
+  </div>
 }
