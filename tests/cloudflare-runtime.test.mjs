@@ -1,7 +1,8 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {resolve,dirname,join} from 'node:path'
-import {existsSync,readdirSync} from 'node:fs'
+import {existsSync,readdirSync,readFileSync} from 'node:fs'
+import ts from 'typescript'
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare'
 
 const category={id:'11111111-1111-4111-8111-111111111111',name:'Action',slug:'action',created_at:'2026-01-01T00:00:00Z'}
@@ -43,11 +44,18 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    if(request.method==='POST'&&path==='/rest/v1/rpc/public_profile_resolve'){
     profileReads++;const {p_identifier}=await request.json()
     profileIdentifiers.push(p_identifier)
-    return Response.json([profile.id,'@joueur-actuel','@ancien-pseudo','@JOUEUR-ACTUEL'].includes(p_identifier)?profile:null)
+    const blocked=request.headers.get('authorization')?.slice(7)===blockedToken
+    return Response.json(!blocked&&[profile.id,'@joueur-actuel','@ancien-pseudo','@JOUEUR-ACTUEL'].includes(p_identifier)?profile:null)
    }
    throw Error('Requête non autorisée dans la fixture du Worker.')
   },
  }))
+ const tokenPayload={sub:'44444444-4444-4444-8444-444444444444',exp:Math.floor(Date.now()/1000)+3600,aud:'authenticated'}
+ const blockedToken=Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')+'.'+Buffer.from(JSON.stringify(tokenPayload)).toString('base64url')+'.fixture'
+ const session={access_token:blockedToken,refresh_token:'fixture-refresh',expires_at:tokenPayload.exp,expires_in:3600,token_type:'bearer',user:{id:tokenPayload.sub,aud:'authenticated'}}
+ const publicConfiguration=ts.parseConfigFileTextToJson('wrangler.jsonc',readFileSync('wrangler.jsonc','utf8')).config
+ const references=new Set(['supabase',new URL(publicConfiguration.vars.NEXT_PUBLIC_SUPABASE_URL).hostname.split('.')[0]])
+ const cookie=[...references].map(ref=>'sb-'+ref+'-auth-token=base64-'+Buffer.from(JSON.stringify(session)).toString('base64url')).join('; ')
  try{
   for(const path of ['/','/games/stickman-fights']){
    const response=await worker.dispatchFetch('https://chibaskogames.fr'+path)
@@ -81,5 +89,14 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
   const missing=await worker.dispatchFetch('https://chibaskogames.fr/players/@inexistant')
   assert.ok([200,404].includes(missing.status))
   assert.match(await missing.text(),/<meta\b[^>]*name="robots"[^>]*content="noindex/)
+  for(const identifier of ['@joueur-actuel',profile.id,'@ancien-pseudo']){
+   const blocked=await worker.dispatchFetch('https://chibaskogames.fr/players/'+identifier,{headers:{Cookie:cookie}})
+   const body=await blocked.text()
+   assert.match(blocked.headers.get('cache-control'),/private.*no-store/)
+   assert.match(body,/<meta\b[^>]*name="robots"[^>]*content="noindex/)
+   assert.doesNotMatch(body,/Profil public de test\./)
+  }
+  const anonymous=await worker.dispatchFetch('https://chibaskogames.fr/players/@joueur-actuel')
+  assert.match(await anonymous.text(),/Profil public de test\./,'Une réponse personnalisée ne doit pas contaminer la consultation anonyme.')
  }finally{await worker.dispose()}
 })

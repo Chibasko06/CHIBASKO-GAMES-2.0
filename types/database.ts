@@ -501,6 +501,9 @@ export type Database = {
       }
     }
     Functions: {
+      social_change: { Args: {p_action:string;p_target:string;p_operation:string;p_relation?:string}; Returns: Json }
+      social_list: { Args: {p_kind:string;p_before?:string;p_cursor?:string}; Returns: Json }
+      social_profile_visible: { Args: {p_target:string}; Returns: boolean }
       public_profile_resolve: {
         Args: {p_identifier: string}
         Returns: Json

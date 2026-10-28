@@ -11,11 +11,15 @@ import tailwind from '@tailwindcss/postcss'
 let browser,script,css
 before(async()=>{
  const result=await build({entryPoints:['tests/fixtures/dashboard-community-host.tsx'],bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','process.env':'{}'},plugins:[{name:'services-de-test',setup(b){
+  b.onResolve({filter:/^@\/lib\/server\/supabaseSession$/},()=>({path:'serverSession',namespace:'fixture'}))
+  b.onResolve({filter:/^server-only$/},()=>({path:'empty',namespace:'fixture'}))
   b.onResolve({filter:/supabaseClient$/},()=>({path:'db',namespace:'fixture'}))
   b.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}))
   b.onResolve({filter:/^@\/lib\/profileSync$/},()=>({path:'sync',namespace:'fixture'}))
   b.onResolve({filter:/^next\/(link|image|navigation)$/},({path})=>({path:path.split('/')[1],namespace:'fixture'}))
   b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',resolveDir:process.cwd(),contents:{
+   empty:'export {}',
+   serverSession:`import {supabase} from '@/lib/supabaseClient';export async function createServerSupabase(){return supabase}`,
    auth:`const q=new URLSearchParams(location.search);const user=q.has('visitor')?null:{id:'11111111-1111-4111-8111-111111111111',email:'private@example.test'};const value={loading:false,user,session:user?{user,access_token:'fixture-token'}:null};export function useAuth(){return value}`,
    sync:`export async function ensureProfile(){return {ok:true}}`,
    navigation:`export function usePathname(){return location.pathname}export function useRouter(){return {replace(){},push(){}}}export function redirect(path){throw Error(path)}`,

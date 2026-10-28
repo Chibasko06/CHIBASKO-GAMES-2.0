@@ -2,11 +2,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
-import {resolvePublicProfile} from '@/lib/queries/profiles'
+import {resolveViewerProfile} from '@/lib/server/publicProfiles'
 import {publicProfileIdentifier, publicProfilePath} from '@/lib/publicUsername'
 import {cache} from 'react'
 
-const getProfile = cache(resolvePublicProfile)
+const getProfile = cache(resolveViewerProfile)
 
 export const dynamic = 'force-dynamic'
 

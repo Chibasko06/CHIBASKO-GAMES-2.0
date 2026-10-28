@@ -1,4 +1,6 @@
 import { DataAccessError, readData } from '@/lib/dataAccess'
+import type {SupabaseClient} from '@supabase/supabase-js'
+import type {Database} from '@/types/database'
 import { Tables } from '@/types/database'
 import { supabase } from '@/lib/supabaseClient'
 import { readAllRows } from '@/lib/pagination'
@@ -12,8 +14,8 @@ export type PublicProfile = Pick<
   'id' | 'username' | 'avatar_url' | 'bio' | 'created_at'
 > & { roles?: ProfileRoles }
 
-export async function getCommunityProfilesPage(search = '', page = 1, role = 'all', id: string | null = null) {
-  const { data } = await readData('community_profiles', supabase.rpc('public_profiles_page', { p_search: search, p_page: page, p_role: role, p_id: id }))
+export async function getCommunityProfilesPage(search = '', page = 1, role = 'all', id: string | null = null, db: SupabaseClient<Database> = supabase) {
+  const { data } = await readData('community_profiles', db.rpc('public_profiles_page', { p_search: search, p_page: page, p_role: role, p_id: id }))
   const result = data as unknown as { items: PublicProfile[]; total: number } | null
   if (!result || !Array.isArray(result.items) || result.items.length > 24 || !Number.isSafeInteger(result.total) || result.total < 0
     || result.items.some(item => !item || typeof item.id !== 'string' || typeof item.username !== 'string'
@@ -46,10 +48,10 @@ export async function getPublicProfilesPage(search = '', page = 1) {
 
 export async function getPublicProfileIds() { return readAllRows<{ id: string; username: string }>('sitemap_profiles', (from, to) => supabase.from('public_profiles').select('id, username', { count: 'exact' }).order('id').range(from, to)) }
 
-export async function resolvePublicProfile(identifier: string): Promise<PublicProfile | null> {
+export async function resolvePublicProfile(identifier: string, db: SupabaseClient<Database> = supabase): Promise<PublicProfile | null> {
   const handle = normalizePublicUsername(identifier.startsWith('@') ? identifier.slice(1) : identifier)
   if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(identifier) && !isPublicUsername(handle)) return null
-  const {data} = await readData('public_profile_resolve', supabase.rpc('public_profile_resolve', {p_identifier: identifier}))
+  const {data} = await readData('public_profile_resolve', db.rpc('public_profile_resolve', {p_identifier: identifier}))
   if (data === null) return null
   const profile = data as unknown as PublicProfile
   if (!profile || typeof profile.id !== 'string' || typeof profile.username !== 'string' || !isPublicUsername(profile.username)

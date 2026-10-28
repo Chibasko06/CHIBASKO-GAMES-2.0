@@ -1,5 +1,5 @@
 import PlayersDirectory from '@/components/PlayersDirectory'
-import { getCommunityProfilesPage } from '@/lib/queries/profiles'
+import { getViewerProfilesPage } from '@/lib/server/publicProfiles'
 import { pageNumber } from '@/lib/pagination'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -9,7 +9,7 @@ export const metadata = buildPageMetadata({ title: 'Communauté', description: '
 export default async function PlayersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams, search = typeof query.search === 'string' ? query.search.slice(0, 80) : '', page = pageNumber(query.page)
   const role = query.role === 'developer' || query.role === 'admin' ? query.role : 'all'
-  const profiles = await getCommunityProfilesPage(search, page, role), pages = Math.max(1, Math.ceil(profiles.total / 24))
+  const profiles = await getViewerProfilesPage(search, page, role), pages = Math.max(1, Math.ceil(profiles.total / 24))
   const href = (number: number) => '/players?' + new URLSearchParams({ search, role, page: String(number) }).toString()
   if (page > pages) redirect(href(pages))
   return <div className="mx-auto w-full max-w-6xl space-y-6">

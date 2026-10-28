@@ -5,6 +5,7 @@ await import('./register.mjs')
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (['@/lib/supabaseClient','../supabaseClient','./supabaseClient'].includes(specifier)) return {url:'reliability:db',shortCircuit:true}
+    if (specifier === '@/lib/server/supabaseSession') return {url:'reliability:serverSession',shortCircuit:true}
     if (specifier === '@/components/AuthProvider') return {url:'reliability:auth',shortCircuit:true}
     if (specifier === 'next/navigation') return {url:'reliability:navigation',shortCircuit:true}
     if (specifier === 'next/link' || specifier === 'next/image') return {url:'reliability:element',shortCircuit:true}
@@ -18,6 +19,7 @@ registerHooks({
   },
   load(url, context, nextLoad) {
     const stubs = {
+      'reliability:serverSession': 'export async function createServerSupabase(){return globalThis.__reliability.db}',
       'reliability:db': 'export const supabase=new Proxy({}, {get:(_,key)=>globalThis.__reliability.db[key]})',
       'reliability:auth': 'export function useAuth(){return globalThis.__reliability.auth}',
       'reliability:navigation': 'export function useRouter(){return globalThis.__reliability.router} export function usePathname(){return "/dashboard"} export function useSearchParams(){return new URLSearchParams()} export function notFound(){throw Error("NOT_FOUND")} export function redirect(path){throw Error("REDIRECT "+path)}',

@@ -343,6 +343,7 @@ export default function DashboardPage() {
         </div>
       </div>
     </section>
+    <details className="rounded-xl border border-zinc-800 p-4"><summary className="cursor-pointer font-semibold">Paramètres avancés</summary><Link href="/dashboard/blocked" className="mt-3 inline-block rounded px-2 py-3 text-cyan-300">Comptes bloqués</Link></details>
     <div className="border-t border-zinc-800 pt-1">{session?.access_token && <AccountDeletion key={user?.id} accessToken={session.access_token} onAccountRemoved={() => withTimeout(supabase.auth.signOut({ scope: 'local' }), 5000)} />}</div>
   </div>
 }

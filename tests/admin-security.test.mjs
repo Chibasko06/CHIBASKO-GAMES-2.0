@@ -55,6 +55,16 @@ test('cookie alone never authorizes writes; supplied cross-origin and cross-site
   assert.equal((await requireAdmin(request('admin','POST'))).user.id,ids.admin)
 })
 
+test('le proxy des profils reste public mais interdit les caches partagés sans contrôle administrateur supplémentaire',async()=>{
+ const response=await proxy(new NextRequest('https://site.example/players/@joueur-public'))
+ assert.equal(response.status,200)
+ assert.match(response.headers.get('cache-control'),/private.*no-store/)
+ assert.match(response.headers.get('vary'),/Cookie.*Authorization/)
+ assert.equal(response.headers.get('x-robots-tag'),null)
+ assert.deepEqual(queries,[])
+ assert.deepEqual(calls,[])
+})
+
 test('all admin handlers deny anonymous and normal users before any private CRUD or upload',async()=>{
   async function files(dir){const out=[];for(const e of await readdir(dir,{withFileTypes:true})){if(e.isDirectory())out.push(...await files(new URL(e.name+'/',dir)));else if(e.name==='route.ts')out.push(new URL(e.name,dir))}return out}
   let methods=0

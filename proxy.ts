@@ -18,6 +18,22 @@ export async function proxy(request: NextRequest) {
       },
     },
   })
+  const administrative=request.nextUrl.pathname.startsWith('/admin')
+  if(!administrative){
+    try {
+      // La session locale ne sert pas d'autorisation : PostgreSQL valide le JWT.
+      // Cette lecture renouvelle seulement les cookies expirés avant le rendu.
+      const {error}=await client.auth.getSession()
+      if(error)throw error
+    }catch{
+      const unavailable=new NextResponse('Profils temporairement indisponibles.',{status:503})
+      for(const cookie of response.cookies.getAll())unavailable.cookies.set(cookie)
+      response=unavailable
+    }
+    response.headers.set('Cache-Control','private, no-store, max-age=0')
+    response.headers.set('Vary','Cookie, Authorization')
+    return response
+  }
   try { await authorizeAdmin(client) }
   catch (error) {
     let denied: NextResponse
@@ -40,4 +56,4 @@ export async function proxy(request: NextRequest) {
 }
 // Before every page render (including future children), not only a cached layout.
 // API routes require their own validated Bearer token; ambient cookies never suffice.
-export const config = { matcher: ['/admin/:path*'] }
+export const config = { matcher: ['/admin/:path*','/players/:path*'] }
