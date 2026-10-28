@@ -1,6 +1,8 @@
 "use client";
 
 import FormField from '@/components/ui/FormField'
+import AuthProfileFeedback from '@/components/AuthProfileFeedback'
+import type {Session} from '@supabase/supabase-js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
@@ -13,6 +15,7 @@ import {withTimeout} from '@/lib/asyncOperation'
 
 export default function LoginPage() {
   const attemptRef = useRef({mounted: false, id: 0})
+  const [profileSession, setProfileSession] = useState<Session | null>(null)
   useEffect(() => {
     const attempt = attemptRef.current
     attempt.mounted = true
@@ -37,11 +40,17 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const {data, error} = await withTimeout(supabase.auth.signInWithPassword({email, password}))
+      const retryProfile = !!profileSession
+      const {data, error} = retryProfile
+        ? await withTimeout(supabase.auth.getSession())
+        : await withTimeout(supabase.auth.signInWithPassword({email, password}))
       if (!current()) return
       if (error) { setMessage('Connexion refusée. Vérifie tes identifiants et la confirmation de ton adresse e-mail.'); return }
-      await ensureProfile(data.session)
+      if (!data.session) { setMessage('La session n’a pas pu être établie. Reconnecte-toi.'); return }
+      setProfileSession(data.session)
+      const result = await ensureProfile(data.session)
       if (!current()) return
+      if (!result.ok) { setMessage(result.error); return }
       router.replace(next)
     } catch {
       if (!current()) return
@@ -49,7 +58,9 @@ export default function LoginPage() {
     } finally { if (current()) setLoading(false) }
   }
 
-  if (!authLoading && user) {
+  if (profileSession && (loading || message)) return <AuthProfileFeedback loading={loading} message={message} onRetry={() => { if (!loading) void handleLogin() }} />
+
+  if (!loading && !authLoading && user) {
     return (
       <div className="mx-auto max-w-md rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 text-center">
         <h1 className="text-2xl font-black uppercase text-white">Tu es deja connecte</h1>

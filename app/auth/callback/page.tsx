@@ -32,7 +32,7 @@ export default function AuthCallbackPage() {
       try {
         const result = await ensureProfile(session)
         if (!active) return
-        if (!result.ok) { fail('Connexion réussie, mais le profil est indisponible. Réessaie dans un instant.'); return }
+        if (!result.ok) { fail(result.error); return }
         router.replace(next)
         clearTimeout(deadline)
         active = false
@@ -43,9 +43,9 @@ export default function AuthCallbackPage() {
       queueMicrotask(() => { void finish(session) })
     })
     void supabase.auth.getSession().then(({data, error}) => {
-      if (error) { fail('Impossible de vérifier la session. Reconnecte-toi.'); return }
+      if (error) { if (!finishing) fail('Impossible de vérifier la session. Reconnecte-toi.'); return }
       void finish(data.session)
-    }).catch(() => fail('La connexion a été interrompue. Réessaie dans un instant.'))
+    }).catch(() => { if (!finishing) fail('La connexion a été interrompue. Réessaie dans un instant.') })
     return () => { active = false; clearTimeout(deadline); subscription.unsubscribe() }
   }, [attempt, router])
 

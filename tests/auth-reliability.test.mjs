@@ -11,6 +11,7 @@ import Dashboard from '../app/dashboard/page.tsx'
 import Favorites from '../app/favorites/page.tsx'
 import Reviews from '../components/GameReviews.tsx'
 import {AUTH_OPERATION_TIMEOUT_MS,withTimeout} from '../lib/asyncOperation.ts'
+import {ensureProfile} from '../lib/profileSync.ts'
 
 let callbacks,mode,session
 beforeEach(t=>{
@@ -37,6 +38,87 @@ async function mount(Component,run){
   finally{await act(async()=>root.unmount());dom.window.close();delete globalThis.window;delete globalThis.document;delete globalThis.IS_REACT_ACT_ENVIRONMENT}
 }
 const button=text=>Array.from(document.querySelectorAll('button')).find(node=>node.textContent===text)
+
+test('une session fraîche envoie un objet JSON explicite sans relire Auth',async t=>{
+ let requests=0,authReads=0
+ globalThis.__reliability.db.auth.getSession=async()=>{authReads++;return {data:{session}}}
+ t.mock.method(globalThis,'fetch',async(url,init)=>{
+  requests++;assert.equal(url,'/api/profile/sync')
+  assert.equal(new Headers(init.headers).get('Content-Type'),'application/json')
+  assert.deepEqual(JSON.parse(init.body),{})
+  assert.equal(new Headers(init.headers).get('Authorization'),'Bearer fixture-token')
+  return Response.json({profile:{id:'A'}})
+ })
+ assert.equal((await ensureProfile(session)).ok,true)
+ assert.equal(requests,1);assert.equal(authReads,0)
+})
+
+test('les synchronisations simultanées partagent une requête par jeton, sans cache après déconnexion',async t=>{
+ const held=deferred(),calls=[]
+ t.mock.method(globalThis,'fetch',async(_url,init)=>{
+  calls.push(new Headers(init.headers).get('Authorization'))
+  if(calls.length===1)await held.promise
+  return Response.json({profile:{id:'fixture'}})
+ })
+ const first=ensureProfile(session),duplicate=ensureProfile(session)
+ const other=await ensureProfile({...session,access_token:'other-token',user:{id:'B'}})
+ assert.equal(other.ok,true);assert.equal(calls.length,2)
+ held.resolve();assert.equal((await first).ok,true);assert.equal((await duplicate).ok,true)
+ assert.equal(calls.length,2)
+ assert.equal((await ensureProfile()).kind,'session_unavailable');assert.equal(calls.length,2)
+ assert.equal((await ensureProfile(session)).ok,true);assert.equal(calls.length,3)
+})
+
+for(const status of [401,404,503])test('le profil distingue une réponse serveur '+status+' sans exposer ses détails',async t=>{
+ t.mock.method(globalThis,'fetch',async()=>Response.json({error:'private SQL credential'},{status}))
+ const result=await ensureProfile(session)
+ assert.equal(result.ok,false)
+ assert.equal(result.kind,status===401?'session_expired':status===404?'profile_missing':'profile_unavailable')
+ assert.doesNotMatch(result.error,/private|SQL|credential/)
+})
+
+test('une panne Auth ne devient pas une session expirée et ne lance aucune lecture profil',async t=>{
+ let requests=0
+ t.mock.method(globalThis,'fetch',async()=>{requests++;return Response.json({profile:{id:'A'}})})
+ globalThis.__reliability.db.auth.getSession=async()=>({data:{session:null},error:{status:503}})
+ assert.equal((await ensureProfile()).kind,'network_error')
+ globalThis.__reliability.db.auth.getSession=async()=>({data:{session:null},error:{status:401}})
+ assert.equal((await ensureProfile()).kind,'session_expired')
+ assert.equal(requests,0)
+})
+
+for(const Component of [Login,Register])test('une erreur profil reste visible et la reprise ne répète pas Auth : '+Component.name,async t=>{
+ let authWrites=0,profileRequests=0
+ const authenticate=async()=>{authWrites++;return {data:{session},error:null}}
+ globalThis.__reliability.db.auth.signInWithPassword=authenticate
+ globalThis.__reliability.db.auth.signUp=authenticate
+ globalThis.__reliability.db.auth.getSession=async()=>({data:{session},error:null})
+ t.mock.method(globalThis,'fetch',async()=>++profileRequests===1?Response.json({error:'private SQL'},{status:503}):Response.json({profile:{id:'A'}}))
+ await mount(Component,async()=>{
+  await act(async()=>Component===Login?button('Connexion').click():document.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__destination,undefined)
+  assert.match(document.querySelector('[role="alert"]').textContent,/Impossible de préparer le profil/)
+  assert.doesNotMatch(document.body.textContent,/private SQL/)
+  await act(async()=>button('Réessayer').click())
+  assert.equal(globalThis.__destination,'/dashboard')
+  assert.equal(authWrites,1);assert.equal(profileRequests,2)
+ })
+})
+
+for(const rejected of [false,true])test('le callback ignore une ancienne lecture Auth après SIGNED_IN, rejet='+rejected,async t=>{
+ const auth=deferred(),profile=deferred();let requests=0
+ globalThis.__reliability.db.auth.getSession=()=>auth.promise
+ t.mock.method(globalThis,'fetch',async()=>{requests++;await profile.promise;return Response.json({profile:{id:'A'}})})
+ await mount(Callback,async()=>{
+  assert.equal(globalThis.__destination,undefined)
+  await act(async()=>{for(const cb of callbacks)cb('SIGNED_IN',session)})
+  assert.match(document.body.textContent,/Connexion en cours/);assert.equal(requests,1)
+  await act(async()=>rejected?auth.reject(new Error('late transport')):auth.resolve({data:{session:null},error:{message:'late stale read'}}))
+  assert.equal(button('Réessayer'),undefined)
+  await act(async()=>profile.resolve())
+  assert.equal(globalThis.__destination,'/dashboard');assert.equal(requests,1)
+ })
+})
 
 test('login network rejection releases the button and exposes a safe retry message',async()=>{
   await mount(Login,async()=>{

@@ -1,6 +1,8 @@
 "use client";
 
 import FormField from '@/components/ui/FormField'
+import AuthProfileFeedback from '@/components/AuthProfileFeedback'
+import type {Session} from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
@@ -14,6 +16,7 @@ import {withTimeout} from '@/lib/asyncOperation'
 
 export default function RegisterPage() {
   const attemptRef = useRef({mounted: false, id: 0})
+  const [profileSession, setProfileSession] = useState<Session | null>(null)
   useEffect(() => {
     const attempt = attemptRef.current
     attempt.mounted = true
@@ -30,8 +33,8 @@ export default function RegisterPage() {
   const [message, setMessage] = useState<string | null>(null)
   const { loading: authLoading, user } = useAuth()
 
-  const handleSignUp = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const handleSignUp = async (event?: React.FormEvent) => {
+    event?.preventDefault()
     const id = ++attemptRef.current.id
     const current = () => attemptRef.current.mounted && attemptRef.current.id === id
     setLoading(true)
@@ -41,7 +44,7 @@ export default function RegisterPage() {
     const trimmedBio = bio.trim()
 
     try {
-      const { data, error } = await withTimeout(supabase.auth.signUp({
+      const { data, error } = profileSession ? await withTimeout(supabase.auth.getSession()) : await withTimeout(supabase.auth.signUp({
         email,
         password,
         options: {
@@ -63,13 +66,15 @@ export default function RegisterPage() {
       }
 
       if (data.session) {
-        await ensureProfile(data.session)
+        setProfileSession(data.session)
+        const result = await ensureProfile(data.session)
         if (!current()) return
+        if (!result.ok) { setMessage(result.error); return }
         router.replace(next)
         return
       }
 
-      setMessage('Compte cree. Verifie ton email pour confirmer ton inscription, puis connecte-toi quand tu veux.')
+      setMessage(profileSession ? 'La session n’a pas pu être établie. Reconnecte-toi.' : 'Compte cree. Verifie ton email pour confirmer ton inscription, puis connecte-toi quand tu veux.')
       setLoading(false)
     } catch {
       if (!current()) return
@@ -77,7 +82,9 @@ export default function RegisterPage() {
     } finally { if (current()) setLoading(false) }
   }
 
-  if (!authLoading && user) {
+  if (profileSession && (loading || message)) return <AuthProfileFeedback loading={loading} message={message} onRetry={() => { if (!loading) void handleSignUp() }} />
+
+  if (!loading && !authLoading && user) {
     return (
       <div className="mx-auto max-w-md rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(180deg,rgba(10,15,23,0.98),rgba(9,9,11,0.98))] p-8 text-center">
         <h1 className="text-2xl font-black uppercase text-white">Tu es deja connecte</h1>
