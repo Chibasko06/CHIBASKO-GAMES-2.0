@@ -27,6 +27,15 @@ with managed as (
     'delete',has_table_privilege(role_name,c.oid,'DELETE'))) from (values('anon'),('authenticated'),('service_role')) r(role_name))
  ) as value from managed c
  union all
+ select 'view:'||c.relname,jsonb_build_object(
+  'owner',pg_get_userbyid(c.relowner),'definition',pg_get_viewdef(c.oid,true),'options',c.reloptions,
+  'columns',(select jsonb_agg(jsonb_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod),'columnAcl',a.attacl::text) order by a.attnum)
+    from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped),
+  'grants',coalesce((select jsonb_agg(jsonb_build_object('role',case when g.grantee=0 then 'PUBLIC' else pg_get_userbyid(g.grantee) end,'privilege',g.privilege_type,'grantable',g.is_grantable) order by case when g.grantee=0 then 'PUBLIC' else pg_get_userbyid(g.grantee) end,g.privilege_type)
+    from aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) g where g.grantee<>c.relowner),'[]'::jsonb))
+ from pg_class c join pg_namespace n on n.oid=c.relnamespace
+ where n.nspname='public' and c.relkind='v' and c.relname='public_profiles'
+ union all
  select 'storage:legacy_write_guard',jsonb_build_object(
   'rls',(select relrowsecurity from pg_class where oid='storage.objects'::regclass),
   'policies',jsonb_agg(jsonb_build_object('name',policyname,'roles',roles,'command',cmd,'permissive',permissive,'using',qual,'check',with_check) order by policyname))

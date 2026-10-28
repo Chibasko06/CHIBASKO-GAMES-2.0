@@ -41,7 +41,7 @@ test('les objets indispensables au portail développeur et à l’administration
  const admin=Object.keys(objects).find(key=>key.startsWith('function:admin_save_game('))
  assert.ok(admin,'Contrat de la RPC admin manquant')
  for(const key of ['table:developer_contacts','table:game_submission_notifications','table:game_submission_drafts',
-  'table:game_developer_registrations','table:game_submissions','table:profiles','table:categories',
+  'table:game_developer_registrations','table:game_submissions','table:profiles','view:public_profiles','table:categories',
   admin]){
   assert.ok(objects[key],key)
   const incomplete={...objects};delete incomplete[key]
@@ -61,7 +61,7 @@ test('les tables et RPC littérales utilisées par l’application figurent dans
  }
  assert.ok(tables.size>10)
  assert.ok(functions.size>5)
- for(const name of tables)assert.ok(objects['table:'+name],name)
+ for(const name of tables)assert.ok(objects['table:'+name]||objects['view:'+name],name)
  for(const name of functions)assert.ok(Object.keys(objects).some(key=>key.startsWith('function:'+name+'(')),name)
 })
 test('metadata readers accept UTF-8 BOM and PowerShell UTF-16LE without changing values',async()=>{

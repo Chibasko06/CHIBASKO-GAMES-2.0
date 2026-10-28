@@ -32,19 +32,19 @@ export async function getCommunityProfilesPage(search = '', page = 1, role = 'al
 
 export async function getPublicProfiles() {
   return readAllRows<PublicProfile>('public_profiles', (from, to) => supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id, username, avatar_url, bio, created_at', { count: 'exact' })
     .order('username', { ascending: true }).order('id').range(from, to))
 }
 
 export async function getPublicProfilesPage(search = '', page = 1) {
   const escaped = search.trim().slice(0, 80).replace(/[\\%_]/g, '\\$&')
-  const { data, count } = await readData('public_profiles_page', supabase.from('profiles').select('id, username, avatar_url, bio, created_at', { count: 'exact' }).ilike('username', '%' + escaped + '%').order('username').order('id').range((page - 1) * 24, page * 24 - 1))
+  const { data, count } = await readData('public_profiles_page', supabase.from('public_profiles').select('id, username, avatar_url, bio, created_at', { count: 'exact' }).ilike('username', '%' + escaped + '%').order('username').order('id').range((page - 1) * 24, page * 24 - 1))
   if (count === null) throw new Error('profile_count_unavailable')
   return { items: (data ?? []) as PublicProfile[], total: count }
 }
 
-export async function getPublicProfileIds() { return readAllRows<{ id: string; username: string }>('sitemap_profiles', (from, to) => supabase.from('profiles').select('id, username', { count: 'exact' }).order('id').range(from, to)) }
+export async function getPublicProfileIds() { return readAllRows<{ id: string; username: string }>('sitemap_profiles', (from, to) => supabase.from('public_profiles').select('id, username', { count: 'exact' }).order('id').range(from, to)) }
 
 export async function resolvePublicProfile(identifier: string): Promise<PublicProfile | null> {
   const handle = normalizePublicUsername(identifier.startsWith('@') ? identifier.slice(1) : identifier)
@@ -61,7 +61,7 @@ export async function resolvePublicProfile(identifier: string): Promise<PublicPr
 
 export async function getPublicProfileByUsername(username: string) {
   const { data } = await readData('profile_by_username', supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id, username, avatar_url, bio, created_at')
     .eq('username', normalizePublicUsername(username))
     .maybeSingle())
@@ -72,7 +72,7 @@ export async function getPublicProfileByUsername(username: string) {
 export async function getPublicProfileById(id: string) {
   if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) return null
   const { data } = await readData('profile_by_id', supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id, username, avatar_url, bio, created_at')
     .eq('id', id)
     .maybeSingle())

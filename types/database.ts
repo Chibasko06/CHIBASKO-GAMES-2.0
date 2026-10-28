@@ -495,7 +495,10 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_profiles: {
+        Row: Pick<Database['public']['Tables']['profiles']['Row'], 'id' | 'username' | 'avatar_url' | 'bio' | 'created_at'>
+        Relationships: []
+      }
     }
     Functions: {
       public_profile_resolve: {

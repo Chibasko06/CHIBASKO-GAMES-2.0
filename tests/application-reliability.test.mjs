@@ -53,6 +53,24 @@ test('transport and unexpected exceptions have distinct safe diagnoses',async()=
   assert.doesNotMatch(logs.join(' '),/secret/)
 })
 
+test('les réponses personnelles concurrentes restent liées au compte authentifié et interdites au cache partagé',async()=>{
+ const profiles=new Map([['actor-a',{id:'actor-a',username:'alpha',display_name:'Privé A'}],['actor-b',{id:'actor-b',username:'beta',display_name:'Privé B'}]])
+ const reads=[]
+ globalThis.__reliability.db=globalThis.__phase0.admin={auth:{async getUser(token){return {data:{user:{id:token}},error:null}}},from(table){
+  assert.equal(table,'profiles');let fields,actor
+  return {update(value){fields=value;return this},eq(key,value){assert.equal(key,'id');actor=value;return this},select(){return this},async single(){reads.push(actor);return {data:{...profiles.get(actor),...fields},error:null}}}
+ }}
+ const responses=await Promise.all(['actor-a','actor-b'].map((actor,index)=>profile(new Request('https://site.example/api/profile/public',{
+  method:'PATCH',headers:{Authorization:'Bearer '+actor,'Content-Type':'application/json'},body:JSON.stringify({username:index?'beta':'alpha',bio:null})
+ }))))
+ for(const [index,response] of responses.entries()){
+  assert.equal(response.status,200)
+  assert.match(response.headers.get('cache-control'),/no-store/)
+  assert.equal((await response.json()).profile.id,index?'actor-b':'actor-a')
+ }
+ assert.deepEqual(reads.sort(),['actor-a','actor-b'])
+})
+
 test('profile input rejects malformed, oversized, unknown and mistyped fields before any update',async()=>{
   for(const [body,status]of [['{',400],['',400],[null,400],[[],400],[{username:''},400],[{username:'x'.repeat(33)},400],
     [{username:'Player',bio:42},400],[{username:'Player',bio:'x'.repeat(17000)},413],[{username:'Player',bio:'a\0b'},400],

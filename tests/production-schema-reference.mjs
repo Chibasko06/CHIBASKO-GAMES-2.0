@@ -45,7 +45,13 @@ try {
  const base=await snapshot(),snapshots=[base],reference={format:1,baselineMigrations:baseline,prerequisites:base.prerequisites,
   snapshotSha256:sqlSha256(await readFile(join(root,'docs/sql/production-schema-snapshot.sql'))),
   migrations:[],stages:[base.objects]}
+ await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261029000200_profile_privacy.sql')]),error=>/profile_public_projection_required/.test(error.stderr));
+ assert.deepEqual(await snapshot(),base,'Une fermeture prématurée ne modifie aucun privilège');
  for(const name of migrations) {
+  if(name==='20261029000200_profile_privacy.sql') {
+   await query('grant select(display_name) on public.profiles to anon');
+   await run('psql',[...args,'-f',join(root,'docs/sql/profile-privacy-preflight.sql')]);
+  }
   if(name==='20261024000100_account_deletion.sql')await run('psql',[...args,'-f',join(root,'tests/account-lifecycle-db.sql')])
   const file=join(root,'supabase/migrations',name)
   if(name==='20261028000100_public_usernames.sql'){
@@ -57,6 +63,9 @@ try {
    await query(`update public.profiles set username='migration-second' where id='${second}'`)
   }
   await run('psql',[...args,'-f',file])
+  if(name==='20261029000100_profile_public_projection.sql'){
+   assert.equal((await query("select has_table_privilege('anon','public.profiles','SELECT') and has_table_privilege('anon','public.public_profiles','SELECT')")).stdout.trim(),'t','La phase additive préserve les anciens consommateurs jusqu’au déploiement applicatif');
+  }
   if(name==='20261028000100_public_usernames.sql'){
    assert.equal((await query("select username from public.profiles where id='fc200000-0000-4000-8000-000000000001'")).stdout.trim(),'pseudo-migre')
    await query("delete from public.profiles where id::text like 'fc200000-%'")
@@ -100,6 +109,9 @@ try {
   ['alter table storage.objects disable row level security','alter table storage.objects enable row level security'],
   ['alter policy chibasko_legacy_storage_no_insert on storage.objects with check(true)',"alter policy chibasko_legacy_storage_no_insert on storage.objects with check(bucket_id not in ('avatars','game-thumbnails'))"],
   ['alter table public.profiles disable row level security','alter table public.profiles enable row level security'],
+  ['grant select(display_name) on public.profiles to anon','revoke select(display_name) on public.profiles from anon'],
+  ['alter view public.public_profiles set (security_invoker=true)','alter view public.public_profiles set (security_invoker=false)'],
+  ['grant update on public.public_profiles to authenticated','revoke update on public.public_profiles from authenticated'],
   ['grant select on public.developer_contacts to anon','revoke select on public.developer_contacts from anon'],
   ['alter table public.categories rename column name to missing_name','alter table public.categories rename column missing_name to name'],
   ['drop trigger initialize_submission_draft on public.game_developer_registrations',reference.stages.at(-1)['trigger:game_developer_registrations:initialize_submission_draft'].definition],
@@ -113,6 +125,7 @@ try {
  await run('psql',[...args,'-f',join(root,'supabase/migrations/20261023000100_atomic_admin_catalogue.sql')])
  assert.equal(compareSchema(await snapshot(),reference).status,'PASS')
  for(const role of ['anon','authenticated'])await assert.rejects(query(`set role ${role};select public.admin_save_game(null,'{}','{}')`),error=>/permission denied|permission refusée/i.test(error.stderr))
+ await run('psql',[...args,'-f',join(root,'docs/sql/profile-privacy-preflight.sql')]);
  const preflight=await run('psql',[...args,'-f',join(root,'docs/sql/production-preflight.sql')])
  assert.match(preflight.stdout,/admin_save_game/)
  assert.match(preflight.stdout,/developer_contacts/)
@@ -121,6 +134,7 @@ try {
  await run('psql',[...args,'-f',join(root,'tests/admin-profile-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/admin-console-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/public-usernames-db.sql')])
+ await run('psql',[...args,'-f',join(root,'tests/profile-privacy-db.sql')])
  const {publicUsernamesConcurrency}=await import('./public-usernames-concurrency.mjs')
  await publicUsernamesConcurrency(async sql=>(await query(sql)).stdout.trim())
  await run('psql',[...args,'-f',join(root,'tests/account-deletion-db.sql')])

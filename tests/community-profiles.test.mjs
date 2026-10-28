@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {createElement} from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
 import RoleBadges from '../components/RoleBadges.tsx'
-import {getCommunityProfilesPage} from '../lib/queries/profiles.ts'
+import {getCommunityProfilesPage,getPublicProfiles,getPublicProfilesPage,getPublicProfileIds,getPublicProfileById,getPublicProfileByUsername} from '../lib/queries/profiles.ts'
 
 const profile={id:'11111111-1111-4111-8111-111111111111',username:'Membre',avatar_url:null,bio:null,created_at:'2026-01-01',roles:{admin:false,developer:true}}
 
@@ -39,4 +39,19 @@ test('les badges sont exclusivement dérivés des deux statuts confirmés',()=>{
   assert.equal((html.match(/aria-hidden="true"/g)??[]).length,Number(admin)+Number(developer))
  }
  assert.equal(renderToStaticMarkup(createElement(RoleBadges)), '')
+})
+
+test('les lectures publiques et le sitemap passent uniquement par la projection sans multiplier les requêtes',async()=>{
+ const calls=[]
+ const row={id:profile.id,username:'membre',avatar_url:null,bio:null,created_at:profile.created_at}
+ const chain={select(fields){calls.push(['select',fields]);return this},order(){return this},range(){return this},eq(){return this},ilike(){return this},
+  async maybeSingle(){return {data:row,error:null}},then(resolve,reject){return Promise.resolve({data:[row],count:1,error:null}).then(resolve,reject)}}
+ globalThis.__reliability={db:{from(table){calls.push(['from',table]);return chain}}}
+ for(const read of [getPublicProfiles,getPublicProfilesPage,getPublicProfileIds,()=>getPublicProfileById(profile.id),()=>getPublicProfileByUsername('membre')]){
+  calls.length=0
+  const result=await read()
+  assert.ok(result)
+  assert.deepEqual(calls.filter(([operation])=>operation==='from'),[['from','public_profiles']])
+  assert.ok(calls.filter(([operation])=>operation==='select').every(([,fields])=>!fields.includes('*')&&!/display_name|xp_points|email/.test(fields)))
+ }
 })
