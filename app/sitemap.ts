@@ -1,3 +1,4 @@
+import {publicProfilePath} from '@/lib/publicUsername'
 import type { MetadataRoute } from 'next'
 import { absoluteUrl } from '@/lib/seo'
 import { getSitemapGames, getCategories } from '@/lib/queries/games'
@@ -68,7 +69,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   const profileRoutes: MetadataRoute.Sitemap = profiles.map((profile) => ({
-    url: absoluteUrl(`/players/${profile.id}`),
+    url: absoluteUrl(publicProfilePath(profile.username)),
     changeFrequency: 'weekly',
     priority: 0.5,
   }))

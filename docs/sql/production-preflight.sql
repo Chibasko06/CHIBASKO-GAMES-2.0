@@ -37,14 +37,14 @@ select p.oid::regprocedure::text as signature,p.prosecdef,p.proconfig,p.proacl,
        md5(pg_get_functiondef(p.oid)) as definition_fingerprint
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
 where n.nspname='public' and (p.proname like 'catalogue\_%' escape '\' or p.proname like 'contact\_%' escape '\' or p.proname like 'distribution\_%' escape '\'
- or p.proname in ('admin_console_users','admin_console_overview','admin_console_deletions','public_profiles_page','admin_save_game','set_active_game_version','guard_game_version','guard_active_game_version','get_published_game_runtimes'))
+ or p.proname in ('valid_public_username','reserve_profile_username','public_profile_resolve','admin_console_users','admin_console_overview','admin_console_deletions','public_profiles_page','admin_save_game','set_active_game_version','guard_game_version','guard_active_game_version','get_published_game_runtimes'))
 order by signature;
 select p.oid::regprocedure::text as signature,r.role_name,
        has_function_privilege(r.role_name,p.oid,'EXECUTE') as can_execute
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
 cross join (values('anon'),('authenticated'),('service_role')) as r(role_name)
 where n.nspname='public' and p.prokind='f'
- and (p.proname like 'catalogue\_%' escape '\' or p.proname like 'contact\_%' escape '\' or p.proname like 'distribution\_%' escape '\' or p.proname in ('admin_console_users','admin_console_overview','admin_console_deletions','public_profiles_page','admin_save_game','set_active_game_version','get_published_game_runtimes'))
+ and (p.proname like 'catalogue\_%' escape '\' or p.proname like 'contact\_%' escape '\' or p.proname like 'distribution\_%' escape '\' or p.proname in ('valid_public_username','reserve_profile_username','public_profile_resolve','admin_console_users','admin_console_overview','admin_console_deletions','public_profiles_page','admin_save_game','set_active_game_version','get_published_game_runtimes'))
 order by signature,role_name;
 select schemaname,tablename,policyname,roles,cmd,qual,with_check from pg_policies
 where schemaname='public' order by tablename,policyname;

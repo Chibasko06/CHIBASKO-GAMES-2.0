@@ -60,7 +60,7 @@ reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','f1000000-0000-4000-8000-000000000004',true);
-update public.profiles set username='ADMIN Studio',bio='DÉVELOPPEUR' where id=auth.uid();
+update public.profiles set username='admin-studio',bio='DÉVELOPPEUR' where id=auth.uid();
 do $$
 begin
  if public.public_profiles_page('',1,'all',auth.uid())->'items'->0->'roles'<>'{"admin":false,"developer":false}'::jsonb then raise exception 'Profil éditable utilisé comme rôle';end if;

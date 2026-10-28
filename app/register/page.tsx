@@ -149,6 +149,10 @@ export default function RegisterPage() {
             <FormField label="Pseudo" descriptionId="auth-feedback"><input
               type="text"
               required
+              minLength={3}
+              maxLength={32}
+              pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,30}[A-Za-z0-9]"
+              title="Identifiant public : 3 à 32 caractères, sans accent ni espace"
               value={username}
               placeholder="Pseudo"
               className="w-full rounded-2xl border border-zinc-800 bg-black/60 p-4 text-sm text-white outline-none focus:border-cyan-500"

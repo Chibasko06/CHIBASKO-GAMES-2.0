@@ -8,6 +8,8 @@ import {getGameReviewsPage} from '@/lib/queries/games'
 import {useMutationRecovery} from '@/lib/useMutationRecovery'
 import { supabase } from '@/lib/supabaseClient'
 import FormField from '@/components/ui/FormField'
+import Link from 'next/link'
+import {publicProfilePath} from '@/lib/publicUsername'
 
 type Review = {
   id: string
@@ -206,7 +208,7 @@ export default function GameReviews({ gameId }: Props) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-3">
-                    <p className="font-bold text-white">{review.username}</p>
+                    <Link href={publicProfilePath(review.username)} className="font-bold text-white hover:text-cyan-300 focus-visible:outline-2 focus-visible:outline-cyan-300">@{review.username}</Link>
                     <p className="text-sm text-cyan-300" aria-label={`${review.rating} sur 5`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
                     <p className="text-xs text-zinc-500">
                       {new Date(review.updated_at || review.created_at).toLocaleString('fr-FR')}

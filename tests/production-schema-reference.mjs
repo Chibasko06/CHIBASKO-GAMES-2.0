@@ -48,7 +48,19 @@ try {
  for(const name of migrations) {
   if(name==='20261024000100_account_deletion.sql')await run('psql',[...args,'-f',join(root,'tests/account-lifecycle-db.sql')])
   const file=join(root,'supabase/migrations',name)
+  if(name==='20261028000100_public_usernames.sql'){
+   const first='fc200000-0000-4000-8000-000000000001',second='fc200000-0000-4000-8000-000000000002'
+   await query(`insert into auth.users(id,email) values('${first}','username-preflight-a@example.test'),('${second}','username-preflight-b@example.test');update public.profiles set username='nom invalide' where id='${first}'`)
+   await assert.rejects(run('psql',[...args,'-f',file]),error=>/public_username_preflight_invalid/.test(error.stderr))
+   await query(`update public.profiles set username='Pseudo-Migre' where id='${first}';update public.profiles set username='pseudo-migre' where id='${second}'`)
+   await assert.rejects(run('psql',[...args,'-f',file]),error=>/public_username_preflight_collision/.test(error.stderr))
+   await query(`update public.profiles set username='migration-second' where id='${second}'`)
+  }
   await run('psql',[...args,'-f',file])
+  if(name==='20261028000100_public_usernames.sql'){
+   assert.equal((await query("select username from public.profiles where id='fc200000-0000-4000-8000-000000000001'")).stdout.trim(),'pseudo-migre')
+   await query("delete from public.profiles where id::text like 'fc200000-%'")
+  }
   reference.migrations.push({name,sha256:sqlSha256(await readFile(file))})
   const state=await snapshot();snapshots.push(state);reference.stages.push(state.objects)
  }
@@ -108,6 +120,9 @@ try {
  await run('psql',[...args,'-f',join(root,'tests/public-profile-directory-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/admin-profile-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/admin-console-db.sql')])
+ await run('psql',[...args,'-f',join(root,'tests/public-usernames-db.sql')])
+ const {publicUsernamesConcurrency}=await import('./public-usernames-concurrency.mjs')
+ await publicUsernamesConcurrency(async sql=>(await query(sql)).stdout.trim())
  await run('psql',[...args,'-f',join(root,'tests/account-deletion-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/account-storage-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/contact-db.sql')])

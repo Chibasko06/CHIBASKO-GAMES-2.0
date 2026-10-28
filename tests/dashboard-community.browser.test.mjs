@@ -58,10 +58,12 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
    if(kind==='dashboard'){
     assert.equal(await x.page.getByText('private@example.test',{exact:true}).count(),1)
     assert.equal(await x.page.getByRole('heading',{name:'Mon profil',exact:true}).count(),1)
+    assert.equal(await x.page.getByRole('link',{name:/Voir mon profil public/}).getAttribute('href'),'/players/@camille')
     assert.equal(await x.page.getByRole('link',{name:/Un jeu au titre/}).count(),2)
     const image=await x.page.locator('main img').first().boundingBox();assert.ok(Math.abs(image.width/image.height-16/9)<.05)
    }else{
     assert.equal(await x.page.locator('main li').count(),24)
+    assert.ok((await x.page.locator('main li a').first().getAttribute('href')).startsWith('/players/@'))
     assert.doesNotMatch(await x.page.locator('main').textContent(),/private@example|fixture-token/)
     const heights=await x.page.locator('main li').evaluateAll(items=>items.map(item=>Math.round(item.getBoundingClientRect().height)))
     assert.equal(new Set(heights).size,1,'Toutes les cartes conservent une hauteur uniforme')
@@ -75,9 +77,9 @@ test('édition du profil : focus, labels, sauvegarde et annulation',async()=>{
  const x=await fixture();try{
   await x.page.getByRole('button',{name:'Modifier le profil',exact:true}).click()
   const username=x.page.getByLabel('Pseudo',{exact:true});await username.waitFor();assert.equal(await username.evaluate(el=>el===document.activeElement),true)
-  await username.fill('Camille Studio');await x.page.getByLabel('Biographie',{exact:true}).fill('Nouveau profil')
+  await username.fill('camille-studio');await x.page.getByLabel('Biographie',{exact:true}).fill('Nouveau profil')
   await x.page.getByRole('button',{name:'Sauvegarder',exact:true}).click();await x.page.getByRole('status').waitFor()
-  assert.deepEqual(x.calls,[{username:'Camille Studio',bio:'Nouveau profil'}])
+  assert.deepEqual(x.calls,[{username:'camille-studio',bio:'Nouveau profil'}])
   await x.page.getByRole('button',{name:'Modifier le profil',exact:true}).click();await username.fill('Ne pas conserver')
   await x.page.getByRole('button',{name:'Annuler',exact:true}).click();assert.equal(await username.count(),0)
   assert.equal(x.calls.length,1);await x.page.getByRole('link',{name:'Réinitialiser mon mot de passe'}).waitFor()

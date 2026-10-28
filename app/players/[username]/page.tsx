@@ -2,11 +2,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import ProfileCard from '@/components/ProfileCard'
-import {
-  getPublicProfileById,
-  getPublicProfileByUsername,
-  getCommunityProfilesPage,
-} from '@/lib/queries/profiles'
+import {resolvePublicProfile} from '@/lib/queries/profiles'
+import {publicProfileIdentifier, publicProfilePath} from '@/lib/publicUsername'
+import {cache} from 'react'
+
+const getProfile = cache(resolvePublicProfile)
 
 export const dynamic = 'force-dynamic'
 
@@ -15,10 +15,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ username: string }>
 }): Promise<Metadata> {
-  const { username } = await params
-  const profile =
-    (await getPublicProfileById(username)) ??
-    (await getPublicProfileByUsername(username))
+  const username = publicProfileIdentifier((await params).username)
+  const profile = username ? await getProfile(username) : null
 
   if (!profile) {
     return {
@@ -38,12 +36,12 @@ export async function generateMetadata({
     title: `${profile.username} - Profil joueur`,
     description,
     alternates: {
-      canonical: `https://chibaskogames.fr/players/${profile.id}`,
+      canonical: `https://chibaskogames.fr${publicProfilePath(profile.username)}`,
     },
     openGraph: {
       title: `${profile.username} - Profil joueur`,
       description,
-      url: `https://chibaskogames.fr/players/${profile.id}`,
+      url: `https://chibaskogames.fr${publicProfilePath(profile.username)}`,
       type: 'profile',
       images: profile.avatar_url ? [{ url: profile.avatar_url }] : undefined,
     },
@@ -61,27 +59,23 @@ export default async function PublicPlayerPage({
 }: {
   params: Promise<{ username: string }>
 }) {
-  const { username } = await params
-  const profile =
-    (await getPublicProfileById(username)) ??
-    (await getPublicProfileByUsername(username))
+  const username = publicProfileIdentifier((await params).username)
+  const profile = username ? await getProfile(username) : null
 
   if (!profile) {
     notFound()
   }
 
-  if (username !== profile.id) {
-    redirect(`/players/${profile.id}`)
+  if (username !== '@' + profile.username) {
+    redirect(publicProfilePath(profile.username))
   }
 
-  const directory = await getCommunityProfilesPage('', 1, 'all', profile.id)
-  const publicProfile = directory.items[0] ?? profile
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <Link href="/players" className="inline-flex py-2 text-sm text-cyan-300 hover:underline">← Communauté</Link>
       <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Profil public</p>
-      <ProfileCard profile={publicProfile} heading="h1" />
+      <ProfileCard profile={profile} heading="h1" />
     </div>
   )
 }

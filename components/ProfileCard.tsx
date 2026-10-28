@@ -10,6 +10,7 @@ export default function ProfileCard({ profile, stats, heading = 'h2' }: { profil
       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cyan-950 text-2xl font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} alt="" width={64} height={64} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
       <div className="min-w-0 space-y-2">
         <Title className="break-words text-xl font-bold text-white">{profile.username}</Title>
+        <p className="break-words text-sm text-zinc-400">@{profile.username}</p>
         <RoleBadges roles={profile.roles} />
       </div>
     </div>

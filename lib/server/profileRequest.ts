@@ -4,21 +4,22 @@ import {adminOriginAllowed} from './adminRequest'
 import {adminJson} from './adminResponses'
 import {InputError} from './inputValidation'
 import {logDataFailure} from '@/lib/dataAccess'
+import {isPublicUsername, normalizePublicUsername, PUBLIC_USERNAME_MAX_LENGTH} from '@/lib/publicUsername'
 
-export const PROFILE_USERNAME_MAX_LENGTH = 32
+export const PROFILE_USERNAME_MAX_LENGTH = PUBLIC_USERNAME_MAX_LENGTH
 // Profile writes use the same 16 KiB JSON budget as other account mutations.
 export const PROFILE_BIO_MAX_LENGTH = 16_384
 
 export function profileFields(body: Record<string, unknown>) {
   if (Object.keys(body).some(key => !['username', 'bio'].includes(key))) throw new InputError('Champ non autorisé.')
-  if (typeof body.username !== 'string' || !body.username.trim() || body.username.trim().length > PROFILE_USERNAME_MAX_LENGTH) {
-    throw new InputError('Le pseudo doit contenir entre 1 et 32 caractères.')
+  if (typeof body.username !== 'string' || !isPublicUsername(normalizePublicUsername(body.username))) {
+    throw new InputError('Le pseudo doit contenir de 3 à 32 lettres sans accent, chiffres, tirets ou underscores, et commencer et finir par une lettre ou un chiffre. Certains pseudos sont réservés.')
   }
   if (body.bio !== undefined && body.bio !== null && typeof body.bio !== 'string') throw new InputError('Bio invalide.')
   const bio = typeof body.bio === 'string' ? body.bio.trim() : ''
   if (body.username.includes('\0') || bio.includes('\0')) throw new InputError('Caractère non autorisé dans le profil.')
   if (bio.length > PROFILE_BIO_MAX_LENGTH) throw new InputError('Bio trop longue.')
-  return {username: body.username.trim(), display_name: body.username.trim(), bio: bio || null}
+  return {username: normalizePublicUsername(body.username), display_name: normalizePublicUsername(body.username), bio: bio || null}
 }
 
 export async function profileIdentity(request: Request) {

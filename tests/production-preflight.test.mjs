@@ -36,8 +36,8 @@ test('production notifications require server configuration on portal and enable
 test('local inventory checks registry dependencies and ordered transactional migrations', async () => {
   const result = await localChecks(fileURLToPath(new URL('../', import.meta.url)))
   assert.equal(result.checks.every(check => check.ok), true)
-  assert.equal(result.migrations.length, 22)
-  assert.equal(result.migrations.at(-1).name,'20261025000300_admin_console.sql')
+  assert.equal(result.migrations.length, 23)
+  assert.equal(result.migrations.at(-1).name,'20261028000100_public_usernames.sql')
   assert.equal(result.baselineMigrations.length, 15)
   assert.equal(result.migrations.every(item => /^[a-f0-9]{64}$/.test(item.sha256)), true)
 })

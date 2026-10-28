@@ -1,5 +1,7 @@
 "use client";
 
+import {publicProfilePath} from '@/lib/publicUsername'
+
 import FormField from '@/components/ui/FormField'
 import AccountDeletion from '@/components/AccountDeletion'
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
@@ -252,7 +254,7 @@ export default function DashboardPage() {
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={button} onClick={() => setIsEditingProfile(true)}>Modifier le profil</button>
-        <Link href={'/players/' + profile.id} className={button}>Voir mon profil public <span aria-hidden="true" className="ml-2">↗</span>
+        <Link href={publicProfilePath(profile.username)} className={button}>Voir mon profil public <span aria-hidden="true" className="ml-2">↗</span>
         </Link>
       </div>
     </header>
@@ -277,9 +279,10 @@ export default function DashboardPage() {
           </div>
         </div>
         {isEditingProfile ? <form onSubmit={event => { event.preventDefault(); if (!savingProfile && !uploadingAvatar) void handleProfileSave() }} className="mt-5 space-y-4">
-          <FormField label="Pseudo">
-            <input id="profile-username" value={draftProfile.username} maxLength={32} required onChange={event => setDraftProfile(current => ({ ...current, username: event.target.value }))} className="min-h-11 w-full rounded-lg border border-zinc-700 bg-black px-3 text-white" />
+          <FormField label="Pseudo" descriptionId="profile-username-help">
+            <input id="profile-username" minLength={3} pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,30}[A-Za-z0-9]" aria-describedby="profile-username-help" value={draftProfile.username} maxLength={32} required onChange={event => setDraftProfile(current => ({ ...current, username: event.target.value }))} className="min-h-11 w-full rounded-lg border border-zinc-700 bg-black px-3 text-white" />
           </FormField>
+          <p id="profile-username-help" className="text-xs text-zinc-400">Identifiant @pseudo : 3 à 32 caractères sans accent ni espace. Les anciens pseudos restent réservés à ton compte.</p>
           <FormField label="Biographie">
             <textarea value={draftProfile.bio} maxLength={16384} rows={4} onChange={event => setDraftProfile(current => ({ ...current, bio: event.target.value }))} className="w-full resize-y rounded-lg border border-zinc-700 bg-black p-3 text-white" />
           </FormField>

@@ -3,6 +3,7 @@ import { Tables } from '@/types/database'
 import { supabase } from '@/lib/supabaseClient'
 import { readAllRows } from '@/lib/pagination'
 import type { ProfileRoles } from '@/lib/profileRoles'
+import {isPublicUsername, normalizePublicUsername} from '@/lib/publicUsername'
 
 type Profile = Tables<'profiles'>
 
@@ -43,13 +44,26 @@ export async function getPublicProfilesPage(search = '', page = 1) {
   return { items: (data ?? []) as PublicProfile[], total: count }
 }
 
-export async function getPublicProfileIds() { return readAllRows<{ id: string }>('sitemap_profiles', (from, to) => supabase.from('profiles').select('id', { count: 'exact' }).order('id').range(from, to)) }
+export async function getPublicProfileIds() { return readAllRows<{ id: string; username: string }>('sitemap_profiles', (from, to) => supabase.from('profiles').select('id, username', { count: 'exact' }).order('id').range(from, to)) }
+
+export async function resolvePublicProfile(identifier: string): Promise<PublicProfile | null> {
+  const handle = normalizePublicUsername(identifier.startsWith('@') ? identifier.slice(1) : identifier)
+  if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(identifier) && !isPublicUsername(handle)) return null
+  const {data} = await readData('public_profile_resolve', supabase.rpc('public_profile_resolve', {p_identifier: identifier}))
+  if (data === null) return null
+  const profile = data as unknown as PublicProfile
+  if (!profile || typeof profile.id !== 'string' || typeof profile.username !== 'string' || !isPublicUsername(profile.username)
+    || (profile.bio !== null && typeof profile.bio !== 'string') || (profile.avatar_url !== null && typeof profile.avatar_url !== 'string')
+    || typeof profile.created_at !== 'string' || typeof profile.roles?.admin !== 'boolean' || typeof profile.roles?.developer !== 'boolean') throw new DataAccessError('unexpected_error')
+  const {id, username, avatar_url, bio, created_at, roles} = profile
+  return {id, username, avatar_url, bio, created_at, roles: {admin: roles!.admin, developer: roles!.developer}}
+}
 
 export async function getPublicProfileByUsername(username: string) {
   const { data } = await readData('profile_by_username', supabase
     .from('profiles')
     .select('id, username, avatar_url, bio, created_at')
-    .eq('username', username)
+    .eq('username', normalizePublicUsername(username))
     .maybeSingle())
 
   return (data as PublicProfile | null) ?? null

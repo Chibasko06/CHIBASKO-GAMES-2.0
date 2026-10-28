@@ -11,11 +11,13 @@ const game={id:'22222222-2222-4222-8222-222222222222',title:'Stickman Fights',sl
  source_page_url:null,views_count:1,play_count:0,is_published:true,created_at:category.created_at,
  game_type:'classic',multiplayer_game_id:null,is_beta:false,active_version_id:null,catalogue_source:'legacy',
  categories:[category],favorites_count:0,ratings_count:0,average_rating:0,comments_count:0,likes_count:0,dislikes_count:0}
+const profile={id:'33333333-3333-4333-8333-333333333333',username:'joueur-actuel',avatar_url:null,bio:'Profil public de test.',created_at:category.created_at,roles:{admin:true,developer:true}}
 
 test('le Worker OpenNext démarre et rend les pages dynamiques sans accès distant',{timeout:60000},async()=>{
  const bundle=resolve(process.env.CLOUDFLARE_RUNTIME_BUNDLE??'.distribution/runtime-smoke/worker.js')
  assert.ok(existsSync(bundle),'Construire le Worker et son bundle Wrangler avant ce test.')
- let reads=0
+ let reads=0,profileReads=0
+ const profileIdentifiers=[]
  const worker=new Miniflare(convertV4MiniflareOptions({
   modules:[{type:'ESModule',path:bundle},...readdirSync(dirname(bundle)).filter(name=>name.endsWith('.wasm'))
    .map(name=>({type:'CompiledWasm',path:join(dirname(bundle),name)}))],
@@ -24,7 +26,7 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    NEXT_PUBLIC_SITE_URL:'https://chibaskogames.fr',CHIBASKO_CLOUDFLARE:'1',CONTACT_FORM_ENABLED:'0',
    GAME_ACCOUNT_DELETIONS_ENABLED:'0',GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'0'},
   serviceBindings:{ASSETS:()=>new Response(null,{status:404})},
-  // Seules les lectures du catalogue sont simulées ; aucun service réel n'est appelé.
+  // Les lectures publiques sont simulées ; aucun service réel n’est appelé.
   outboundService:async request=>{
    const path=new URL(request.url).pathname
    if(path==='/rest/v1/categories'&&request.method==='GET'){
@@ -37,6 +39,11 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    }
    if(request.method==='POST'&&path==='/rest/v1/rpc/catalogue_home'){
     reads++;return Response.json([{category,games:[game]}])
+   }
+   if(request.method==='POST'&&path==='/rest/v1/rpc/public_profile_resolve'){
+    profileReads++;const {p_identifier}=await request.json()
+    profileIdentifiers.push(p_identifier)
+    return Response.json([profile.id,'@joueur-actuel','@ancien-pseudo','@JOUEUR-ACTUEL'].includes(p_identifier)?profile:null)
    }
    throw Error('Requête non autorisée dans la fixture du Worker.')
   },
@@ -52,5 +59,27 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    assert.doesNotMatch(html,/Unexpected loadManifest|<iframe\b/)
   }
   assert.ok(reads>0,'Le test doit traverser le rendu dynamique et ses lectures.')
+  const response=await worker.dispatchFetch('https://chibaskogames.fr/players/@joueur-actuel')
+  assert.equal(response.status,200)
+  const html=await response.text()
+  assert.match(html,/https:\/\/chibaskogames.fr\/players\/@joueur-actuel/)
+  assert.ok(html.includes('ADMIN'),JSON.stringify({profileIdentifiers,visible:html.replace(/<script\b[\s\S]*?<\/script>/g,'').replace(/<[^>]+>/g,' ').slice(-1300),digests:html.match(/NEXT_[A-Z_]+[^"<]*/g)}))
+  assert.match(html,/DÉVELOPPEUR/)
+  assert.equal(profileReads,1,'Les métadonnées et la page partagent leur résolution.')
+  for(const identifier of [profile.id,'@ancien-pseudo','@JOUEUR-ACTUEL']){
+   const previous=profileReads
+   const redirect=await worker.dispatchFetch('https://chibaskogames.fr/players/'+identifier,{redirect:'manual'})
+   if(redirect.status===307)assert.equal(redirect.headers.get('location'),'/players/@joueur-actuel')
+   else{
+    assert.equal(redirect.status,200)
+    const document=await redirect.text()
+    const refresh=document.match(/<meta\b[^>]*http-equiv="refresh"[^>]*>/i)?.[0]
+    assert.ok(refresh?.includes('url=/players/@joueur-actuel'),'Le rendu streamé doit contenir la redirection native de Next.js vers le profil courant.')
+   }
+   assert.equal(profileReads,previous+1)
+  }
+  const missing=await worker.dispatchFetch('https://chibaskogames.fr/players/@inexistant')
+  assert.ok([200,404].includes(missing.status))
+  assert.match(await missing.text(),/<meta\b[^>]*name="robots"[^>]*content="noindex/)
  }finally{await worker.dispose()}
 })

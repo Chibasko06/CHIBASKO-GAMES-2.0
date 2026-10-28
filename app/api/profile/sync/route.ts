@@ -4,26 +4,23 @@ import {profileIdentity, profileFailure, PROFILE_BIO_MAX_LENGTH} from '@/lib/ser
 import {InputError, readJsonObject} from '@/lib/server/inputValidation'
 import {readData} from '@/lib/dataAccess'
 import { getSupabaseAdminClient } from '@/lib/supabaseAdmin'
+import {generatedUsername} from '@/lib/publicUsername'
 
 function sanitizeUsername(value: string | null | undefined) {
-  const normalized = (typeof value === 'string' ? value : '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 32)
-
-  return normalized || 'joueur'
+  return generatedUsername(typeof value === 'string' ? value : '')
 }
 
 async function buildUniqueUsername(
   supabaseAdmin: ReturnType<typeof getSupabaseAdminClient>,
   requestedUsername: string | null | undefined,
-  userId: string
+  userId: string,
+  attempt = 0,
 ) {
   const base = sanitizeUsername(requestedUsername)
   const suffix = userId.slice(0, 6).toLowerCase()
   const candidates = [base, `${base.slice(0, 25)}-${suffix}`, `${base.slice(0, 27)}-${Date.now().toString().slice(-4)}`]
 
-  for (const username of candidates) {
+  for (const username of candidates.slice(attempt)) {
     const { data: existingProfile } = await readData('profile_username_lookup', supabaseAdmin
       .from('profiles')
       .select('id')
@@ -105,24 +102,32 @@ export async function POST(request: NextRequest) {
     }
 
     if (requestedBio.length > PROFILE_BIO_MAX_LENGTH || requestedBio.includes('\0')) throw new InputError('Bio invalide ou trop longue.')
-    const username = await buildUniqueUsername(supabaseAdmin, requestedUsername, user.id)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const username = await buildUniqueUsername(supabaseAdmin, requestedUsername, user.id, attempt)
+      const { data: createdProfile, error: insertError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: user.id,
+          username,
+          display_name: username,
+          avatar_url: null,
+          bio: requestedBio || null,
+        })
+        .select('id, username, display_name, avatar_url, bio, created_at')
+        .single()
 
-    const { data: createdProfile, error: insertError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: user.id,
-        username,
-        display_name: username,
-        avatar_url: null,
-        bio: requestedBio || null,
-      })
-      .select('id, username, display_name, avatar_url, bio, created_at')
-      .single()
+      if (insertError) {
+        if (insertError.code === '23505') {
+          const {data: concurrentProfile} = await readData('profile_sync_concurrent', supabaseAdmin.from('profiles')
+            .select('id, username, display_name, avatar_url, bio, created_at').eq('id', user.id).maybeSingle())
+          if (concurrentProfile) return adminJson({profile: concurrentProfile, created: false, repaired: false})
+          if (attempt < 2) continue
+        }
+        throw insertError
+      }
 
-    if (insertError) {
-      throw insertError
+      return adminJson({ profile: createdProfile, created: true, repaired: false })
     }
-
-    return adminJson({ profile: createdProfile, created: true, repaired: false })
+    throw new Error('profile_creation_failed')
   } catch (error) { return profileFailure('profile_sync', error) }
 }

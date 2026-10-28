@@ -62,7 +62,7 @@ test('profile input rejects malformed, oversized, unknown and mistyped fields be
   }
   assert.deepEqual(events,[])
   for(const bio of [null,'',' Bonjour '])assert.equal((await profile(request({username:' Player ',bio}))).status,200)
-  assert.equal(events.at(-1)[1].username,'Player')
+  assert.equal(events.at(-1)[1].username,'player')
 })
 
 test('profile auth/database failures are private and sync never treats a failed lookup as absence',async()=>{

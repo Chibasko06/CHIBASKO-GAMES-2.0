@@ -498,6 +498,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      public_profile_resolve: {
+        Args: {p_identifier: string}
+        Returns: Json
+      }
       admin_console_users: {
         Args: {p_actor:string;p_search?:string;p_role?:string;p_offset?:number;p_limit?:number}
         Returns: Json

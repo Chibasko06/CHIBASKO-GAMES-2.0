@@ -137,9 +137,9 @@ test('panneau utilisateur mobile : focus, sauvegarde avec instantané et conflit
   const x=await fixture({viewport:{width:390,height:844},path:'/admin?section=users',conflict});try{
    await x.page.getByRole('button',{name:'Modifier Membre 001',exact:true}).click()
    const input=x.page.getByLabel('Pseudo',{exact:true});await input.waitFor();assert.equal(await input.evaluate(el=>el===document.activeElement),true)
-   await input.fill('Nouveau pseudo');await x.page.getByRole('button',{name:'Enregistrer le profil'}).click()
-   if(conflict){await x.page.getByRole('alert').waitFor();assert.equal(await input.inputValue(),'Nouveau pseudo')}
-   else await x.page.getByRole('button',{name:'Modifier Nouveau pseudo',exact:true}).waitFor()
+   await input.fill('nouveau-pseudo');await x.page.getByRole('button',{name:'Enregistrer le profil'}).click()
+   if(conflict){await x.page.getByRole('alert').waitFor();assert.equal(await input.inputValue(),'nouveau-pseudo')}
+   else await x.page.getByRole('button',{name:'Modifier nouveau-pseudo',exact:true}).waitFor()
    const write=x.requests.find(request=>request.method==='PATCH');assert.equal(write.body.expected.username,'Membre 001')
    assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
   }finally{await x.context.close()}

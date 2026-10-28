@@ -867,7 +867,7 @@ function AdminPanel() {
 
               <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4">
                 <FormField label="Pseudo">
-                  <input disabled={savingUser || uploadingUserAvatar} maxLength={32} value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+                  <input disabled={savingUser || uploadingUserAvatar} minLength={3} maxLength={32} pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,30}[A-Za-z0-9]" title="Identifiant public : 3 à 32 caractères, sans accent ni espace" value={userForm.username} onChange={(e) => handleUserChange('username', e.target.value)} placeholder="Pseudo" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
                 </FormField>
                 <FormField label="URL de l’avatar">
                   <input disabled={savingUser || uploadingUserAvatar} maxLength={2048} value={userForm.avatar_url} onChange={(e) => handleUserChange('avatar_url', e.target.value)} placeholder="URL de l’avatar" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
