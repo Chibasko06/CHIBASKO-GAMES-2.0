@@ -56,3 +56,18 @@ test('maintenance de modération désactivée puis activée avec configuration i
  await assert.rejects(runMaintenance({MODERATION_MAINTENANCE_ENABLED:'1'},{db:{async call(name){calls.push(name);return 0}},log(){}}),/maintenance_cycle_failed/)
  assert.ok(calls.includes('distribution_moderation_cleanup'))
 })
+
+
+test('e-mail HTML de marque : motif français, lien privé et échappement du contenu',async()=>{
+ const x=fixture();await deliverModeration(x.db,x.env,x.options);const message=JSON.parse(x.sent[0].body)
+ assert.match(message.html,/Chibasko/);assert.match(message.html,/chibaskogames-logo.png/);assert.match(message.html,/Examiner le dossier/);assert.match(message.text,/Type : Joueur/);assert.match(message.text,/Motif : Spam/)
+ const y=fixture();y.job.kind='decision';y.job.case.contact_email='guest@example.test';y.job.decision='<img src=x onerror=alert(1)> & motif';await deliverModeration(y.db,y.env,y.options)
+ const decision=JSON.parse(y.sent[0].body);assert.match(decision.html,/&lt;img/);assert.doesNotMatch(decision.html,/<img src=x/);assert.match(decision.text,/<img src=x/)
+})
+test('envoi accepté mais confirmation SQL indisponible : reprise identique sans nouvel événement',async()=>{
+ const x=fixture(),original=x.db.call;let unavailable=true
+ x.db.call=async(name,args)=>{if(name==='distribution_moderation_finish_mail'&&unavailable)throw Error('fixture-ack-unavailable');return original(name,args)}
+ assert.equal(await deliverModeration(x.db,x.env,x.options),0);assert.equal(x.state(),'pending')
+ unavailable=false;x.retry();assert.equal(await deliverModeration(x.db,x.env,x.options),1);assert.equal(x.state(),'sent')
+ assert.equal(x.sent[0].body,x.sent[1].body);assert.equal(x.sent[0].headers['Idempotency-Key'],x.sent[1].headers['Idempotency-Key'])
+})

@@ -1,3 +1,4 @@
+import {moderationPresentation} from './moderationPresentation'
 import 'server-only'
 import {createHmac} from 'node:crypto'
 import {isIP} from 'node:net'
@@ -91,7 +92,7 @@ export async function moderationRequest(request:Request,admin=false){
   const db=uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??'')
   const result=admin?await db.call('distribution_moderation_admin',{p_actor:actor,p_input:input}):await db.call('distribution_moderation_submit',{p_actor:actor,p_input:input,p_client:client,p_fingerprint:fingerprint})
   if(!result)throw new InputError('Dossier introuvable.',404)
-  return adminJson({data:result},{status:admin?200:201})
+  return adminJson({data:admin?await moderationPresentation(result):result},{status:admin?200:201})
  }catch(error){
   if(error instanceof InputError)return adminJson({error:error.message},{status:error.status})
   if(error&&typeof error==='object'&&'status' in error&&[401,403].includes(Number(error.status)))return adminJson({error:'Accès non autorisé.'},{status:Number(error.status)})

@@ -1,3 +1,5 @@
+import {moderationEmailHtml,reportReason} from './moderationEmail'
+import type {ReportKind} from './moderation'
 import type {UploadRepository} from '@/lib/game-distribution/uploads/contracts'
 import {withTimeout} from '@/lib/asyncOperation'
 
@@ -23,9 +25,10 @@ export async function deliverModeration(db:UploadRepository,env:ModerationMailEn
     const destination=job.kind==='admin'?to:job.case.contact_email
     if(!destination||!/^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(destination))throw Error('moderation_recipient_missing')
     message={from,to:[destination],subject:job.kind==='admin'?'Nouveau signalement sur Chibasko Games':job.kind==='receipt'?'Chibasko Games — signalement reçu':'Chibasko Games — décision sur le signalement',text:job.kind==='admin'
-     ?`Dossier #${job.case.number}\nType : ${job.case.target_kind}\nMotif : ${job.case.category}\nConsulter le dossier privé : ${adminUrl.href}`
+     ?`Dossier #${job.case.number}\nType : ${job.case.target_kind==='player'?'Joueur':'Jeu'}\nMotif : ${reportReason(job.case.target_kind as ReportKind,job.case.category)}\nConsulter le dossier privé : ${adminUrl.href}`
      :job.kind==='receipt'?`Le signalement #${job.case.number} a été enregistré et sera examiné par Chibasko Games.\nAucune sanction n’est automatique.\nPour compléter le dossier ou contester une décision : ${appeal}, en précisant ce numéro.`
       :`Décision relative au signalement #${job.case.number}\n\n${job.decision??''}\n\nCette réponse concerne le suivi du dossier et n’atteste pas une sanction automatique.\nPour demander un réexamen : ${appeal}, en précisant ce numéro. Les voies judiciaires restent ouvertes ; les autres voies applicables dépendent de la qualification du service.`}
+    message.html=moderationEmailHtml(String(message.subject),String(message.text),adminUrl,job.kind==='admin'?adminUrl:undefined)
    }
    message=await withTimeout(db.call<Record<string,unknown>>('distribution_moderation_prepare_mail',{p_id:job.id,p_lease:job.lease,p_message:message}),8000)
    phase='send';options.signal?.throwIfAborted()

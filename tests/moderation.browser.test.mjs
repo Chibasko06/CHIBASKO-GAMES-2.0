@@ -18,8 +18,8 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function fixture({guest=false,admin=false,width=390,menu=''}={}){
- const context=await browser.newContext({viewport:{width,height:844}}),calls=[],record={id:id(3),number:42,target_kind:'player',target_user:id(2),target_game:null,target_locator:'/players/'+id(2),reporter:guest?null:id(1),category:'spam',description:'Description <script>window.injection=true</script> du signalement.',contact_name:null,contact_email:null,state:'open',version:1,created_at:'2026-10-29T12:00:00Z',privacy_review:false,events:[],mail:[]}
+async function fixture({guest=false,admin=false,width=390,menu='',linked=false}={}){
+ const context=await browser.newContext({viewport:{width,height:844}}),calls=[],record={id:id(3),number:42,target_kind:'player',target_user:id(2),target_game:null,target_locator:'/players/'+id(2),reporter:guest?null:id(1),category:'spam',description:'Description <script>window.injection=true</script> du signalement.',contact_name:null,contact_email:null,state:'open',version:1,created_at:'2026-10-29T12:00:00Z',privacy_review:false,reporter_name:'declarant',target_view:{username:'joueur-signale',bio:'Profil public'},events:[],mail:[{id:id(9),kind:'admin',state:'pending',attempts:1}]}
  await context.addInitScript(({guest})=>{window.fixture={guest};window.confirm=()=>true},{guest})
  await context.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url())
@@ -36,7 +36,7 @@ async function fixture({guest=false,admin=false,width=390,menu=''}={}){
   }
   return route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body class="bg-black text-white"><div id="root"></div><script src="/host.js"></script></body></html>'})
  })
- const page=await context.newPage();await page.goto('https://portal.test/'+(admin?'admin/moderation':'contact?report=player'+(menu?'&menu='+menu:'')))
+ const page=await context.newPage();await page.goto('https://portal.test/'+(admin?'admin/moderation'+(linked?'?id='+id(3):''):'contact?report=player'+(menu?'&menu='+menu:'')))
  return {context,page,calls,record}
 }
 for(const guest of [false,true])test('signalement '+(guest?'invité avec défi':'authentifié')+' : formulaire accessible et réception',async()=>{
@@ -58,7 +58,10 @@ test('notification illicite : bonne foi explicite et exception sans coordonnées
 })
 for(const width of [390,768,1366])test('modération administrative à '+width+'px : recherche, détail, historique et aucune sanction',async()=>{
  const x=await fixture({admin:true,width});try{
+  await x.page.getByRole('heading',{name:'@joueur-signale'}).waitFor();assert.equal(await x.page.getByText('Spam',{exact:true}).count(),1)
   await x.page.getByRole('button',{name:'Examiner le dossier #42'}).click();await x.page.getByRole('heading',{name:'Dossier #42'}).waitFor()
+  assert.equal(await x.page.getByText(id(3),{exact:true}).isVisible(),false);await x.page.getByText('Références techniques',{exact:true}).click();assert.equal(await x.page.getByText(id(3),{exact:true}).isVisible(),true)
+  await x.page.getByLabel('Note administrative privée').fill('Brouillon à conserver');x.record.mail[0].state='sent';await x.page.getByRole('button',{name:'Actualiser les envois'}).click();await x.page.getByText(/Accepté par le service d’envoi/).waitFor();assert.equal(await x.page.getByLabel('Note administrative privée').inputValue(),'Brouillon à conserver')
   assert.equal(await x.page.evaluate(()=>window.injection),undefined)
   await x.page.getByLabel('Décision de suivi').selectOption('resolved');await x.page.getByLabel('Justification communicable').fill('Examen termine et dossier resolu sans application de sanction.');await x.page.getByLabel('Note administrative privée').fill('Note interne de fixture.')
   await x.page.getByRole('button',{name:'Enregistrer la décision'}).click();await x.page.getByText('Note privée : Note interne de fixture.').waitFor();assert.equal(x.record.state,'resolved')
@@ -74,5 +77,12 @@ for(const menu of ['profile','game'])test('menu réel '+menu+' : signalement acc
   await dialog.getByRole('button',{name:'Envoyer le signalement'}).click();await dialog.getByText('Signalement reçu — dossier #42').waitFor()
   assert.equal(x.calls[0].kind,menu==='game'?'game':'player')
   await x.page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'})
+ }finally{await x.context.close()}
+})
+
+
+test('lien depuis un e-mail : le dossier s’ouvre directement sans charger la liste',async()=>{
+ const x=await fixture({admin:true,linked:true});try{
+  await x.page.getByRole('heading',{name:'Dossier #42'}).waitFor();assert.deepEqual(x.calls,[{id:id(3)}]);assert.equal(await x.page.getByText('Alerte administrative',{exact:true}).count(),1)
  }finally{await x.context.close()}
 })

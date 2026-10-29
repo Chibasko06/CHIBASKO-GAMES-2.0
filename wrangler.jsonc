@@ -52,7 +52,7 @@
     "run_worker_first": true
   },
   "vars": {
-    "MODERATION_ENABLED": "0",
+    "MODERATION_ENABLED": "1",
     "CHIBASKO_CLOUDFLARE": "1",
     "CONTACT_FORM_ENABLED": "1",
     "CONTACT_NOTIFY_EMAIL": "chibasko06@gmail.com",

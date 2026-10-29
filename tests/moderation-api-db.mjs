@@ -15,6 +15,10 @@ export async function moderationApiIntegration(query,ids){
   if(url.pathname==='/auth/v1/user')return Object.values(ids).includes(actor)?Response.json({id:actor}):Response.json({message:'expired'},{status:401})
   if(url.pathname==='/rest/v1/admin_users')return Response.json(actor===ids.admin?{user_id:ids.admin}:null)
   assert.equal(authorization,'Bearer server-fixture');assert.equal(init.cache,'no-store')
+  if(url.pathname==='/rest/v1/moderation_cases'){
+   const caseIds=url.searchParams.get('id').slice(4,-1).split(',');assert.ok(caseIds.length<=20)
+   const rows=JSON.parse(await query("select coalesce(json_agg(json_build_object('id',c.id,'target_profile',(select json_build_object('username',p.username) from profiles p where p.id=c.target_user),'target_game_view',(select json_build_object('title',g.title,'is_published',g.is_published) from games g where g.id=c.target_game))),'[]'::json) from moderation_cases c where c.id in("+caseIds.map(literal).join(',')+")"));return Response.json(rows)
+  }
   const args=JSON.parse(init.body),name=url.pathname.split('/').at(-1)
   assert.ok(['distribution_moderation_submit','distribution_moderation_admin'].includes(name))
   const type={p_actor:'uuid',p_input:'jsonb',p_client:'text',p_fingerprint:'text'}
@@ -45,7 +49,7 @@ export async function moderationApiIntegration(query,ids){
   assert.equal((await send(null,{...body,operationId:randomUUID()})).status,400)
   const guest=await send(null,{...body,operationId:randomUUID(),contactName:'Invitée',contactEmail:'guest@example.test',botToken:'fixture-token'});assert.equal(guest.status,201)
   challengeValid=false;assert.equal((await send(null,{...body,operationId:randomUUID(),contactName:'Fixture',contactEmail:'guest@example.test',botToken:'invalid'})).status,400);challengeValid=true
-  const list=await send(ids.admin,undefined,true,'?state=open&page=1');assert.equal(list.status,200);assert.ok(list.body.data.items.length>0)
+  const list=await send(ids.admin,undefined,true,'?state=open&page=1');assert.equal(list.status,200);assert.ok(list.body.data.items.length>0);assert.ok(list.body.data.items.some(item=>item.target_view?.username));assert.ok(list.body.data.items.some(item=>item.target_view?.title==='Moderation'))
   process.env.MODERATION_ENABLED='0';assert.equal((await send(ids.admin,undefined,true,'?page=1')).status,200);assert.equal((await send(ids.actor,body)).status,503);process.env.MODERATION_ENABLED='1'
   const detail=await send(ids.admin,undefined,true,'?id='+saved.body.data.id);assert.equal(detail.body.data.reporter,ids.actor)
   const decision={action:'update',id:saved.body.data.id,version:1,state:'dismissed',justification:'Examen effectue sans sanction automatique.',note:'Note privee de fixture.',privacyReviewed:false}
