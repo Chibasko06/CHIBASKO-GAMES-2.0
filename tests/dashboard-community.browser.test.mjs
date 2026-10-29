@@ -43,6 +43,7 @@ async function fixture(query='',viewport={width:1366,height:768},accountEnabled=
   if(url.pathname==='/style.css')return route.fulfill({contentType:'text/css',body:css})
   if(url.pathname==='/thumbnail.svg')return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="80" height="45"><rect width="80" height="45" fill="#164e63"/></svg>'})
   if(url.pathname==='/api/social')return route.fulfill({json:{items:[],nextCursor:null}})
+  if(url.pathname==='/api/social/notifications')return route.fulfill({json:{data:{avatarUrl:null,isAdmin:false,unreadCount:0}}})
   if(url.pathname==='/api/admin/status')return route.fulfill({json:{isAdmin:false}})
   if(url.pathname==='/api/profile/public'){calls.push(route.request().postDataJSON());return route.fulfill({json:{profile:{id:'11111111-1111-4111-8111-111111111111',...calls.at(-1)}}})}
   if(url.pathname==='/api/account'){calls.push('delete');return route.fulfill({status:accountEnabled?202:503,json:accountEnabled?{deletion:{state:'review_required'}}:{error:'disabled'}})}

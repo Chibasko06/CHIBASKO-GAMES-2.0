@@ -501,6 +501,12 @@ export type Database = {
       }
     }
     Functions: {
+      social_navigation: {Args:Record<string,never>;Returns:Json}
+      social_notifications_count: {Args:Record<string,never>;Returns:number}
+      social_notifications_page: {Args:{p_kind?:string;p_before?:string;p_cursor?:string};Returns:Json}
+      social_notifications_read: {Args:{p_ids:string[]};Returns:number}
+      social_share_friends: {Args:{p_search?:string;p_before?:string;p_cursor?:string};Returns:Json}
+      social_share_game: {Args:{p_target:string;p_game:string;p_operation:string};Returns:Json}
       social_relation: {Args:{p_target:string};Returns:Json}
       social_change: { Args: {p_action:string;p_target:string;p_operation:string;p_relation?:string}; Returns: Json }
       social_list: { Args: {p_kind:string;p_before?:string;p_cursor?:string}; Returns: Json }

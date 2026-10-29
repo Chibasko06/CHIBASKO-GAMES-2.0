@@ -2,6 +2,20 @@ import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import worker,{maintainSessions,runMaintenance} from '../cloudflare/session-maintenance.ts'
 
+test('la purge sociale utilise le cycle existant, reste désactivable et ne bloque pas les autres tâches',async()=>{
+ const calls=[],logs=[]
+ await runMaintenance({GAME_SESSION_MAINTENANCE_ENABLED:'1'},{db:{async call(name){calls.push(name);return name==='distribution_cleanup_sessions'?true:0}},log:event=>logs.push(event)})
+ assert.equal(calls.filter(name=>name==='distribution_cleanup_social_notifications').length,1)
+ assert.ok(logs.some(event=>event.task==='social'&&event.outcome==='completed'&&event.count===0))
+ calls.length=0
+ await runMaintenance({CONTACT_RECEIPTS_MAINTENANCE_ENABLED:'1'},{db:{async call(name){calls.push(name);return 0}},log(){}})
+ assert.equal(calls.includes('distribution_cleanup_social_notifications'),false)
+ calls.length=0
+ await assert.rejects(runMaintenance({GAME_SESSION_MAINTENANCE_ENABLED:'1',CONTACT_RECEIPTS_MAINTENANCE_ENABLED:'1'},
+  {db:{async call(name){calls.push(name);if(name==='distribution_cleanup_social_notifications')throw Error('détail privé');return true}},log(){}}),/maintenance_cycle_failed/)
+ assert.ok(calls.includes('contact_cleanup'));assert.ok(calls.includes('distribution_maintenance_health'))
+})
+
 test('scheduled maintenance awaits notification delivery and acknowledgement before finishing',async()=>{
  const original=globalThis.fetch;const events=[];let release
  const gate=new Promise(resolve=>{release=resolve})

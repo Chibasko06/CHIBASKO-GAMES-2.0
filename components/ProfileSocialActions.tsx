@@ -1,6 +1,7 @@
 'use client'
 import {useEffect,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
+import {emitSocialUpdate} from '@/lib/socialNotifications'
 import SocialConfirmation from '@/components/SocialConfirmation'
 import {changeSocialRelation,readSocialRelation,socialButton,SocialApiError,type Relation,type SocialAction,type SocialChange} from '@/lib/social'
 
@@ -8,9 +9,9 @@ type Props={target:string;username:string;initial?:Relation;onChanged?:(change:S
 export default function ProfileSocialActions(props:Props){
  const {session,user,loading}=useAuth()
  if(loading||!session||!user||user.id===props.target)return null
- return <Actions key={session.access_token+props.target+(props.initial?.state??'')+(props.initial?.relationId??'')} {...props} token={session.access_token}/>
+ return <Actions key={session.access_token+props.target+(props.initial?.state??'')+(props.initial?.relationId??'')} {...props} token={session.access_token} actorId={user.id}/>
 }
-function Actions({target,username,initial,onChanged,token}:Props&{token:string}){
+function Actions({target,username,initial,onChanged,token,actorId}:Props&{token:string;actorId:string}){
  const [relation,setRelation]=useState<Relation|null>(initial??null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
  const [confirmation,setConfirmation]=useState<SocialAction|null>(null),[uncertain,setUncertain]=useState(false)
  const alive=useRef(true),locked=useRef(false),menu=useRef<HTMLDetailsElement>(null)
@@ -38,7 +39,7 @@ function Actions({target,username,initial,onChanged,token}:Props&{token:string})
   if(result){
    setRelation(result)
    if(confirmed||result.state!==relation.state||result.relationId!==relation.relationId){
-    onChanged?.({action:confirmed?action:'refresh',target,relation:result});setNotice('Relation actualisée.');if(menu.current)menu.current.open=false
+    emitSocialUpdate({actorId,source:'profile',change:{action:confirmed?action:'refresh',target,relation:result}});onChanged?.({action:confirmed?action:'refresh',target,relation:result});setNotice('Relation actualisée.');if(menu.current)menu.current.open=false
    }
   }
  }

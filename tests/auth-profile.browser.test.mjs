@@ -46,6 +46,7 @@ async function setup(view='login',profileStatus=200){
    const valid=request.headers()['content-type']==='application/json'&&request.postData()==='{}'&&request.headers().authorization==='Bearer browser-fixture'
    return route.fulfill({status:valid?profileStatus:415,json:profileStatus===200?{profile:{id:'A'}}:{error:'private provider detail'}})
   }
+  if(url.pathname==='/api/social/notifications')return route.fulfill({json:{data:{avatarUrl:null,isAdmin:false,unreadCount:0}}})
   if(url.pathname==='/api/admin/status')return route.fulfill({json:{isAdmin:false}})
   if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:'<div id="root"></div><script src="/bundle.js"></script>'})
   return route.fulfill({status:404,body:''})
@@ -60,7 +61,7 @@ test('connexion à froid et Navbar : une requête Auth et une synchronisation pr
   await x.page.getByRole('button',{name:'Connexion',exact:true}).click()
   await x.page.waitForFunction(()=>window.fixture.destination==='/dashboard')
   assert.equal(x.requests.length,1)
-  assert.deepEqual(await x.page.evaluate(()=>window.fixture.counts),{reads:1,signIns:1,profileReads:1})
+  assert.deepEqual(await x.page.evaluate(()=>window.fixture.counts),{reads:1,signIns:1,profileReads:0})
   assert.equal(await x.page.getByRole('button',{name:'Mon compte',exact:true}).count(),1)
   assert.equal(await x.page.getByText(/profil est indisponible/).count(),0)
   await x.page.evaluate(()=>window.fixture.signOut())

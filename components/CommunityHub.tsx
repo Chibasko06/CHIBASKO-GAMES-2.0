@@ -3,6 +3,8 @@ import {useEffect,useRef,useState} from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {useAuth} from '@/components/AuthProvider'
+import SharedGames from '@/components/SharedGames'
+import {type SocialUpdate} from '@/lib/socialNotifications'
 import RoleBadges from '@/components/RoleBadges'
 import ProfileSocialActions from '@/components/ProfileSocialActions'
 import {publicProfilePath} from '@/lib/publicUsername'
@@ -30,6 +32,13 @@ function Hub({token,userId,loading,profiles,searching,children}:{token?:string;u
   const affected:Kind[]=event.action==='request'?['outgoing','incoming']:event.action==='accept'?['friends','incoming']:event.action==='reject'?['incoming']:event.action==='cancel'?['outgoing']:event.action==='remove'?['friends']:['friends','incoming','outgoing']
   setRevisions(previous=>Object.fromEntries((Object.keys(previous) as Kind[]).map(key=>[key,previous[key]+(affected.includes(key)?1:0)])) as Record<Kind,number>)
  }
+ const changeHandler=useRef(changed)
+ useEffect(()=>{changeHandler.current=changed})
+ useEffect(()=>{
+  const receive=(event:Event)=>{const detail=(event as CustomEvent<SocialUpdate>).detail;if(detail?.actorId===userId&&detail.source==='bell')changeHandler.current(detail.change)}
+  window.addEventListener('chibasko:social-change',receive)
+  return()=>window.removeEventListener('chibasko:social-change',receive)
+ },[userId])
  const found=profiles.filter(profile=>!hidden.includes(profile.id))
  return <div className="space-y-7">
   {notice&&<p role="status" className="text-sm text-cyan-200">{notice}</p>}
@@ -43,6 +52,7 @@ function Hub({token,userId,loading,profiles,searching,children}:{token?:string;u
    <div><h2 className="font-semibold">Retrouve tes amis sur Chibasko Games</h2><p className="mt-1 text-sm text-zinc-400">Connecte-toi pour envoyer des demandes et retrouver tes amis dans un espace privé.</p></div>
    <Link href="/login?next=/players" className={socialButton+' border-cyan-700 text-cyan-200'}>Se connecter</Link>
   </section>}
+  {token&&userId&&<SharedGames token={token} actorId={userId}/>}
  </div>
 }
 function MemberLink({profile}:{profile:{username:string;avatar_url?:string|null;bio?:string|null;roles?:PublicProfile['roles']}}){

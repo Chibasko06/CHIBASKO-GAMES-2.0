@@ -13,7 +13,7 @@ export async function maintainSessions(db:UploadRepository,log:(event:Event)=>vo
  try{log({component:'session_maintenance',outcome,durationMs:Date.now()-started})}catch{}
  if(outcome==='failed')throw Error('session_maintenance_failed')
 }
-type Task='sessions'|'previews'|'launches'|'uploads'|'contact'|'notifications'|'accounts'|'health'|'cycle'
+type Task='social'|'sessions'|'previews'|'launches'|'uploads'|'contact'|'notifications'|'accounts'|'health'|'cycle'
 type Log={component:'maintenance';runId:string;task:Task;outcome:'completed'|'failed'|'deferred'|'attention_required';durationMs:number;count?:number;metric?:string}
 type Options={db?:UploadRepository;log?:(event:Log)=>void;operationMs?:number;accountMs?:number;notificationMs?:number;notifications?:()=>Promise<number>;account?:(signal:AbortSignal)=>Promise<{state:string}|null>}
 export async function runMaintenance(env:Environment,options:Options={}){
@@ -36,6 +36,7 @@ export async function runMaintenance(env:Environment,options:Options={}){
    await task('sessions',()=>maintainSessions(db,()=>{}))
    await task('previews',()=>db.call('distribution_cleanup_previews',{}))
    await task('launches',()=>db.call('distribution_cleanup_launches',{}))
+   await task('social',()=>db.call('distribution_cleanup_social_notifications',{}))
   }
   if(env.GAME_UPLOAD_MAINTENANCE_ENABLED==='1')await task('uploads',()=>db.call('distribution_maintenance_uploads',{}))
   if(env.CONTACT_RECEIPTS_MAINTENANCE_ENABLED==='1')await task('contact',()=>db.call('contact_cleanup',{}))

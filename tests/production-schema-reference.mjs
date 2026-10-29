@@ -62,7 +62,12 @@ try {
    await assert.rejects(run('psql',[...args,'-f',file]),error=>/public_username_preflight_collision/.test(error.stderr))
    await query(`update public.profiles set username='migration-second' where id='${second}'`)
   }
+  if(name==='20261101000100_social_notifications.sql')await query("insert into auth.users(id,email) values('fa410000-0000-4000-8000-000000000001','historical-a@example.test'),('fa410000-0000-4000-8000-000000000002','historical-b@example.test');insert into public.social_relationships(user_low,user_high,requester,state) values('fa410000-0000-4000-8000-000000000001','fa410000-0000-4000-8000-000000000002','fa410000-0000-4000-8000-000000000001','pending')")
   await run('psql',[...args,'-f',file])
+  if(name==='20261101000100_social_notifications.sql'){
+   assert.equal((await query('select count(*) from public.social_notifications')).stdout.trim(),'0','Les demandes historiques ne créent aucun nouvel événement');
+   await query("delete from public.profiles where id::text like 'fa410000-%'");
+  }
   if(name==='20261029000100_profile_public_projection.sql'){
    assert.equal((await query("select has_table_privilege('anon','public.profiles','SELECT') and has_table_privilege('anon','public.public_profiles','SELECT')")).stdout.trim(),'t','La phase additive préserve les anciens consommateurs jusqu’au déploiement applicatif');
   }
@@ -175,6 +180,8 @@ try {
  await assert.rejects(query('set role anon;select public.distribution_cleanup_sessions()'))
  const {socialInterfaceIntegration}=await import('./social-interface-db.mjs')
  await socialInterfaceIntegration(async sql=>(await query(sql)).stdout.trim())
+ const {socialNotificationsIntegration}=await import('./social-notifications-db.mjs')
+ await socialNotificationsIntegration(async sql=>(await query(sql)).stdout.trim())
  const output=join(root,'contracts/production-schema.v1.json')
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')

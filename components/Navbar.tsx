@@ -5,7 +5,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/components/AuthProvider'
 import {withTimeout} from '@/lib/asyncOperation'
-import {readData} from '@/lib/dataAccess'
+import {notificationCall,parseUnread,notificationReadTime,type SocialUpdate} from '@/lib/socialNotifications'
+import NotificationBell from '@/components/NotificationBell'
 import { supabase } from '@/lib/supabaseClient'
 import UserDropdown from '@/components/UserDropdown'
 import ChibaskoLogo from '@/components/ChibaskoLogo'
@@ -19,6 +20,9 @@ export function Navbar() {
   const token = session?.access_token ?? null
   const [adminUserId, setAdminUserId] = useState<string | null>(null)
   const isAdmin = !!user && adminUserId === user.id
+  const [unreadCount,setUnreadCount]=useState<number|null>(null)
+  const [navigationOwner,setNavigationOwner]=useState<string|null>(null)
+  const counterEpoch=useRef(0),counterTime=useRef(0)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [profileUnavailable, setProfileUnavailable] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -32,53 +36,35 @@ export function Navbar() {
 
   useEffect(() => {
     let mounted = true
+    const initialCounter=++counterEpoch.current
     const controller = new AbortController()
     const timer = setTimeout(() => { controller.abort(); if (mounted) setAdminUserId(null) }, 10_000)
 
     const loadUser = async () => {
-      if (userId) {
-        // Avatar availability must not delay the independent admin status check.
-        const profileRequest = async () => {
-          const { data: profile } = await readData('navigation_profile', supabase
-            .from('profiles')
-            .select('avatar_url')
-            .eq('id', userId)
-            .abortSignal(controller.signal)
-            .maybeSingle())
-
-          if (mounted) {
-            setAvatarUrl(profile?.avatar_url ?? null)
-            setProfileUnavailable(false)
-          }
-        }
-        void profileRequest().catch(() => { if (mounted) setProfileUnavailable(true) })
-
-        if (token) {
-          const response = await fetch('/api/admin/status', {
-            cache: 'no-store',
-            signal: controller.signal,
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          })
-
-          const payload = await response.json()
-
-          if (mounted) {
-            setAdminUserId(response.ok && payload.isAdmin === true ? userId : null)
-          }
-        }
-      } else if (mounted) {
-        setAdminUserId(null)
-        setAvatarUrl(null)
-        setProfileUnavailable(false)
-      }
+      if (userId && token) {
+        const response=await fetch('/api/social/notifications?view=navigation',{cache:'no-store',signal:controller.signal,headers:{Authorization:'Bearer '+token}})
+        const payload=await response.json(),value=payload.data
+        if(!response.ok||!value||typeof value.isAdmin!=='boolean'||(value.avatarUrl!==null&&typeof value.avatarUrl!=='string'))throw Error('navigation_unavailable')
+        const count=parseUnread(value.unreadCount)
+        if(mounted){setAvatarUrl(value.avatarUrl);setAdminUserId(value.isAdmin?userId:null);if(initialCounter===counterEpoch.current)setUnreadCount(count);setNavigationOwner(userId);setProfileUnavailable(false)}
+      } else if(mounted){setAdminUserId(null);setAvatarUrl(null);setUnreadCount(null);setProfileUnavailable(false)}
     }
+    const changed=(event:Event)=>{
+      const detail=(event as CustomEvent<SocialUpdate>).detail
+      if(detail?.actorId!==userId||detail.source==='bell'||!token)return
+      const observedAt=notificationReadTime(),version=++counterEpoch.current
+      void notificationCall(token,'count').then(value=>{if(mounted&&version===counterEpoch.current&&observedAt>=counterTime.current){counterTime.current=observedAt;setUnreadCount(parseUnread(value))}}).catch(()=>{if(mounted&&version===counterEpoch.current)setUnreadCount(null)})
+    }
+    const counted=(event:Event)=>{const detail=(event as CustomEvent<{actorId:string;count:number;observedAt:number}>).detail;if(detail?.actorId!==userId||!Number.isFinite(detail.observedAt)||detail.observedAt<counterTime.current)return;try{const count=parseUnread(detail.count);counterTime.current=detail.observedAt;++counterEpoch.current;setNavigationOwner(userId);setUnreadCount(count)}catch{}}
+    window.addEventListener('chibasko:notification-count',counted)
+    window.addEventListener('chibasko:social-change',changed)
 
-    void loadUser().catch(() => { if (mounted) setAdminUserId(null) }).finally(() => clearTimeout(timer))
+    void loadUser().catch(() => { if (mounted){setAdminUserId(null);setProfileUnavailable(true);setUnreadCount(null)} }).finally(() => clearTimeout(timer))
 
     return () => {
       mounted = false
+      window.removeEventListener('chibasko:social-change',changed)
+      window.removeEventListener('chibasko:notification-count',counted)
       clearTimeout(timer)
       controller.abort()
     }
@@ -121,7 +107,7 @@ export function Navbar() {
                     Admin
                   </Link>
                 ) : null}
-                <UserDropdown user={user} isAdmin={isAdmin} avatarUrl={avatarUrl} />
+                <UserDropdown user={user} isAdmin={isAdmin} avatarUrl={navigationOwner===userId?avatarUrl:null} />
               </>
             ) : loading ? (
               <div className="h-[38px] w-[275px] animate-pulse rounded-full border border-zinc-800 bg-zinc-950" />
@@ -137,6 +123,8 @@ export function Navbar() {
             )}
           </div>
 
+          <div className="flex items-center gap-2">
+          {userId&&token&&<NotificationBell key={token} token={token} actorId={userId} count={navigationOwner===userId?unreadCount:null} onCount={(count,observedAt)=>{if(observedAt<counterTime.current)return;counterTime.current=observedAt;++counterEpoch.current;setNavigationOwner(userId);setUnreadCount(count)}}/>}
           <button
             type="button"
             onClick={() => setMobileMenuOpen((current) => !current)}
@@ -159,6 +147,7 @@ export function Navbar() {
               </span>
             )}
           </button>
+          </div>
         </div>
 
         {mobileMenuOpen ? (
@@ -187,7 +176,7 @@ export function Navbar() {
                   <div className="rounded-[22px] border border-zinc-800 bg-black/30 p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-cyan-700 bg-cyan-600 text-xs font-black text-black">
-                        {avatarUrl ? (
+                        {navigationOwner===userId&&avatarUrl ? (
                           <Image
                             src={avatarUrl}
                             alt="Avatar compte"

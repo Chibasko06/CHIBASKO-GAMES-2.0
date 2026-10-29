@@ -1,3 +1,4 @@
+import GameSharingMenu from '@/components/GameSharingMenu'
 import {cache} from 'react'
 import GamePagePlayerLayout from '@/components/GamePagePlayerLayout'
 import {selectGameRecommendations} from '@/lib/catalogueRecommendations'
@@ -9,7 +10,7 @@ import GameReviews from '@/components/GameReviews'
 import GameViewport from '@/components/GameViewport'
 import PlaySessionTracker from '@/components/PlaySessionTracker'
 import { getGameBySlug, getGameRecommendations } from '@/lib/queries/games'
-import { serializeJsonLd } from '@/lib/seo'
+import { siteConfig, serializeJsonLd } from '@/lib/seo'
 import { gameMetadata, gameStructuredData } from '@/lib/seoCatalogue'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -73,7 +74,7 @@ export default async function GamePage({
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-3">
-          <h1 className="text-3xl font-black uppercase text-cyan-400 sm:text-4xl">{game.title}</h1>
+          <div className="flex items-start justify-between gap-4"><h1 className="text-3xl font-black uppercase text-cyan-400 sm:text-4xl">{game.title}</h1><GameSharingMenu gameId={game.id} title={game.title} url={siteConfig.url+'/games/'+game.slug}/></div>
           {game.developer_name && <p className="text-sm text-zinc-400">{game.developer_name}</p>}
           <div className="flex flex-wrap gap-2">
             {game.categories?.map((category) => (
