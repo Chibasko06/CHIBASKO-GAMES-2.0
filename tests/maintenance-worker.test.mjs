@@ -5,6 +5,23 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare'
 import {readFile} from 'node:fs/promises'
 import ts from 'typescript'
 
+test('le Worker reprend une alerte de modération sans nouveau cron et attend son acquittement',async()=>{
+ const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'ts',contents:`import worker from './cloudflare/session-maintenance';export default {async fetch(request,env){await worker.scheduled({},env);return new Response('completed')}}`},bundle:true,write:false,platform:'browser',format:'esm'})
+ const calls=[];let claimed=false,message
+ const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-10-18',script:bundle.outputFiles[0].text,bindings:{SUPABASE_URL:'https://db.example.test',SUPABASE_SERVICE_ROLE_KEY:'fixture-only',MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture-only',RESEND_FROM_EMAIL:'noreply@example.test',GAME_SUBMISSION_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test'},outboundService:async request=>{
+  const url=new URL(request.url),body=await request.json();calls.push(url.pathname)
+  if(url.hostname==='api.resend.com'){assert.equal(request.headers.get('Idempotency-Key'),'moderation/fa800000-0000-4000-8000-000000000001');assert.deepEqual(body,message);return Response.json({id:'fixture-only'})}
+  assert.equal(url.hostname,'db.example.test')
+  if(url.pathname.endsWith('distribution_moderation_cleanup'))return Response.json(0)
+  if(url.pathname.endsWith('distribution_moderation_claim_mail')){if(claimed)return Response.json(null);claimed=true;return Response.json({id:'fa800000-0000-4000-8000-000000000001',lease:'fa800000-0000-4000-8000-000000000002',kind:'admin',message:null,case:{id:'fa800000-0000-4000-8000-000000000003',number:42,target_kind:'game',category:'spam',contact_email:null}})}
+  if(url.pathname.endsWith('distribution_moderation_prepare_mail')){message=body.p_message;return Response.json(message)}
+  if(url.pathname.endsWith('distribution_moderation_finish_mail')){assert.equal(body.p_success,true);return Response.json(null)}
+  if(url.pathname.endsWith('distribution_maintenance_health'))return Response.json({})
+  assert.fail('RPC imprévue')
+ }}))
+ try{assert.equal((await runtime.dispatchFetch('https://maintenance.test')).status,200);assert.ok(calls.includes('/rest/v1/rpc/distribution_moderation_finish_mail'));assert.equal(calls.filter(path=>path==='/emails').length,1)}finally{await runtime.dispose()}
+})
+
 test('les configurations de production conservent les ressources et les activations explicites',async()=>{
  const config=async path=>{const parsed=ts.parseConfigFileTextToJson(path,await readFile(path,'utf8'));assert.equal(parsed.error,undefined);return parsed.config}
  const maintenance=await config('cloudflare/wrangler.maintenance.production.jsonc')

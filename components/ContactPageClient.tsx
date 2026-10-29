@@ -39,6 +39,7 @@ export default function ContactPageClient(){
  return <div className="mx-auto max-w-4xl rounded-[28px] border border-cyan-950/80 bg-zinc-950 p-8 md:p-10">
   <p className="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80">Contact</p><h1 className="mt-3 text-4xl font-black uppercase text-white">Nous contacter</h1>
   <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-400">Une question, un bug, une idée de partenariat ou un retour sur un jeu ? Ton message est transmis à l’équipe Chibasko Games par Resend. Le contenu n’est pas enregistré dans la base du site. <a className="text-cyan-300 underline" href="/confidentialite">Confidentialité</a></p>
+  <p className="mt-4 text-sm"><a href="/contact?report=player" className="text-cyan-300 underline">Signaler un joueur ou un jeu, y compris un compte bloqué</a></p>
   <form ref={element} onSubmit={submit} noValidate aria-busy={phase==='sending'} className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
    {(['lastName','firstName','email','message'] as ContactFields[]).map(name=><FormField key={name} label={labels[name]} error={errors[name]} className={name==='email'||name==='message'?'md:col-span-2':''}>
     {name==='message'?<textarea name={name} value={form[name]} required maxLength={CONTACT_LIMITS[name]} readOnly={phase==='sending'||phase==='unconfirmed'} onChange={event=>{setForm(current=>({...current,[name]:event.target.value}));setErrors(current=>({...current,[name]:undefined}))}} className="min-h-48 rounded-2xl border border-zinc-800 bg-black/60 p-4 text-white"/>:

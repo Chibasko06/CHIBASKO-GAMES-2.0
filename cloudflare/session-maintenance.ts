@@ -1,3 +1,4 @@
+import {deliverModeration,type ModerationMailEnvironment} from '../lib/moderationDelivery'
 import {deliverSubmissionNotifications,type NotificationEnvironment} from '../lib/game-distribution/submission-notifications'
 import {uploadRepository} from '../lib/game-distribution/uploads/repository'
 import type {UploadRepository} from '../lib/game-distribution/uploads/contracts'
@@ -5,7 +6,7 @@ import {processAccountDeletion,accountDeletionAuth} from '../lib/game-distributi
 import {accountCleanup,type CleanupBindings} from '../lib/game-distribution/account-cleanup'
 import {withTimeout} from '../lib/asyncOperation'
 
-type Environment=NotificationEnvironment & CleanupBindings & {GAME_ACCOUNT_DELETIONS_ENABLED?:string;GAME_SUBMISSION_NOTIFICATIONS_ENABLED?:string;SUPABASE_URL:string;SUPABASE_SERVICE_ROLE_KEY:string;GAME_SESSION_MAINTENANCE_ENABLED?:string;GAME_UPLOAD_MAINTENANCE_ENABLED?:string;CONTACT_RECEIPTS_MAINTENANCE_ENABLED?:string}
+type Environment=ModerationMailEnvironment & NotificationEnvironment & CleanupBindings & {GAME_ACCOUNT_DELETIONS_ENABLED?:string;GAME_SUBMISSION_NOTIFICATIONS_ENABLED?:string;SUPABASE_URL:string;SUPABASE_SERVICE_ROLE_KEY:string;GAME_SESSION_MAINTENANCE_ENABLED?:string;GAME_UPLOAD_MAINTENANCE_ENABLED?:string;CONTACT_RECEIPTS_MAINTENANCE_ENABLED?:string}
 type Event={component:'session_maintenance';outcome:'completed'|'already_running'|'failed';durationMs:number}
 export async function maintainSessions(db:UploadRepository,log:(event:Event)=>void=event=>console.info(JSON.stringify(event))){
  const started=Date.now();let outcome:Event['outcome']='failed'
@@ -13,11 +14,11 @@ export async function maintainSessions(db:UploadRepository,log:(event:Event)=>vo
  try{log({component:'session_maintenance',outcome,durationMs:Date.now()-started})}catch{}
  if(outcome==='failed')throw Error('session_maintenance_failed')
 }
-type Task='social'|'sessions'|'previews'|'launches'|'uploads'|'contact'|'notifications'|'accounts'|'health'|'cycle'
+type Task='moderation'|'social'|'sessions'|'previews'|'launches'|'uploads'|'contact'|'notifications'|'accounts'|'health'|'cycle'
 type Log={component:'maintenance';runId:string;task:Task;outcome:'completed'|'failed'|'deferred'|'attention_required';durationMs:number;count?:number;metric?:string}
 type Options={db?:UploadRepository;log?:(event:Log)=>void;operationMs?:number;accountMs?:number;notificationMs?:number;notifications?:()=>Promise<number>;account?:(signal:AbortSignal)=>Promise<{state:string}|null>}
 export async function runMaintenance(env:Environment,options:Options={}){
- const flags=[env.GAME_SESSION_MAINTENANCE_ENABLED,env.GAME_UPLOAD_MAINTENANCE_ENABLED,env.CONTACT_RECEIPTS_MAINTENANCE_ENABLED,env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED,env.GAME_ACCOUNT_DELETIONS_ENABLED]
+ const flags=[env.MODERATION_MAINTENANCE_ENABLED,env.GAME_SESSION_MAINTENANCE_ENABLED,env.GAME_UPLOAD_MAINTENANCE_ENABLED,env.CONTACT_RECEIPTS_MAINTENANCE_ENABLED,env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED,env.GAME_ACCOUNT_DELETIONS_ENABLED]
  if(!flags.some(flag=>flag==='1'))return
  const runId=crypto.randomUUID(),start=Date.now(),operationMs=options.operationMs??8000,accountMs=options.accountMs??90000,notificationMs=options.notificationMs??75000
  if(!Number.isInteger(operationMs)||operationMs<1||operationMs>8000||!Number.isInteger(accountMs)||accountMs<1||accountMs>90000||!Number.isInteger(notificationMs)||notificationMs<1||notificationMs>75000)throw Error('invalid_maintenance_budget')
@@ -38,6 +39,11 @@ export async function runMaintenance(env:Environment,options:Options={}){
    await task('launches',()=>db.call('distribution_cleanup_launches',{}))
    await task('social',()=>db.call('distribution_cleanup_social_notifications',{}))
   }
+  if(env.MODERATION_MAINTENANCE_ENABLED==='1')await task('moderation',async()=>{
+   const signal=AbortSignal.timeout(24000)
+   await db.call('distribution_moderation_cleanup',{})
+   return deliverModeration(db,env,{signal})
+  },25000)
   if(env.GAME_UPLOAD_MAINTENANCE_ENABLED==='1')await task('uploads',()=>db.call('distribution_maintenance_uploads',{}))
   if(env.CONTACT_RECEIPTS_MAINTENANCE_ENABLED==='1')await task('contact',()=>db.call('contact_cleanup',{}))
   if(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='1')await task('notifications',async()=>{

@@ -2,13 +2,15 @@
 import {useEffect,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
 import {emitSocialUpdate} from '@/lib/socialNotifications'
+import ReportButton from '@/components/ReportButton'
 import SocialConfirmation from '@/components/SocialConfirmation'
 import {changeSocialRelation,readSocialRelation,socialButton,SocialApiError,type Relation,type SocialAction,type SocialChange} from '@/lib/social'
 
 type Props={target:string;username:string;initial?:Relation;onChanged?:(change:SocialChange)=>void}
 export default function ProfileSocialActions(props:Props){
  const {session,user,loading}=useAuth()
- if(loading||!session||!user||user.id===props.target)return null
+ if(loading||user?.id===props.target)return null
+ if(!session||!user)return <details className="relative shrink-0"><summary className={socialButton+' cursor-pointer list-none'} aria-label={'Actions pour @'+props.username}>···</summary><div className="absolute right-0 z-30 w-64 rounded-xl border border-zinc-700 bg-zinc-950 p-2"><ReportButton kind="player" target={props.target}/></div></details>
  return <Actions key={session.access_token+props.target+(props.initial?.state??'')+(props.initial?.relationId??'')} {...props} token={session.access_token} actorId={user.id}/>
 }
 function Actions({target,username,initial,onChanged,token,actorId}:Props&{token:string;actorId:string}){
@@ -58,6 +60,7 @@ function Actions({target,username,initial,onChanged,token,actorId}:Props&{token:
      {relation.state==='friends'&&<button disabled={busy||uncertain} className={socialButton+' w-full'} onClick={()=>setConfirmation('remove')}>Supprimer des amis</button>}
      <button disabled={busy||uncertain} className={socialButton+' mt-2 w-full text-red-300'} onClick={()=>setConfirmation('block')}>Bloquer le joueur</button>
     </>}
+    <ReportButton kind="player" target={target}/>
     {relation&&!available&&<p className="p-2 text-zinc-400">Ce profil n’est plus accessible.</p>}
    </div>
   </details>

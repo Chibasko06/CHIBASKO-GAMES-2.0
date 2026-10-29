@@ -1,0 +1,8 @@
+export const reportCategories={player:{harassment:'Harcèlement',spam:'Spam',impersonation:'Usurpation d’identité',inappropriate:'Contenu inapproprié',illegal:'Contenu potentiellement illicite',other:'Autre'},game:{inappropriate:'Contenu inapproprié',security:'Problème de sécurité',illegal:'Contenu potentiellement illicite',impersonation:'Usurpation',spam:'Spam',other:'Autre'}} as const
+export type ReportKind=keyof typeof reportCategories
+export type ModerationState='open'|'review'|'dismissed'|'resolved'
+export const moderationStates:Record<ModerationState,string>={open:'À examiner',review:'En cours d’examen',dismissed:'Classé sans suite',resolved:'Résolu'}
+export type ModerationCase={id:string;number:number;target_kind:ReportKind;target_locator:string;target_view?:ModerationTargetView;target_user:string|null;target_game:string|null;reporter:string|null;reporter_name?:string|null;category:string;description:string;contact_name:string|null;contact_email:string|null;state:ModerationState;version:number;created_at:string;privacy_review:boolean;justification:string|null;events:{id:string;actor:string|null;actor_reference?:string|null;state:ModerationState;note:string|null;justification:string|null;created_at:string}[];mail:{id:string;kind:string;state:string;attempts:number}[]}
+// Contrat de décision distinct : aucune commande de sanction n'est exécutée ici.
+export type FutureSanctionDecision={kind:'suspend'|'ban'|'lift';publicReason:string;privateNote?:string;endsAt?:string;appealContact:string;caseId:string;expectedVersion:number}
+export type ModerationTargetView={username?:string;bio?:string|null;title?:string;published?:boolean}|null

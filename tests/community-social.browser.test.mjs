@@ -156,7 +156,9 @@ test('une réponse de relation tardive ne réapparaît pas après déconnexion',
   await x.open();await x.statusStarted
   await x.switchActor('guest');x.releaseStatus()
   await x.page.getByRole('heading',{name:'joueur-alpha',exact:true}).waitFor()
-  assert.equal(await x.page.locator('summary').count(),0)
+  await x.page.getByLabel('Actions pour @joueur-alpha').click()
+  assert.equal(await x.page.getByRole('button',{name:/Ajouter en ami|Accepter la demande|Annuler la demande/}).count(),0)
+  assert.equal(await x.page.getByRole('link',{name:'Signaler le joueur',exact:true}).getAttribute('href'),'/contact?report=player&target='+profiles.a.id)
   assert.equal(x.calls.filter(c=>c.body).length,0)
  }finally{await x.context.close()}
 })

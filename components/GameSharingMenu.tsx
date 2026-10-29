@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react'
 import Link from 'next/link'
 import {useAuth} from '@/components/AuthProvider'
+import ReportButton from '@/components/ReportButton'
 import SocialDialog from '@/components/SocialDialog'
 import {socialButton,type SocialPage} from '@/lib/social'
 import {readShareFriends,notificationCall} from '@/lib/socialNotifications'
@@ -23,6 +24,7 @@ export default function GameSharingMenu({gameId,title,url}:{gameId:string;title:
    <div className="absolute right-0 z-30 mt-2 w-60 rounded-xl border border-zinc-700 bg-zinc-950 p-2 shadow-xl">
     {user&&session?<button className={socialButton+' w-full'} onClick={()=>{if(menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus()}setOpen(true)}}>Partager à un ami</button>:<Link href="/login" className={socialButton+' w-full'}>Se connecter pour partager à un ami</Link>}
     <button className={socialButton+' mt-2 w-full'} onClick={()=>void publicShare()}>Partager un lien</button>
+    <ReportButton kind="game" target={gameId}/>
    </div>
   </details>
   {notice&&<p role="status" className="mt-2 max-w-60 text-sm text-cyan-200">{notice}</p>}

@@ -9,7 +9,7 @@ set local search_path=pg_catalog,public;
 with managed as (
  select c.* from pg_class c join pg_namespace n on n.oid=c.relnamespace
  where n.nspname='public' and c.relkind in ('r','p') and c.relname ~
- '^(social_|profile_username_reservations$|contact_dispatches$|games$|profiles$|categories$|game_categories$|favorites$|play_history$|game_reviews$|game_reactions$|faq_entries$|admin_users$|password_reset_|developer_contacts$|game_account_|game_management_authorities$|game_platform_management$|game_submissions$|game_submission_|game_developer_|game_versions$|game_build_|game_reviewers$|game_version_delivery_policies$|game_preview_sessions$|game_launch_sessions$|game_server_|game_online_|game_connection_tickets$|game_exchange_limits$|multiplayer_)'
+ '^(moderation_|social_|profile_username_reservations$|contact_dispatches$|games$|profiles$|categories$|game_categories$|favorites$|play_history$|game_reviews$|game_reactions$|faq_entries$|admin_users$|password_reset_|developer_contacts$|game_account_|game_management_authorities$|game_platform_management$|game_submissions$|game_submission_|game_developer_|game_versions$|game_build_|game_reviewers$|game_version_delivery_policies$|game_preview_sessions$|game_launch_sessions$|game_server_|game_online_|game_connection_tickets$|game_exchange_limits$|multiplayer_)'
 ), objects as (
  select 'table:'||c.relname as key,jsonb_build_object(
   'owner',pg_get_userbyid(c.relowner),'rls',c.relrowsecurity,'forceRls',c.relforcerowsecurity,
@@ -50,7 +50,7 @@ with managed as (
     from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) g where g.grantee<>p.proowner),'[]'::jsonb),
   'execute',(select jsonb_object_agg(role_name,has_function_privilege(role_name,p.oid,'EXECUTE')) from (values('anon'),('authenticated'),('service_role')) r(role_name))
  ) from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
- where n.nspname='public' and p.prokind='f' and (p.proname like 'distribution\_%' escape '\' or p.proname like 'social\_%' escape '\' or p.proname like 'contact\_%' escape '\'
+ where n.nspname='public' and p.prokind='f' and (p.proname like 'distribution\_%' escape '\' or p.proname like 'moderation\_%' escape '\' or p.proname like 'social\_%' escape '\' or p.proname like 'contact\_%' escape '\'
  or p.proname in ('valid_public_username','reserve_profile_username','public_profile_resolve','admin_console_users','admin_console_overview','admin_console_deletions','public_profiles_page','catalogue_recent_history','catalogue_admin_users','catalogue_game_stats','catalogue_device','catalogue_page','catalogue_home','admin_save_game','guard_game_version','guard_active_game_version','set_active_game_version','get_published_game_runtimes',
  'normalize_profile_username','handle_new_user','slugify_profile_handle','touch_game_review_updated_at','touch_game_reaction_updated_at',
  'increment_game_view','record_game_play','get_game_public_stats','get_game_reviews','set_game_submissions_updated_at',

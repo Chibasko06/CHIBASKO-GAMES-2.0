@@ -13,6 +13,7 @@
     "traces": { "enabled": false }
   },
   "vars": {
+    "MODERATION_MAINTENANCE_ENABLED": "0",
     "SUPABASE_URL": "https://oakjtjrzqkoiajmzbdlc.supabase.co",
     "RESEND_FROM_EMAIL": "noreply@chibaskogames.fr",
     "GAME_SUBMISSION_NOTIFY_EMAIL": "chibasko06@gmail.com",
