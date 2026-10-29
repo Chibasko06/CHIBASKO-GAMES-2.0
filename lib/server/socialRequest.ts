@@ -31,10 +31,16 @@ export async function socialRequest(request:Request) {
   let result
   if(request.method==='GET'){
    const query=new URL(request.url).searchParams,kind=query.get('kind')??'friends',before=query.get('before'),cursor=query.get('cursor')
+   const target=query.get('target')
+   if(target!==null){
+    if([...query.keys()].length!==1||!uuid.test(target))throw new InputError('Profil invalide.')
+    result=await withTimeout(db.rpc('social_relation',{p_target:target}))
+   }else{
    if([...query.keys()].some(key=>!['kind','before','cursor'].includes(key)||query.getAll(key).length!==1)
     || !kinds.includes(kind)||(before===null)!==(cursor===null)
     ||(cursor!==null&&!uuid.test(cursor))||(before!==null&&(before.length>40||!/^\d{4}-\d\d-\d\dT/.test(before)||!Number.isFinite(Date.parse(before)))))throw new InputError('Pagination invalide.')
    result=await withTimeout(db.rpc('social_list',{p_kind:kind,...(before&&cursor?{p_before:before,p_cursor:cursor}:{})}))
+   }
   }else{
    const body=await readJsonObject(request,2048,5000)
    if(Object.keys(body).some(key=>!['action','target','operationId','relationId'].includes(key))||typeof body.action!=='string'||!actions.includes(body.action)

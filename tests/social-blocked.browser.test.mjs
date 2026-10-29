@@ -7,8 +7,9 @@ let browser,script
 before(async()=>{
  const result=await build({stdin:{contents:`import {createRoot} from 'react-dom/client';import Page from './app/dashboard/blocked/page';createRoot(document.getElementById('root')).render(<Page/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',plugins:[{name:'services-locaux',setup(b){
   b.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}))
+  b.onResolve({filter:/^next\/image$/},()=>({path:'image',namespace:'fixture'}))
   b.onResolve({filter:/^next\/link$/},()=>({path:'link',namespace:'fixture'}))
-  b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',resolveDir:process.cwd(),contents:path==='auth'?`export function useAuth(){return {loading:false,session:location.search.includes('guest')?null:{access_token:'fixture'}}}`:`import {createElement} from 'react';export default function Link(props){return createElement('a',props)}`}))
+  b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',resolveDir:process.cwd(),contents:path==='image'?`import {createElement} from 'react';export default function Image({unoptimized,...props}){return createElement('img',props)}`:path==='auth'?`export function useAuth(){return {loading:false,session:location.search.includes('guest')?null:{access_token:'fixture'}}}`:`import {createElement} from 'react';export default function Link(props){return createElement('a',props)}`}))
  }}]})
  script=result.outputFiles[0].text;browser=await chromium.launch({channel:'chrome',headless:true})
 })
@@ -22,7 +23,8 @@ async function fixture(query='',ambiguous=false){
   if(url.pathname==='/api/social'){
    calls.push({method:request.method(),body:request.method()==='POST'?request.postDataJSON():null})
    if(request.method()==='POST'){blocked=false;if(ambiguous)return route.abort();return route.fulfill({json:{state:'none'}})}
-   return route.fulfill({json:{items:blocked?[{id:'fe000000-0000-4000-8000-000000000001',profile:{id:'fe000000-0000-4000-8000-000000000002',username:'joueur-bloque'}}]:[],nextCursor:null}})
+   if(query.includes('volume')){const start=url.searchParams.has('cursor')?20:0;return route.fulfill({json:{items:Array.from({length:start?1:20},(_,i)=>({id:'fe000000-0000-4000-8000-'+String(100+start+i).padStart(12,'0'),createdAt:'2026-10-30T12:00:00Z',profile:{id:'fe000000-0000-4000-8000-'+String(200+start+i).padStart(12,'0'),username:'bloque-'+(start+i),avatar_url:null}})),nextCursor:start?null:{createdAt:'2026-10-30T12:00:00Z',id:'fe000000-0000-4000-8000-000000000119'}}})}
+   return route.fulfill({json:{items:blocked?[{id:'fe000000-0000-4000-8000-000000000001',createdAt:'2026-10-30T12:00:00Z',profile:{id:'fe000000-0000-4000-8000-000000000002',username:'joueur-bloque',avatar_url:null}}]:[],nextCursor:null}})
   }
   return route.fulfill({contentType:'text/html',body:'<div id="root"></div><script src="/bundle.js"></script>'})
  })
@@ -33,10 +35,24 @@ test('un invité ne charge aucune liste privée',async()=>{
  const {context,page,calls}=await fixture('?guest')
  try{await page.getByRole('link',{name:/Connecte-toi/}).waitFor();assert.equal(calls.length,0)}finally{await context.close()}
 })
+test('les comptes bloqués sont paginés et le déblocage peut être annulé sans écriture',async()=>{
+ const {context,page,calls}=await fixture('?volume')
+ try{
+  await page.getByRole('button',{name:'Débloquer @bloque-19',exact:true}).waitFor()
+  assert.equal(await page.locator('li').count(),20)
+  await page.getByRole('button',{name:'Afficher la suite',exact:true}).click()
+  await page.getByRole('button',{name:'Débloquer @bloque-20',exact:true}).waitFor()
+  assert.equal(await page.locator('li').count(),21)
+  await page.getByRole('button',{name:'Débloquer @bloque-0',exact:true}).click()
+  await page.getByRole('button',{name:'Annuler',exact:true}).click()
+  assert.equal(calls.filter(c=>c.method==='POST').length,0)
+ }finally{await context.close()}
+})
 for(const ambiguous of [false,true])test('le déblocage réconcilie l’état sans répéter la mutation : '+ambiguous,async()=>{
  const {context,page,calls}=await fixture('',ambiguous)
  try{
   await page.getByRole('button',{name:'Débloquer @joueur-bloque'}).click()
+  await page.getByRole('button',{name:'Confirmer',exact:true}).click()
   await page.getByText('Aucun compte bloqué.').waitFor()
   assert.equal(calls.filter(c=>c.method==='POST').length,1)
   assert.equal(calls.filter(c=>c.method==='GET').length,2)

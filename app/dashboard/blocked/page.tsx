@@ -1,17 +1,16 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import {useEffect,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
 import {fetchJson} from '@/lib/asyncOperation'
+import SocialConfirmation from '@/components/SocialConfirmation'
+import RoleBadges from '@/components/RoleBadges'
+import {readSocialPage,type SocialEntry as Entry,type SocialCursor as Cursor} from '@/lib/social'
 
-type Entry={id:string;profile:{id:string;username:string}}
-type Cursor={createdAt:string;id:string}
 async function read(token:string,cursor:Cursor|null){
- const query=new URLSearchParams({kind:'blocked',...(cursor?{before:cursor.createdAt,cursor:cursor.id}:{})})
- const {response,payload}=await fetchJson('/api/social?'+query,{headers:{Authorization:'Bearer '+token}})
- if(!response.ok)throw new Error('social_read_failed')
- return payload as {items:Entry[];nextCursor:Cursor|null}
+ return readSocialPage(token,'blocked',cursor)
 }
 export default function BlockedAccounts(){
  const {session,loading}=useAuth(),token=session?.access_token
@@ -22,6 +21,7 @@ export default function BlockedAccounts(){
 function BlockedList({token}:{token:string}){
  const [items,setItems]=useState<Entry[]>([]),[cursor,setCursor]=useState<Cursor|null>(null)
  const [busy,setBusy]=useState(true),[message,setMessage]=useState(''),[ready,setReady]=useState(false)
+ const [confirmation,setConfirmation]=useState<Entry|null>(null)
  const generation=useRef(0),locked=useRef(true)
  useEffect(()=>{
   const version=++generation.current
@@ -57,7 +57,7 @@ function BlockedList({token}:{token:string}){
    setItems(result.items);setCursor(result.nextCursor);setReady(true)
    setMessage(confirmed?'Compte débloqué. L’amitié n’est pas rétablie automatiquement.':'État actualisé après une réponse incertaine. Aucune mutation n’a été répétée.')
   }catch{if(version===generation.current)setMessage('État non confirmé. Actualise la liste avant une nouvelle action.')}
-  finally{if(version===generation.current){locked.current=false;setBusy(false)}}
+  finally{if(version===generation.current){locked.current=false;setBusy(false);setConfirmation(null)}}
  }
  return <section className="mx-auto max-w-2xl space-y-5" aria-busy={busy}>
   <Link href="/dashboard" className="text-cyan-300 hover:underline">← Tableau de bord</Link><h1 className="text-2xl font-bold">Comptes bloqués</h1>
@@ -66,8 +66,9 @@ function BlockedList({token}:{token:string}){
   <button disabled={busy} onClick={()=>void refresh()} className="rounded-lg border border-zinc-700 px-4 py-3 disabled:opacity-50">Actualiser</button>
   {ready&&!items.length&&<p>Aucun compte bloqué.</p>}
   <ul className="space-y-2">{items.map(item=><li key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 p-3">
-   <span className="min-w-0 break-all">@{item.profile.username}</span><button disabled={busy||!ready} onClick={()=>void unblock(item.profile.id,item.id)} className="shrink-0 rounded-lg border border-cyan-800 px-3 py-3 text-cyan-200 disabled:opacity-50">Débloquer <span className="sr-only">@{item.profile.username}</span></button>
+   <div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-cyan-950 text-cyan-200">{item.profile.avatar_url?<Image src={item.profile.avatar_url} alt="" width={40} height={40} unoptimized className="h-full w-full object-cover"/>:item.profile.username[0]?.toUpperCase()}</span><div className="min-w-0"><p className="break-all">@{item.profile.username}</p><RoleBadges roles={item.profile.roles}/></div></div><button disabled={busy||!ready} onClick={()=>setConfirmation(item)} className="shrink-0 rounded-lg border border-cyan-800 px-3 py-3 text-cyan-200 disabled:opacity-50">Débloquer <span className="sr-only">@{item.profile.username}</span></button>
   </li>)}</ul>
   {cursor&&<button disabled={busy} onClick={()=>void refresh(cursor)} className="rounded-lg border border-zinc-700 px-4 py-3 disabled:opacity-50">Afficher la suite</button>}
+  {confirmation&&<SocialConfirmation title={'Débloquer @'+confirmation.profile.username+' ?'} description="L’amitié ne sera pas rétablie. Si l’autre personne t’a bloqué, son blocage restera actif." busy={busy} onCancel={()=>setConfirmation(null)} onConfirm={()=>void unblock(confirmation.profile.id,confirmation.id)}/>}
  </section>
 }

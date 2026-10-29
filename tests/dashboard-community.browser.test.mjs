@@ -26,7 +26,7 @@ before(async()=>{
    link:`import {createElement} from 'react';export default function Link(props){return createElement('a',props)}`,
    image:`import {createElement} from 'react';export default function Image({fill,priority,unoptimized,...props}){return createElement('img',props)}`,
    db:`const q=new URLSearchParams(location.search);const roles={admin:q.has('admin'),developer:q.has('developer')};const id='11111111-1111-4111-8111-111111111111';const profile={id,username:'Camille',bio:'Je crée des jeux et partage mes découvertes.',avatar_url:null,created_at:'2026-01-01'};const game={id:'game',slug:'jeu-test',title:'Un jeu au titre très long pour vérifier les débordements sur mobile',thumbnail_url:'/thumbnail.svg'};
-   export const supabase={auth:{async signOut(){}},from(table){let head=false;const chain={select(fields,options){head=options?.head;return chain},eq(){return chain},order(){return chain},range(){return chain},abortSignal(){return chain},async single(){return {data:profile,error:null}},async maybeSingle(){return {data:profile,error:null}},then(resolve){return Promise.resolve({error:null,count:table==='favorites'?8:3,data:head?null:table==='favorites'?[{id:'favorite',created_at:'2026-10-24',games:game}]:[]}).then(resolve)}};return chain},async rpc(name,args){if(name==='catalogue_recent_history')return {data:[{historyId:'history',played_at:'2026-10-24',game}],error:null};if(q.has('failure'))return {data:null,error:{code:'08006',message:'private diagnostic'}};if(args.p_id)return {data:{items:[{...profile,roles}],total:1},error:null};let profiles=Array.from({length:49},(_,i)=>({id:'member-'+i,username:'Membre '+String(i).padStart(2,'0'),avatar_url:null,bio:i%3?'Présentation du membre.':null,created_at:'2026-01-01',roles:{admin:i%4===0,developer:i%4===1||i%4===0}}));profiles=profiles.filter(p=>p.username.toLowerCase().includes(args.p_search.toLowerCase())&&(args.p_role==='all'||p.roles[args.p_role]));return {data:{items:profiles.slice((args.p_page-1)*24,args.p_page*24),total:profiles.length},error:null}}}`,
+   export const supabase={auth:{async signOut(){}},from(table){let head=false;const chain={select(fields,options){head=options?.head;return chain},eq(){return chain},order(){return chain},range(){return chain},abortSignal(){return chain},async single(){return {data:profile,error:null}},async maybeSingle(){return {data:profile,error:null}},then(resolve){return Promise.resolve({error:null,count:table==='favorites'?8:3,data:head?null:table==='favorites'?[{id:'favorite',created_at:'2026-10-24',games:game}]:[]}).then(resolve)}};return chain},async rpc(name,args){if(name==='catalogue_recent_history')return {data:[{historyId:'history',played_at:'2026-10-24',game}],error:null};if(q.has('failure'))return {data:null,error:{code:'08006',message:'private diagnostic'}};if(args.p_id)return {data:{items:[{...profile,roles}],total:1},error:null};let profiles=Array.from({length:49},(_,i)=>({id:'member-'+i,username:'membre-'+String(i).padStart(2,'0'),avatar_url:null,bio:i%3?'Présentation du membre.':null,created_at:'2026-01-01',roles:{admin:i%4===0,developer:i%4===1||i%4===0}}));profiles=profiles.filter(p=>p.username.toLowerCase().includes(args.p_search.toLowerCase())&&(args.p_role==='all'||p.roles[args.p_role]));return {data:{items:profiles.slice((args.p_page-1)*24,args.p_page*24),total:profiles.length},error:null}}}`,
   }[path]}))
  }}]})
  script=result.outputFiles[0].contents
@@ -42,6 +42,7 @@ async function fixture(query='',viewport={width:1366,height:768},accountEnabled=
   if(url.pathname==='/host.js')return route.fulfill({contentType:'text/javascript',body:Buffer.from(script)})
   if(url.pathname==='/style.css')return route.fulfill({contentType:'text/css',body:css})
   if(url.pathname==='/thumbnail.svg')return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="80" height="45"><rect width="80" height="45" fill="#164e63"/></svg>'})
+  if(url.pathname==='/api/social')return route.fulfill({json:{items:[],nextCursor:null}})
   if(url.pathname==='/api/admin/status')return route.fulfill({json:{isAdmin:false}})
   if(url.pathname==='/api/profile/public'){calls.push(route.request().postDataJSON());return route.fulfill({json:{profile:{id:'11111111-1111-4111-8111-111111111111',...calls.at(-1)}}})}
   if(url.pathname==='/api/account'){calls.push('delete');return route.fulfill({status:accountEnabled?202:503,json:accountEnabled?{deletion:{state:'review_required'}}:{error:'disabled'}})}
@@ -66,11 +67,9 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
     assert.equal(await x.page.getByRole('link',{name:/Un jeu au titre/}).count(),2)
     const image=await x.page.locator('main img').first().boundingBox();assert.ok(Math.abs(image.width/image.height-16/9)<.05)
    }else{
-    assert.equal(await x.page.locator('main li').count(),24)
-    assert.ok((await x.page.locator('main li a').first().getAttribute('href')).startsWith('/players/@'))
+    await x.page.getByText('Pas encore d’ami',{exact:true}).waitFor()
+    assert.equal(await x.page.locator('main li').count(),0)
     assert.doesNotMatch(await x.page.locator('main').textContent(),/private@example|fixture-token/)
-    const heights=await x.page.locator('main li').evaluateAll(items=>items.map(item=>Math.round(item.getBoundingClientRect().height)))
-    assert.equal(new Set(heights).size,1,'Toutes les cartes conservent une hauteur uniforme')
    }
    if(viewport.width===390||viewport.width===1366)await x.page.screenshot({path:join(tmpdir(),`chibasko-${kind}-${viewport.width}.png`),fullPage:true})
   }finally{await x.context.close()}}
@@ -98,17 +97,19 @@ for(const roles of ['', 'admin','developer','admin&developer'])test('badges conf
  }finally{await x.context.close()}}
 })
 
-test('communauté : recherche et rôle préservés entre pages, résultat vide et panne distincts',async()=>{
+test('communauté : recherche ciblée, pagination et absence d’annuaire à vide',async()=>{
  const x=await fixture('kind=directory');try{
-  await x.page.getByRole('link',{name:'Suivant',exact:true}).click();await x.page.getByText('Page 2 sur 3').waitFor()
-  assert.equal(await x.page.getByRole('heading',{name:'Membre 24',exact:true}).count(),1)
-  await x.page.getByLabel('Rechercher un membre').fill('Membre 0');await x.page.getByLabel('Rôle',{exact:true}).selectOption('developer')
+  await x.page.getByRole('button',{name:'Mes amis',exact:true}).waitFor()
+  assert.equal(await x.page.locator('main li').count(),0)
+  await x.page.getByLabel('Rechercher par @pseudo').fill('@membre')
   await x.page.getByRole('button',{name:'Rechercher',exact:true}).click()
-  // Le formulaire GET reste utilisable sans JavaScript ; la fixture conserve sa vue au rechargement.
-  assert.equal(new URL(x.page.url()).searchParams.get('search'),'Membre 0')
-  assert.equal(new URL(x.page.url()).searchParams.get('role'),'developer')
+  await x.page.getByText('Page 1 sur 3').waitFor()
+  assert.equal(new URL(x.page.url()).searchParams.get('search'),'@membre')
+  await x.page.getByRole('link',{name:'Suivant',exact:true}).click()
+  await x.page.getByText('Page 2 sur 3').waitFor()
+  assert.equal(await x.page.locator('main li').count(),24)
  }finally{await x.context.close()}
- for(const [query,text] of [['kind=directory&search=absent','Aucun membre trouvé'],['kind=directory&failure=1','La communauté est temporairement indisponible']]){
+ for(const [query,text] of [['kind=directory&search=absent','Aucun joueur accessible'],['kind=directory&search=membre&failure=1','La communauté est temporairement indisponible']]){
   const h=await fixture(query);try{await h.page.getByText(text,{exact:false}).waitFor();assert.doesNotMatch(await h.page.locator('main').textContent(),/private diagnostic/)}finally{await h.context.close()}
  }
 })

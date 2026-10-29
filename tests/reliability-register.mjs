@@ -21,7 +21,7 @@ registerHooks({
     const stubs = {
       'reliability:serverSession': 'export async function createServerSupabase(){return globalThis.__reliability.db}',
       'reliability:db': 'export const supabase=new Proxy({}, {get:(_,key)=>globalThis.__reliability.db[key]})',
-      'reliability:auth': 'export function useAuth(){return globalThis.__reliability.auth}',
+      'reliability:auth': 'export function useAuth(){return globalThis.__reliability.auth ?? {loading:false,user:null,session:null}}',
       'reliability:navigation': 'export function useRouter(){return globalThis.__reliability.router} export function usePathname(){return "/dashboard"} export function useSearchParams(){return new URLSearchParams()} export function notFound(){throw Error("NOT_FOUND")} export function redirect(path){throw Error("REDIRECT "+path)}',
       'reliability:element': 'import {createElement} from "react"; export default function Element({children,fill,unoptimized,priority,...props}){return createElement(props.href?"a":"img",props,children)}',
       'reliability:css': 'export default new Proxy({}, {get:(_,key)=>String(key)})',

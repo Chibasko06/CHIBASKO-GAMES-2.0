@@ -173,6 +173,8 @@ try {
  await holding
  assert.equal((await query('set role service_role;select public.distribution_cleanup_sessions();select public.distribution_cleanup_sessions()')).stdout.trim().replaceAll('\r\n','\n'),'t\nt')
  await assert.rejects(query('set role anon;select public.distribution_cleanup_sessions()'))
+ const {socialInterfaceIntegration}=await import('./social-interface-db.mjs')
+ await socialInterfaceIntegration(async sql=>(await query(sql)).stdout.trim())
  const output=join(root,'contracts/production-schema.v1.json')
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')

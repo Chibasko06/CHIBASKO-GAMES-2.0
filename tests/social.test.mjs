@@ -12,7 +12,7 @@ beforeEach(t=>{
   calls.push({path,body:init?.body?JSON.parse(init.body):null,headers:new Headers(init?.headers)})
   assert.equal(init.cache,'no-store')
   if(path==='/auth/v1/user')return authorized?Response.json({id:actor}):Response.json({message:'Session invalide'},{status:401})
-  assert.match(path,/\/rest\/v1\/rpc\/social_(?:list|change)$/)
+  assert.match(path,/\/rest\/v1\/rpc\/social_(?:list|change|relation)$/)
   assert.equal(new Headers(init.headers).get('authorization'),'Bearer fixture-user-token')
   return failure?Response.json({code:'P0001',message:failure},{status:400}):Response.json(result)
  })
@@ -61,4 +61,11 @@ test('les curseurs préservent les microsecondes et rejettent les paramètres am
   calls=[];assert.equal((await GET(new Request('https://portal.test/api/social?'+query,{headers:{Authorization:'Bearer fixture-user-token'}}))).status,400)
   assert.equal(calls.length,1)
  }
+})
+
+ test('la lecture ciblée refuse les paramètres supplémentaires et ne parcourt aucune liste',async()=>{
+ result={state:'incoming',relationId:operationId};
+ const response=await GET(new Request('https://portal.test/api/social?target='+target,{headers:{Authorization:'Bearer fixture-user-token'}}));
+ assert.equal(response.status,200);assert.equal(calls[1].path,'/rest/v1/rpc/social_relation');assert.deepEqual(calls[1].body,{p_target:target});
+ for(const query of ['target='+target+'&kind=friends','target=invalid','target='+target+'&target='+target]){calls=[];assert.equal((await GET(new Request('https://portal.test/api/social?'+query,{headers:{Authorization:'Bearer fixture-user-token'}}))).status,400);assert.equal(calls.length,1)}
 })

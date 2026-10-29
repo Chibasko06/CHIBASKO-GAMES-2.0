@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import ProfileCard from '@/components/ProfileCard'
+import PublicProfileView from '@/components/PublicProfileView'
 import {resolveViewerProfile} from '@/lib/server/publicProfiles'
 import {publicProfileIdentifier, publicProfilePath} from '@/lib/publicUsername'
 import {cache} from 'react'
@@ -74,8 +74,7 @@ export default async function PublicPlayerPage({
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <Link href="/players" className="inline-flex py-2 text-sm text-cyan-300 hover:underline">← Communauté</Link>
-      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Profil public</p>
-      <ProfileCard profile={profile} heading="h1" />
+      <PublicProfileView key={profile.id} profile={profile}/>
     </div>
   )
 }
