@@ -1,3 +1,4 @@
+import AccountAccessBoundary from '@/components/AccountAccessBoundary'
 import type { Metadata } from 'next'
 import SubmitGamePageClient from '@/components/SubmitGamePageClient'
 import { getCategories } from '@/lib/queries/games'
@@ -14,5 +15,5 @@ export const metadata: Metadata = buildPageMetadata({
 export default async function PublishGamePage() {
   const categories = await getCategories()
 
-  return <SubmitGamePageClient categories={categories} />
+  return <AccountAccessBoundary><SubmitGamePageClient categories={categories} /></AccountAccessBoundary>
 }

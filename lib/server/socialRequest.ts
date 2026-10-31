@@ -10,6 +10,7 @@ const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i
 const actions=['request','accept','reject','cancel','remove','block','unblock']
 const kinds=['friends','incoming','outgoing','blocked']
 const failures:Record<string,{status:number;message:string}>={
+ account_restricted:{status:403,message:'Ce compte fait l’objet d’une restriction. Consulte les décisions et recours.'},
  social_invalid:{status:400,message:'Demande invalide.'},
  social_unauthorized:{status:401,message:'Connexion requise.'},
  social_inactive:{status:403,message:'Cette action n’est pas disponible pour ce compte.'},

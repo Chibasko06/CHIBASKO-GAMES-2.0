@@ -62,9 +62,9 @@ export async function runMaintenance(env:Environment,options:Options={}){
    return processAccountDeletion({db:guarded,auth:{async exists(id){signal.throwIfAborted();const result=await withTimeout(auth.exists(id),12000);signal.throwIfAborted();return result},async remove(id){signal.throwIfAborted();await withTimeout(auth.remove(id),12000);signal.throwIfAborted()}},cleanup:accountCleanup(guarded,env,signal),log:entry=>log('accounts',entry.outcome==='completed'?'completed':'deferred',Date.now(),{metric:entry.phase})})
   },accountMs)
   const health=await task('health',()=>db.call<Record<string,number>>('distribution_maintenance_health',{}))
-  if(health&&typeof health==='object')for(const metric of ['notifications_attention','accounts_attention','accounts_review','notifications_pending','notifications_oldest_seconds','accounts_pending','expired_uploads','expired_contacts']){
+  if(health&&typeof health==='object')for(const metric of ['moderation_pending','moderation_attention','moderation_oldest_seconds','notifications_attention','accounts_attention','accounts_review','notifications_pending','notifications_oldest_seconds','accounts_pending','expired_uploads','expired_contacts']){
    const value=(health as Record<string,unknown>)[metric]
-   if(typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=1e12)log('health',(metric.endsWith('_attention')&&value>0)||(metric==='notifications_oldest_seconds'&&value>3600)?'attention_required':'completed',Date.now(),{metric,count:value})
+   if(typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=1e12)log('health',(metric.endsWith('_attention')&&value>0)||(metric.endsWith('_oldest_seconds')&&value>3600)?'attention_required':'completed',Date.now(),{metric,count:value})
   }
  }catch{failures++;log('cycle','failed',start)}
  log('cycle',failures?'failed':'completed',start,{count:failures})

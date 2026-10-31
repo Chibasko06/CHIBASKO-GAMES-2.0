@@ -56,6 +56,7 @@ export const migrations = Object.freeze([
   '20261031000100_social_interface_reads.sql',
   '20261101000100_social_notifications.sql',
   '20261102000100_moderation_reports.sql',
+  '20261103000100_moderation_measures.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']
@@ -75,6 +76,10 @@ export function environmentChecks(component, env) {
   if (!Object.hasOwn(environments, component)) throw new Error('unknown_component')
   const checks = environments[component].map(name => ({ check: name, ok: typeof env[name] === 'string' && env[name].trim().length > 0 }))
   const add = (check, ok) => checks.push({ check, ok: Boolean(ok) })
+  if(component==='portal'){
+    if(env.MODERATION_MEASURES_ENABLED!==undefined)add('MODERATION_MEASURES_ENABLED:boolean',['0','1'].includes(env.MODERATION_MEASURES_ENABLED))
+    if(env.MODERATION_MEASURES_ENABLED==='1')add('MODERATION_MEASURES_RETENTION_DAYS:policy',/^[1-9][0-9]{0,3}$/.test(env.MODERATION_MEASURES_RETENTION_DAYS??'')&&Number(env.MODERATION_MEASURES_RETENTION_DAYS)<=3650)
+  }
   if(env.CONTACT_FORM_ENABLED!==undefined)add('CONTACT_FORM_ENABLED:boolean',['0','1'].includes(env.CONTACT_FORM_ENABLED))
   if(component==='portal'&&env.CONTACT_FORM_ENABLED==='1'){
     for(const name of ['CONTACT_NOTIFY_EMAIL','RESEND_FROM_EMAIL'])add(name+':contact_email',/^[^\s@<>]+@[^\s@<>]+[.][^\s@<>]+$/.test(env[name]??''))

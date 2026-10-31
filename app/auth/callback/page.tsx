@@ -32,7 +32,8 @@ export default function AuthCallbackPage() {
       try {
         const result = await ensureProfile(session)
         if (!active) return
-        if (!result.ok) { fail(result.error); return }
+        if (!result.ok && result.kind==='account_restricted') { router.replace('/account/moderation'); return }
+      if (!result.ok) { fail(result.error); return }
         router.replace(next)
         clearTimeout(deadline)
         active = false

@@ -125,9 +125,10 @@ try {
   assert.equal(compareSchema(await snapshot(),reference).status,'BLOCKING_DRIFT',change)
   await query(restore)
  }
+ const currentAdminSave=(await query("select pg_get_functiondef('public.admin_save_game(uuid,jsonb,uuid[],uuid,text)'::regprocedure)")).stdout
  await query('drop function public.admin_save_game(uuid,jsonb,uuid[],uuid,text)')
  assert.equal(compareSchema(await snapshot(),reference).status,'BLOCKING_DRIFT','RPC admin absente après migrations de cycle de vie')
- await run('psql',[...args,'-f',join(root,'supabase/migrations/20261023000100_atomic_admin_catalogue.sql')])
+ await query(currentAdminSave+";revoke all on function public.admin_save_game(uuid,jsonb,uuid[],uuid,text) from public,anon,authenticated;grant execute on function public.admin_save_game(uuid,jsonb,uuid[],uuid,text) to service_role;")
  assert.equal(compareSchema(await snapshot(),reference).status,'PASS')
  for(const role of ['anon','authenticated'])await assert.rejects(query(`set role ${role};select public.admin_save_game(null,'{}','{}')`),error=>/permission denied|permission refusée/i.test(error.stderr))
  await run('psql',[...args,'-f',join(root,'docs/sql/profile-privacy-preflight.sql')]);
@@ -135,6 +136,7 @@ try {
  assert.match(preflight.stdout,/admin_save_game/)
  assert.match(preflight.stdout,/developer_contacts/)
  for(const name of ['catalogue_page','catalogue_home','catalogue_admin_users','catalogue_recent_history'])assert.match(preflight.stdout,new RegExp(name))
+ if(!process.argv.includes('--focus-measures')){
  await run('psql',[...args,'-f',join(root,'tests/public-profile-directory-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/admin-profile-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/admin-console-db.sql')])
@@ -184,6 +186,9 @@ try {
  await socialNotificationsIntegration(async sql=>(await query(sql)).stdout.trim())
  const {moderationIntegration}=await import('./moderation-db.mjs')
  await moderationIntegration(async sql=>(await query(sql)).stdout.trim())
+ }
+ const {moderationMeasuresIntegration}=await import('./moderation-measures-db.mjs')
+ await moderationMeasuresIntegration(async sql=>(await query(sql)).stdout.trim())
  const output=join(root,'contracts/production-schema.v1.json')
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')

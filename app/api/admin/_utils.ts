@@ -16,7 +16,7 @@ export async function requireAdmin(request: NextRequest) {
   try {
     const user = await authorizeAdmin(createUserAuthClient(token), token)
     // Privileged client is created ONLY after user verification and DB membership.
-    return { supabaseAdmin: getSupabaseAdminClient(), user }
+    return { supabaseAdmin: getSupabaseAdminClient(user.id), user }
   } catch (error) {
     return { error: adminJson({ error: error instanceof AdminAccessError ? error.message : 'Administration temporairement indisponible.' },
       { status: error instanceof AdminAccessError ? error.status : 503 }) }

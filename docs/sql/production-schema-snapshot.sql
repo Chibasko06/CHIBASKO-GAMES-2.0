@@ -50,7 +50,7 @@ with managed as (
     from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) g where g.grantee<>p.proowner),'[]'::jsonb),
   'execute',(select jsonb_object_agg(role_name,has_function_privilege(role_name,p.oid,'EXECUTE')) from (values('anon'),('authenticated'),('service_role')) r(role_name))
  ) from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
- where n.nspname='public' and p.prokind='f' and (p.proname like 'distribution\_%' escape '\' or p.proname like 'moderation\_%' escape '\' or p.proname like 'social\_%' escape '\' or p.proname like 'contact\_%' escape '\'
+ where n.nspname='public' and p.prokind='f' and (p.proname like 'distribution\_%' escape '\' or p.proname like 'moderation\_%' escape '\' or p.proname like 'account\_%' escape '\' or p.proname like 'social\_%' escape '\' or p.proname like 'contact\_%' escape '\'
  or p.proname in ('valid_public_username','reserve_profile_username','public_profile_resolve','admin_console_users','admin_console_overview','admin_console_deletions','public_profiles_page','catalogue_recent_history','catalogue_admin_users','catalogue_game_stats','catalogue_device','catalogue_page','catalogue_home','admin_save_game','guard_game_version','guard_active_game_version','set_active_game_version','get_published_game_runtimes',
  'normalize_profile_username','handle_new_user','slugify_profile_handle','touch_game_review_updated_at','touch_game_reaction_updated_at',
  'increment_game_view','record_game_play','get_game_public_stats','get_game_reviews','set_game_submissions_updated_at',
@@ -69,7 +69,7 @@ with managed as (
    'select',has_sequence_privilege(role_name,c.oid,'SELECT'),'update',has_sequence_privilege(role_name,c.oid,'UPDATE')))
    from (values('anon'),('authenticated'),('service_role')) r(role_name)))
  from pg_class c join pg_sequence s on s.seqrelid=c.oid
- where exists(select 1 from pg_depend d where d.objid=c.oid and d.classid='pg_class'::regclass
+ where c.oid=to_regclass('public.moderation_delivery_rotation') or exists(select 1 from pg_depend d where d.objid=c.oid and d.classid='pg_class'::regclass
   and d.refclassid='pg_class'::regclass and d.refobjid in (select oid from managed) and d.deptype in ('a','i'))
  union all
  select 'trigger:'||c.relname||':'||t.tgname,jsonb_build_object('definition',pg_get_triggerdef(t.oid),'enabled',t.tgenabled)
@@ -106,7 +106,7 @@ with managed as (
     and i.indnkeyatts=1 and i.indkey[0]=(select attnum from pg_attribute where attrelid=i.indrelid and attname='slug')),
   'serviceProfileRead',case when to_regclass('public.profiles') is null then false else has_table_privilege('service_role','public.profiles','SELECT') end,
   'legacyTriggers',coalesce((select jsonb_agg(jsonb_build_object('name',t.tgname,'definition',pg_get_triggerdef(t.oid),'enabled',t.tgenabled) order by t.tgname)
-    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname not in ('guard_active_game_version','account_asset_guard')),'[]'::jsonb),
+    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname not in ('guard_active_game_version','account_asset_guard','moderation_game_publication_guard')),'[]'::jsonb),
   'gamesRls',(select relrowsecurity from pg_class where oid=to_regclass('public.games')),
   'adminRls',(select relrowsecurity from pg_class where oid=to_regclass('public.admin_users')),
   'browserCatalogueWrites',coalesce((select bool_or(has_column_privilege(r.role_name,c.oid,a.attnum,'INSERT') or has_column_privilege(r.role_name,c.oid,a.attnum,'UPDATE')

@@ -345,3 +345,13 @@ test('review publication waits for uncertain writes and reconciles a late commit
     assert.equal(store.writes.length,1);assert.match(document.body.textContent,/New review/);assert.ok(button('Publier mon avis'))
   })
 })
+
+for(const Component of [Login,Register])test('un compte restreint est dirige vers les decisions apres Auth : '+Component.name,async t=>{
+ globalThis.__reliability.db.auth.signInWithPassword=async()=>({data:{session},error:null})
+ globalThis.__reliability.db.auth.signUp=async()=>({data:{session},error:null})
+ t.mock.method(globalThis,'fetch',async()=>Response.json({code:'account_restricted',error:'Compte restreint.'},{status:403}))
+ await mount(Component,async()=>{
+  await act(async()=>Component===Login?button('Connexion').click():document.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__destination,'/account/moderation')
+ })
+})

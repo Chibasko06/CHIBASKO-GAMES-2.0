@@ -39,7 +39,7 @@ export async function socialNotificationsRequest(request:Request){
    }else throw new InputError('Action invalide.')
   }
   if(result.error){
-   const failures:Record<string,[number,string]>={social_unauthorized:[401,'Connexion requise.'],social_invalid:[400,'Demande invalide.'],social_inactive:[403,'Ce compte ne peut pas utiliser cette fonction.'],social_unavailable:[404,'Le jeu ou le destinataire n’est plus disponible.'],social_conflict:[409,'La demande a changé. Actualise avant de réessayer.'],social_rate_limited:[429,'Limite atteinte : 20 partages par jour, un même jeu au même ami toutes les 24 heures.']}
+   const failures:Record<string,[number,string]>={account_restricted:[403,'Ce compte fait l’objet d’une restriction. Consulte les décisions et recours.'],social_unauthorized:[401,'Connexion requise.'],social_invalid:[400,'Demande invalide.'],social_inactive:[403,'Ce compte ne peut pas utiliser cette fonction.'],social_unavailable:[404,'Le jeu ou le destinataire n’est plus disponible.'],social_conflict:[409,'La demande a changé. Actualise avant de réessayer.'],social_rate_limited:[429,'Limite atteinte : 20 partages par jour, un même jeu au même ami toutes les 24 heures.']}
    const failure=failures[result.error.message]
    if(failure)return adminJson({error:failure[1],code:result.error.message},{status:failure[0]})
    throw result.error

@@ -125,6 +125,7 @@ export default function UserDropdown({
           >
             MES FAVORIS
           </Link>
+          <Link href="/account/moderation" onClick={()=>setOpen(false)} className="block border-b border-zinc-900 px-4 py-2 text-xs font-bold text-zinc-400 hover:text-cyan-300">DÉCISIONS ET RECOURS</Link>
           {isAdmin ? (
             <Link
               href="/admin"

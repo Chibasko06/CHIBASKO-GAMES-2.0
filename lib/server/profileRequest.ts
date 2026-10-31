@@ -1,4 +1,5 @@
 import 'server-only'
+import {assertAccountAccess,AccountRestrictedError} from './accountAccess'
 import {getSupabaseAdminClient} from '@/lib/supabaseAdmin'
 import {adminOriginAllowed} from './adminRequest'
 import {adminJson} from './adminResponses'
@@ -35,10 +36,12 @@ export async function profileIdentity(request: Request) {
     throw error
   }
   if (!data.user) throw new InputError('Connexion requise.', 401)
+  await assertAccountAccess(data.user.id,db)
   return {db, user: data.user}
 }
 
 export function profileFailure(operation: string, error: unknown) {
+  if(error instanceof AccountRestrictedError)return adminJson({error:error.message,code:'account_restricted'},{status:403})
   if (error instanceof InputError) return adminJson({error: error.message}, {status: error.status})
   logDataFailure(operation, error, 'database_error')
   const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined

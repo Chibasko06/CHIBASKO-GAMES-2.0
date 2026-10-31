@@ -1,0 +1,97 @@
+import assert from 'node:assert/strict'
+import {randomUUID,randomBytes} from 'node:crypto'
+
+export async function moderationMeasuresIntegration(query){
+ const admin=randomUUID(),player=randomUUID(),other=randomUUID(),game=randomUUID()
+ await query(`insert into auth.users(id,email,raw_user_meta_data) values('${admin}','measures-admin@example.test','{"username":"measures-admin"}'),('${player}','measures-player@example.test','{"username":"measures-player"}'),('${other}','measures-other@example.test','{"username":"measures-other"}');insert into public.admin_users(user_id) values('${admin}');insert into public.games(id,title,slug,game_url,is_published) values('${game}','Mesures','measures-fixture','https://example.test/game',true)`)
+ const literal=value=>"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb"
+ const decide=async(body,actor=admin)=>JSON.parse(await query(`set role service_role;select public.distribution_moderation_measure('${actor}',${literal({...body,retentionDays:30})})`))
+ const status=async()=>JSON.parse(await query(`set role authenticated;set request.jwt.claim.sub='${player}';select public.moderation_self_status()`))
+ let version=0
+ const action=async(type,extra={})=>{const input={kind:'player',target:player,action:type,operationId:randomUUID(),version,reason:'Motif communicable suffisamment precis.',note:'Note administrative privee.',...extra};const result=await decide(input);version=result.version;return {input,result}}
+ const warning=await action('warn');assert.equal((await status()).blocked,false)
+ const runtimeVersion=randomUUID(),draftVersion=randomUUID(),deployment=randomUUID(),capability=randomBytes(32).toString('hex'),control=randomBytes(32).toString('hex'),credential=randomBytes(32).toString('hex'),ticket=randomBytes(32).toString('hex'),exchange=randomUUID()
+ const manifest={gameId:game,version:'1.0.0',schemaVersion:1,integrationVersion:1,capabilities:{local:{players:{min:1,max:1}},online:{access:['public','private'],players:{min:2,max:2}}},client:{entrypoints:{local:'local/index.html',online:'online/index.html'}}}
+ await query(`insert into public.game_developer_members(game_id,user_id,role) values('${game}','${player}','owner');insert into public.game_versions(id,game_id,version,schema_version,integration_version,manifest,artifact_sha256,artifact_size,file_count,created_by) values('${runtimeVersion}','${game}','1.0.0',1,1,${literal(manifest)},repeat('a',64),100,2,'${player}');update public.game_versions set status='in_review' where id='${runtimeVersion}';update public.game_versions set status='approved' where id='${runtimeVersion}';update public.game_versions set status='published' where id='${runtimeVersion}';select public.set_active_game_version('${game}','${runtimeVersion}');insert into public.game_server_deployments(id,game_id,hosting_mode,endpoint,status) values('${deployment}','${game}','self_hosted','wss://game.example.test','active');insert into public.game_server_deployment_versions(deployment_id,game_id,version_id) values('${deployment}','${game}','${runtimeVersion}')`)
+ const session=await query(`set role service_role;select public.distribution_prepare_online_session('${runtimeVersion}','${deployment}',${literal([{actorId:player,displayName:'Fixture'},{actorId:other,displayName:'Autre fixture'}])})`)
+ const participant=await query(`select id from public.game_online_participants where session_id='${session}' and actor_id='${player}'`)
+ const context={gameId:game,gameVersionId:runtimeVersion,execution:'online',locale:'fr',session:{sessionId:session,localParticipantIds:[participant]}}
+ const launch=JSON.parse(await query(`set role service_role;select public.distribution_create_launch('${player}','${game}','${runtimeVersion}','published','online','${capability}','${control}',${literal(context)},1800,60,600)`))
+ await query(`set role service_role;select public.distribution_create_server_credential('${deployment}','${credential}',now()+interval '2 hours');select public.distribution_issue_connection_ticket('${launch.id}','${control}','${launch.generation}','${ticket}')`)
+ assert.ok(JSON.parse(await query(`set role service_role;select public.distribution_exchange_connection_ticket('${credential}','${ticket}','${exchange}')`)).data)
+ const draftManifest={...manifest,version:'2.0.0'}
+ await query(`insert into public.game_versions(id,game_id,version,schema_version,integration_version,manifest,artifact_sha256,artifact_size,file_count,created_by) values('${draftVersion}','${game}','2.0.0',1,1,${literal(draftManifest)},repeat('b',64),100,2,'${player}')`)
+ await query(`set role service_role;select public.distribution_issue_preview('${player}','${draftVersion}','local',repeat('c',64),60,900,30)`)
+ const lobby=JSON.parse(await query(`set role service_role;select public.distribution_multiplayer_create('${player}','${game}','public','${randomUUID()}')`))
+ const lobbyId=lobby.id??lobby.lobby?.id
+ assert.ok(lobbyId)
+ await query(`set role service_role;select public.distribution_multiplayer_mutate('${other}','${lobbyId}','join')`)
+ const suspension=await action('suspend',{endsAt:new Date(Date.now()+3600000).toISOString()});assert.equal((await status()).blocked,true)
+ assert.equal(await query(`set role service_role;select public.distribution_account_access('${player}')`),'f')
+ await assert.rejects(query(`set role authenticated;set request.jwt.claim.sub='${player}';insert into favorites(user_id,game_id) values('${player}','${game}')`))
+ await assert.rejects(query(`set role authenticated;set request.jwt.claim.sub='${player}';select public.social_change('request','${other}','${randomUUID()}')`))
+ await assert.rejects(query(`set role service_role;select public.distribution_developer_catalog('${player}',0)`),error=>/account_restricted/.test(error.stderr))
+ await assert.rejects(query(`set role service_role;select public.distribution_renew_launch('${launch.id}','${control}',1800)`))
+ await assert.rejects(query(`set role service_role;select public.distribution_check_launch('${capability}')`))
+ assert.equal(JSON.parse(await query(`set role service_role;select public.distribution_exchange_connection_ticket('${credential}','${ticket}','${exchange}')`)).error.code,'invalid_ticket')
+ assert.equal(await query(`select count(*) from public.game_preview_sessions where issued_by='${player}'`),'0')
+ await assert.rejects(query(`set role service_role;select public.distribution_multiplayer_mutate('${player}','${lobbyId}','ready',true)`),error=>/account_restricted/.test(error.stderr))
+ await assert.rejects(query(`set role service_role;select public.distribution_prepare_online_session('${runtimeVersion}','${deployment}',${literal([{actorId:player,displayName:'Fixture'},{actorId:other,displayName:'Autre fixture'}])})`),error=>/account_restricted/.test(error.stderr))
+ await query(`set role service_role;select public.distribution_cleanup_multiplayer()`)
+ assert.equal(await query(`select leader_actor from public.multiplayer_lobbies where id='${lobbyId}'`),other)
+ assert.equal(await query(`select count(*) from public.multiplayer_lobby_members where lobby_id='${lobbyId}' and actor_id='${player}'`),'0')
+ await assert.rejects(query(`set role service_role;update profiles set bio='Modification tardive non autorisee' where id='${player}'`),error=>/account_restricted/.test(error.stderr))
+ await query(`set role service_role;set request.headers='{"x-chibasko-admin-actor":"${admin}"}';update profiles set bio='Correction administrative autorisee' where id='${player}'`)
+ await assert.rejects(query(`insert into public.admin_users(user_id) values('${player}')`),error=>/account_restricted/.test(error.stderr))
+ assert.equal(await query(`set role anon;select count(*) from public.games where id='${game}'`),'1')
+ await query(`update moderation_subjects set ends_at=now()-interval '1 second' where user_id='${player}'`)
+ assert.equal((await status()).blocked,false,'Expiration sans cron')
+ const ban=await action('ban');assert.equal((await status()).blocked,true)
+ assert.equal((await decide(ban.input)).id,ban.result.id)
+ await assert.rejects(action('suspend',{endsAt:new Date(Date.now()+7200000).toISOString()}),error=>/invalid_state/.test(error.stderr))
+ const appeal=randomUUID(),description='Je demande un reexamen factuel de cette decision.'
+ const appealResult=await query(`set role authenticated;set request.jwt.claim.sub='${player}';select public.moderation_appeal('${appeal}','${ban.result.id}','${description}')`)
+ assert.equal(JSON.parse(appealResult).state,'pending')
+ assert.equal(await query(`set role authenticated;set request.jwt.claim.sub='${player}';select public.moderation_appeal('${appeal}','${ban.result.id}','${description}')`),appealResult)
+ await assert.rejects(query(`set role authenticated;set request.jwt.claim.sub='${other}';select public.moderation_appeal('${randomUUID()}','${ban.result.id}','${description}')`),error=>/forbidden/.test(error.stderr))
+ const review={id:appeal,version:1,state:'accepted',decision:'Reexamen termine et levee explicitement approuvee.',lift:true,operationId:randomUUID(),subjectVersion:version}
+ await query(`set role service_role;select public.distribution_moderation_appeals('${admin}',${literal(review)})`);version++
+ assert.equal((await status()).blocked,false)
+ await assert.rejects(query(`set role service_role;select public.distribution_moderation_appeals('${admin}',${literal(review)})`),error=>/request_conflict/.test(error.stderr))
+ for(const role of ['anon','authenticated']){
+  await assert.rejects(query(`set role ${role};select * from public.moderation_measures`))
+  await assert.rejects(query(`set role ${role};select public.distribution_moderation_measure('${admin}','{}')`))
+ }
+ await assert.rejects(decide({...ban.input,operationId:randomUUID(),target:admin,version:0}),error=>/forbidden/.test(error.stderr))
+ await assert.rejects(decide({...ban.input,operationId:randomUUID(),version},other),error=>/forbidden/.test(error.stderr))
+ const simultaneous=await Promise.allSettled([decide({...ban.input,operationId:randomUUID(),version}),decide({...ban.input,operationId:randomUUID(),version})])
+ assert.equal(simultaneous.filter(value=>value.status==='fulfilled').length,1)
+ version++;await action('lift');assert.equal((await status()).blocked,false)
+ const unpublish={kind:'game',target:game,action:'unpublish',operationId:randomUUID(),version:0,reason:'Retrait temporaire pour verification de securite.',note:''}
+ const removed=await decide(unpublish);assert.equal(await query(`select is_published from games where id='${game}'`),'f')
+ await assert.rejects(query(`set role service_role;update public.games set is_published=true where id='${game}'`),error=>/game_not_available/.test(error.stderr))
+ await decide({...unpublish,action:'restore',version:removed.version,operationId:randomUUID()});assert.equal(await query(`select is_published from games where id='${game}'`),'t')
+ const linkedReport=randomUUID();await query(`insert into public.game_developer_members(game_id,user_id,role) values('${game}','${other}','owner');insert into public.moderation_cases(id,target_kind,target_game,target_locator,category,description) values('${linkedReport}','game','${game}','measures-fixture','security','Dossier de fixture avec plusieurs proprietaires du jeu.')`)
+ const secondRemoval=await decide({...unpublish,caseId:linkedReport,version:2,operationId:randomUUID()})
+ assert.equal(await query(`select count(*) from public.moderation_measure_mail where measure_id='${secondRemoval.id}'`),'2','Chaque proprietaire recoit une notification sans conflit sur le dossier')
+ const gameAppeal=randomUUID();await query(`set role authenticated;set request.jwt.claim.sub='${player}';select public.moderation_appeal('${gameAppeal}','${secondRemoval.id}','Le jeu a ete corrige et sa publication peut etre reexaminee.')`)
+ await query(`set role service_role;select public.distribution_moderation_appeals('${admin}',${literal({id:gameAppeal,version:1,state:'accepted',decision:'La restauration du jeu est explicitement approuvee.',lift:true,operationId:randomUUID(),subjectVersion:3})})`)
+ assert.equal(await query(`select is_published from games where id='${game}'`),'t')
+ assert.equal(await query(`select count(*) from public.moderation_measure_mail where recipient='${player}'`),'12')
+ const job=JSON.parse(await query('set role service_role;select public.distribution_moderation_claim_measure_mail()'))
+ assert.equal(job.stream,'measure');assert.ok(job.notice.text);assert.doesNotMatch(job.notice.text,/Note administrative privee/)
+ await query(`set role service_role;select public.distribution_moderation_prepare_measure_mail('${job.id}','${job.lease}','{"text":"fixture"}');select public.distribution_moderation_finish_measure_mail('${job.id}','${job.lease}',true)`)
+ await assert.rejects(query(`set role service_role;select public.distribution_moderation_finish_measure_mail('${job.id}','${job.lease}',true)`),error=>/lease_lost/.test(error.stderr))
+ assert.equal(await query(`select count(*) from public.moderation_measures where id='${warning.result.id}' or id='${suspension.result.id}'`),'2')
+ const {moderationMeasuresApiIntegration}=await import('./moderation-measures-api-db.mjs')
+ await moderationMeasuresApiIntegration(query,{admin,player,game})
+ await query(`update moderation_subjects set retain_until=now()-interval '1 day' where user_id='${player}';update moderation_measure_mail set state='sent' where recipient='${player}';set role service_role;select public.distribution_moderation_archive()`)
+ assert.equal(await query(`select archived_at is null from moderation_measures where id='${warning.result.id}'`),'t','Un recours en attente preserve toutes les justifications de la cible')
+ const archiveUser=randomUUID();await query(`insert into auth.users(id,email,raw_user_meta_data) values('${archiveUser}','archive-measure@example.test','{"username":"archive-measure"}')`)
+ const archiveWarning=await decide({kind:'player',target:archiveUser,action:'warn',operationId:randomUUID(),version:0,reason:'Justification originale de la fixture de conservation.',note:'Note privee a expurger.'})
+ await query(`update moderation_subjects set retain_until=now()-interval '1 day' where user_id='${archiveUser}';update moderation_measure_mail set state='sent' where recipient='${archiveUser}';set role service_role;select public.distribution_moderation_archive()`)
+ assert.equal(await query(`select archived_at is not null and note is null from moderation_measures where id='${archiveWarning.id}'`),'t')
+ assert.equal(await query(`select version from moderation_subjects where user_id='${archiveUser}'`),'1','Le compteur de concurrence survit a l’archivage')
+ await assert.rejects(query(`set role authenticated;set request.jwt.claim.sub='${archiveUser}';select public.moderation_appeal('${randomUUID()}','${archiveWarning.id}','Recours apres archivage de la justification.')`),error=>/decision_archived/.test(error.stderr))
+ console.log('Mesures : avertissement, suspension, expiration, JWT existant, blocages SQL, recours, concurrence, jeux et outbox verifies sur PostgreSQL jetable.')
+}

@@ -31,7 +31,7 @@ const dependencies:Dependencies={
  },
  service:createLaunchService
 }
-const publicCodes=new Set(['unauthorized','forbidden','invalid_launch_request','service_unavailable','invalid_gateway_configuration','version_not_found','version_not_previewable','preview_forbidden','unsupported_execution','invalid_launch_context','invalid_launch_session','invalid_version_record','invalid_delivery_policy','unsupported_delivery_policy','online_session_required','online_session_unavailable','database_error','quota_exceeded','launch_expired','invalid_request','game_not_found','invalid_operation','invalid_launch'])
+const publicCodes=new Set(['account_restricted','unauthorized','forbidden','invalid_launch_request','service_unavailable','invalid_gateway_configuration','version_not_found','version_not_previewable','preview_forbidden','unsupported_execution','invalid_launch_context','invalid_launch_session','invalid_version_record','invalid_delivery_policy','unsupported_delivery_policy','online_session_required','online_session_unavailable','database_error','quota_exceeded','launch_expired','invalid_request','game_not_found','invalid_operation','invalid_launch'])
 export async function gameLaunchRequest(request:Request,id?:string,deps=dependencies){
  const requestId=crypto.randomUUID(),headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Request-Id':requestId}
  let phase:Phase='request_validation',rpc:RpcDiagnostic|undefined,audience:LaunchDiagnostic['audience'],execution:LaunchDiagnostic['execution']

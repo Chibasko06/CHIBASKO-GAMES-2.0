@@ -1,4 +1,7 @@
 'use client'
+import ModerationMeasures from './ModerationMeasures'
+import ModerationAppeals from './ModerationAppeals'
+
 import {useCallback,useEffect,useRef,useState} from 'react'
 import Link from 'next/link'
 import {useAuth} from '@/components/AuthProvider'
@@ -8,13 +11,13 @@ import {moderationStates,reportCategories,type ModerationCase,type ModerationSta
 import {fetchJson} from '@/lib/asyncOperation'
 import {socialButton} from '@/lib/social'
 
-export default function Moderation(){
+export default function Moderation({measuresEnabled=false,directTarget}:{measuresEnabled?:boolean;directTarget?:{id:string;kind:"player"|"game";subject?:string}}){
  const {session}=useAuth(),access=useAdminAccess()
  if(access.status==='checking')return <p role="status">Vérification des accès…</p>
  if(access.status!=='allowed'||!session)return <div role="alert">Accès administrateur requis. <button className={socialButton} onClick={access.retry}>Réessayer</button></div>
- return <Console key={session.access_token} token={session.access_token}/>
+ return <Console key={session.access_token} token={session.access_token} measuresEnabled={measuresEnabled} directTarget={directTarget}/>
 }
-function Console({token}:{token:string}){
+function Console({token,measuresEnabled,directTarget}:{token:string;measuresEnabled:boolean;directTarget?:{id:string;kind:"player"|"game";subject?:string}}){
  const [items,setItems]=useState<ModerationCase[]>([]),[hasMore,setHasMore]=useState(false),[page,setPage]=useState(1),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[state,setState]=useState(''),[kind,setKind]=useState('')
  const [detail,setDetail]=useState<ModerationCase|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[revision,setRevision]=useState(0)
  const [decision,setDecision]=useState<ModerationState>('review'),[justification,setJustification]=useState(''),[note,setNote]=useState(''),[reviewed,setReviewed]=useState(false),[redact,setRedact]=useState(false),[redactNotes,setRedactNotes]=useState(false),[redactedDescription,setRedactedDescription]=useState('')
@@ -51,6 +54,8 @@ function Console({token}:{token:string}){
  return <AdminShell active="moderation"><div aria-busy={busy} className="space-y-6">
   <div className="flex flex-wrap items-center justify-between gap-3"><p className="max-w-2xl text-sm text-zinc-400">Examine les faits, puis consigne une décision. Aucune sanction ni dépublication n’est automatique.</p>{busy&&<p role="status" className="text-sm text-cyan-200">Chargement…</p>}</div>
   {error&&<p role="alert" className="rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-200">{error}</p>}
+  {<ModerationAppeals token={token}/>}
+  {directTarget&&!detail&&<ModerationMeasures creationEnabled={measuresEnabled} key={directTarget.id} token={token} target={directTarget.id} kind={directTarget.kind} subject={directTarget.subject}/>}
   {detail?<>
    <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 bg-cyan-950/20 p-5"><div><p className="mb-2 text-xs font-semibold uppercase tracking-widest text-cyan-300">Signalement {detail.target_kind==='player'?'de joueur':'de jeu'}</p><h2 className="text-2xl font-bold">Dossier #{detail.number}</h2><p className="mt-2 text-sm text-zinc-400">Reçu le {date(detail.created_at)}</p></div><div className="flex flex-wrap gap-2"><button disabled={busy} className={socialButton} onClick={()=>{setDetail(null);setRevision(value=>value+1)}}>Retour aux dossiers</button><button disabled={busy} className={socialButton} onClick={()=>void open(detail.id)}>Recharger le dossier</button></div></header>
@@ -67,6 +72,7 @@ function Console({token}:{token:string}){
      <details className="text-sm text-zinc-400"><summary className="cursor-pointer py-2 focus-visible:outline-cyan-400">Références techniques</summary><dl className="mt-2 space-y-2 break-all"><div><dt>Dossier</dt><dd>{detail.id}</dd></div><div><dt>Auteur</dt><dd>{detail.reporter??'Aucun compte associé'}</dd></div><div><dt>Cible</dt><dd>{detail.target_user??detail.target_game??'Supprimée'}</dd></div><div><dt>Version</dt><dd>{detail.version}</dd></div></dl></details>
     </div>
    </section>
+   {(detail.target_user||detail.target_game||detail.measure_subject)&&<ModerationMeasures key={detail.id} token={token} kind={detail.target_kind} target={(detail.target_user??detail.target_game??detail.measure_subject)!} subject={detail.target_user||detail.target_game?undefined:detail.measure_subject} caseId={detail.id} caseVersion={detail.version} onChanged={value=>{if(typeof value?.published==='boolean')setDetail(previous=>previous?{...previous,target_view:{...previous.target_view,published:value.published!}}:previous)}}/>}
    <form onSubmit={save} className="space-y-5 rounded-2xl border border-cyan-900/60 bg-cyan-950/10 p-4 sm:p-6">
     <div><h3 className="text-lg font-semibold">Décider du suivi</h3><p className="mt-1 text-sm text-zinc-400">Cette décision concerne le dossier de signalement, pas les droits du compte ou la publication du jeu.</p></div>
     {detail.privacy_review&&<p role="status" className="rounded-lg border border-amber-900 bg-amber-950/20 p-3 text-sm text-amber-200">Compte supprimé : vérifier et minimiser les données personnelles encore nécessaires dans les textes.</p>}

@@ -29,6 +29,7 @@ async function fixture({guest=false,admin=false,width=390,menu='',linked=false}=
   if(url.pathname==='/style.css')return route.fulfill({contentType:'text/css',body:css})
   if(url.pathname==='/api/social')return route.fulfill({json:{state:'unavailable',relationId:null}})
   if(url.pathname==='/api/reports'){calls.push(request.postDataJSON());return route.fulfill({status:201,json:{data:{id:id(3),number:42}}})}
+  if(url.pathname==='/api/admin/moderation/measures')return route.fulfill({json:{data:{version:0,blocked:false,measure:null,name:null,history:[]}}})
   if(url.pathname==='/api/admin/moderation'){
    const body=request.method()==='POST'?request.postDataJSON():null;calls.push(body??Object.fromEntries(url.searchParams))
    if(body){if(body.version!==record.version)return route.fulfill({status:409,json:{error:'Dossier modifié. Recharge le dossier.'}});record.version++;record.state=body.state;record.events.push({id:id(5),actor:id(1),state:body.state,created_at:'2026-10-29T13:00:00Z',note:body.note,justification:body.justification});return route.fulfill({json:{data:record}})}

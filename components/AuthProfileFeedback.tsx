@@ -7,6 +7,7 @@ export default function AuthProfileFeedback({loading, message, onRetry}: {loadin
     {!loading && <div className="flex flex-wrap justify-center gap-4">
       <button type="button" onClick={onRetry} className="rounded-lg bg-cyan-400 px-4 py-3 font-bold text-black">Réessayer</button>
       <Link href="/login" className="text-cyan-300 underline">Retour à la connexion</Link>
+      <Link href="/account/moderation" className="text-cyan-300 underline">Décisions et recours</Link>
       <Link href="/" className="text-cyan-300 underline">Accueil</Link>
     </div>}
   </section>

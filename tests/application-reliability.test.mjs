@@ -23,7 +23,7 @@ beforeEach(t=>{
     async maybeSingle(){return {data:rows[0]??null,error:failure}},
     async single(){return {data:{id:user,username:'Player'},error:failure}},
     then(resolve,reject){return Promise.resolve({data:rows,count:rows.length,error:failure}).then(resolve,reject)}}
-  const db={from(){return chain},rpc(name,args){events.push(['rpc',name,args]);if(name==='catalogue_page')return Promise.resolve({data:{items:rows,total:rows.length},error:failure});return chain},
+  const db={from(){return chain},rpc(name,args){events.push(['rpc',name,args]);if(name==='distribution_account_access')return Promise.resolve({data:true,error:failure});if(name==='catalogue_page')return Promise.resolve({data:{items:rows,total:rows.length},error:failure});return chain},
     auth:{async getUser(){return {data:{user:{id:user,user_metadata:{}}},error:null}}}}
   globalThis.__reliability={db}
   globalThis.__phase0={admin:db}
@@ -56,7 +56,7 @@ test('transport and unexpected exceptions have distinct safe diagnoses',async()=
 test('les réponses personnelles concurrentes restent liées au compte authentifié et interdites au cache partagé',async()=>{
  const profiles=new Map([['actor-a',{id:'actor-a',username:'alpha',display_name:'Privé A'}],['actor-b',{id:'actor-b',username:'beta',display_name:'Privé B'}]])
  const reads=[]
- globalThis.__reliability.db=globalThis.__phase0.admin={auth:{async getUser(token){return {data:{user:{id:token}},error:null}}},from(table){
+ globalThis.__reliability.db=globalThis.__phase0.admin={rpc:async()=>({data:true,error:null}),auth:{async getUser(token){return {data:{user:{id:token}},error:null}}},from(table){
   assert.equal(table,'profiles');let fields,actor
   return {update(value){fields=value;return this},eq(key,value){assert.equal(key,'id');actor=value;return this},select(){return this},async single(){reads.push(actor);return {data:{...profiles.get(actor),...fields},error:null}}}
  }}
@@ -78,7 +78,7 @@ test('profile input rejects malformed, oversized, unknown and mistyped fields be
     const response=await profile(request(body));assert.equal(response.status,status,JSON.stringify(body)?.slice(0,80))
     assert.match(response.headers.get('cache-control'),/no-store/)
   }
-  assert.deepEqual(events,[])
+  assert.deepEqual(events.filter(([kind,name])=>kind!=='rpc'||name!=='distribution_account_access'),[])
   for(const bio of [null,'',' Bonjour '])assert.equal((await profile(request({username:' Player ',bio}))).status,200)
   assert.equal(events.at(-1)[1].username,'player')
 })

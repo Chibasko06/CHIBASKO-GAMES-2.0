@@ -69,7 +69,7 @@
     "test:catalogue-interface": "node --import ./tests/product-register.mjs --test tests/catalogue-recommendations.test.mjs && node --test tests/catalogue-interface.browser.test.mjs",
     "test:developer-contacts": "node --import ./tests/register.mjs --test tests/developer-contact.test.mjs",
     "test:http-security-browser": "node --test tests/http-security.browser.test.mjs",
-    "test:reliability": "node --import ./tests/reliability-register.mjs --test tests/application-reliability.test.mjs tests/auth-reliability.test.mjs tests/catalogue-pagination.test.mjs tests/community-profiles.test.mjs tests/public-usernames.test.mjs tests/social.test.mjs tests/social-notifications.test.mjs tests/moderation.test.mjs && node --test tests/profile-sync.worker.test.mjs",
+    "test:reliability": "node --import ./tests/reliability-register.mjs --test tests/application-reliability.test.mjs tests/auth-reliability.test.mjs tests/catalogue-pagination.test.mjs tests/community-profiles.test.mjs tests/public-usernames.test.mjs tests/social.test.mjs tests/social-notifications.test.mjs tests/moderation.test.mjs tests/moderation-measures.test.mjs && node --test tests/profile-sync.worker.test.mjs",
     "test:cloudflare-dependencies": "node --test tests/cloudflare-dependencies.test.mjs",
     "test:account-deletion": "node --import ./tests/register.mjs --test tests/account-deletion.test.mjs && node --test tests/account-cleanup.r2.test.mjs",
     "test:account-deletion-browser": "node --test tests/account-deletion.browser.test.mjs",

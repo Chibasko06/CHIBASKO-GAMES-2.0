@@ -2,7 +2,7 @@ import type {Session} from '@supabase/supabase-js'
 import {supabase} from '@/lib/supabaseClient'
 import {withTimeout, fetchJson} from '@/lib/asyncOperation'
 
-type ProfileSyncResult = {ok: false; error: string; kind: 'session_unavailable' | 'session_expired' | 'profile_missing' | 'profile_unavailable' | 'network_error'} | {ok: true; profile: unknown}
+type ProfileSyncResult = {ok: false; error: string; kind: 'account_restricted' | 'session_unavailable' | 'session_expired' | 'profile_missing' | 'profile_unavailable' | 'network_error'} | {ok: true; profile: unknown}
 const inFlightProfileSync = new Map<string, Promise<ProfileSyncResult>>()
 
 export async function ensureProfile(sessionOverride?: Session | null): Promise<ProfileSyncResult> {
@@ -24,6 +24,7 @@ export async function ensureProfile(sessionOverride?: Session | null): Promise<P
         const {response, payload} = await fetchJson('/api/profile/sync', {
           method: 'POST', headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'}, body: '{}',
         })
+        if (response.status===403 && payload.code==='account_restricted') return {ok:false,kind:'account_restricted',error:'Ce compte fait l’objet d’une restriction.'}
         if (response.status === 401) return {ok: false, kind: 'session_expired', error: 'La session a expiré. Reconnecte-toi.'}
         if (response.status === 404) return {ok: false, kind: 'profile_missing', error: 'Le profil est introuvable. Contacte Chibasko Games si le problème persiste.'}
         if (!response.ok || !payload?.profile) return {ok: false, kind: 'profile_unavailable', error: 'Impossible de préparer le profil. Réessaie dans un instant. Si le problème persiste, contacte Chibasko Games.'}

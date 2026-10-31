@@ -69,7 +69,8 @@ export default function RegisterPage() {
         setProfileSession(data.session)
         const result = await ensureProfile(data.session)
         if (!current()) return
-        if (!result.ok) { setMessage(result.error); return }
+        if (!result.ok && result.kind==='account_restricted') { router.replace('/account/moderation'); return }
+      if (!result.ok) { setMessage(result.error); return }
         router.replace(next)
         return
       }

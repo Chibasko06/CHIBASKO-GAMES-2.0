@@ -5,7 +5,7 @@ import { Database } from '@/types/database'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-export function getSupabaseAdminClient() {
+export function getSupabaseAdminClient(verifiedAdminActor?:string) {
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL')
   }
@@ -15,6 +15,7 @@ export function getSupabaseAdminClient() {
   }
 
   return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    global: verifiedAdminActor?{headers:{'x-chibasko-admin-actor':verifiedAdminActor}}:undefined,
     auth: {
       autoRefreshToken: false,
       persistSession: false,

@@ -7,7 +7,7 @@ test('le contrat profil traverse la vraie route dans Workers, sans dépendre des
  const bundle=await build({stdin:{resolveDir:process.cwd(),contents:`
  import {POST} from './app/api/profile/sync/route'
  let profile={id:'fixture-user',username:'Joueur',display_name:'Joueur',bio:null},writes=0,reads=0
- globalThis.fixtureDb={auth:{async getUser(token){return token==='expired'?{data:{user:null},error:{status:401}}:{data:{user:{id:'fixture-user',email:'fixture@example.test',user_metadata:{}}},error:null}}},from(){let username=false;return {select(){return this},eq(key){username=key==='username';return this},async maybeSingle(){reads++;return {data:username?null:profile,error:null}},insert(value){writes++;profile=value;return this},async single(){return {data:profile,error:null}}}}}
+ globalThis.fixtureDb={async rpc(name,args){if(name!=='distribution_account_access')throw Error('unexpected_rpc');return {data:true,error:null}},auth:{async getUser(token){return token==='expired'?{data:{user:null},error:{status:401}}:{data:{user:{id:'fixture-user',email:'fixture@example.test',user_metadata:{}}},error:null}}},from(){let username=false;return {select(){return this},eq(key){username=key==='username';return this},async maybeSingle(){reads++;return {data:username?null:profile,error:null}},insert(value){writes++;profile=value;return this},async single(){return {data:profile,error:null}}}}}
  export default {async fetch(request){
   if(new URL(request.url).pathname==='/missing')profile=null
   const hasBody=!!request.body

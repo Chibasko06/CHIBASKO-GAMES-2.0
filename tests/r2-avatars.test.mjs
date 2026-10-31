@@ -20,6 +20,7 @@ let events
 
 function database(options = {}) {
   return {
+    async rpc(name,args){assert.equal(name,'distribution_account_access');assert.equal(args.p_actor,owner);return {data:!options.restricted,error:null}},
     auth: { getUser: async token => {
       events.push(['auth', token === 'test-token'])
       return { data: { user: options.noUser ? null : { id: owner } }, error: options.authError || null }
