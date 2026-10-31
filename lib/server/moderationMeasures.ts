@@ -55,16 +55,18 @@ export async function moderationMeasuresRequest(request:Request,scope:'admin'|'a
      ||typeof input.lift!=='boolean'||input.lift&&(!id(input.operationId)||!Number.isInteger(input.subjectVersion))))throw new InputError('Réexamen invalide.')
    if(scope==='admin'&&request.method==='POST'){
     const policy=process.env.MODERATION_MEASURES_RETENTION_DAYS
-    if(policy!==undefined){
-     if(!/^[1-9][0-9]{0,3}$/.test(policy)||Number(policy)>3650)throw new InputError('Politique de conservation non configurée.',503)
+    const recovery=['lift','restore'].includes(String(input.action))
+    if(policy!==undefined&&/^[1-9][0-9]{0,3}$/.test(policy)&&Number(policy)<=3650){
      input.retentionDays=Number(policy)
-    }else if(!['lift','restore'].includes(String(input.action)))throw new InputError('Politique de conservation non configurée.',503)
+    }else if(!recovery)throw new InputError('Politique de conservation non configurée.',503)
    }
    result=await uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??'').call(scope==='admin'?'distribution_moderation_measure':'distribution_moderation_appeals',{p_actor:actor,p_input:input})
   }
   return adminJson({data:result})
  }catch(error){
   if(error instanceof InputError)return adminJson({error:error.message},{status:error.status})
+  if(error instanceof UploadError&&error.code==='moderation_scope_disabled')return adminJson({error:'La création de mesures est désactivée dans le périmètre serveur.',code:error.code},{status:503})
+  if(error instanceof UploadError&&error.code==='moderation_target_not_allowed')return adminJson({error:'Cette cible ne fait pas partie des ressources autorisées pour la qualification.',code:error.code},{status:403})
   if(error&&typeof error==='object'&&'status' in error&&[401,403].includes(Number(error.status)))return adminJson({error:'Accès refusé.'},{status:Number(error.status)})
   if(error instanceof UploadError&&[400,404,409,429].includes(error.status))return adminJson({error:error.status===409?'La cible ou le dossier a changé. Actualise avant de décider à nouveau.':'Décision impossible dans cet état.',code:error.code},{status:error.status})
   logDataFailure('moderation_measures',error,'database_unavailable')

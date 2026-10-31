@@ -40,8 +40,21 @@ test('mesures : flag, validation stricte, identité vérifiée et absence de cac
  assert.equal((await POST(request(measure))).status,503)
  assert.equal((await POST(request({...measure,retentionDays:30}))).status,400)
  process.env.MODERATION_MEASURES_ENABLED='0'
+ process.env.MODERATION_MEASURES_RETENTION_DAYS='incorrect'
  assert.equal((await POST(request({...measure,action:'lift'}))).status,200,'Une désactivation ne bloque pas les levées')
  assert.equal((await GET(request(undefined,admin,'/api/admin/moderation/measures?kind=player&target='+player))).status,200)
+})
+
+test('le portail restitue le refus du périmètre SQL sans exposer son contenu',async t=>{
+ environment(t)
+ const fetcher=globalThis.fetch
+ for(const [code,status] of [['moderation_scope_disabled',503],['moderation_target_not_allowed',403]]){
+  globalThis.fetch=async(input,init)=>String(input).includes('/rpc/distribution_moderation_measure')
+   ?Response.json({message:code,code:'P0001'},{status:400}):fetcher(input,init)
+  const response=await POST(request(measure));assert.equal(response.status,status)
+  const result=await response.text();assert.equal(JSON.parse(result).code,code);assert.doesNotMatch(result,/private-fixture|fa900000|P0001/)
+ }
+ assert.equal((await POST(request({...measure,mode:'general'}))).status,400)
 })
 test('un JWT encore valide donne accès au recours, sans autoriser un profil restreint',async t=>{
  environment(t);process.env.MODERATION_MEASURES_ENABLED='0'

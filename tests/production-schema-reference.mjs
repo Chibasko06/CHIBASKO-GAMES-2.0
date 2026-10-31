@@ -189,6 +189,8 @@ try {
  }
  const {moderationMeasuresIntegration}=await import('./moderation-measures-db.mjs')
  await moderationMeasuresIntegration(async sql=>(await query(sql)).stdout.trim())
+ const {moderationQualificationIntegration}=await import('./moderation-qualification-db.mjs')
+ await moderationQualificationIntegration(async sql=>(await query(sql)).stdout.trim())
  const output=join(root,'contracts/production-schema.v1.json')
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')

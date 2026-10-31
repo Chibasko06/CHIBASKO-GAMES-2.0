@@ -727,3 +727,80 @@ Le test SQL utilise PostgreSQL jetable loopback, pas un DSN Supabase hérité.
 Les références Pong/SDK restent inchangées ; le build fixture Pong sert seulement
 de recette locale, jamais d'upload production. Aucune migration distante, ressource,
 credential, DNS, upload, publication, commit ou push n'est effectué pendant PREP.
+
+## Qualification des mesures de modération
+
+Le portail conserve `MODERATION_MEASURES_ENABLED=0` par défaut. La valeur exacte
+`1` ouvre la création dans la limite du périmètre PostgreSQL ; toute autre valeur
+ferme la création. Les lectures, recours, levées et restaurations restent disponibles.
+`MODERATION_MEASURES_RETENTION_DAYS` accepte un entier de 1 à 3650, sans valeur par
+défaut. La durée relève d'une politique de conservation validée. Une valeur absente
+ou incorrecte bloque les nouvelles mesures, mais les levées utilisent la politique
+valide déjà enregistrée sur la cible. Les échéances existantes ne sont pas raccourcies.
+
+La table privée `moderation_measure_scope` contient une seule ligne :
+
+| Mode SQL | Création de nouvelles mesures |
+| --- | --- |
+| `disabled`, ligne absente | Refusée, même si le flag du portail vaut 1 |
+| `qualification` | Seulement les cibles de `moderation_qualification_targets` |
+| `general` | Toutes les cibles éligibles, avec les protections administratives habituelles |
+
+La migration installe `disabled` et une liste vide. Aucun UUID réel n'est versionné.
+Les colonnes `user_id` et `game_id` sont mutuellement exclusives ; leurs clés
+étrangères imposent l'existence du bon type de ressource. La RPC vérifie aussi le
+profil du compte. Les comptes administrateurs ne peuvent pas être sanctionnés.
+La suppression d'une ressource supprime son autorisation de qualification.
+
+La configuration relève d'une session SQL d'exploitation autorisée, pas d'une
+route du portail. Les rôles anon, authenticated et service_role n'ont aucun droit
+sur ces tables. Les UUID sont injectés dans les variables psql ci-dessous par
+l'opérateur, après vérification des cibles et des destinataires d'e-mails.
+
+```sql
+begin;
+select id from public.moderation_measure_scope where id for update;
+insert into public.moderation_qualification_targets(user_id) values (:'test_player_uuid'::uuid);
+insert into public.moderation_qualification_targets(game_id) values (:'test_game_uuid'::uuid);
+update public.moderation_measure_scope set mode='qualification' where id;
+commit;
+```
+
+Une liste vide refuse toute nouvelle mesure en qualification. Une valeur de mode
+inconnue est refusée par la contrainte SQL. Ne jamais utiliser le rôle propriétaire
+pour contourner les RPC pendant les tests.
+
+L'ordre de livraison est : migration additive, contrôles de permissions en lecture
+seule, déploiement du portail avec création désactivée, configuration du périmètre
+SQL, qualification contrôlée, puis activation explicitement autorisée du flag.
+Le Worker et son cron existants restent compatibles ; aucune variable, liaison R2
+ou clé supplémentaire n'est nécessaire. Le passage ultérieur à `general` exige
+une décision séparée. Pour fermer les créations, remettre le flag à 0 et le mode
+SQL à `disabled`. Ne pas annuler les sanctions ni supprimer les historiques.
+
+Les verrous du périmètre et des cibles sérialisent les créations avec une fermeture
+ou un retrait d'autorisation. Le service_role ne peut pas appeler la fonction interne
+`moderation_measure_apply`. Le propriétaire SQL conserve nécessairement ses
+privilèges d'exploitation : la protection ne couvre pas sa compromission.
+Une répétition strictement identique d'une décision confirmée reste une lecture
+idempotente en RPC, même après fermeture du périmètre SQL ; elle ne renvoie aucun
+nouvel e-mail. Avec le flag du portail à 0, consulter l'historique par GET : le POST
+de création reste refusé. Le flag du portail n'est pas lu par PostgreSQL : fermer
+aussi le mode SQL pour bloquer les nouvelles mesures par appel service_role direct.
+Les autres droits administratifs du catalogue et de gestion des comptes restent
+indépendants ; ce périmètre protège les nouvelles mesures du moteur de modération.
+
+### Expurgation bornée
+
+La maintenance sélectionne les cibles éligibles avant sa limite de dix cibles.
+Une restriction active, un recours en attente ou un e-mail non envoyé, y compris
+`attention_required`, conserve les justificatifs. Chaque passage traite au plus
+50 décisions et 100 contenus d'e-mails par cible. Les contenus restants sont repris
+même si toutes les décisions sont déjà archivées. Le résultat de la RPC est le
+nombre de décisions expurgées et de contenus d'e-mails nettoyés. Un arrêt avant
+commit annule le lot ; un arrêt entre deux lots laisse un état reprenable.
+
+Les identifiants, actions, dates, empreintes et références administratives restent
+conservés. L'expurgation n'est pas une anonymisation complète. La durée de ces
+métadonnées, les sauvegardes et les interventions sur les envois bloqués doivent
+faire partie de la politique de conservation et d'exploitation.

@@ -35,6 +35,8 @@ export async function moderationMeasuresApiIntegration(query,{admin,player}){
   assert.equal((await developer.GET(send('/api/developer/games',player))).status,403)
   assert.equal((await selfRoute.POST(send('/api/account/moderation',player,{operationId:randomUUID(),measureId:operationId,description:'Reexamen demande avec un JWT deja ouvert avant le blocage.'}))).status,200)
   assert.equal((await adminRoute.POST(send('/api/admin/moderation/measures',player,{...body,operationId:randomUUID()}))).status,403)
+  process.env.MODERATION_MEASURES_ENABLED='0'
+  process.env.MODERATION_MEASURES_RETENTION_DAYS='incorrect'
   assert.equal((await adminRoute.POST(send('/api/admin/moderation/measures',admin,{...body,action:'lift',version:version+1,operationId:randomUUID()}))).status,200)
   assert.equal(JSON.parse(await query(`set role authenticated;set request.jwt.claim.sub='${player}';select public.moderation_self_status()`)).blocked,false)
   console.log('Mesures HTTP : vrais handlers, RPC PostgreSQL, ancien JWT, profil, social, developpeur et recours verifies.')
