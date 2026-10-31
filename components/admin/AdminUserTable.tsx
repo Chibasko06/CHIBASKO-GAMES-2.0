@@ -31,7 +31,7 @@ export default function AdminUserTable({ users, busy, actor, onEdit, onDelete }:
         <td className="text-xs text-zinc-400"><span className="admin-cell-label">Inscription : </span>{user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR') : '—'}</td>
         <td>
           <div className="flex flex-wrap gap-2">
-            {<Link href={'/admin/moderation?kind=player&target='+user.id} className="admin-action">Modération<span className="sr-only"> {user.username}</span></Link>}
+            {<Link href={'/admin/moderation?view=measures&kind=player&target='+user.id} className="admin-action">Modération<span className="sr-only"> {user.username}</span></Link>}
             <button type="button" disabled={busy} onClick={() => onEdit(user)} className="admin-action">Modifier<span className="sr-only"> {user.username}</span>
             </button>
             <button type="button" disabled={busy || user.id === actor} title={user.id === actor ? 'Utilisez la suppression personnelle dans le tableau de bord' : undefined} onClick={() => onDelete(user.id)} className="admin-action text-rose-300">Supprimer<span className="sr-only"> {user.username}</span>

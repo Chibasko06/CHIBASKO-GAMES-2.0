@@ -343,7 +343,7 @@ export default function DashboardPage() {
         </div>
       </div>
     </section>
-    <details className="rounded-xl border border-zinc-800 p-4"><summary className="cursor-pointer font-semibold">Paramètres avancés</summary><Link href="/dashboard/blocked" className="mt-3 inline-block rounded px-2 py-3 text-cyan-300">Comptes bloqués</Link></details>
+    <details className="rounded-xl border border-zinc-800 p-4"><summary className="cursor-pointer font-semibold">Paramètres avancés</summary><nav aria-label="Paramètres avancés" className="mt-3 flex flex-col items-start gap-1"><Link href="/account/moderation" className="rounded px-2 py-3 text-cyan-300 focus-visible:outline-cyan-400">Mes avertissements et sanctions</Link><Link href="/dashboard/blocked" className="rounded px-2 py-3 text-cyan-300 focus-visible:outline-cyan-400">Comptes bloqués</Link></nav></details>
     <div className="border-t border-zinc-800 pt-1">{session?.access_token && <AccountDeletion key={user?.id} accessToken={session.access_token} onAccountRemoved={() => withTimeout(supabase.auth.signOut({ scope: 'local' }), 5000)} />}</div>
   </div>
 }

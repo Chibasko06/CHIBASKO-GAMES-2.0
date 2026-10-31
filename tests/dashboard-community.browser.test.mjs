@@ -66,6 +66,8 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
     assert.equal(await x.page.getByRole('heading',{name:'Mon profil',exact:true}).count(),1)
     assert.equal(await x.page.getByRole('link',{name:/Voir mon profil public/}).getAttribute('href'),'/players/@camille')
     assert.equal(await x.page.getByRole('link',{name:/Un jeu au titre/}).count(),2)
+    await x.page.getByText('Paramètres avancés',{exact:true}).click()
+    assert.equal(await x.page.getByRole('link',{name:'Mes avertissements et sanctions',exact:true}).getAttribute('href'),'/account/moderation')
     const image=await x.page.locator('main img').first().boundingBox();assert.ok(Math.abs(image.width/image.height-16/9)<.05)
    }else{
     await x.page.getByText('Pas encore d’ami',{exact:true}).waitFor()

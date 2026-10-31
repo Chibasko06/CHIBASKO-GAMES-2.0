@@ -29,8 +29,8 @@ beforeEach(t=>{
     return Response.json({profile:{id:'A',username:'Player',bio:''}})
   })
 })
-async function mount(Component,run){
-  const dom=new JSDOM('<div id="root"></div>',{url:'https://site.example/auth/callback?next=%2Fdashboard'})
+async function mount(Component,run,next='/dashboard'){
+  const dom=new JSDOM('<div id="root"></div>',{url:'https://site.example/auth/callback?next='+encodeURIComponent(next)})
   dom.window.HTMLElement.prototype.attachEvent=()=>{};dom.window.HTMLElement.prototype.detachEvent=()=>{}
   globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true
   const root=createRoot(document.getElementById('root'))
@@ -355,3 +355,8 @@ for(const Component of [Login,Register])test('un compte restreint est dirige ver
   assert.equal(globalThis.__destination,'/account/moderation')
  })
 })
+
+ test('le lien de decision retrouve l’espace personnel apres connexion',async()=>{
+ globalThis.__reliability.db.auth.signInWithPassword=async()=>({data:{session},error:null})
+ await mount(Login,async()=>{await act(async()=>button('Connexion').click());assert.equal(globalThis.__destination,'/account/moderation')},'/account/moderation')
+ })

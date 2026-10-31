@@ -11,6 +11,29 @@ import {logDataFailure} from '@/lib/dataAccess'
 const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i
 const id=(value:unknown)=>typeof value==='string'&&uuid.test(value)
 const text=(value:unknown,min=10)=>typeof value==='string'&&value.trim().length>=min&&value.length<=5000&&!value.includes('\0')
+export async function moderationBrowseRequest(request:Request){
+ try{
+  const token=request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1]
+  if(!token)throw new InputError('Connexion requise.',401)
+  const actor=(await authorizeAdmin(createUserAuthClient(token),token)).id
+  const query=new URL(request.url).searchParams,input=Object.fromEntries(query)
+  if([...query.keys()].some(key=>query.getAll(key).length!==1||!['view','id','kind','action','state','search','before','cursor'].includes(key))
+   ||!['measures','appeals','deliveries'].includes(input.view)||input.id!==undefined&&!id(input.id)
+   ||input.search!==undefined&&(input.search.length>100||input.search.includes('\0'))||input.kind!==undefined&&!['','player','game'].includes(input.kind)
+   ||input.action!==undefined&&!['','warn','suspend','ban','lift','unpublish','restore'].includes(input.action)
+   ||input.state!==undefined&&!(input.view==='appeals'?['','pending','accepted','rejected']:['','active','expired','lifted','warning','replaced','recorded','unavailable','closed']).includes(input.state)
+   ||input.view==='deliveries'&&(!input.id||[...query.keys()].some(key=>!['view','id','before','cursor'].includes(key)))
+   ||input.view==='appeals'&&!!input.action
+   ||(input.before===undefined)!==(input.cursor===undefined)||input.before!==undefined&&(input.before.length>40||!Number.isFinite(Date.parse(input.before))||!id(input.cursor)))throw new InputError('Recherche ou pagination invalide.')
+  const data=await uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??'').call('distribution_moderation_browse',{p_actor:actor,p_input:input})
+  return data===null?adminJson({error:'Décision introuvable.'},{status:404}):adminJson({data})
+ }catch(error){
+  if(error instanceof InputError)return adminJson({error:error.message},{status:error.status})
+  if(error&&typeof error==='object'&&'status' in error&&[401,403].includes(Number(error.status)))return adminJson({error:'Accès refusé.'},{status:Number(error.status)})
+  logDataFailure('moderation_history',error,'database_unavailable')
+  return adminJson({error:'L’historique est temporairement indisponible.'},{status:503})
+ }
+}
 export async function moderationMeasuresRequest(request:Request,scope:'admin'|'appeals'|'self'){
  try{
   if(request.method==='POST'&&!adminOriginAllowed(request))throw new InputError('Origine refusée.',403)

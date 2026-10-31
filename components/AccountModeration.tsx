@@ -10,6 +10,11 @@ import {socialButton} from '@/lib/social'
 type Measure={archived_at?:string|null;id:string;action:string;reason:string;ends_at:string|null;created_at:string;game_title?:string|null;appeal:{state:string;decision:string|null}|null}
 type Status={blocked:boolean;measure?:string;endsAt?:string|null;current?:Measure|null;history:Measure[]}
 export default function AccountModeration(){
+ const {session}=useAuth()
+ // Les brouillons et décisions d'un autre compte ne doivent jamais rester affichés.
+ return <AccountModerationContent key={session?.user?.id??session?.access_token??'guest'}/>
+}
+function AccountModerationContent(){
  const {session,loading}=useAuth(),token=session?.access_token
  const [cursor,setCursor]=useState<{before:string;cursor:string}|null>(null)
  const [data,setData]=useState<Status|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0),[selected,setSelected]=useState(''),[description,setDescription]=useState('')
@@ -28,7 +33,7 @@ export default function AccountModeration(){
   catch(cause){if(version===epoch.current)setError(cause instanceof Error?cause.message:'Réception non confirmée.')}
   finally{if(version===epoch.current){locked.current=false;setBusy(false)}}
  }
- return <main className="mx-auto max-w-3xl space-y-6 px-4 py-8"><h1 className="text-3xl font-bold">Décisions et recours</h1><p className="text-sm leading-6 text-zinc-400">Cet espace reste accessible pendant une restriction de ton compte Chibasko Games. Il présente les motifs communicables et permet un réexamen.</p>
+ return <main className="mx-auto max-w-3xl space-y-6 px-4 py-8"><h1 className="text-3xl font-bold">Mes avertissements et sanctions</h1><p className="text-sm leading-6 text-zinc-400">Cet espace reste accessible pendant une restriction de ton compte Chibasko Games. Il présente les motifs communicables et permet un réexamen.</p>
   {!loading&&!session?<Link href="/login?next=%2Faccount%2Fmoderation" className={socialButton}>Se connecter</Link>:<>
    {error&&<p role="alert" className="text-red-200">{error}</p>}{(loading||busy)&&<p role="status">Chargement…</p>}
    {data&&<p className="rounded-xl border border-cyan-900 p-4">{data.blocked?'Ton compte fait actuellement l’objet d’une restriction.':'Aucune restriction active sur ton compte.'}{data.endsAt&&data.blocked?' Fin prévue : '+new Date(data.endsAt).toLocaleString('fr-FR'):''}</p>}

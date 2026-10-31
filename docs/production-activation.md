@@ -804,3 +804,40 @@ Les identifiants, actions, dates, empreintes et références administratives res
 conservés. L'expurgation n'est pas une anonymisation complète. La durée de ces
 métadonnées, les sauvegardes et les interventions sur les envois bloqués doivent
 faire partie de la politique de conservation et d'exploitation.
+
+
+## Centre de modération : lectures et navigation
+
+La migration 20261105000100_moderation_read_models.sql ajoute uniquement des modèles
+de consultation et deux index. Elle ne modifie ni les décisions, ni le périmètre de
+qualification, ni les permissions de mutation. La RPC distribution_moderation_browse
+est réservée au service_role et vérifie à nouveau le compte administrateur.
+
+Les espaces sont accessibles par les paramètres view=reports, view=measures et
+view=appeals de /admin/moderation. Les liens historiques ?id=signalement,
+?kind=player&target=compte et ?subject=reference restent compatibles. Une fiche de
+mesure utilise ?view=measures&measure=reference ; une fiche de recours utilise
+?view=appeals&appeal=reference. La rubrique Utilisateurs existante reste accessible
+par /admin?section=users. Aucune route /admin/users distincte n'est nécessaire.
+
+Les listes et notifications sont limitées à 20 éléments par page, avec curseur
+(date, UUID). La recherche est déclenchée par validation du formulaire ; aucun
+polling n'est ajouté. Les statuts des mesures sont calculés au chargement depuis
+les décisions existantes. Une échéance atteinte, une levée explicite et une clôture
+de signalement restent trois événements différents.
+
+L'espace /account/moderation reste indépendant du blocage du Dashboard. Le lien
+Mes avertissements et sanctions est présent dans ses paramètres avancés et dans
+le panneau de compte restreint. Le propriétaire lit uniquement les motifs
+communicables et ses recours via les RPC personnelles existantes.
+
+Appliquer la migration de lecture avant de déployer le portail, puis reconstruire
+et déployer la maintenance pour les nouveaux e-mails. Aucun flag, secret, binding
+ou cron supplémentaire n'est nécessaire. Les messages déjà préparés restent
+figés pour conserver l'idempotence Resend ; les nouvelles préparations incluent
+le bouton Consulter ma décision et le chemin de navigation du Dashboard.
+
+Un retour au portail précédent peut conserver cette migration additive. Ne pas
+retirer les protections de qualification ni effacer les décisions pour revenir
+à l'interface précédente. Les validations locales ne remplacent pas la recette
+en production sur les ressources de qualification autorisées.

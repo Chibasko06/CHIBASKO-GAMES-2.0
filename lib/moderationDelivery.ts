@@ -1,4 +1,4 @@
-import {moderationEmailHtml,reportReason} from './moderationEmail'
+import {moderationEmailHtml,moderationAccountNavigation,reportReason} from './moderationEmail'
 import type {ReportKind} from './moderation'
 import type {UploadRepository} from '@/lib/game-distribution/uploads/contracts'
 import {withTimeout} from '@/lib/asyncOperation'
@@ -29,7 +29,9 @@ export async function deliverModeration(db:UploadRepository,env:ModerationMailEn
      :job.kind==='receipt'?`Le signalement #${job.case.number} a été enregistré et sera examiné par Chibasko Games.\nAucune sanction n’est automatique.\nPour compléter le dossier ou contester une décision : ${appeal}, en précisant ce numéro.`
       :`Décision relative au signalement #${job.case.number}\n\n${job.decision??''}\n\nCette réponse concerne le suivi du dossier et n’atteste pas une sanction automatique.\nPour demander un réexamen : ${appeal}, en précisant ce numéro. Les voies judiciaires restent ouvertes ; les autres voies applicables dépendent de la qualification du service.`}
     if(job.notice){if(typeof job.notice.title!=='string'||typeof job.notice.text!=='string')throw Error('moderation_notice_invalid');message.subject='Chibasko Games — '+job.notice.title;message.text=job.notice.text+'\n\nPour demander un réexamen : '+appeal+'. Décisions et recours : '+new URL('/account/moderation',adminUrl).href}
-    message.html=moderationEmailHtml(String(message.subject),String(message.text),adminUrl,job.kind==='admin'?adminUrl:undefined)
+    const personal=job.stream==='measure'&&job.kind!=='admin'?new URL('/account/moderation',adminUrl):undefined
+    if(personal)message.text=String(message.text)+'\n\n'+moderationAccountNavigation
+    message.html=moderationEmailHtml(String(message.subject),String(message.text),adminUrl,job.kind==='admin'?adminUrl:personal,personal?'Consulter ma décision':undefined)
    }
    message=await withTimeout(db.call<Record<string,unknown>>(job.stream==='measure'?'distribution_moderation_prepare_measure_mail':'distribution_moderation_prepare_mail',{p_id:job.id,p_lease:job.lease,p_message:message}),8000)
    phase='send';options.signal?.throwIfAborted()

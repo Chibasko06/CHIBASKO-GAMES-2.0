@@ -18,6 +18,6 @@ export default function AccountAccessBoundary({children}:{children:React.ReactNo
  if(!loading&&access!==null&&access.token===token&&!access.blocked)return children
  return <section className="mx-auto min-h-80 max-w-2xl space-y-5 px-4 py-10">
   {error?<p role="alert" className="text-red-200">{error}</p>:access!==null&&access.token===token&&access.blocked?<><h1 className="text-2xl font-bold">Compte restreint</h1><p className="text-zinc-300">Cet espace n’est pas accessible pendant la restriction. Tu peux consulter le motif et demander un réexamen.</p></>:<p role="status">Vérification du compte…</p>}
-  <div className="flex flex-wrap gap-3"><Link href="/account/moderation" className={socialButton}>Décisions et recours</Link>{!loading&&<button className={socialButton} onClick={()=>setAttempt(value=>value+1)}>Vérifier l’accès</button>}<Link href="/games" className={socialButton}>Catalogue public</Link></div>
+  <div className="flex flex-wrap gap-3"><Link href="/account/moderation" className={socialButton}>Mes avertissements et sanctions</Link>{!loading&&<button className={socialButton} onClick={()=>setAttempt(value=>value+1)}>Vérifier l’accès</button>}<Link href="/games" className={socialButton}>Catalogue public</Link></div>
  </section>
 }
