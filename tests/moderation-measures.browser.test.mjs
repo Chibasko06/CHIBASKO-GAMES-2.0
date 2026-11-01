@@ -19,21 +19,27 @@ after(async()=>browser?.close())
 async function fixture(width=390,path='/admin/moderation?target='+id(2)+'&kind=player'){
  let releaseSecond;const secondResponse=new Promise(resolve=>{releaseSecond=resolve})
  const context=await browser.newContext({viewport:{width,height:844}}),calls=[],state={reviewed:false,version:0,blocked:false,measure:null,history:[],name:'joueur-fixture'},record={id:id(3),action:'ban',reason:'Motif <script>window.injection=true</script> communiqué.',created_at:'2026-11-03T12:00:00Z',ends_at:null,appeal:null}
+ if(path.includes('warning-appeal'))record.action='warn'
+ state.facts=path.includes('closed-facts')?[{id:id(7),reference:'incident-deja-examine',summary:'Faits contestés ayant déjà donné lieu à un recours accepté.',revision:1,state:'closed',decided:true,created_at:record.created_at}]:[]
  await context.addInitScript(()=>{window.confirm=()=>true})
  await context.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url());assert.equal(url.origin,'https://portal.test')
   if(url.pathname==='/host.js')return route.fulfill({contentType:'text/javascript',body:script});if(url.pathname==='/style.css')return route.fulfill({contentType:'text/css',body:css})
+  if(url.pathname==='/api/admin/moderation/facts'){
+   if(req.method()==='POST'){calls.push(req.postDataJSON());state.facts[0]={...state.facts[0],revision:2,state:'open',decided:false}}
+   return route.fulfill({json:{data:{items:state.facts,hasMore:false}}})
+  }
   if(url.pathname==='/api/admin/moderation/measures'){
    if(req.method()==='GET')return route.fulfill({json:{data:state}})
    const body=req.postDataJSON();calls.push(body);state.version++;state.measure=body.action;state.blocked=!['warn','lift','restore'].includes(body.action);state.history.unshift({...record,...body,id:body.operationId,created_at:record.created_at});return route.fulfill({json:{data:{id:body.operationId,version:state.version}}})
   }
   if(url.pathname==='/api/admin/moderation/appeals'){
-   if(req.method()==='POST'){calls.push(req.postDataJSON());state.reviewed=true;return route.fulfill({json:{data:[]}})}
+   if(req.method()==='POST'){calls.push(req.postDataJSON());state.effect=req.postDataJSON().effect;state.reviewed=true;return route.fulfill({json:{data:[]}})}
    return route.fulfill({json:{data:state.reviewed?[]:[{id:id(4),version:1,subject_version:state.version,user_id:id(2),username:'joueur-fixture',description:'Je souhaite faire verifier les faits.',action:'ban',reason:record.reason,created_at:record.created_at}]}})
   }
   if(url.pathname==='/api/admin/moderation/history'){
    const measure={...record,subject:id(2),kind:'player',target:id(2),name:'joueur-fixture',actor_name:'admin-fixture',actor_reference:id(1),version:1,current_version:1,blocked:true,protected:false,state:'active',next:null,note:'Note privée de fixture',appeal:{id:id(4),state:'pending'},mail:[]}
-   const appeal={id:id(4),version:1,state:state.reviewed?'accepted':'pending',username:'joueur-fixture',description:'Je souhaite faire verifier les faits.',decision:state.reviewed?'Les faits ont été réexaminés.':null,created_at:record.created_at,reviewed_at:state.reviewed?record.created_at:null,measure}
+   const appeal={id:id(4),version:1,state:state.reviewed?'accepted':'pending',effect:state.effect,username:'joueur-fixture',description:'Je souhaite faire verifier les faits.',decision:state.reviewed?'Les faits ont été réexaminés.':null,created_at:record.created_at,reviewed_at:state.reviewed?record.created_at:null,measure}
    if(url.searchParams.get('view')==='deliveries')return route.fulfill({json:{data:{items:[{id:id(9),kind:'decision',state:'sent',attempts:1,created_at:record.created_at,recipient_name:'joueur-fixture'}],hasMore:false}}})
    return route.fulfill({json:{data:url.searchParams.has('id')?(url.searchParams.get('view')==='appeals'?appeal:measure):{items:url.searchParams.get('view')==='appeals'?[appeal]:[measure],hasMore:false}}})
   }
@@ -51,15 +57,15 @@ async function fixture(width=390,path='/admin/moderation?target='+id(2)+'&kind=p
 }
 for(const width of [390,768,1366])test('mesure administrative responsive à '+width+'px : justification et confirmation',async()=>{
  const x=await fixture(width);try{
-  await x.page.getByRole('button',{name:'Prendre une mesure',exact:true}).click();await x.page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Mesure');await x.page.getByLabel('Mesure',{exact:true}).selectOption('suspend');await x.page.getByLabel('Durée',{exact:true}).selectOption('168');await x.page.getByLabel('Motif communiqué à la personne concernée').fill('Suspension de fixture justifiee par des faits verifies.');await x.page.getByLabel('Note privée sur la mesure').fill('Note interne uniquement.')
-  await x.page.getByRole('button',{name:'Confirmer la mesure'}).dblclick();await x.page.getByRole('link',{name:'Consulter l’historique de la mesure'}).waitFor();assert.equal(x.calls.length,1);assert.equal(x.calls[0].action,'suspend');assert.ok(x.calls[0].endsAt);assert.ok(x.calls[0].operationId)
+  await x.page.getByRole('button',{name:'Prendre une mesure — faits nouveaux ou réexamen',exact:true}).click();await x.page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Mesure');await x.page.getByLabel('Mesure',{exact:true}).selectOption('suspend');await x.page.getByLabel('Durée',{exact:true}).selectOption('168');await x.page.getByLabel('Motif communiqué à la personne concernée').fill('Suspension de fixture justifiee par des faits verifies.');await x.page.getByLabel('Note privée sur la mesure').fill('Note interne uniquement.')
+  await x.page.getByLabel('Référence stable des faits').fill('incident-2026-a');await x.page.getByLabel('Description des faits nouveaux').fill('Incident distinct vérifié pendant la qualification du formulaire.');await x.page.getByRole('button',{name:'Confirmer la mesure'}).dblclick();await x.page.getByRole('link',{name:'Consulter l’historique de la mesure'}).waitFor();assert.equal(x.calls.length,1);assert.equal(x.calls[0].action,'suspend');assert.ok(x.calls[0].endsAt);assert.ok(x.calls[0].operationId);assert.equal(x.calls[0].factsKey,'incident-2026-a')
   assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  }finally{await x.context.close()}
 })
 test('dépublication et restauration réutilisent le même formulaire et la version courante',async()=>{
  const x=await fixture(1366,'/admin/moderation?target='+id(2)+'&kind=game');try{
-  await x.page.getByRole('button',{name:'Prendre une mesure',exact:true}).click();await x.page.getByLabel('Motif communiqué à la personne concernée').fill('Retrait temporaire le temps de verifier les contenus.');await x.page.getByRole('button',{name:'Confirmer la mesure'}).click();await x.page.getByText(/Restriction active/).waitFor()
-  await x.page.getByRole('button',{name:'Prendre une mesure',exact:true}).click();await x.page.getByLabel('Mesure',{exact:true}).selectOption('restore');await x.page.getByLabel('Motif communiqué à la personne concernée').fill('Verification terminee, la publication est restauree.');await x.page.getByRole('button',{name:'Confirmer la mesure'}).click();await x.page.getByText('Aucune restriction active.').waitFor();assert.deepEqual(x.calls.map(call=>call.action),['unpublish','restore']);assert.equal(x.calls[1].version,1)
+  await x.page.getByRole('button',{name:'Prendre une mesure — faits nouveaux ou réexamen',exact:true}).click();await x.page.getByLabel('Motif communiqué à la personne concernée').fill('Retrait temporaire le temps de verifier les contenus.');await x.page.getByLabel('Référence stable des faits').fill('incident-jeu-1');await x.page.getByLabel('Description des faits nouveaux').fill('Contenu nouveau vérifié et justifiant le retrait temporaire.');await x.page.getByRole('button',{name:'Confirmer la mesure'}).click();await x.page.getByText(/Restriction active/).waitFor()
+  await x.page.getByRole('button',{name:'Prendre une mesure — faits nouveaux ou réexamen',exact:true}).click();await x.page.getByLabel('Mesure',{exact:true}).selectOption('restore');await x.page.getByLabel('Motif communiqué à la personne concernée').fill('Verification terminee, la publication est restauree.');await x.page.getByRole('button',{name:'Confirmer la mesure'}).click();await x.page.getByText('Aucune restriction active.').waitFor();assert.deepEqual(x.calls.map(call=>call.action),['unpublish','restore']);assert.equal(x.calls[1].version,1)
  }finally{await x.context.close()}
 })
 test('compte restreint : motif, recours et déconnexion accessibles sans note privée',async()=>{
@@ -119,4 +125,45 @@ test('changement de compte : aucun ancien motif ni brouillon pendant le chargeme
   assert.equal(await x.page.getByLabel('Motif de ton recours').count(),0);assert.doesNotMatch(await x.page.locator('main').textContent(),/Motif <script>|Brouillon prive/)
   x.releaseSecond();await x.page.getByText('Aucune décision enregistrée.').waitFor()
  }finally{x.releaseSecond();await x.context.close()}
+})
+
+test('avertissement contesté : acceptation et retrait sont explicitement distincts',async()=>{
+ const x=await fixture(390,'/admin/moderation?view=appeals&appeal='+id(4)+'&warning-appeal');try{
+  await x.page.getByLabel('Issue du recours').selectOption('accepted')
+  await x.page.getByLabel('Justification du réexamen').fill('Les faits ne justifient pas cet avertissement ; retrait décidé.')
+  await x.page.getByLabel('Retirer explicitement l’avertissement contesté, sans lever d’autre restriction').check()
+  assert.equal(await x.page.getByLabel('Lever explicitement la restriction actuellement active').count(),0)
+  await x.page.getByRole('button',{name:'Confirmer le réexamen'}).click()
+  await x.page.getByText('Avertissement retiré. Les autres restrictions restent inchangées.').waitFor()
+  assert.equal(x.calls[0].effect,'withdraw_warning');assert.equal(x.calls[0].lift,false)
+ }finally{await x.context.close()}
+})
+test('mêmes faits clos : confirmation interdite avant réouverture motivée',async()=>{
+ const x=await fixture(1366,'/admin/moderation?target='+id(2)+'&kind=player&closed-facts');try{
+  await x.page.getByRole('button',{name:'Prendre une mesure — faits nouveaux ou réexamen',exact:true}).click()
+  await x.page.getByLabel('Affaire',{exact:true}).selectOption(id(7))
+  await x.page.getByText('Nouvelle mesure bloquée sur cette révision.',{exact:false}).waitFor()
+  assert.equal(await x.page.getByRole('button',{name:'Confirmer la mesure'}).isDisabled(),true)
+  await x.page.getByLabel('Justification de réouverture').fill('Nouvel élément vérifié justifiant le réexamen du dossier.')
+  await x.page.getByRole('button',{name:'Réouvrir explicitement les faits'}).click()
+  await x.page.getByLabel('Motif communiqué à la personne concernée').fill('Motif du réexamen explicitement justifié et vérifié.')
+  await x.page.getByRole('button',{name:'Confirmer la mesure'}).click()
+  await x.page.getByRole('link',{name:'Consulter l’historique de la mesure'}).waitFor()
+  assert.equal(x.calls[1].factId,id(7));assert.equal(x.calls[1].factsRevision,2)
+  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ }finally{await x.context.close()}
+})
+
+test('pagination des affaires : une ancienne sélection ne devient pas implicitement des faits nouveaux',async()=>{
+ const x=await fixture(390);try{
+  await x.context.route('**/api/admin/moderation/facts?*',route=>{const older=new URL(route.request().url()).searchParams.has('before');return route.fulfill({json:{data:{items:[{id:id(older?8:7),reference:older?'affaire-ancienne':'affaire-recente',summary:'Faits disponibles pour un examen administratif explicite.',revision:1,state:'open',decided:false,created_at:'2026-11-03T12:00:00Z'}],hasMore:!older}}})})
+  await x.page.getByRole('button',{name:'Prendre une mesure — faits nouveaux ou réexamen',exact:true}).click()
+  await x.page.getByLabel('Référence stable des faits').fill('brouillon-faits-distincts')
+  await x.page.getByLabel('Description des faits nouveaux').fill('Description saisie avant de sélectionner une affaire existante.')
+  await x.page.getByLabel('Affaire',{exact:true}).selectOption(id(7))
+  await x.page.getByRole('button',{name:'Affaires antérieures',exact:true}).click()
+  await x.page.getByText('L’affaire sélectionnée n’est pas sur cette page.',{exact:false}).waitFor()
+  assert.equal(await x.page.getByRole('button',{name:'Confirmer la mesure'}).isDisabled(),true)
+  assert.equal(x.calls.length,0)
+ }finally{await x.context.close()}
 })

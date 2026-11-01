@@ -59,6 +59,7 @@ export const migrations = Object.freeze([
   '20261103000100_moderation_measures.sql',
   '20261104000100_moderation_qualification_archive.sql',
   '20261105000100_moderation_read_models.sql',
+  '20261106000100_moderation_facts_appeals.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']

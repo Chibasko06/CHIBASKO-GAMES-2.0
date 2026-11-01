@@ -841,3 +841,52 @@ Un retour au portail précédent peut conserver cette migration additive. Ne pas
 retirer les protections de qualification ni effacer les décisions pour revenir
 à l'interface précédente. Les validations locales ne remplacent pas la recette
 en production sur les ressources de qualification autorisées.
+
+## Faits examinés, recours et retrait des avertissements
+
+La migration additive 20261106000100_moderation_facts_appeals.sql rattache les mesures
+à des faits stables et à leur révision. Une seule mesure punitive est autorisée par
+révision, indépendamment de sa clé d’idempotence. Les UUID internes restent les
+références des cibles ; aucun rôle ni périmètre de qualification n’est modifié.
+
+Un recours accepté clôt les faits de la révision contestée. Son effet est explicite :
+aucun retrait, retrait du seul avertissement, ou levée de la restriction actuelle.
+Le retrait d’un avertissement est enregistré séparément et ne lève jamais une autre
+restriction. L’historique demeure consultable. Les recours historiques acceptés
+n’entraînent aucun retrait rétroactif : leur effet reste non précisé. Une correction
+explicite permet de retirer un ancien avertissement et de notifier son destinataire.
+
+Une nouvelle infraction reçoit une référence stable et une description distincte.
+La référence normalisée et l’empreinte de la description détectent les répétitions
+exactes, sans prétendre identifier des faits équivalents réécrits différemment.
+L’administrateur reste responsable de ce rapprochement. Pour les mêmes faits, une
+réouverture motivée, journalisée et soumise à une révision attendue est obligatoire.
+La réouverture d’un dossier classé le remet en examen ; une mesure ne clôture jamais
+automatiquement un signalement. Les faits archivés ne peuvent pas être rouverts sans
+constituer une nouvelle affaire documentée.
+
+Ordre d’installation :
+
+1. Sauvegarder la base et contrôler en lecture seule les migrations précédentes,
+   les permissions et le périmètre SQL de qualification.
+2. Suspendre les décisions administratives pendant la fenêtre de mise à jour.
+3. Appliquer uniquement la nouvelle migration additive. Les tables privées et les
+   nouvelles RPC administratives ne sont accessibles ni à anon ni à authenticated.
+4. Vérifier le snapshot du schéma avec le contrat versionné et les grants.
+5. Déployer le portail et la maintenance utilisant le nouveau type de notification
+   correction. Les anciens messages restent compatibles.
+6. Qualifier sur des cibles autorisées : avertissement, acceptation sans retrait,
+   refus de répétition, retrait explicite, faits nouveaux, réouverture motivée.
+7. Réouvrir les décisions administratives après ces vérifications.
+
+Entre la migration et le nouveau portail, les anciennes créations sans référence
+aux faits sont refusées sans mutation ; les consultations, levées et restaurations
+restent disponibles. Un retour au seul ancien portail ne permet donc pas de reprendre
+les nouvelles décisions. Conserver la migration et désactiver leur création lors
+d’un retour arrière ; ne pas supprimer l’historique ni les faits enregistrés.
+
+Les textes des faits, réouvertures et retraits suivent la conservation des décisions.
+L’expurgation est bornée et reprenable ; restrictions actives, recours en attente et
+notifications non terminées préservent les justificatifs. Les identifiants et les
+empreintes persistantes empêchent de présenter cet archivage comme une anonymisation
+complète. La durée applicable reste une décision à valider pour le service.

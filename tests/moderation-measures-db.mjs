@@ -6,7 +6,7 @@ export async function moderationMeasuresIntegration(query){
  const admin=randomUUID(),player=randomUUID(),other=randomUUID(),game=randomUUID()
  await query(`insert into auth.users(id,email,raw_user_meta_data) values('${admin}','measures-admin@example.test','{"username":"measures-admin"}'),('${player}','measures-player@example.test','{"username":"measures-player"}'),('${other}','measures-other@example.test','{"username":"measures-other"}');insert into public.admin_users(user_id) values('${admin}');insert into public.games(id,title,slug,game_url,is_published) values('${game}','Mesures','measures-fixture','https://example.test/game',true)`)
  const literal=value=>"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb"
- const decide=async(body,actor=admin)=>JSON.parse(await query(`set role service_role;select public.distribution_moderation_measure('${actor}',${literal({...body,retentionDays:30})})`))
+ const decide=async(body,actor=admin)=>JSON.parse(await query(`set role service_role;select public.distribution_moderation_measure('${actor}',${literal({factsKey:body.operationId,factsSummary:"Faits de test independants : "+body.operationId,...body,retentionDays:30})})`))
  const status=async()=>JSON.parse(await query(`set role authenticated;set request.jwt.claim.sub='${player}';select public.moderation_self_status()`))
  let version=0
  const action=async(type,extra={})=>{const input={kind:'player',target:player,action:type,operationId:randomUUID(),version,reason:'Motif communicable suffisamment precis.',note:'Note administrative privee.',...extra};const result=await decide(input);version=result.version;return {input,result}}
@@ -58,7 +58,7 @@ export async function moderationMeasuresIntegration(query){
  const review={id:appeal,version:1,state:'accepted',decision:'Reexamen termine et levee explicitement approuvee.',lift:true,operationId:randomUUID(),subjectVersion:version}
  await query(`set role service_role;select public.distribution_moderation_appeals('${admin}',${literal(review)})`);version++
  assert.equal((await status()).blocked,false)
- await assert.rejects(query(`set role service_role;select public.distribution_moderation_appeals('${admin}',${literal(review)})`),error=>/request_conflict/.test(error.stderr))
+ await query(`set role service_role;select public.distribution_moderation_appeals('${admin}',${literal(review)})`)
  for(const role of ['anon','authenticated']){
   await assert.rejects(query(`set role ${role};select * from public.moderation_measures`))
   await assert.rejects(query(`set role ${role};select public.distribution_moderation_measure('${admin}','{}')`))

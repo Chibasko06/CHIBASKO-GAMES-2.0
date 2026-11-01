@@ -21,7 +21,7 @@ export async function moderationBrowseRequest(request:Request){
    ||!['measures','appeals','deliveries'].includes(input.view)||input.id!==undefined&&!id(input.id)
    ||input.search!==undefined&&(input.search.length>100||input.search.includes('\0'))||input.kind!==undefined&&!['','player','game'].includes(input.kind)
    ||input.action!==undefined&&!['','warn','suspend','ban','lift','unpublish','restore'].includes(input.action)
-   ||input.state!==undefined&&!(input.view==='appeals'?['','pending','accepted','rejected']:['','active','expired','lifted','warning','replaced','recorded','unavailable','closed']).includes(input.state)
+   ||input.state!==undefined&&!(input.view==='appeals'?['','pending','accepted','rejected']:['','active','expired','lifted','withdrawn','warning','replaced','recorded','unavailable','closed']).includes(input.state)
    ||input.view==='deliveries'&&(!input.id||[...query.keys()].some(key=>!['view','id','before','cursor'].includes(key)))
    ||input.view==='appeals'&&!!input.action
    ||(input.before===undefined)!==(input.cursor===undefined)||input.before!==undefined&&(input.before.length>40||!Number.isFinite(Date.parse(input.before))||!id(input.cursor)))throw new InputError('Recherche ou pagination invalide.')
@@ -66,7 +66,7 @@ export async function moderationMeasuresRequest(request:Request,scope:'admin'|'a
     result=value.data
    }
   }else{
-   const fields=scope==='admin'?['kind','target','before','cursor',...(request.method==='GET'?['subject']:[]),...(request.method==='POST'?['action','version','operationId','caseId','reason','note','endsAt']:[])]:['before','cursor',...(request.method==='POST'?['id','version','state','decision','lift','subjectVersion','operationId']:[])]
+   const fields=scope==='admin'?['kind','target','before','cursor',...(request.method==='GET'?['subject']:[]),...(request.method==='POST'?['action','version','operationId','caseId','reason','note','endsAt','factId','factsRevision','factsKey','factsSummary']:[])]:['before','cursor',...(request.method==='POST'?['id','version','state','decision','lift','effect','subjectVersion','operationId']:[])]
    if(Object.keys(input).some(key=>!fields.includes(key))||(input.before===undefined)!==(input.cursor===undefined)
     ||input.before!==undefined&&(typeof input.before!=='string'||input.before.length>40||!Number.isFinite(Date.parse(input.before))||!id(input.cursor)))throw new InputError('Demande ou pagination invalide.')
    if(scope==='admin'){
@@ -74,8 +74,15 @@ export async function moderationMeasuresRequest(request:Request,scope:'admin'|'a
     if(request.method==='POST'&&(!['warn','suspend','ban','lift','unpublish','restore'].includes(String(input.action))||!id(input.operationId)||!Number.isInteger(input.version)||Number(input.version)<0
       ||!text(input.reason)||typeof input.note!=='string'||!text(input.note,0)||input.caseId!==undefined&&!id(input.caseId)
       ||input.endsAt!==undefined&&(typeof input.endsAt!=='string'||!Number.isFinite(Date.parse(input.endsAt)))))throw new InputError('Décision invalide. Motif requis : 10 à 5 000 caractères.')
+    if(request.method==='POST'&&((input.factId===undefined)!==(input.factsRevision===undefined)||(input.factsKey===undefined)!==(input.factsSummary===undefined)||input.factId!==undefined&&input.factsKey!==undefined
+     ||input.factId!==undefined&&(!id(input.factId)||!Number.isInteger(input.factsRevision)||Number(input.factsRevision)<1)
+     ||input.factsKey!==undefined&&(typeof input.factsKey!=='string'||input.factsKey.trim().length<4||input.factsKey.length>120)
+     ||input.factsSummary!==undefined&&!text(input.factsSummary,20)))throw new InputError('Référence des faits invalide.')
    }else if(request.method==='POST'&&(!id(input.id)||!Number.isInteger(input.version)||!['accepted','rejected'].includes(String(input.state))||!text(input.decision)
      ||typeof input.lift!=='boolean'||input.lift&&(!id(input.operationId)||!Number.isInteger(input.subjectVersion))))throw new InputError('Réexamen invalide.')
+   if(scope==='appeals'&&request.method==='POST'&&input.effect!==undefined&&(!['none','withdraw_warning','lift_current'].includes(String(input.effect))
+    ||input.effect!=='none'&&(input.state!=='accepted'||!id(input.operationId)||!Number.isInteger(input.subjectVersion))
+    ||input.lift!==(input.effect==='lift_current')))throw new InputError('Effet du recours invalide.')
    if(scope==='admin'&&request.method==='POST'){
     const policy=process.env.MODERATION_MEASURES_RETENTION_DAYS
     const recovery=['lift','restore'].includes(String(input.action))
@@ -88,11 +95,37 @@ export async function moderationMeasuresRequest(request:Request,scope:'admin'|'a
   return adminJson({data:result})
  }catch(error){
   if(error instanceof InputError)return adminJson({error:error.message},{status:error.status})
+  if(error instanceof UploadError&&factsErrors[error.code])return adminJson({error:factsErrors[error.code],code:error.code},{status:error.status})
   if(error instanceof UploadError&&error.code==='moderation_scope_disabled')return adminJson({error:'La création de mesures est désactivée dans le périmètre serveur.',code:error.code},{status:503})
   if(error instanceof UploadError&&error.code==='moderation_target_not_allowed')return adminJson({error:'Cette cible ne fait pas partie des ressources autorisées pour la qualification.',code:error.code},{status:403})
   if(error&&typeof error==='object'&&'status' in error&&[401,403].includes(Number(error.status)))return adminJson({error:'Accès refusé.'},{status:Number(error.status)})
   if(error instanceof UploadError&&[400,404,409,429].includes(error.status))return adminJson({error:error.status===409?'La cible ou le dossier a changé. Actualise avant de décider à nouveau.':'Décision impossible dans cet état.',code:error.code},{status:error.status})
   logDataFailure('moderation_measures',error,'database_unavailable')
   return adminJson({error:'Le résultat ne peut pas être confirmé. Actualise avant de réessayer avec la même référence.'},{status:503})
+ }
+}
+
+const factsErrors:Record<string,string>={decision_archived:'Les justificatifs de cette affaire ont été archivés. Une réouverture n’est plus possible ; de nouveaux faits doivent être documentés séparément.',facts_required:'Décris les faits nouveaux et leur référence, ou sélectionne une affaire existante.',facts_closed:'Ces faits sont clos après réexamen ou clôture du dossier. Une réouverture motivée est nécessaire.',facts_already_decided:'Une mesure existe déjà pour cette révision des faits. Un réexamen motivé est nécessaire pour décider à nouveau.',facts_conflict:'Les faits ont changé ou correspondent à une affaire existante. Recharge les affaires avant de décider.'}
+export async function moderationFactsRequest(request:Request,correction=false){
+ try{
+  if(request.method==='POST'&&!adminOriginAllowed(request))throw new InputError('Origine refusée.',403)
+  const token=request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1]
+  if(!token)throw new InputError('Connexion requise.',401)
+  const actor=(await authorizeAdmin(createUserAuthClient(token),token)).id
+  const q=new URL(request.url).searchParams,input=request.method==='POST'?await readJsonObject(request,16000):Object.fromEntries(q)
+  const fields=correction?['measureId','operationId','version','reason']:request.method==='POST'?['id','revision','operationId','reason']:['kind','target','caseId','before','cursor']
+  if(Object.keys(input).some(key=>!fields.includes(key))||request.method==='GET'&&[...q.keys()].some(key=>q.getAll(key).length!==1))throw new InputError()
+  if(request.method==='POST'){
+   if(!id(input.operationId)||!text(input.reason)||!id(correction?input.measureId:input.id)||!Number.isInteger(correction?input.version:input.revision))throw new InputError('Justification et référence requises.')
+   if(!correction)input.action='reopen'
+  }else if(!['player','game'].includes(String(input.kind))||!id(input.target)||input.caseId!==undefined&&!id(input.caseId)
+   ||(input.before===undefined)!==(input.cursor===undefined)||input.before!==undefined&&(typeof input.before!=='string'||!Number.isFinite(Date.parse(input.before))||!id(input.cursor)))throw new InputError()
+  const data=await uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??'').call(correction?'distribution_moderation_warning_withdraw':'distribution_moderation_facts',{p_actor:actor,p_input:input})
+  return adminJson({data})
+ }catch(error){
+  if(error instanceof InputError)return adminJson({error:error.message},{status:error.status})
+  if(error instanceof UploadError)return adminJson({error:factsErrors[error.code]??'Décision impossible dans cet état. Recharge le dossier.',code:error.code},{status:[400,403,404,409,410,429].includes(error.status)?error.status:503})
+  if(error&&typeof error==='object'&&'status' in error&&[401,403].includes(Number(error.status)))return adminJson({error:'Accès refusé.'},{status:Number(error.status)})
+  logDataFailure('moderation_facts',error,'database_unavailable');return adminJson({error:'Le résultat ne peut pas être confirmé. Recharge le dossier avant de réessayer.'},{status:503})
  }
 }

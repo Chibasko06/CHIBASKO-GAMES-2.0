@@ -7,7 +7,7 @@ export async function moderationQualificationIntegration(query){
  const seed=async id=>query(`insert into auth.users(id,email,raw_user_meta_data) values('${id}','${id}@example.test','{"username":"qual-${id.slice(0,12)}"}')`)
  for(const id of [admin,player,other])await seed(id)
  await query(`insert into admin_users(user_id) values('${admin}');insert into games(id,title,slug,game_url,is_published) values('${game}','Qualification','qualification-${game}','https://example.test/game',true)`)
- const body=(target=player,extra={})=>({kind:'player',target,action:'warn',version:0,operationId:randomUUID(),reason:'Qualification autorisee de ressources de test.',note:'Note privee de qualification.',retentionDays:30,...extra})
+ const body=(target=player,extra={})=>{const op=randomUUID();return {factsKey:op,factsSummary:'Faits de qualification distincts : '+op,kind:'player',target,action:'warn',version:0,operationId:randomUUID(),reason:'Qualification autorisee de ressources de test.',note:'Note privee de qualification.',retentionDays:30,...extra}}
  const decide=async input=>JSON.parse(await query(`set role service_role;select public.distribution_moderation_measure('${admin}',${literal(input)})`))
  const fails=(input,message)=>assert.rejects(decide(input),error=>error.stderr?.includes(message))
  const original=body()

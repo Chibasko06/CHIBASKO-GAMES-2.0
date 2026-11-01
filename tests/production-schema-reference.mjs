@@ -63,7 +63,19 @@ try {
    await query(`update public.profiles set username='migration-second' where id='${second}'`)
   }
   if(name==='20261101000100_social_notifications.sql')await query("insert into auth.users(id,email) values('fa410000-0000-4000-8000-000000000001','historical-a@example.test'),('fa410000-0000-4000-8000-000000000002','historical-b@example.test');insert into public.social_relationships(user_low,user_high,requester,state) values('fa410000-0000-4000-8000-000000000001','fa410000-0000-4000-8000-000000000002','fa410000-0000-4000-8000-000000000001','pending')")
+  if(name==='20261106000100_moderation_facts_appeals.sql'){
+   await query("insert into auth.users(id,email,raw_user_meta_data) values('fa960000-0000-4000-8000-000000000001','historical-admin@example.test','{\"username\":\"historical-admin\"}'),('fa960000-0000-4000-8000-000000000002','historical-player@example.test','{\"username\":\"historical-player\"}');insert into admin_users(user_id) values('fa960000-0000-4000-8000-000000000001');update moderation_measure_scope set mode='general'")
+   await query(`set role service_role;select distribution_moderation_measure('fa960000-0000-4000-8000-000000000001','{"kind":"player","target":"fa960000-0000-4000-8000-000000000002","action":"warn","version":0,"operationId":"fa960000-0000-4000-8000-000000000003","reason":"Avertissement historique avant structuration des faits.","note":"","retentionDays":30}')`)
+   await query(`set role authenticated;set request.jwt.claim.sub='fa960000-0000-4000-8000-000000000002';select moderation_appeal('fa960000-0000-4000-8000-000000000004','fa960000-0000-4000-8000-000000000003','Reexamen historique avant installation de la nouvelle migration.')`)
+   await query(`set role service_role;select distribution_moderation_appeals('fa960000-0000-4000-8000-000000000001','{"id":"fa960000-0000-4000-8000-000000000004","version":1,"state":"accepted","decision":"Recours historique accepte sans retrait automatique.","lift":false}')`)
+  }
   await run('psql',[...args,'-f',file])
+  if(name==='20261106000100_moderation_facts_appeals.sql'){
+   assert.equal((await query("select f.state||':'||coalesce(a.effect,'historique') from moderation_measures m join moderation_facts f on f.id=m.fact_id join moderation_appeals a on a.measure=m.id where m.id='fa960000-0000-4000-8000-000000000003'")).stdout.trim(),'closed:historique')
+   assert.equal((await query("select count(*) from moderation_warning_withdrawals")).stdout.trim(),'0','Un recours accepte ancien ne retire pas retroactivement un avertissement')
+   assert.equal((await query("select count(*) from moderation_measure_mail")).stdout.trim(),'3','La migration ne produit aucune nouvelle notification historique')
+   await query("update moderation_measure_mail set state='sent';update moderation_measure_scope set mode='disabled'")
+  }
   if(name==='20261101000100_social_notifications.sql'){
    assert.equal((await query('select count(*) from public.social_notifications')).stdout.trim(),'0','Les demandes historiques ne créent aucun nouvel événement');
    await query("delete from public.profiles where id::text like 'fa410000-%'");
@@ -193,6 +205,8 @@ try {
  await moderationQualificationIntegration(async sql=>(await query(sql)).stdout.trim())
  const {moderationHistoryIntegration}=await import('./moderation-history-db.mjs')
  await moderationHistoryIntegration(async sql=>(await query(sql)).stdout.trim())
+ const {moderationFactsIntegration}=await import('./moderation-facts-db.mjs')
+ await moderationFactsIntegration(async sql=>(await query(sql)).stdout.trim())
  const output=join(root,'contracts/production-schema.v1.json')
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')

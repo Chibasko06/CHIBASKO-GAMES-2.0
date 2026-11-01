@@ -4,7 +4,7 @@ import type {UploadRepository} from '@/lib/game-distribution/uploads/contracts'
 import {withTimeout} from '@/lib/asyncOperation'
 
 export type ModerationMailEnvironment={MODERATION_MAINTENANCE_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;GAME_SUBMISSION_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string;MODERATION_APPEAL_EMAIL?:string}
-type Job={stream?:'measure';notice?:{title:string;text:string};adminPath?:string;id:string;lease:string;kind:'admin'|'receipt'|'decision';message:Record<string,unknown>|null;case:{id:string;number:number;category:string;target_kind:string;target_locator:string;contact_email:string|null};decision:string|null}
+type Job={stream?:'measure';notice?:{title:string;text:string};adminPath?:string;id:string;lease:string;kind:'admin'|'receipt'|'decision'|'correction';message:Record<string,unknown>|null;case:{id:string;number:number;category:string;target_kind:string;target_locator:string;contact_email:string|null};decision:string|null}
 export async function deliverModeration(db:UploadRepository,env:ModerationMailEnvironment,options:{fetcher?:typeof fetch;signal?:AbortSignal;log?:(event:{event:'moderation_mail';outcome:string;phase:string})=>void}={}){
  if(env.MODERATION_MAINTENANCE_ENABLED!=='1')return 0
  const log=(outcome:string,phase:string)=>{try{(options.log??console.info)({event:'moderation_mail',outcome,phase})}catch{}}

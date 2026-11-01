@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 import {GET,POST} from '../app/api/admin/moderation/measures/route.ts'
 import {GET as self,POST as appeal} from '../app/api/account/moderation/route.ts'
 import {PATCH as profile} from '../app/api/profile/public/route.ts'
+import {GET as facts,POST as reopen} from '../app/api/admin/moderation/facts/route.ts'
+import {POST as withdraw} from '../app/api/admin/moderation/corrections/route.ts'
+import {POST as review} from '../app/api/admin/moderation/appeals/route.ts'
 import {deliverModeration} from '../lib/moderationDelivery.ts'
 
 const admin='fa900000-0000-4000-8000-000000000001',player='fa900000-0000-4000-8000-000000000002'
@@ -18,6 +21,7 @@ function environment(t){
   if(url.pathname==='/rest/v1/rpc/moderation_self_status'){assert.equal(actor,player);return Response.json({blocked:true,history:[]})}
   if(url.pathname==='/rest/v1/rpc/moderation_appeal'){assert.equal(actor,player);return Response.json({state:'pending'})}
   if(url.pathname==='/rest/v1/rpc/distribution_moderation_measure'){assert.equal(actor,'private-fixture');const body=JSON.parse(init.body);assert.equal(body.p_actor,admin);return Response.json({version:1,history:[]})}
+  if(['/rest/v1/rpc/distribution_moderation_facts','/rest/v1/rpc/distribution_moderation_warning_withdraw','/rest/v1/rpc/distribution_moderation_appeals'].includes(url.pathname)){assert.equal(actor,'private-fixture');return Response.json({items:[],hasMore:false})}
   assert.fail('Requête inattendue : '+url.pathname)
  })
  return calls
@@ -90,4 +94,26 @@ test('e-mail de mesure : une panne conserve le message et la même clé lors de 
  available=true
  assert.equal(await deliverModeration(db,env,{fetcher,log(){}}),1)
  assert.deepEqual(acknowledgements,[false,true]);assert.equal(preparations,2);assert.deepEqual(sent[0],sent[1])
+})
+
+test('faits et corrections : contrôles administrateur, validation et reprise sans création activée',async t=>{
+ const calls=environment(t),path='/api/admin/moderation/facts',body={id:measure.operationId,revision:1,operationId:measure.operationId,reason:'Réouverture justifiée après examen de nouveaux éléments.'}
+ for(const actor of [null,player])assert.equal((await reopen(request(body,actor,path))).status,actor?403:401)
+ assert.equal(calls.some(call=>call.path.includes('/rpc/')),false)
+ assert.equal((await reopen(request({...body,actor:admin},admin,path))).status,400)
+ process.env.MODERATION_MEASURES_ENABLED='0'
+ assert.equal((await reopen(request(body,admin,path))).status,200)
+ assert.equal(JSON.parse(calls.find(call=>call.path.endsWith('distribution_moderation_facts')).body).p_input.action,'reopen')
+ const response=await facts(request(undefined,admin,path+'?kind=player&target='+player));assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/private.*no-store/)
+ assert.equal((await withdraw(request({measureId:measure.operationId,operationId:measure.operationId,version:2,reason:'Retrait explicite du seul avertissement contesté.'},admin,'/api/admin/moderation/corrections'))).status,200)
+})
+test('recours : effet explicite cohérent et refus sûr des mêmes faits',async t=>{
+ environment(t)
+ const body={id:measure.operationId,version:1,state:'accepted',decision:'Retrait explicite de cet avertissement contesté.',lift:false,effect:'withdraw_warning',subjectVersion:2,operationId:measure.operationId}
+ assert.equal((await review(request(body,admin,'/api/admin/moderation/appeals'))).status,200)
+ assert.equal((await review(request({...body,lift:true},admin,'/api/admin/moderation/appeals'))).status,400)
+ assert.equal((await review(request({...body,state:'rejected'},admin,'/api/admin/moderation/appeals'))).status,400)
+ const fetcher=globalThis.fetch
+ globalThis.fetch=async(input,init)=>String(input).includes('/rpc/distribution_moderation_measure')?Response.json({message:'facts_closed',code:'P0001'},{status:400}):fetcher(input,init)
+ const response=await POST(request(measure));assert.equal(response.status,409);const text=await response.text();assert.match(text,/réouverture motivée/);assert.doesNotMatch(text,/P0001|private-fixture/)
 })

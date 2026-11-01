@@ -25,7 +25,7 @@ export async function moderationMeasuresApiIntegration(query,{admin,player}){
  const send=(path,actor,body)=>new Request('https://portal.test'+path,{method:body===undefined?'GET':'POST',headers:{Origin:'https://portal.test',Authorization:'Bearer fixture-'+actor,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})})
  try{
   const current=await adminRoute.GET(send('/api/admin/moderation/measures?kind=player&target='+player,admin));assert.equal(current.status,200)
-  const version=(await current.json()).data.version,operationId=randomUUID(),body={kind:'player',target:player,action:'ban',version,operationId,reason:'Decision de fixture verifiee par le handler et PostgreSQL.',note:'Note privee invisible au joueur.'}
+  const version=(await current.json()).data.version,operationId=randomUUID(),body={kind:'player',target:player,action:'ban',version,operationId,factsKey:operationId,factsSummary:'Faits HTTP distincts : '+operationId,reason:'Decision de fixture verifiee par le handler et PostgreSQL.',note:'Note privee invisible au joueur.'}
   const response=await adminRoute.POST(send('/api/admin/moderation/measures',admin,body));assert.equal(response.status,200)
   assert.equal((await adminRoute.POST(send('/api/admin/moderation/measures',admin,body))).status,200)
   const status=await selfRoute.GET(send('/api/account/moderation',player));assert.equal(status.status,200);assert.match(status.headers.get('cache-control'),/private.*no-store/)
