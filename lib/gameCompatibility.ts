@@ -16,16 +16,9 @@ export function supportsDevice(value:string|boolean|null|undefined,device:Discov
 export function isCompatibilityDeclaration(value:unknown):value is Exclude<GameCompatibility,'unknown'>{return value==='desktop'||value==='mobile'||value==='both'}
 export const mobileCompatibilityHelp='Le jeu doit proposer des commandes tactiles, une interface lisible sur téléphone et une alternative à tout clavier obligatoire. Vérifie son fonctionnement en portrait ou paysage. Cette déclaration reste soumise à la revue administrative.'
 
-export type DeviceCapabilities={coarse:boolean;fine:boolean;touchPoints:number;shortSide:number}
-export function capabilityDevice(value:DeviceCapabilities):DiscoveryDevice{
- if(value.fine)return 'desktop'
- if(value.coarse&&value.touchPoints>0&&value.shortSide>0)return 'mobile'
- return 'all'
-}
 export function initialDevice(userAgent:string,hint:string|null,cookie:string|undefined):DiscoveryDevice{
  if(cookie==='desktop'||cookie==='mobile'||cookie==='all')return cookie
  if(/bot|crawler|spider/i.test(userAgent))return 'all'
  if(hint==='?1'||/Android|iPhone|iPad|Mobile|Tablet/i.test(userAgent))return 'mobile'
- if(/Windows NT|Macintosh|X11|CrOS/i.test(userAgent))return 'desktop'
  return 'all'
 }

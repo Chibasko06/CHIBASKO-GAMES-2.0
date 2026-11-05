@@ -8,7 +8,7 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare'
 const category={id:'11111111-1111-4111-8111-111111111111',name:'Action',slug:'action',created_at:'2026-01-01T00:00:00Z'}
 const game={id:'22222222-2222-4222-8222-222222222222',title:'Stickman Fights',slug:'stickman-fights',
  game_url:'https://legacy.example.test/index.html',thumbnail_url:null,description:'Un jeu de combat navigateur.',
- developer_name:'Studio de test',release_date_text:null,mobile_compatible:'oui',technology:'HTML5',provider_name:null,
+ developer_name:'Studio de test',release_date_text:null,mobile_compatible:'platform:desktop',technology:'HTML5',provider_name:null,
  source_page_url:null,views_count:1,play_count:0,is_published:true,created_at:category.created_at,
  game_type:'classic',multiplayer_game_id:null,is_beta:false,active_version_id:null,catalogue_source:'legacy',
  categories:[category],favorites_count:0,ratings_count:0,average_rating:0,comments_count:0,likes_count:0,dislikes_count:0}
@@ -36,7 +36,7 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    }
    if(request.method==='POST'&&path==='/rest/v1/rpc/catalogue_page'){
     reads++;const input=await request.json();devices.push(input.p_device)
-    const items=input.p_slug&&input.p_slug!==game.slug?[]:[game]
+    const items=input.p_device==='mobile'||input.p_slug&&input.p_slug!==game.slug?[]:[game]
     return Response.json({items,total:items.length})
    }
    if(request.method==='POST'&&(path==='/rest/v1/rpc/catalogue_home'||path==='/rest/v1/rpc/catalogue_home_for_device')){
@@ -67,13 +67,21 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    assert.match(html,/Stickman Fights/)
    assert.doesNotMatch(html,/Unexpected loadManifest|<iframe\b/)
   }
-  for(const [agent,device] of [['iPhone','mobile'],['Windows NT','desktop']]){
+  for(const agent of ['iPhone','Android Tablet','Windows NT','unknown']){
    devices.length=0
-   for(const path of ['/','/games']){
-    const response=await worker.dispatchFetch('https://chibaskogames.fr'+path,{headers:{'User-Agent':agent}})
-    assert.equal(response.status,200);assert.match(await response.text(),/Stickman Fights/)
+   const home=await worker.dispatchFetch('https://chibaskogames.fr/',{headers:{'User-Agent':agent}})
+   assert.equal(home.status,200);assert.match(await home.text(),/Stickman Fights/);assert.ok(devices.every(value=>value==='all'))
+   const mobile=/iPhone|Tablet/.test(agent)
+   for(const [path,preference,expected] of [['/games','',mobile?'mobile':'all'],['/games?device=all','mobile','all'],['/games?device=mobile','all','mobile'],['/games','all','all'],['/games','mobile','mobile']]){
+    devices.length=0
+    const response=await worker.dispatchFetch('https://chibaskogames.fr'+path,{headers:{'User-Agent':agent,...preference?{Cookie:'cg-catalogue-filter='+preference}:{}}})
+    assert.equal(response.status,200);const body=await response.text()
+    assert.ok(devices.length>0);assert.ok(devices.every(value=>value===expected),JSON.stringify(devices))
+    if(expected==='all')assert.match(body,/Stickman Fights/)
+    else assert.match(body,/Aucun jeu ne correspond/)
    }
-   assert.ok(devices.length>0);assert.ok(devices.every(value=>value===device),JSON.stringify(devices))
+   const direct=await worker.dispatchFetch('https://chibaskogames.fr/games/stickman-fights',{headers:{'User-Agent':agent}})
+   assert.equal(direct.status,200);const body=await direct.text();assert.match(body,/Stickman Fights/);assert.doesNotMatch(body,/Continuer vers le lecteur/)
   }
   assert.ok(reads>0,'Le test doit traverser le rendu dynamique et ses lectures.')
   const response=await worker.dispatchFetch('https://chibaskogames.fr/players/@joueur-actuel')

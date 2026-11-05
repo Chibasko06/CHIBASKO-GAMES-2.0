@@ -1,5 +1,3 @@
-import {requestDevice} from '@/lib/server/requestDevice'
-import GameCompatibilityNotice from '@/components/GameCompatibilityNotice'
 import {gameCompatibility,compatibilityLabels} from '@/lib/gameCompatibility'
 import GameSharingMenu from '@/components/GameSharingMenu'
 import {cache} from 'react'
@@ -62,7 +60,6 @@ export default async function GamePage({
     }))
     : []
 
-  const device=await requestDevice()
   const structuredData = gameStructuredData(game)
 
   return (
@@ -96,8 +93,8 @@ export default async function GamePage({
 
       </div>
 
-      <GamePagePlayerLayout recommendations={selectGameRecommendations(game,await getGameRecommendations(game,device))} primaryCategoryId={game.categories[0]?.id}>
-      <GameCompatibilityNotice key={game.id} value={game.mobile_compatible} device={device}>
+      <GamePagePlayerLayout recommendations={selectGameRecommendations(game,await getGameRecommendations(game))} primaryCategoryId={game.categories[0]?.id}>
+
       {!game.active_version_id && isClassicGame(game) ? (
         <GameViewport title={game.title} developerName={game.developer_name} coverUrl={game.thumbnail_url} gameId={game.id} gameUrl={game.game_url} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
       ) : (
@@ -116,7 +113,7 @@ export default async function GamePage({
         />
       )}
 
-      </GameCompatibilityNotice>
+
       </GamePagePlayerLayout>
 
       <p className="text-zinc-400">

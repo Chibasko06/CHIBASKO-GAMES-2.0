@@ -1,4 +1,3 @@
-import {requestDevice} from '@/lib/server/requestDevice'
 import type { Metadata } from 'next'
 import { getCataloguePage } from '@/lib/queries/games'
 import {pageNumber} from '@/lib/pagination'
@@ -15,8 +14,7 @@ export const metadata: Metadata = buildPageMetadata({
 })
 export default async function MultiplayerPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   const page=pageNumber((await searchParams).page)
-  const device=await requestDevice()
-  const games = await getCataloguePage({type:'multiplayer',device,offset:(page-1)*24})
+  const games = await getCataloguePage({type:'multiplayer',offset:(page-1)*24})
   return <div className="space-y-10 sm:space-y-12">
     <header className="rounded-[28px] border border-cyan-950/80 bg-gradient-to-br from-cyan-950/25 to-zinc-950 px-5 py-7 sm:p-9">
       <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-300/80">Chibasko Games</p>

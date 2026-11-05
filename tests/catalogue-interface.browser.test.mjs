@@ -241,3 +241,17 @@ test('le filtre automatique et le choix toutes plateformes restent dans les URL 
   await select.selectOption('all');assert.equal(await x.page.evaluate(()=>window.catalogueNavigation),'/games?device=all')
  }finally{await x.context.close()}
 })
+
+test('le choix manuel persiste et reste prioritaire sur un nouveau défaut détecté',async()=>{
+ const x=await setup('catalogue',{width:390,height:844})
+ try{
+  const render=async(device,url='/games')=>{await x.page.evaluate(({device,url})=>{history.replaceState(null,'',url);window.catalogueFixture.render({page:'catalogue',total:1205,cataloguePage:1,device})},{device,url})}
+  await render('mobile');const select=x.page.getByRole('combobox').filter({has:x.page.locator('option[value="mobile"]')});assert.equal(await select.inputValue(),'mobile')
+  await select.selectOption('all');assert.equal((await x.context.cookies()).find(c=>c.name==='cg-catalogue-filter').value,'all')
+  await render('mobile','/games?device=all');assert.equal(await select.inputValue(),'all')
+  await x.page.setViewportSize({width:1366,height:768});await render('desktop','/games?device=all');assert.equal(await select.inputValue(),'all')
+  assert.match(await x.page.getByRole('link',{name:'Suivant',exact:true}).getAttribute('href'),/device=all/)
+  await x.page.getByPlaceholder('Titre, categorie, studio, techno...').fill('Pong');await x.page.getByRole('button',{name:'Rechercher',exact:true}).click();assert.equal(await x.page.evaluate(()=>window.catalogueNavigation),'/games?search=Pong&device=all')
+  await render('all','/games?device=mobile');assert.equal(await select.inputValue(),'mobile')
+ }finally{await x.context.close()}
+})

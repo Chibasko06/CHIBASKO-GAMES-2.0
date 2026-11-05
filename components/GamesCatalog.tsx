@@ -1,6 +1,6 @@
 "use client";
 
-import {useTransition} from 'react'
+import {useEffect,useTransition} from 'react'
 import GamePagination from '@/components/GamePagination'
 import { useSearchParams,useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -33,6 +33,10 @@ export default function GamesCatalog({
   const { search, category: selectedCategory, sort, device: deviceFilter } = filters
   const router=useRouter()
   const [pending,startTransition]=useTransition()
+  const explicitDevice=params.get('device')
+  useEffect(()=>{
+    if(explicitDevice==='all'||explicitDevice==='mobile'||explicitDevice==='desktop')document.cookie='cg-catalogue-filter='+explicitDevice+'; Path=/; Max-Age=2592000; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'')
+  },[explicitDevice])
   const updateFilters = (patch: Partial<CatalogueFilters>) => {
     const current = readCatalogueFilters(new URLSearchParams(window.location.search))
     if(!new URLSearchParams(window.location.search).has('device'))current.device=defaultDevice
@@ -40,7 +44,16 @@ export default function GamesCatalog({
     startTransition(()=>router.replace(url.pathname+url.search,{scroll:false}))
   }
   const setSort = (sort: SortOption) => updateFilters({ sort })
-  const setDeviceFilter = (device: DeviceFilter) => updateFilters({ device })
+  const setDeviceFilter = (device: DeviceFilter) => {
+    document.cookie='cg-catalogue-filter='+device+'; Path=/; Max-Age=2592000; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'')
+    updateFilters({device})
+  }
+  const categoryHref=(slug?:string)=>{
+    const query=new URLSearchParams()
+    if(slug)query.set('category',slug)
+    if(filters.device!=='all'||params.has('device'))query.set('device',filters.device)
+    return '/games'+(query.size?'?'+query.toString():'')
+  }
   const visibleGames = games
   const deferredSearch=search
   const pageHref=(value:number)=>{const url=new URL(catalogueQueryString(filters),'https://chibaskogames.fr');if(filters.device!=='all'||params.has('device'))url.searchParams.set('device',filters.device);if(value>1)url.searchParams.set('page',String(value));return url.pathname+url.search}
@@ -94,7 +107,7 @@ export default function GamesCatalog({
               onChange={(event) => setDeviceFilter(event.target.value as DeviceFilter)}
               className="w-full border border-zinc-800 bg-black px-4 py-3 text-white outline-none focus:border-cyan-500"
             >
-              <option value="all">Toutes les plateformes</option>
+              <option value="all">Tous les jeux</option>
               <option value="mobile">Compatible mobile</option>
               <option value="desktop">Compatible ordinateur</option>
             </select>
@@ -107,7 +120,7 @@ export default function GamesCatalog({
               Categories
             </p>
             <Link
-              href="/games"
+              href={categoryHref()}
               prefetch={false}
               className="text-xs text-zinc-400 transition-colors hover:text-cyan-400"
             >
@@ -117,7 +130,7 @@ export default function GamesCatalog({
 
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/games"
+              href={categoryHref()}
               prefetch={false}
               className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors sm:tracking-[0.2em] ${
                 selectedCategory === 'all'
@@ -130,7 +143,7 @@ export default function GamesCatalog({
             {categories.map((category) => (
               <Link
                 key={category.id}
-                href={'/games?category='+encodeURIComponent(category.slug)}
+                href={categoryHref(category.slug)}
                 prefetch={false}
                 className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors sm:tracking-[0.2em] ${
                   selectedCategory === category.slug

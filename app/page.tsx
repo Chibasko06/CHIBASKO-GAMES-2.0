@@ -1,4 +1,3 @@
-import {requestDevice} from '@/lib/server/requestDevice'
 import HorizontalScroller from '@/components/HorizontalScroller'
 import MultiplayerSection from '@/components/multiplayer/MultiplayerSection'
 import { GameBadges } from '@/components/multiplayer/GameBadges'
@@ -21,12 +20,11 @@ export const metadata: Metadata = buildPageMetadata({
 })
 
 export default async function Home() {
-  const device=await requestDevice()
   const [featuredRows, categoryRows, highlightRows, multiplayerRows] = await Promise.all([
-    getFeaturedGames(8,device),
-    getGamesByCategory(10,device),
-    getHomepageHighlights(device),
-    getCataloguePage({type:'multiplayer',limit:10,device}),
+    getFeaturedGames(8),
+    getGamesByCategory(10),
+    getHomepageHighlights(),
+    getCataloguePage({type:'multiplayer',limit:10}),
   ])
   const featuredGames=featuredRows.map(withHomeImage)
   const categorySections=categoryRows.map(section=>({...section,games:section.games.map(withHomeImage)}))
@@ -35,7 +33,7 @@ export default async function Home() {
 
   return (
     <div className="space-y-12 xl:space-y-14">
-      {!featuredRows.length&&<p className="rounded-xl border border-zinc-700 p-4 text-sm">Aucun jeu déclaré compatible avec cet appareil pour le moment. <Link className="text-cyan-300 underline" href="/games?device=all">Consulter toutes les fiches</Link></p>}
+      {!featuredRows.length&&<p className="rounded-xl border border-zinc-700 p-4 text-sm">Aucun jeu publié pour le moment. <Link className="text-cyan-300 underline" href="/games?device=all">Consulter toutes les fiches</Link></p>}
       <section className="overflow-hidden rounded-[28px] border border-cyan-950/80 bg-[linear-gradient(135deg,rgba(8,12,18,0.98),rgba(15,23,42,0.92))]">
         <div className="grid gap-8 px-5 py-7 sm:px-6 md:px-8 md:py-9 lg:grid-cols-[1.08fr_0.92fr] lg:px-10 lg:py-10 xl:gap-10 2xl:grid-cols-[1.02fr_0.98fr] 2xl:px-12">
           <div className="space-y-6">

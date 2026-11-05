@@ -84,7 +84,7 @@
     "test:securite": "npm test && npm run test:go-live-db && npm run test:securite:navigateur",
     "test:securite:navigateur": "node --import ./tests/register.mjs --test --test-concurrency=1 tests/auth-profile.browser.test.mjs tests/dashboard-community.browser.test.mjs tests/moderation.browser.test.mjs tests/moderation-measures.browser.test.mjs tests/game-runtime.browser.test.mjs tests/game-player.browser.test.mjs tests/ux-navigation.browser.test.mjs",
     "test:ux-navigation": "node --import ./tests/reliability-register.mjs --test tests/ux-navigation.test.mjs && node --test tests/ux-navigation.browser.test.mjs",
-    "test:game-compatibility": "node --import ./tests/reliability-register.mjs --test tests/game-compatibility.test.mjs && node --test tests/game-compatibility.browser.test.mjs"
+    "test:game-compatibility": "node --import ./tests/reliability-register.mjs --test tests/game-compatibility.test.mjs && node --test tests/catalogue-interface.browser.test.mjs"
   },
   "dependencies": {
     "@chibaskogames/sdk": "0.3.0",

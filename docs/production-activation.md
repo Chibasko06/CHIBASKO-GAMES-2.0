@@ -908,7 +908,7 @@ soumis aux restrictions permanentes.
 4. Déployer le portail : les anciennes signatures et les booléens de soumission
    restent compatibles pendant la transition. Ne pas déployer le nouveau formulaire
    avant la migration, car l’ancien SQL refuse les déclarations textuelles.
-5. Vérifier les listes, la pagination et les fiches sur téléphone, ordinateur et
+5. Vérifier le filtre initial du catalogue, le choix manuel, la pagination et les fiches sur téléphone, ordinateur et
    tablette. Examiner les classifications unknown via game_compatibility. Corriger
    explicitement les jeux après test réel, sans traitement automatique de masse.
 

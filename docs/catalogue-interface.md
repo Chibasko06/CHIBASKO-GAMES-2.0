@@ -80,18 +80,19 @@ déclarations des textes legacy, qui restent enregistrés sans modification.
 Le classement historique mobile devient « les deux », et le classement ordinateur
 reste ordinateur. Les valeurs ambiguës restent à vérifier, sans certification inventée.
 
-Le catalogue, les catégories, l’accueil, les classements, les recommandations et le
-multijoueur filtrent en SQL avant le comptage et la pagination. Le filtre existant
-permet toujours de consulter toutes les plateformes. Les favoris, historiques et
-notifications conservés ne sont pas amputés : la fiche explique les incompatibilités.
-Une fiche publique reste accessible et partageable. Un avertissement précède le
-lecteur ; un choix explicite permet de continuer sur un appareil hybride. Les previews
-administratives restent accessibles pour qualifier les commandes réelles.
+Seul le catalogue /games présélectionne « Compatible mobile » sur téléphone et
+tablette. Sur ordinateur ou appareil inconnu, le filtre initial est « Tous les jeux ».
+Les catégories et recherches du catalogue conservent ce filtre modifiable ; le SQL
+filtre avant comptage et pagination. Une URL explicite est prioritaire. Le choix
+manuel est conservé dans cg-catalogue-filter pendant 30 jours. L’ancien cookie
+cg-device n’est plus lu et aucune détection de pointeur ou de clavier n’est utilisée.
 
-Le premier rendu utilise les indications de requête, avec repli sur toutes les
-plateformes en cas d’incertitude et pour les robots. Le navigateur affine les visites
-suivantes avec le pointeur et le tactile via cg-device, sans rechargement initial.
-Une souris utilisable privilégie ordinateur ; une tablette tactile privilégie mobile.
-La présence d’un clavier physique ne peut pas être déduite de façon fiable par le Web.
-La détection est indicative, n’accorde aucun droit et ne remplace pas le filtre manuel.
-Les rendus dépendant de l’appareil restent dynamiques, sans cache public partagé.
+L’accueil, les classements, les recommandations et la page multijoueur proposent
+toutes les plateformes : ces espaces n’ont pas de filtre d’appareil modifiable.
+Les favoris et historiques restent complets. La compatibilité affichée sur la fiche
+est informative : aucun lecteur n’est masqué et aucune confirmation de compatibilité
+n’est nécessaire, y compris pour les anciennes URL de lancement.
+
+Le rendu initial et les requêtes du catalogue utilisent le même filtre serveur.
+Aucun reclassement ni remplacement de cartes n’intervient après hydratation.
+Les rendus dépendant de la préférence restent dynamiques, sans cache public partagé.
