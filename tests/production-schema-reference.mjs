@@ -41,6 +41,13 @@ try {
   await run('psql',[...args,'-f',file])
   baseline.push({name,sha256:sqlSha256(await readFile(file))})
  }
+ const moderationHistory=async()=>{
+  const state={}
+  for(const table of ['moderation_cases','moderation_events','moderation_subjects','moderation_measures','moderation_appeals','moderation_mail','moderation_measure_mail','moderation_receipts','moderation_facts','moderation_fact_events','moderation_warning_withdrawals'])
+   state[table]=(await query(`select count(*)||':'||md5(coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text)::text,'[]')) from public.${table} r`)).stdout.trim()
+  return state
+ }
+ let savedModerationHistory
  const snapshot=async()=>JSON.parse((await run('psql',[...args,'-f',join(root,'docs/sql/production-schema-snapshot.sql')])).stdout)
  const base=await snapshot(),snapshots=[base],reference={format:1,policyFormat:1,baselineMigrations:baseline,prerequisites:base.prerequisites,
   snapshotSha256:sqlSha256(await readFile(join(root,'docs/sql/production-schema-snapshot.sql'))),
@@ -69,7 +76,35 @@ try {
    await query(`set role authenticated;set request.jwt.claim.sub='fa960000-0000-4000-8000-000000000002';select moderation_appeal('fa960000-0000-4000-8000-000000000004','fa960000-0000-4000-8000-000000000003','Reexamen historique avant installation de la nouvelle migration.')`)
    await query(`set role service_role;select distribution_moderation_appeals('fa960000-0000-4000-8000-000000000001','{"id":"fa960000-0000-4000-8000-000000000004","version":1,"state":"accepted","decision":"Recours historique accepte sans retrait automatique.","lift":false}')`)
   }
+  if(name==='20261107000100_remove_moderation_qualification.sql'){
+   await query("update moderation_measure_scope set mode='qualification';insert into moderation_qualification_targets(user_id) values('fa960000-0000-4000-8000-000000000002')")
+   await query(`set role service_role;select distribution_moderation_measure('fa960000-0000-4000-8000-000000000001','{"kind":"player","target":"fa960000-0000-4000-8000-000000000002","action":"ban","version":1,"operationId":"fa960000-0000-4000-8000-000000000005","reason":"Restriction historique conservee apres retrait du perimetre.","note":"Note interne historique.","retentionDays":30,"factsKey":"historical-incident-two","factsSummary":"Faits distincts verifies avant le nettoyage du perimetre de test."}')`)
+   savedModerationHistory=await moderationHistory()
+   // Une dépendance imprévue doit annuler aussi le remplacement de la RPC.
+   const before=await snapshot()
+   await query('alter table public.moderation_measures disable trigger moderation_measure_fact_guard')
+   await assert.rejects(run('psql',[...args,'-f',file]),error=>/moderation_facts_required/.test(error.stderr))
+   await query('alter table public.moderation_measures enable trigger moderation_measure_fact_guard')
+   assert.deepEqual(await snapshot(),before)
+   await query(`create function public.fixture_legacy_scope_dependency() returns bigint language plpgsql set search_path='' as $$declare total bigint;begin select count(*) into total from public.moderation_measure_scope;return total;end$$`)
+   await assert.rejects(run('psql',[...args,'-f',file]),error=>/moderation_qualification_dependency/.test(error.stderr))
+   await query('drop function public.fixture_legacy_scope_dependency()')
+   assert.deepEqual(await snapshot(),before)
+   await query('create view public.fixture_scope_dependency as select id from public.moderation_measure_scope')
+   await assert.rejects(run('psql',[...args,'-f',file]),error=>/depend|dépend/i.test(error.stderr))
+   await query('drop view public.fixture_scope_dependency')
+   assert.deepEqual(await snapshot(),before,'La migration interrompue conserve le contrat précédent')
+  }
   await run('psql',[...args,'-f',file])
+  if(name==='20261107000100_remove_moderation_qualification.sql'){
+   assert.equal((await query("select to_regclass('public.moderation_measure_scope') is null and to_regclass('public.moderation_qualification_targets') is null")).stdout.trim(),'t')
+   assert.deepEqual(await moderationHistory(),savedModerationHistory,'Les historiques et notifications préexistants sont inchangés')
+   assert.equal((await query("set role service_role;select distribution_account_access('fa960000-0000-4000-8000-000000000002')")).stdout.trim(),'f','Une restriction préexistante reste applicable')
+   assert.equal((await query("select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.prosrc ~ 'moderation_measure_scope|moderation_qualification_targets'")).stdout.trim(),'0')
+   await assert.rejects(run('psql',[...args,'-f',file]))
+   assert.deepEqual(await moderationHistory(),savedModerationHistory,'Une réapplication refusée ne change pas les données')
+   await query("update moderation_measure_mail set state='sent' where measure_id='fa960000-0000-4000-8000-000000000005'")
+  }
   if(name==='20261106000100_moderation_facts_appeals.sql'){
    assert.equal((await query("select f.state||':'||coalesce(a.effect,'historique') from moderation_measures m join moderation_facts f on f.id=m.fact_id join moderation_appeals a on a.measure=m.id where m.id='fa960000-0000-4000-8000-000000000003'")).stdout.trim(),'closed:historique')
    assert.equal((await query("select count(*) from moderation_warning_withdrawals")).stdout.trim(),'0','Un recours accepte ancien ne retire pas retroactivement un avertissement')
@@ -203,8 +238,8 @@ try {
  }
  const {moderationMeasuresIntegration}=await import('./moderation-measures-db.mjs')
  await moderationMeasuresIntegration(async sql=>(await query(sql)).stdout.trim())
- const {moderationQualificationIntegration}=await import('./moderation-qualification-db.mjs')
- await moderationQualificationIntegration(async sql=>(await query(sql)).stdout.trim())
+ const {moderationLifecycleIntegration}=await import('./moderation-lifecycle-db.mjs')
+ await moderationLifecycleIntegration(async sql=>(await query(sql)).stdout.trim())
  const {moderationHistoryIntegration}=await import('./moderation-history-db.mjs')
  await moderationHistoryIntegration(async sql=>(await query(sql)).stdout.trim())
  const {moderationFactsIntegration}=await import('./moderation-facts-db.mjs')

@@ -157,6 +157,20 @@ l’autre compte. Se limiter à leurs profils/favoris/uploads existants et aux r
 d’accès administrateur. Ne créer aucun témoin et ne lire aucune donnée d’un autre
 joueur sans autorisation. Garder les JWT dans le navigateur, hors des rapports.
 
+## Modération administrative
+
+La migration 20261107000100_remove_moderation_qualification.sql retire le périmètre
+SQL temporaire des sanctions. Toutes les cibles éligibles suivent les mêmes règles,
+y compris les comptes de test : aucun pseudo n’accorde d’exception. L’administration,
+les protections des comptes administrateurs, les faits déjà jugés, les recours et
+les restrictions actives restent contrôlés par les RPC permanentes.
+
+Le flag MODERATION_MEASURES_ENABLED du portail conserve son rôle d’interrupteur des
+nouvelles mesures. Il ne constitue pas une restriction des appels directs avec
+service_role. Les clés privilégiées restent une frontière de confiance serveur.
+Le nettoyage des anciennes tables ne révoque aucune sanction et ne supprime aucun
+historique. Suivre l’ordre de livraison de docs/production-activation.md.
+
 ## Compteurs : décision du projet
 
 `increment_game_view` et `record_game_play` conservent leur fonctionnement actuel.

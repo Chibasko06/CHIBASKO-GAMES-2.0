@@ -5,7 +5,7 @@ export async function moderationFactsIntegration(query){
  const admin=randomUUID(),player=randomUUID(),other=randomUUID(),report=randomUUID()
  const literal=value=>"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb"
  const call=async(name,input,actor=admin)=>JSON.parse(await query(`set role service_role;select public.${name}('${actor}',${literal(input)})`))
- await query(`insert into auth.users(id,email,raw_user_meta_data) values('${admin}','${admin}@example.test','{"username":"facts-admin"}'),('${player}','${player}@example.test','{"username":"facts-player"}'),('${other}','${other}@example.test','{"username":"facts-other"}');insert into admin_users(user_id) values('${admin}');update moderation_measure_scope set mode='general';insert into moderation_cases(id,target_kind,target_user,target_locator,category,description) values('${report}','player','${player}','facts-player','spam','Messages repetes dans le cadre du premier incident verifie.')`)
+ await query(`insert into auth.users(id,email,raw_user_meta_data) values('${admin}','${admin}@example.test','{"username":"facts-admin"}'),('${player}','${player}@example.test','{"username":"facts-player"}'),('${other}','${other}@example.test','{"username":"facts-other"}');insert into admin_users(user_id) values('${admin}');insert into moderation_cases(id,target_kind,target_user,target_locator,category,description) values('${report}','player','${player}','facts-player','spam','Messages repetes dans le cadre du premier incident verifie.')`)
  const decide=input=>call('distribution_moderation_measure',{kind:'player',target:player,operationId:randomUUID(),action:'warn',version:0,reason:'Motif communicable de la decision administrative.',note:'Note privee jamais publique.',retentionDays:30,...input})
  const warn=await decide({caseId:report}),fact=warn.current.history[0].facts
  assert.equal(fact.revision,1)
@@ -51,10 +51,9 @@ export async function moderationFactsIntegration(query){
   for(const table of ['moderation_facts','moderation_fact_events','moderation_warning_withdrawals'])await assert.rejects(query(`set role ${role};select * from ${table}`))
   for(const rpc of ['distribution_moderation_facts','distribution_moderation_warning_withdraw'])await assert.rejects(query(`set role ${role};select public.${rpc}('${admin}','{}')`))
  }
- await query("update moderation_measure_scope set mode='disabled'")
  const lifted=await decide({action:'lift',version:5})
  assert.equal(lifted.current.blocked,false)
- const correction={measureId:revised.id,operationId:randomUUID(),version:6,reason:'Correction explicite possible meme lorsque la creation est desactivee.'}
+ const correction={measureId:revised.id,operationId:randomUUID(),version:6,reason:'Correction explicite du seul avertissement apres reexamen.'}
  await call('distribution_moderation_warning_withdraw',correction)
  assert.equal(await query(`select count(*) from moderation_measure_mail where measure_id='${revised.id}' and kind='correction'`),'1')
  const secondAppeal=randomUUID()

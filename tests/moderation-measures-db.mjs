@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import {randomUUID,randomBytes} from 'node:crypto'
 
 export async function moderationMeasuresIntegration(query){
- await query("update public.moderation_measure_scope set mode='general' where id")
  const admin=randomUUID(),player=randomUUID(),other=randomUUID(),game=randomUUID()
  await query(`insert into auth.users(id,email,raw_user_meta_data) values('${admin}','measures-admin@example.test','{"username":"measures-admin"}'),('${player}','measures-player@example.test','{"username":"measures-player"}'),('${other}','measures-other@example.test','{"username":"measures-other"}');insert into public.admin_users(user_id) values('${admin}');insert into public.games(id,title,slug,game_url,is_published) values('${game}','Mesures','measures-fixture','https://example.test/game',true)`)
  const literal=value=>"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb"
@@ -94,6 +93,5 @@ export async function moderationMeasuresIntegration(query){
  assert.equal(await query(`select archived_at is not null and note is null from moderation_measures where id='${archiveWarning.id}'`),'t')
  assert.equal(await query(`select version from moderation_subjects where user_id='${archiveUser}'`),'1','Le compteur de concurrence survit a l’archivage')
  await assert.rejects(query(`set role authenticated;set request.jwt.claim.sub='${archiveUser}';select public.moderation_appeal('${randomUUID()}','${archiveWarning.id}','Recours apres archivage de la justification.')`),error=>/decision_archived/.test(error.stderr))
- await query("update public.moderation_measure_scope set mode='disabled' where id")
  console.log('Mesures : avertissement, suspension, expiration, JWT existant, blocages SQL, recours, concurrence, jeux et outbox verifies sur PostgreSQL jetable.')
 }

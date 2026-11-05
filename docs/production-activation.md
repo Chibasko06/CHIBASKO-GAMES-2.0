@@ -728,67 +728,31 @@ Les références Pong/SDK restent inchangées ; le build fixture Pong sert seule
 de recette locale, jamais d'upload production. Aucune migration distante, ressource,
 credential, DNS, upload, publication, commit ou push n'est effectué pendant PREP.
 
-## Qualification des mesures de modération
+## Activation des mesures de modération
 
-Le portail conserve `MODERATION_MEASURES_ENABLED=0` par défaut. La valeur exacte
-`1` ouvre la création dans la limite du périmètre PostgreSQL ; toute autre valeur
-ferme la création. Les lectures, recours, levées et restaurations restent disponibles.
+Le flag serveur du portail `MODERATION_MEASURES_ENABLED` reste l’interrupteur des
+nouvelles mesures. Seule la valeur `1` permet leur création depuis le portail.
+Les lectures, recours, retraits d’avertissements, levées et restaurations restent
+accessibles lorsque la création est désactivée. Le flag ne définit aucune liste
+de comptes ou de jeux et n’est pas interprété par PostgreSQL.
+
+Toutes les cibles éligibles suivent les mêmes contrôles permanents : compte
+administrateur vérifié, cible existante du bon type, protection des comptes
+administrateurs, version attendue, idempotence, faits distincts ou réouverture
+motivée. Un pseudo de test n’accorde aucun privilège ni traitement différent.
+La fonction interne moderation_measure_apply n’est pas accessible directement au
+service_role. La RPC publique privilégiée vérifie l’administrateur déclaré ; elle
+n’est exécutable ni par anon ni par authenticated.
+
 `MODERATION_MEASURES_RETENTION_DAYS` accepte un entier de 1 à 3650, sans valeur par
-défaut. La durée relève d'une politique de conservation validée. Une valeur absente
-ou incorrecte bloque les nouvelles mesures, mais les levées utilisent la politique
-valide déjà enregistrée sur la cible. Les échéances existantes ne sont pas raccourcies.
+défaut. Sa valeur relève d’une politique validée. Une configuration invalide bloque
+les nouvelles mesures du portail ; les levées utilisent la politique valide déjà
+enregistrée. Les échéances existantes ne sont pas raccourcies.
 
-La table privée `moderation_measure_scope` contient une seule ligne :
-
-| Mode SQL | Création de nouvelles mesures |
-| --- | --- |
-| `disabled`, ligne absente | Refusée, même si le flag du portail vaut 1 |
-| `qualification` | Seulement les cibles de `moderation_qualification_targets` |
-| `general` | Toutes les cibles éligibles, avec les protections administratives habituelles |
-
-La migration installe `disabled` et une liste vide. Aucun UUID réel n'est versionné.
-Les colonnes `user_id` et `game_id` sont mutuellement exclusives ; leurs clés
-étrangères imposent l'existence du bon type de ressource. La RPC vérifie aussi le
-profil du compte. Les comptes administrateurs ne peuvent pas être sanctionnés.
-La suppression d'une ressource supprime son autorisation de qualification.
-
-La configuration relève d'une session SQL d'exploitation autorisée, pas d'une
-route du portail. Les rôles anon, authenticated et service_role n'ont aucun droit
-sur ces tables. Les UUID sont injectés dans les variables psql ci-dessous par
-l'opérateur, après vérification des cibles et des destinataires d'e-mails.
-
-```sql
-begin;
-select id from public.moderation_measure_scope where id for update;
-insert into public.moderation_qualification_targets(user_id) values (:'test_player_uuid'::uuid);
-insert into public.moderation_qualification_targets(game_id) values (:'test_game_uuid'::uuid);
-update public.moderation_measure_scope set mode='qualification' where id;
-commit;
-```
-
-Une liste vide refuse toute nouvelle mesure en qualification. Une valeur de mode
-inconnue est refusée par la contrainte SQL. Ne jamais utiliser le rôle propriétaire
-pour contourner les RPC pendant les tests.
-
-L'ordre de livraison est : migration additive, contrôles de permissions en lecture
-seule, déploiement du portail avec création désactivée, configuration du périmètre
-SQL, qualification contrôlée, puis activation explicitement autorisée du flag.
-Le Worker et son cron existants restent compatibles ; aucune variable, liaison R2
-ou clé supplémentaire n'est nécessaire. Le passage ultérieur à `general` exige
-une décision séparée. Pour fermer les créations, remettre le flag à 0 et le mode
-SQL à `disabled`. Ne pas annuler les sanctions ni supprimer les historiques.
-
-Les verrous du périmètre et des cibles sérialisent les créations avec une fermeture
-ou un retrait d'autorisation. Le service_role ne peut pas appeler la fonction interne
-`moderation_measure_apply`. Le propriétaire SQL conserve nécessairement ses
-privilèges d'exploitation : la protection ne couvre pas sa compromission.
-Une répétition strictement identique d'une décision confirmée reste une lecture
-idempotente en RPC, même après fermeture du périmètre SQL ; elle ne renvoie aucun
-nouvel e-mail. Avec le flag du portail à 0, consulter l'historique par GET : le POST
-de création reste refusé. Le flag du portail n'est pas lu par PostgreSQL : fermer
-aussi le mode SQL pour bloquer les nouvelles mesures par appel service_role direct.
-Les autres droits administratifs du catalogue et de gestion des comptes restent
-indépendants ; ce périmètre protège les nouvelles mesures du moteur de modération.
+L’accès direct avec service_role demeure une frontière de confiance privilégiée :
+le flag du portail ne bloque pas ces appels SQL/REST administratifs. Les clés
+restent exclusivement côté serveur. Ne jamais utiliser le propriétaire SQL pour
+contourner les RPC lors d’une recette.
 
 ### Expurgation bornée
 
@@ -809,8 +773,8 @@ faire partie de la politique de conservation et d'exploitation.
 ## Centre de modération : lectures et navigation
 
 La migration 20261105000100_moderation_read_models.sql ajoute uniquement des modèles
-de consultation et deux index. Elle ne modifie ni les décisions, ni le périmètre de
-qualification, ni les permissions de mutation. La RPC distribution_moderation_browse
+de consultation et deux index. Elle ne modifie ni les décisions ni les permissions
+de mutation. La RPC distribution_moderation_browse
 est réservée au service_role et vérifie à nouveau le compte administrateur.
 
 Les espaces sont accessibles par les paramètres view=reports, view=measures et
@@ -837,17 +801,18 @@ ou cron supplémentaire n'est nécessaire. Les messages déjà préparés resten
 figés pour conserver l'idempotence Resend ; les nouvelles préparations incluent
 le bouton Consulter ma décision et le chemin de navigation du Dashboard.
 
-Un retour au portail précédent peut conserver cette migration additive. Ne pas
-retirer les protections de qualification ni effacer les décisions pour revenir
-à l'interface précédente. Les validations locales ne remplacent pas la recette
-en production sur les ressources de qualification autorisées.
+Un retour au portail précédent conserve les migrations installées et les
+historiques. Les signatures RPC restent compatibles ; aucun retour d’interface
+ne doit effacer les décisions. Les validations locales ne remplacent pas une
+recette autorisée sur des données de test.
 
 ## Faits examinés, recours et retrait des avertissements
 
 La migration additive 20261106000100_moderation_facts_appeals.sql rattache les mesures
 à des faits stables et à leur révision. Une seule mesure punitive est autorisée par
 révision, indépendamment de sa clé d’idempotence. Les UUID internes restent les
-références des cibles ; aucun rôle ni périmètre de qualification n’est modifié.
+références des cibles ; les autorisations administratives restent indépendantes
+des profils modifiables par les joueurs.
 
 Un recours accepté clôt les faits de la révision contestée. Son effet est explicite :
 aucun retrait, retrait du seul avertissement, ou levée de la restriction actuelle.
@@ -868,14 +833,14 @@ constituer une nouvelle affaire documentée.
 Ordre d’installation :
 
 1. Sauvegarder la base et contrôler en lecture seule les migrations précédentes,
-   les permissions et le périmètre SQL de qualification.
+   les permissions et les protections permanentes des faits.
 2. Suspendre les décisions administratives pendant la fenêtre de mise à jour.
 3. Appliquer uniquement la nouvelle migration additive. Les tables privées et les
    nouvelles RPC administratives ne sont accessibles ni à anon ni à authenticated.
 4. Vérifier le snapshot du schéma avec le contrat versionné et les grants.
 5. Déployer le portail et la maintenance utilisant le nouveau type de notification
    correction. Les anciens messages restent compatibles.
-6. Qualifier sur des cibles autorisées : avertissement, acceptation sans retrait,
+6. Tester sur des comptes et jeux dédiés : avertissement, acceptation sans retrait,
    refus de répétition, retrait explicite, faits nouveaux, réouverture motivée.
 7. Réouvrir les décisions administratives après ces vérifications.
 
@@ -890,3 +855,43 @@ L’expurgation est bornée et reprenable ; restrictions actives, recours en att
 notifications non terminées préservent les justificatifs. Les identifiants et les
 empreintes persistantes empêchent de présenter cet archivage comme une anonymisation
 complète. La durée applicable reste une décision à valider pour le service.
+
+## Retrait définitif du périmètre temporaire des sanctions
+
+La migration 20261107000100_remove_moderation_qualification.sql remplace la RPC
+administrative avant de supprimer moderation_measure_scope et
+moderation_qualification_targets. Elle ne supprime ni décisions, ni restrictions,
+ni recours, ni faits, ni notifications. Les migrations historiques restent
+versionnées pour reconstruire les anciens états ; elles ne doivent pas être rejouées
+sur une base qui les a déjà appliquées.
+
+Ordre de déploiement :
+
+1. Sauvegarder la base et vérifier en lecture seule la présence de la migration
+   20261106000100_moderation_facts_appeals.sql, de ses fonctions et de son déclencheur.
+   Relever les compteurs des historiques pour la vérification après migration.
+2. Suspendre les décisions administratives pendant la fenêtre de mise à jour.
+   Le flag du portail peut être fermé si nécessaire, sans annuler les restrictions.
+3. Appliquer uniquement la nouvelle migration, dans sa transaction complète.
+   Une dépendance inattendue ou un verrou dépassant cinq secondes provoque un échec
+   et un rollback. Diagnostiquer puis reprendre ; ne pas ajouter CASCADE ni forcer
+   les suppressions. Une réapplication n’est pas une procédure de reprise après
+   un succès déjà inscrit au registre.
+4. Exécuter docs/sql/moderation-measures-preflight.sql et un nouveau snapshot en
+   lecture seule. Les deux tables doivent être absentes et aucune fonction active
+   ne doit encore les référencer. Contrôler les permissions EXECUTE, les RLS,
+   le déclencheur de faits et les compteurs des historiques.
+5. Déployer le portail actualisé. Le portail précédent reste compatible pendant
+   cet intervalle : il appelle les mêmes signatures RPC. La maintenance, le Gateway
+   et le dispatcher conservent leurs contrats ; aucun secret, binding ou cron
+   supplémentaire n’est nécessaire.
+6. Reprendre les décisions après une recette explicitement autorisée : comptes
+   ordinaires, refus d’une cible administrateur, avertissement, recours, retrait,
+   levée et refus de répéter une mesure sur les mêmes faits sans réouverture.
+
+Après installation, les tables ne doivent jamais être recréées pour revenir à une
+ancienne interface. Un retour applicatif conserve le nouveau schéma et ses
+historiques. En cas d’incident, fermer la création dans le portail et suspendre les
+appels administratifs privilégiés externes ; consulter et lever les décisions reste
+possible via les RPC protégées. Les jetons existants des joueurs sanctionnés restent
+soumis aux restrictions permanentes.

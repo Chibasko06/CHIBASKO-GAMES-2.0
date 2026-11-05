@@ -96,8 +96,6 @@ export async function moderationMeasuresRequest(request:Request,scope:'admin'|'a
  }catch(error){
   if(error instanceof InputError)return adminJson({error:error.message},{status:error.status})
   if(error instanceof UploadError&&factsErrors[error.code])return adminJson({error:factsErrors[error.code],code:error.code},{status:error.status})
-  if(error instanceof UploadError&&error.code==='moderation_scope_disabled')return adminJson({error:'La création de mesures est désactivée dans le périmètre serveur.',code:error.code},{status:503})
-  if(error instanceof UploadError&&error.code==='moderation_target_not_allowed')return adminJson({error:'Cette cible ne fait pas partie des ressources autorisées pour la qualification.',code:error.code},{status:403})
   if(error&&typeof error==='object'&&'status' in error&&[401,403].includes(Number(error.status)))return adminJson({error:'Accès refusé.'},{status:Number(error.status)})
   if(error instanceof UploadError&&[400,404,409,429].includes(error.status))return adminJson({error:error.status===409?'La cible ou le dossier a changé. Actualise avant de décider à nouveau.':'Décision impossible dans cet état.',code:error.code},{status:error.status})
   logDataFailure('moderation_measures',error,'database_unavailable')

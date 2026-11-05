@@ -14,6 +14,12 @@ trap 'rm -rf -- "$build_dir"' EXIT
 # Le checkout courant est copié sans dépendances Windows ni identifiants locaux.
 cd "$source_root"
 git ls-files --cached --others --exclude-standard -z |
+  while IFS= read -r -d '' source_path; do
+    # L’index peut encore référencer un fichier supprimé dans l’arbre de travail.
+    if [[ -f "$source_path" || -L "$source_path" ]]; then
+      printf '%s\0' "$source_path"
+    fi
+  done |
   tar --null --verbatim-files-from --exclude='.env*' --exclude='*/.env*' \
     --exclude='.dev.vars*' --exclude='*/.dev.vars*' --exclude='node_modules/*' \
     --exclude='.next/*' --exclude='.open-next/*' --exclude='.distribution/*' \
