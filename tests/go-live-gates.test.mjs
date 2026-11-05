@@ -8,6 +8,42 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 const id='11111111-1111-4111-8111-111111111111',capabilities={online:{access:['public','private'],players:{min:2,max:2}}}
+
+async function policyFixture(){
+ const reference=JSON.parse(await readFile(new URL('../contracts/production-schema.v1.json',import.meta.url),'utf8'))
+ return {reference,snapshot:{format:1,policyFormat:1,readOnly:true,objects:structuredClone(reference.stages.at(-1)),prerequisites:structuredClone(reference.prerequisites)}}
+}
+test('un ancien snapshot et une ancienne référence sans mode RLS ne peuvent pas valider le schéma',async()=>{
+ const {reference,snapshot}=await policyFixture()
+ const remove=value=>{if(!value||typeof value!=='object')return;delete value.permissive;delete value.policyFormat;for(const child of Object.values(value))remove(child)}
+ remove(reference);remove(snapshot)
+ assert.equal(compareSchema(snapshot,reference).status,'BLOCKING_DRIFT')
+})
+test('les politiques publiques attendues sont valides et l’ordre des rôles est sans effet',async()=>{
+ const {reference,snapshot}=await policyFixture()
+ const policy=snapshot.objects['table:games'].policies[0]
+ assert.equal(policy.permissive,'PERMISSIVE')
+ policy.roles.reverse()
+ assert.equal(compareSchema(snapshot,reference).status,'PASS')
+})
+test('mode, rôles, commande, USING, WITH CHECK et activation RLS sont contrôlés séparément',async()=>{
+ for(const field of ['permissive','roles','command','using','check','rls','forceRls']){
+  const {reference,snapshot}=await policyFixture(),table=snapshot.objects['table:favorites']
+  const policy=table.policies.find(item=>item.name==='moderation_account_boundary')
+  if(field==='rls'||field==='forceRls')table[field]=!table[field]
+  else policy[field]=({permissive:'PERMISSIVE',roles:['anon'],command:'SELECT',using:'true',check:'true'})[field]
+  const result=compareSchema(snapshot,reference)
+  assert.equal(result.status,'BLOCKING_DRIFT',field)
+  assert.ok(result.rows.some(row=>row.object==='table:favorites'&&row.status==='BLOCKING_DRIFT'),field)
+ }
+})
+test('un attribut de politique manquant dans le snapshot est bloquant',async()=>{
+ for(const field of ['name','permissive','roles','command','using','check']){
+  const {reference,snapshot}=await policyFixture()
+  delete snapshot.objects['table:games'].policies[0][field]
+  assert.equal(compareSchema(snapshot,reference).status,'BLOCKING_DRIFT',field)
+ }
+})
 test('catalogue lookup requires one exact UUID identity and compatible active capabilities',()=>{
  const row={id,slug:'fixture-game',gameType:'multiplayer_chibasko',activeVersionId:null}
  assert.equal(catalogueGameId([row],row.slug,capabilities).capabilitiesStatus,'DIFFERENCE_EXPECTED')
@@ -23,18 +59,18 @@ test('schema reference is tied to migration bytes and rejects partial or unrecog
  assert.equal(ref.stages.length,ref.migrations.length+1)
  assert.throws(()=>compareSchema({format:1,readOnly:false},ref),/invalid_snapshot/)
  const p={columns:{},roles:{},legacyPolicies:[]}
- const result=compareSchema({format:1,readOnly:true,objects:{unexpected:{value:true}},prerequisites:p},ref)
+ const result=compareSchema({format:1,policyFormat:1,readOnly:true,objects:{unexpected:{value:true}},prerequisites:p},ref)
  assert.equal(result.status,'BLOCKING_DRIFT')
  assert.ok(result.rows.some(row=>row.object==='unexpected' && row.status==='BLOCKING_DRIFT'))
 })
 test('un préfixe cohérent ne valide pas un schéma incomplet pour le code actuel',async()=>{
  const ref=await readReference()
  for(let index=0;index<ref.stages.length-1;index++){
-  const result=compareSchema({format:1,readOnly:true,objects:ref.stages[index],prerequisites:ref.prerequisites},ref)
+  const result=compareSchema({format:1,policyFormat:1,readOnly:true,objects:ref.stages[index],prerequisites:ref.prerequisites},ref)
   assert.equal(result.status,'MIGRATIONS_REQUIRED')
   assert.equal(result.pendingMigrations.length,ref.migrations.length-index)
  }
- assert.equal(compareSchema({format:1,readOnly:true,objects:ref.stages.at(-1),prerequisites:ref.prerequisites},ref).status,'PASS')
+ assert.equal(compareSchema({format:1,policyFormat:1,readOnly:true,objects:ref.stages.at(-1),prerequisites:ref.prerequisites},ref).status,'PASS')
 })
 test('les objets indispensables au portail développeur et à l’administration sont contrôlés',async()=>{
  const ref=await readReference(),objects=ref.stages.at(-1)
@@ -45,7 +81,7 @@ test('les objets indispensables au portail développeur et à l’administration
   admin]){
   assert.ok(objects[key],key)
   const incomplete={...objects};delete incomplete[key]
-  assert.notEqual(compareSchema({format:1,readOnly:true,objects:incomplete,prerequisites:ref.prerequisites},ref).status,'PASS',key)
+  assert.notEqual(compareSchema({format:1,policyFormat:1,readOnly:true,objects:incomplete,prerequisites:ref.prerequisites},ref).status,'PASS',key)
  }
 })
 test('les tables et RPC littérales utilisées par l’application figurent dans la référence',async()=>{

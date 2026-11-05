@@ -42,7 +42,7 @@ try {
   baseline.push({name,sha256:sqlSha256(await readFile(file))})
  }
  const snapshot=async()=>JSON.parse((await run('psql',[...args,'-f',join(root,'docs/sql/production-schema-snapshot.sql')])).stdout)
- const base=await snapshot(),snapshots=[base],reference={format:1,baselineMigrations:baseline,prerequisites:base.prerequisites,
+ const base=await snapshot(),snapshots=[base],reference={format:1,policyFormat:1,baselineMigrations:baseline,prerequisites:base.prerequisites,
   snapshotSha256:sqlSha256(await readFile(join(root,'docs/sql/production-schema-snapshot.sql'))),
   migrations:[],stages:[base.objects]}
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261029000200_profile_privacy.sql')]),error=>/profile_public_projection_required/.test(error.stderr));
@@ -99,6 +99,8 @@ try {
   const result=compareSchema(state,reference)
   assert.equal(result.status,index===migrations.length?'PASS':'MIGRATIONS_REQUIRED');assert.equal(result.matchedMigrationCount,index)
  }
+ const {rlsDriftIntegration}=await import('./rls-drift-db.mjs')
+ await rlsDriftIntegration(async sql=>(await query(sql)).stdout.trim(),snapshot,reference)
  await query('create role fixture_auditor nologin')
  for(const sql of ['alter table public.game_server_credentials disable row level security',
   'grant select on public.game_connection_tickets to authenticated',

@@ -6,13 +6,29 @@ import {readJson} from './read-json.mjs'
 
 function canonical(value) {
   if(Array.isArray(value))return value.map(canonical)
-  if(value && typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])]))
+  if(value && typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(key==='roles'&&Array.isArray(value[key])?[...value[key]].sort():value[key])]))
   return value
 }
 const equal=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b))
+function completePolicies(policies){
+ return Array.isArray(policies)&&policies.every(policy=>policy&&typeof policy.name==='string'&&policy.name.length>0
+  &&['PERMISSIVE','RESTRICTIVE'].includes(policy.permissive)
+  &&Array.isArray(policy.roles)&&policy.roles.length>0&&policy.roles.every(role=>typeof role==='string'&&role.length>0)
+  &&['ALL','SELECT','INSERT','UPDATE','DELETE'].includes(policy.command)
+  &&['using','check'].every(field=>Object.hasOwn(policy,field)&&(policy[field]===null||typeof policy[field]==='string')))
+}
+function policyObjects(objects){
+ return Object.entries(objects??{}).filter(([name])=>name.startsWith('table:')||name==='storage:legacy_write_guard')
+}
 export function compareSchema(snapshot,reference) {
   if(snapshot?.format!==1 || snapshot.readOnly!==true || !snapshot.objects || !snapshot.prerequisites || reference?.format!==1)throw Error('invalid_snapshot')
   const rows=[],add=(object,ok)=>rows.push({object,status:ok?'PASS':'BLOCKING_DRIFT'})
+  // Deux exports incomplets identiques ne constituent pas une preuve de conformité.
+  add('policy_snapshot_format',snapshot.policyFormat===1)
+  add('policy_reference_format',reference.policyFormat===1)
+  add('policy_snapshot_prerequisites',completePolicies(snapshot.prerequisites.legacyPolicies))
+  add('policy_reference_complete',Array.isArray(reference.stages)&&reference.stages.every(stage=>policyObjects(stage).every(([,value])=>completePolicies(value.policies))))
+  for(const [name,value] of policyObjects(snapshot.objects))add('policy_attributes:'+name,completePolicies(value.policies))
   const required={'auth.users.id':'uuid','auth.users.email':['text','varchar'],'auth.users.raw_user_meta_data':'jsonb','auth.users.created_at':'timestamptz',
     'public.games.id':'uuid','public.games.slug':'text','public.games.title':'text',
     'public.games.is_published':'bool','public.games.game_type':'text','public.games.multiplayer_game_id':'text',
@@ -51,7 +67,7 @@ export function compareSchema(snapshot,reference) {
 }
 export async function readReference() {
   const ref=JSON.parse(await readFile(new URL('../contracts/production-schema.v1.json',import.meta.url),'utf8'))
-  if(ref.migrations.length!==migrations.length)throw Error('reference_outdated')
+  if(ref.policyFormat!==1||ref.migrations.length!==migrations.length||!ref.stages.every(stage=>policyObjects(stage).every(([,value])=>completePolicies(value.policies))))throw Error('reference_outdated')
   for(const [names,entries] of [[migrations,ref.migrations],[baselineMigrations,ref.baselineMigrations]]) {
    if(!Array.isArray(entries)||entries.length!==names.length)throw Error('reference_outdated')
    for(const [index,name] of names.entries()) {

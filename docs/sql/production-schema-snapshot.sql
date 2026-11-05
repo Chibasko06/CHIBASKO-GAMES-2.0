@@ -17,7 +17,7 @@ with managed as (
     'generated',a.attgenerated,'default',pg_get_expr(d.adbin,d.adrelid),'columnAcl',a.attacl::text) order by a.attnum)
    from pg_attribute a left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped),
   'constraints',coalesce((select jsonb_agg(jsonb_build_object('name',k.conname,'definition',pg_get_constraintdef(k.oid),'valid',k.convalidated) order by k.conname) from pg_constraint k where k.conrelid=c.oid),'[]'::jsonb),
-  'policies',coalesce((select jsonb_agg(jsonb_build_object('name',p.policyname,'roles',p.roles,'command',p.cmd,'using',p.qual,'check',p.with_check) order by p.policyname) from pg_policies p where p.schemaname='public' and p.tablename=c.relname),'[]'::jsonb),
+  'policies',coalesce((select jsonb_agg(jsonb_build_object('name',p.policyname,'roles',p.roles,'permissive',p.permissive,'command',p.cmd,'using',p.qual,'check',p.with_check) order by p.policyname) from pg_policies p where p.schemaname='public' and p.tablename=c.relname),'[]'::jsonb),
   'grants',coalesce((select jsonb_agg(jsonb_build_object('role',case when g.grantee=0 then 'PUBLIC' else pg_get_userbyid(g.grantee) end,'privilege',g.privilege_type,'grantable',g.is_grantable) order by case when g.grantee=0 then 'PUBLIC' else pg_get_userbyid(g.grantee) end,g.privilege_type)
     from aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) g where g.grantee<>c.relowner),'[]'::jsonb),
   'access',(select jsonb_object_agg(role_name,jsonb_build_object(
@@ -112,10 +112,10 @@ with managed as (
   'browserCatalogueWrites',coalesce((select bool_or(has_column_privilege(r.role_name,c.oid,a.attnum,'INSERT') or has_column_privilege(r.role_name,c.oid,a.attnum,'UPDATE')
     or has_table_privilege(r.role_name,c.oid,'DELETE')) from pg_class c join pg_attribute a on a.attrelid=c.oid
     cross join (values('anon'),('authenticated')) r(role_name) where c.oid=to_regclass('public.games') and a.attnum>0 and not a.attisdropped),true),
-  'legacyPolicies',coalesce((select jsonb_agg(jsonb_build_object('table',tablename,'name',policyname,'roles',roles,'command',cmd,'using',qual,'check',with_check) order by tablename,policyname)
+  'legacyPolicies',coalesce((select jsonb_agg(jsonb_build_object('table',tablename,'name',policyname,'roles',roles,'permissive',permissive,'command',cmd,'using',qual,'check',with_check) order by tablename,policyname)
     from pg_policies where schemaname='public' and tablename in ('games','admin_users')),'[]'::jsonb)
  ) as value
 )
-select jsonb_build_object('format',1,'readOnly',current_setting('transaction_read_only')='on',
+select jsonb_build_object('format',1,'policyFormat',1,'readOnly',current_setting('transaction_read_only')='on',
  'prerequisites',(select value from prerequisites),'objects',coalesce((select jsonb_object_agg(key,value) from objects),'{}'::jsonb));
 rollback;

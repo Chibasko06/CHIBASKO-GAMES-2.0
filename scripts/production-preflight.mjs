@@ -156,6 +156,7 @@ export async function localChecks(root) {
     target.push({ name, sha256: sqlSha256(bytes) })
   }
   const reference=JSON.parse(await readFile(resolve(root,'contracts/production-schema.v1.json'),'utf8'))
+  add('schema_reference_policy_format',reference.policyFormat===1)
   add('schema_reference_migrations',JSON.stringify(reference.migrations)===JSON.stringify(inventory)
     && JSON.stringify(reference.baselineMigrations)===JSON.stringify(baselineInventory))
   const snapshot=await readFile(resolve(root,'docs/sql/production-schema-snapshot.sql'))

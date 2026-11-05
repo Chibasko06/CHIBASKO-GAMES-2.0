@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { localChecks, environmentChecks, environments, sqlSha256 } from '../scripts/production-preflight.mjs'
-import {mkdtemp,mkdir,cp,writeFile,rm} from 'node:fs/promises'
+import {mkdtemp,mkdir,cp,readFile,writeFile,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join,dirname} from 'node:path'
 
@@ -52,6 +52,11 @@ test('une migration hors de l’ancien intervalle de dates bloque le préflight'
    const target=join(directory,path);await mkdir(dirname(target),{recursive:true});await cp(join(root,path),target,{recursive:true})
   }
   assert.equal((await localChecks(directory)).checks.every(check=>check.ok),true)
+  const referencePath=join(directory,'contracts/production-schema.v1.json'),original=await readFile(referencePath,'utf8'),stale=JSON.parse(original)
+  delete stale.policyFormat
+  await writeFile(referencePath,JSON.stringify(stale))
+  assert.equal((await localChecks(directory)).checks.find(check=>check.check==='schema_reference_policy_format').ok,false)
+  await writeFile(referencePath,original)
   await writeFile(join(directory,'supabase/migrations/20261024000100_unknown.sql'),'begin;\ncommit;\n')
   assert.equal((await localChecks(directory)).checks.find(check=>check.check==='migration_order').ok,false)
  }finally{await rm(directory,{recursive:true,force:true})}
