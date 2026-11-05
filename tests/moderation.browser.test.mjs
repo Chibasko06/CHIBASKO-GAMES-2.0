@@ -13,7 +13,7 @@ before(async()=>{
   b.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}))
   b.onResolve({filter:/^@\/components\/admin\/useAdminAccess$/},()=>({path:'access',namespace:'fixture'}))
   b.onResolve({filter:/^next\/(?:link|navigation)$/},({path})=>({path:path.split('/')[1],namespace:'fixture'}))
-  b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',resolveDir:process.cwd(),contents:{auth:`export const useAuth=()=>({loading:false,user:window.fixture.guest?null:{id:'${id(1)}'},session:window.fixture.guest?null:{access_token:'fixture'}})`,access:`export const useAdminAccess=()=>({status:'allowed',retry(){}})`,link:`import {createElement} from 'react';export default p=>createElement('a',p)`,navigation:`export const useRouter=()=>({push(){}})`}[path]}))
+  b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',resolveDir:process.cwd(),contents:{auth:`export const useAuth=()=>({loading:false,user:window.fixture.guest?null:{id:'${id(1)}'},session:window.fixture.guest?null:{access_token:'fixture'}})`,access:`export const useAdminAccess=()=>({status:'allowed',retry(){}})`,link:`import {createElement} from 'react';export default p=>createElement('a',p)`,navigation:`export const usePathname=()=>location.pathname;export const useRouter=()=>({push(){}})`}[path]}))
  }}]});script=bundle.outputFiles[0].text;css=(await postcss([tailwind()]).process(readFileSync('app/globals.css','utf8'),{from:resolve('app/globals.css')})).css
  browser=await chromium.launch({channel:'chrome',headless:true})
 })

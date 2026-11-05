@@ -1,5 +1,6 @@
 "use client";
 
+import AuthRequired from '@/components/AuthRequired'
 import {publicProfilePath} from '@/lib/publicUsername'
 
 import FormField from '@/components/ui/FormField'
@@ -233,12 +234,13 @@ export default function DashboardPage() {
 
   if (loadError && !authLoading && user) return <div role="alert" className="space-y-4 rounded-2xl border border-zinc-800 p-6">
     <p>{loadError}</p>
+    <Link href="/account/moderation" className="inline-block rounded px-2 py-3 text-cyan-300 underline">Mes avertissements et sanctions</Link>
     <button type="button" className="rounded-lg px-4 py-3 text-cyan-300 underline" onClick={() => window.dispatchEvent(new Event('focus'))}>Réessayer</button>
   </div>
   if (!authLoading && (!user || needsAuth)) return <section className="mx-auto max-w-xl rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
     <h1 className="text-2xl font-bold">Tableau de bord</h1>
     <p className="my-4 text-sm text-zinc-400">Connectez-vous à Chibasko Games pour retrouver votre profil et vos jeux.</p>
-    <Link href="/login" className="inline-block rounded-lg bg-cyan-400 px-5 py-3 font-semibold text-black">Connexion</Link>
+    <AuthRequired/>
   </section>
   if (loading || authLoading || !profile || profile.id !== user?.id) return <div role="status" className="space-y-5">
     <h1 className="text-3xl font-bold">Tableau de bord</h1>

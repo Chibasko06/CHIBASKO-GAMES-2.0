@@ -129,7 +129,7 @@ for(const enabled of [false,true])test('suppression intégrée : confirmation et
 
 test('visiteur et navigation Tous les jeux sur desktop et mobile',async()=>{
  for(const width of [390,1366]){const x=await fixture('visitor=1',{width,height:844});try{
-  await x.page.getByRole('link',{name:'Connexion',exact:true}).last().waitFor()
+  await x.page.getByRole('link',{name:'Se connecter',exact:true}).last().waitFor()
   if(width===390)await x.page.getByRole('button',{name:'Ouvrir le menu'}).click()
   const link=x.page.getByRole('link',{name:'Tous les jeux',exact:true});await link.waitFor();assert.equal(await link.getAttribute('href'),'/games')
   assert.equal(await x.page.getByText('private@example.test',{exact:true}).count(),0)

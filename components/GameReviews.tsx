@@ -1,4 +1,5 @@
-"use client";
+'use client'
+import AuthRequired from '@/components/AuthRequired'
 
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
@@ -68,15 +69,15 @@ export default function GameReviews({ gameId }: Props) {
       return
     }
 
-    if (blocked) { await refreshReviews(); return }
     setMessage(null)
 
     if (!user) {
       setNeedsAuth(true)
-      setMessage('Connecte-toi pour laisser un commentaire.')
+      setMessage(null)
       return
     }
 
+    if (blocked) { await refreshReviews(); return }
     if (!comment.trim()) {
       setMessage('Ecris un commentaire avant de publier.')
       return
@@ -162,8 +163,8 @@ export default function GameReviews({ gameId }: Props) {
         {message ? (
           <p id="review-feedback" role="status" className="text-sm text-cyan-300">{message}</p>
         ) : null}
-        {needsAuth ? (
-          <p className="text-sm text-zinc-500">La lecture est publique, mais il faut un compte pour commenter.</p>
+        {!user && needsAuth ? (
+          <AuthRequired/>
         ) : null}
 
         <button

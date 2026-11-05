@@ -1,4 +1,5 @@
 'use client'
+import AuthRequired from '@/components/AuthRequired'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
@@ -17,6 +18,7 @@ export default function GameReactions({ gameId, initialLikes, initialDislikes, c
   const [reaction, setReaction] = useState<Reaction>(null)
   const [loadError, setLoadError] = useState(false)
   const [countsError, setCountsError] = useState(false)
+  const [needsAuth,setNeedsAuth]=useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const {pending, blocked, mutate, check} = useMutationRecovery(gameId + ':' + (user?.id ?? ''))
 
@@ -56,8 +58,8 @@ export default function GameReactions({ gameId, initialLikes, initialDislikes, c
 
   const applyReaction = async (nextReaction: Exclude<Reaction, null>) => {
     if (pending) return
+    if (!user) { setNeedsAuth(true); return }
     if (blocked) { await reloadReaction(); return }
-    if (!user) { setMessage('Connecte-toi pour liker ou disliker un jeu.'); return }
     const target = reaction === nextReaction ? null : nextReaction
     const previous = reaction
     setMessage(null)
@@ -87,12 +89,14 @@ export default function GameReactions({ gameId, initialLikes, initialDislikes, c
   const label = (value: 'like' | 'dislike') => feedback || (value === 'like' ? 'J’aime · ' + likes : 'Je n’aime pas · ' + dislikes)
 
   if(compact)return <div className={playerStyles.reactionButtons}>
+    {!user && needsAuth && <AuthRequired/>}
     {feedback && <span role="status" className="sr-only">{feedback}</span>}
     {(['like','dislike'] as const).map(value=><button key={value} className={playerStyles.iconButton} type="button" aria-label={value==='like'?'J’aime':'Je n’aime pas'} aria-pressed={loadError ? undefined : reaction===value} title={label(value)} disabled={pending} onClick={()=>void applyReaction(value)}><PlayerIcon name={value}/><span className={playerStyles.tooltip} aria-hidden="true">{label(value)}</span></button>)}
   </div>
 
   return (
         <div className="flex flex-wrap items-center gap-2">
+          {!user && needsAuth && <AuthRequired/>}
           {feedback && <p role="status">{feedback}</p>}
           <button
             type="button"

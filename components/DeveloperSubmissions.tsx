@@ -1,4 +1,5 @@
 'use client'
+import AuthRequired from '@/components/AuthRequired'
 import Link from 'next/link'
 import {useEffect,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
@@ -7,7 +8,7 @@ import {reviewLabel,REVIEW_NOTICE,type ReviewSummary} from '@/lib/game-distribut
 type Row=ReviewSummary&{id:string;title:string;version:string;createdAt:string;editorialComplete:boolean}
 export default function DeveloperSubmissions(){const {session,loading}=useAuth()
   if(loading)return <p>Chargement…</p>
-  if(!session)return <div className="p-6"><p>Connectez-vous pour consulter vos soumissions.</p><Link href="/login?next=%2Fdeveloper%2Fsubmissions">Connexion</Link></div>
+  if(!session)return <div className="p-6"><AuthRequired/></div>
   return <List key={session.user.id} token={session.access_token}/>
 }
 function List({token}:{token:string}){

@@ -1,3 +1,4 @@
+import FaqAnswer from '@/components/FaqAnswer'
 import type { Metadata } from 'next'
 import { getPublishedFaqEntries } from '@/lib/queries/faq'
 import { buildPageMetadata } from '@/lib/seo'
@@ -34,7 +35,7 @@ export default async function FaqPage() {
           faqEntries.map((entry) => (
             <section key={entry.id} className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
               <h2 className="text-lg font-black uppercase text-white">{entry.question}</h2>
-              <p className="mt-3 text-sm leading-7 text-zinc-400 whitespace-pre-line">{entry.answer}</p>
+              <p className="mt-3 text-sm leading-7 text-zinc-400 whitespace-pre-line"><FaqAnswer text={entry.answer}/></p>
             </section>
           ))
         )}

@@ -19,7 +19,7 @@ before(async()=>{
    auth:`const anonymous={user:null,session:null,loading:false},signed={user:{id:'owner'},session:{user:{id:'owner'},access_token:'fixture-only'},loading:false};export function useAuth(){return window.fixtureSignedIn?signed:anonymous}`,
    supabase:`export const supabase={from(){return {select(){return this},eq(){return this},async maybeSingle(){return {data:null,error:null}}}},async rpc(){return {data:[],error:null}}}`,
    profile:`export async function ensureProfile(){return {ok:true}}`,
-   navigation:`export function useRouter(){return {push(){throw Error('Unexpected navigation in embedded player')}}}`,
+   navigation:`export function usePathname(){return location.pathname}export function useRouter(){return {push(){throw Error('Unexpected navigation in embedded player')}}}`,
    link:`import {createElement} from 'react';export default function Link(props){return createElement('a',props)}`,
   }[path]}))
  }}]})
@@ -73,6 +73,17 @@ async function oneDock(page){assert.equal(await page.getByRole('region',{name:'J
 const boxSize=({width,height})=>({width,height})
 const launcher=page=>page.getByLabel('Écran de lancement',{exact:true})
 const startLocal=page=>page.getByRole('button',{name:/^Jouer en local/}).click()
+test('réaction invitée dans le lecteur mobile : accès Auth visible sans débordement',async()=>{
+ const x=await setup({viewport:{width:390,height:844}})
+ try{
+  await x.page.getByRole('button',{name:'J’aime',exact:true}).click()
+  await x.page.getByRole('link',{name:'Se connecter',exact:true}).waitFor()
+  await x.page.getByRole('link',{name:'Créer un compte',exact:true}).waitFor()
+  const bounds=await x.page.getByRole('link',{name:'Créer un compte',exact:true}).boundingBox()
+  assert.ok(bounds&&bounds.x>=0&&bounds.x+bounds.width<=390)
+  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ }finally{await x.context.close()}
+})
 async function assertIdle(x){
  await launcher(x.page).waitFor();await oneDock(x.page)
  assert.equal(await x.page.locator('iframe').count(),0)

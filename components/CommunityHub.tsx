@@ -1,4 +1,5 @@
 'use client'
+import AuthRequired from '@/components/AuthRequired'
 import {useEffect,useRef,useState} from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -50,7 +51,7 @@ function Hub({token,userId,loading,profiles,searching,children}:{token?:string;u
   </section>}
   {loading?<p role="status" className="text-sm text-zinc-400">Chargement de ton espace…</p>:token&&userId?<SocialLists key={userId} token={token} revisions={revisions} hidden={hidden} onChanged={changed}/>:<section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-cyan-900/60 bg-cyan-950/20 p-5">
    <div><h2 className="font-semibold">Retrouve tes amis sur Chibasko Games</h2><p className="mt-1 text-sm text-zinc-400">Connecte-toi pour envoyer des demandes et retrouver tes amis dans un espace privé.</p></div>
-   <Link href="/login?next=/players" className={socialButton+' border-cyan-700 text-cyan-200'}>Se connecter</Link>
+   <AuthRequired/>
   </section>}
   {token&&userId&&<SharedGames token={token} actorId={userId}/>}
  </div>

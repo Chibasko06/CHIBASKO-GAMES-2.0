@@ -1,4 +1,5 @@
 'use client'
+import AuthRequired from '@/components/AuthRequired'
 import {useEffect,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
 import {emitSocialUpdate} from '@/lib/socialNotifications'
@@ -10,7 +11,7 @@ type Props={target:string;username:string;initial?:Relation;onChanged?:(change:S
 export default function ProfileSocialActions(props:Props){
  const {session,user,loading}=useAuth()
  if(loading||user?.id===props.target)return null
- if(!session||!user)return <details className="relative shrink-0"><summary className={socialButton+' cursor-pointer list-none'} aria-label={'Actions pour @'+props.username}>···</summary><div className="absolute right-0 z-30 w-64 rounded-xl border border-zinc-700 bg-zinc-950 p-2"><ReportButton kind="player" target={props.target}/></div></details>
+ if(!session||!user)return <details className="relative shrink-0"><summary className={socialButton+' cursor-pointer list-none'} aria-label={'Actions pour @'+props.username}>···</summary><div className="absolute right-0 z-30 w-64 rounded-xl border border-zinc-700 bg-zinc-950 p-2"><AuthRequired/><ReportButton kind="player" target={props.target}/></div></details>
  return <Actions key={session.access_token+props.target+(props.initial?.state??'')+(props.initial?.relationId??'')} {...props} token={session.access_token} actorId={user.id}/>
 }
 function Actions({target,username,initial,onChanged,token,actorId}:Props&{token:string;actorId:string}){

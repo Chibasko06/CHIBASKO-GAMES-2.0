@@ -1,4 +1,5 @@
-"use client";
+'use client'
+import AuthRequired from '@/components/AuthRequired'
 
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
@@ -18,6 +19,7 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [needsAuth,setNeedsAuth]=useState(false)
   const [loadError, setLoadError] = useState(false)
   const [reload, setReload] = useState(0)
   const requestIdRef = useRef(0)
@@ -86,7 +88,7 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
     }
 
     if (!userId) {
-      alert('Connecte-toi pour ajouter ce jeu en favori.')
+      setNeedsAuth(true)
       return
     }
 
@@ -130,6 +132,8 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
       alert('Impossible de modifier les favoris. Réessaie dans un instant.')
     } finally { setPending(false) }
   }
+
+  if(!user && needsAuth)return <AuthRequired/>
 
   if(compact)return <button type="button" className={playerStyles.iconButton} aria-label="Favori" aria-pressed={loadError ? undefined : isGameFavorite} disabled={loading || pending} title={loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'} onClick={()=>void toggleFavorite()}><PlayerIcon name="favorite"/><span className={playerStyles.tooltip} aria-hidden="true">{loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'}</span></button>
 

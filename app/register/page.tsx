@@ -93,6 +93,7 @@ export default function RegisterPage() {
           Tu peux aller directement sur ton tableau de bord ou explorer les jeux.
         </p>
         <div className="mt-6 flex justify-center gap-3">
+          {next !== '/' && <Link href={next} className="rounded-full border border-cyan-700 px-5 py-3 text-sm font-black text-cyan-200">Continuer</Link>}
           <Link href="/dashboard" className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase text-black">
             Mon profil
           </Link>

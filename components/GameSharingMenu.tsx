@@ -1,6 +1,6 @@
 'use client'
+import AuthRequired from '@/components/AuthRequired'
 import {useEffect,useRef,useState} from 'react'
-import Link from 'next/link'
 import {useAuth} from '@/components/AuthProvider'
 import ReportButton from '@/components/ReportButton'
 import SocialDialog from '@/components/SocialDialog'
@@ -22,7 +22,7 @@ export default function GameSharingMenu({gameId,title,url}:{gameId:string;title:
   <details ref={menu} onKeyDown={event=>{if(event.key==='Escape'&&menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus()}}}>
    <summary className={socialButton+' cursor-pointer list-none px-4'} aria-label="Partager ce jeu">···</summary>
    <div className="absolute right-0 z-30 mt-2 w-60 rounded-xl border border-zinc-700 bg-zinc-950 p-2 shadow-xl">
-    {user&&session?<button className={socialButton+' w-full'} onClick={()=>{if(menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus()}setOpen(true)}}>Partager à un ami</button>:<Link href="/login" className={socialButton+' w-full'}>Se connecter pour partager à un ami</Link>}
+    {user&&session?<button className={socialButton+' w-full'} onClick={()=>{if(menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus()}setOpen(true)}}>Partager à un ami</button>:<AuthRequired/>}
     <button className={socialButton+' mt-2 w-full'} onClick={()=>void publicShare()}>Partager un lien</button>
     <ReportButton kind="game" target={gameId}/>
    </div>
