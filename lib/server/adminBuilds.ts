@@ -20,6 +20,10 @@ export async function adminBuildRequest(request:NextRequest,id?:string) {
     }
     if(!id)throw new UploadError('invalid_request',400)
     const body=await readAdminJson(request,4096)
+    if(body.action==='compatibility'){
+      if(Object.keys(body).some(k=>!['action','compatibility','expected'].includes(k))||typeof body.compatibility!=='string'||!['desktop','mobile','both','unknown'].includes(body.compatibility)||typeof body.expected!=='string'||body.expected.length>500)throw new UploadError('invalid_request',400)
+      return adminJson({data:await db.call('distribution_admin_compatibility',{p_actor:auth.user.id,p_upload:id,p_value:body.compatibility,p_expected:body.expected})})
+    }
     if(typeof body.action!=='string'||Object.keys(body).some(k=>!['action','checklist','reason','submissionId'].includes(k)) ||
       !['review','publish','reject','archive','link_submission'].includes(String(body.action)))throw new UploadError('invalid_request',400)
     if(body.submissionId!==undefined&&body.submissionId!==null)assertUploadId(String(body.submissionId))

@@ -1,3 +1,5 @@
+import GameCompatibilityNotice from '@/components/GameCompatibilityNotice'
+import {requestDevice} from '@/lib/server/requestDevice'
 import DurableLobby from '@/components/multiplayer/DurableLobby'
 import type { Metadata } from 'next'
 import Link from 'next/link'
@@ -11,6 +13,6 @@ export default async function OnlineGamePage({ params }: { params: Promise<{ slu
   return <section className="mx-auto max-w-3xl space-y-6">
     <Link href={`/games/${game.slug}`} className="rounded text-cyan-300 focus-visible:outline-2 focus-visible:outline-cyan-300">← Retour à la fiche</Link>
     <header className="space-y-2"><p className="text-sm text-cyan-300">Salons publics · Chibasko Games</p><h1 className="break-words text-3xl font-black">{game.title}</h1><p className="text-zinc-400">Rejoins un salon public ou crée le tien.</p></header>
-    <DurableLobby gameId={game.id} slug={game.slug} access="public" />
+    <GameCompatibilityNotice value={game.mobile_compatible} device={await requestDevice()}><DurableLobby gameId={game.id} slug={game.slug} access="public" /></GameCompatibilityNotice>
   </section>
 }

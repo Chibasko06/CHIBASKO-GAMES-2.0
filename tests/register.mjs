@@ -43,7 +43,7 @@ registerHooks({
       'phase0:cloudflare': 'export function getCloudflareContext() { return globalThis.__r2.context ?? { env: { CHIBASKO_ASSETS: globalThis.__r2.bucket } } }',
       'phase0:admin-check': 'export function requireAdmin(request) { return globalThis.__r2.adminCheck(request) } export function adminJson(body,init){return Response.json(body,init)} export function adminErrorMessage(){return "Opération impossible."} export function readAdminJson(request){return request.json()}',
       'phase0:server-only': 'export {}',
-      'phase0:headers': 'export async function cookies(){return globalThis.__adminCookies}',
+      'phase0:headers': 'export async function cookies(){return globalThis.__adminCookies??{get(){}}} export async function headers(){return {get(){return null}}}',
       'phase0:navigation': 'export function redirect(url){throw new Error("REDIRECT "+url)} export function notFound(){throw new Error("NOT_FOUND")}',
     }
     if (stubs[url]) return { format: 'module', source: stubs[url], shortCircuit: true }

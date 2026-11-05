@@ -18,6 +18,7 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
  const bundle=resolve(process.env.CLOUDFLARE_RUNTIME_BUNDLE??'.distribution/runtime-smoke/worker.js')
  assert.ok(existsSync(bundle),'Construire le Worker et son bundle Wrangler avant ce test.')
  let reads=0,profileReads=0
+ const devices=[]
  const profileIdentifiers=[]
  const worker=new Miniflare(convertV4MiniflareOptions({
   modules:[{type:'ESModule',path:bundle},...readdirSync(dirname(bundle)).filter(name=>name.endsWith('.wasm'))
@@ -34,12 +35,12 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
     reads++;return Response.json([category],{headers:{'Content-Range':'0-0/1'}})
    }
    if(request.method==='POST'&&path==='/rest/v1/rpc/catalogue_page'){
-    reads++;const input=await request.json()
+    reads++;const input=await request.json();devices.push(input.p_device)
     const items=input.p_slug&&input.p_slug!==game.slug?[]:[game]
     return Response.json({items,total:items.length})
    }
-   if(request.method==='POST'&&path==='/rest/v1/rpc/catalogue_home'){
-    reads++;return Response.json([{category,games:[game]}])
+   if(request.method==='POST'&&(path==='/rest/v1/rpc/catalogue_home'||path==='/rest/v1/rpc/catalogue_home_for_device')){
+    reads++;devices.push((await request.json()).p_device??'all');return Response.json([{category,games:[game]}])
    }
    if(request.method==='POST'&&path==='/rest/v1/rpc/public_profile_resolve'){
     profileReads++;const {p_identifier}=await request.json()
@@ -65,6 +66,14 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    assert.match(response.headers.get('content-type')??'',/text\/html/)
    assert.match(html,/Stickman Fights/)
    assert.doesNotMatch(html,/Unexpected loadManifest|<iframe\b/)
+  }
+  for(const [agent,device] of [['iPhone','mobile'],['Windows NT','desktop']]){
+   devices.length=0
+   for(const path of ['/','/games']){
+    const response=await worker.dispatchFetch('https://chibaskogames.fr'+path,{headers:{'User-Agent':agent}})
+    assert.equal(response.status,200);assert.match(await response.text(),/Stickman Fights/)
+   }
+   assert.ok(devices.length>0);assert.ok(devices.every(value=>value===device),JSON.stringify(devices))
   }
   assert.ok(reads>0,'Le test doit traverser le rendu dynamique et ses lectures.')
   const response=await worker.dispatchFetch('https://chibaskogames.fr/players/@joueur-actuel')

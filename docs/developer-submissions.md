@@ -263,3 +263,17 @@ revue admin existantes.
 la réservation d’identité, les champs éditoriaux, le multipart de couverture et
 un PUT ZIP vers un serveur de stockage local distinct. Aucun service distant
 n’est appelé par ce harness.
+
+## Déclaration des appareils
+
+Le formulaire demande « Ordinateur uniquement », « Mobile uniquement » ou
+« Ordinateur et mobile ». La déclaration est une métadonnée éditoriale, indépendante
+du manifeste et du SDK. Les anciens booléens restent acceptés : vrai conserve
+la compatibilité mobile legacy et faux signifie ordinateur.
+
+Le mobile exige des commandes tactiles, une interface lisible sur téléphone et
+une alternative au clavier obligatoire, avec une orientation exploitable.
+L’administration vérifie et corrige la déclaration dans le dossier de soumission
+avant publication ; la correction invalide la revue éditoriale en attente. Après
+publication, le catalogue administratif et le dossier permettent de corriger la
+classification sans modifier les artefacts, le code du jeu ou son SDK.

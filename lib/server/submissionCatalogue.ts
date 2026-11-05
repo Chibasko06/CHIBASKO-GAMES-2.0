@@ -1,3 +1,4 @@
+import {isCompatibilityDeclaration} from '@/lib/gameCompatibility'
 import 'server-only'
 import {InputError} from './inputValidation'
 import {UploadError,assertUploadId} from '../game-distribution/uploads/policy'
@@ -14,7 +15,7 @@ export function catalogueInput(body:Record<string,unknown>) {
     for(const [key,max] of [['title',160],['studio',160],['description',10000],['technology',120]] as const){
       if(typeof data[key]!=='string'||!data[key].trim()||data[key].length>max)throw new UploadError('invalid_request')
     }
-    if(typeof data.mobile!=='boolean'||typeof data.releaseDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(data.releaseDate)
+    if((typeof data.mobile!=='boolean'&&!isCompatibilityDeclaration(data.mobile))||typeof data.releaseDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(data.releaseDate)
       ||!Number.isFinite(Date.parse(data.releaseDate))||new Date(data.releaseDate).toISOString().slice(0,10)!==data.releaseDate)throw new UploadError('invalid_request')
     if(!Array.isArray(data.categories)||data.categories.length<1||data.categories.length>8||new Set(data.categories).size!==data.categories.length)throw new UploadError('invalid_request')
     data.categories.forEach(v=>assertUploadId(String(v)))

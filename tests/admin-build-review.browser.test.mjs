@@ -28,6 +28,7 @@ const server=createServer(async(request,response)=>{
   if(request.method==='GET'){json({data:url.pathname.endsWith('/'+id)?row:[row]});return}
   const chunks=[];for await(const chunk of request)chunks.push(chunk);const body=JSON.parse(Buffer.concat(chunks));actions.push(body)
   if(body.action==='review'){row.review={...row.review,decision:'reviewed',checklist:body.checklist,reviewedAt:'2026-10-20T11:00:00Z'};row.versionStatus='in_review'}
+  if(body.action==='compatibility'){row.submission.mobile='platform:'+body.compatibility;row.review.checklist={};row.review.reviewedAt=null}
   if(body.action==='publish'){row.versionStatus='published';row.review.decision='published'}
   if(body.action==='reject'||body.action==='archive'){row.review.decision=body.action==='reject'?'rejected':'archived';row.review.reason=body.reason}
   json({data:row});return
@@ -38,6 +39,11 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='h
 let browser
 try{
  browser=await chromium.launch({channel:'chrome',headless:true})
+ await test('Chrome : correction de compatibilité dans la revue',async()=>{
+  row=initial();actions=[];const page=await browser.newPage();await page.goto(origin)
+  await page.getByLabel('Appareils compatibles',{exact:true}).selectOption('mobile');await page.getByRole('button',{name:'Enregistrer la compatibilité',exact:true}).click()
+  await page.getByText('Compatibilité enregistrée.',{exact:true}).waitFor();assert.equal(actions[0].action,'compatibility');assert.equal(actions[0].compatibility,'mobile');assert.equal(actions[0].expected,'Oui');assert.equal(row.submission.mobile,'platform:mobile');await page.close()
+ })
  await test('Chrome review: queued build presents four actions; UUIDs and commands remain collapsed',async()=>{
   row=initial();actions=[];const page=await browser.newPage();await page.goto(origin)
   await page.getByRole('heading',{name:'Proposed fixture title',exact:true}).waitFor()

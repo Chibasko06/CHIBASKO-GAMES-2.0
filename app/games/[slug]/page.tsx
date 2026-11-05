@@ -1,3 +1,6 @@
+import {requestDevice} from '@/lib/server/requestDevice'
+import GameCompatibilityNotice from '@/components/GameCompatibilityNotice'
+import {gameCompatibility,compatibilityLabels} from '@/lib/gameCompatibility'
 import GameSharingMenu from '@/components/GameSharingMenu'
 import {cache} from 'react'
 import GamePagePlayerLayout from '@/components/GamePagePlayerLayout'
@@ -59,6 +62,7 @@ export default async function GamePage({
     }))
     : []
 
+  const device=await requestDevice()
   const structuredData = gameStructuredData(game)
 
   return (
@@ -92,7 +96,8 @@ export default async function GamePage({
 
       </div>
 
-      <GamePagePlayerLayout recommendations={selectGameRecommendations(game,await getGameRecommendations(game))} primaryCategoryId={game.categories[0]?.id}>
+      <GamePagePlayerLayout recommendations={selectGameRecommendations(game,await getGameRecommendations(game,device))} primaryCategoryId={game.categories[0]?.id}>
+      <GameCompatibilityNotice key={game.id} value={game.mobile_compatible} device={device}>
       {!game.active_version_id && isClassicGame(game) ? (
         <GameViewport title={game.title} developerName={game.developer_name} coverUrl={game.thumbnail_url} gameId={game.id} gameUrl={game.game_url} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
       ) : (
@@ -111,6 +116,7 @@ export default async function GamePage({
         />
       )}
 
+      </GameCompatibilityNotice>
       </GamePagePlayerLayout>
 
       <p className="text-zinc-400">
@@ -128,7 +134,7 @@ export default async function GamePage({
         </div>
         <div className="bg-zinc-900 border border-zinc-800 p-4">
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">Mobile</p>
-          <p className="text-base font-bold text-white">{game.mobile_compatible || 'Non renseigne'}</p>
+          <p className="text-base font-bold text-white">{compatibilityLabels[gameCompatibility(game.mobile_compatible)]}</p>
         </div>
         <div className="bg-zinc-900 border border-zinc-800 p-4">
           <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-2">Technologie</p>

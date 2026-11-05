@@ -17,6 +17,7 @@ type Props = {
   categories: Category[]
   total?:number
   page?:number
+  defaultDevice?:DeviceFilter
 }
 
 export default function GamesCatalog({
@@ -24,21 +25,25 @@ export default function GamesCatalog({
   categories,
   total=games.length,
   page=1,
+  defaultDevice='all',
 }: Props) {
   const params = useSearchParams()
-  const filters = readCatalogueFilters(params)
+  const filters = readCatalogueFilters(new URLSearchParams(params.toString()))
+  if(!params.has('device'))filters.device=defaultDevice
   const { search, category: selectedCategory, sort, device: deviceFilter } = filters
   const router=useRouter()
   const [pending,startTransition]=useTransition()
   const updateFilters = (patch: Partial<CatalogueFilters>) => {
     const current = readCatalogueFilters(new URLSearchParams(window.location.search))
-    startTransition(()=>router.replace(catalogueQueryString({ ...current, ...patch }),{scroll:false}))
+    if(!new URLSearchParams(window.location.search).has('device'))current.device=defaultDevice
+    const next={...current,...patch},url=new URL(catalogueQueryString(next),'https://chibaskogames.fr');if(patch.device!==undefined||next.device!=='all'||new URLSearchParams(window.location.search).has('device'))url.searchParams.set('device',next.device)
+    startTransition(()=>router.replace(url.pathname+url.search,{scroll:false}))
   }
   const setSort = (sort: SortOption) => updateFilters({ sort })
   const setDeviceFilter = (device: DeviceFilter) => updateFilters({ device })
   const visibleGames = games
   const deferredSearch=search
-  const pageHref=(value:number)=>{const url=new URL(catalogueQueryString(filters),'https://chibaskogames.fr');if(value>1)url.searchParams.set('page',String(value));return url.pathname+url.search}
+  const pageHref=(value:number)=>{const url=new URL(catalogueQueryString(filters),'https://chibaskogames.fr');if(filters.device!=='all'||params.has('device'))url.searchParams.set('device',filters.device);if(value>1)url.searchParams.set('page',String(value));return url.pathname+url.search}
 
   return (
     <div className="space-y-6">
@@ -89,9 +94,9 @@ export default function GamesCatalog({
               onChange={(event) => setDeviceFilter(event.target.value as DeviceFilter)}
               className="w-full border border-zinc-800 bg-black px-4 py-3 text-white outline-none focus:border-cyan-500"
             >
-              <option value="all">Toutes</option>
-              <option value="mobile">Mobile compatible</option>
-              <option value="desktop">PC uniquement</option>
+              <option value="all">Toutes les plateformes</option>
+              <option value="mobile">Compatible mobile</option>
+              <option value="desktop">Compatible ordinateur</option>
             </select>
           </label>
         </div>
@@ -164,6 +169,7 @@ export default function GamesCatalog({
       {visibleGames.length === 0 ? (
         <div className="border border-zinc-800 bg-zinc-950 p-8 text-center text-zinc-400">
           Aucun jeu ne correspond aux filtres actuels.
+          {deviceFilter!=='all'&&<div className="mt-3 space-y-3 text-sm"><p>Les jeux dont la compatibilité {deviceFilter==='mobile'?'mobile':'ordinateur'} n’est pas déclarée restent accessibles depuis leurs fiches.</p><button type="button" className="min-h-11 rounded-lg border border-cyan-800 px-4 py-2 text-cyan-300" onClick={()=>setDeviceFilter('all')}>Consulter toutes les plateformes</button></div>}
         </div>
       ) : (
         <div className={collectionStyles.grid}>

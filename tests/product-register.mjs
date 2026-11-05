@@ -7,7 +7,7 @@ registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier === 'server-only') return { url:'server-only', shortCircuit:true }
     const stubs = {
-      'next/link': 'link', 'next/image': 'image', 'next/navigation': 'navigation',
+      'next/headers':'headers', 'next/link': 'link', 'next/image': 'image', 'next/navigation': 'navigation',
       '@/components/AuthProvider': 'auth', '@/lib/supabaseClient': 'supabase',
       '@/components/GameReviews': 'reviews', '@/components/FavoriteButton': 'favorites',
       '@/components/PlaySessionTracker': 'tracker',
@@ -38,6 +38,7 @@ registerHooks({
       'product:image': "import {createElement} from 'react'; export default function Image({fill,priority,unoptimized,...props}) {return createElement('img', props)}",
       'product:auth': 'export function useAuth() { return globalThis.__productAuth ?? {user:null,session:null,loading:false} }',
       'product:multiplayer': `export function useMultiplayer(){return globalThis.__productMultiplayer ?? {available:true,state:{busy:false,error:'',lobby:null,game:{connected:false,count:0,expected:0,status:''}},controller:{connect:async()=>{throw new Error('Unexpected connection')}}}}`,
+      'product:headers':'export async function cookies(){return {get(){}}}export async function headers(){return {get(){return null}}}',
       'product:serverSession': 'export async function createServerSupabase(){return {auth:{getUser:async()=>({data:{user:globalThis.__productAuth?.user ?? null}})}}}',
       'product:analytics': 'export function suppressLobbyAnalytics(){}',
       'product:navigation': "import {useSyncExternalStore} from 'react'; export function useSearchParams() { const query=useSyncExternalStore(cb=>{window.addEventListener('popstate',cb);return()=>window.removeEventListener('popstate',cb)},()=>window.location.search,()=>globalThis.__productSearch ?? '');return new URLSearchParams(query) } export function redirect(path){throw new Error('REDIRECT '+path)} export function notFound(){throw new Error('NOT_FOUND')} const router={push(path){globalThis.__productNavigation=path},replace(path){globalThis.__productNavigation=path}}; export function useRouter(){return router} export function usePathname(){return typeof window==='undefined'?'/':window.location.pathname}",

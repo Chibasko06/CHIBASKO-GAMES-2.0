@@ -230,3 +230,14 @@ for(const width of [390,1366])test('pagination numérotée, bornes et filtres pa
   assert.equal(await nav.getByText('…',{exact:true}).count(),0)
  }finally{await x.context.close()}
 })
+
+test('le filtre automatique et le choix toutes plateformes restent dans les URL de pagination',async()=>{
+ const x=await setup('catalogue',{width:390,height:844})
+ try{
+  await x.page.evaluate(()=>window.catalogueFixture.render({page:'catalogue',count:0,total:1205,cataloguePage:1,device:'mobile'}))
+  const select=x.page.getByRole('combobox').filter({has:x.page.locator('option[value="mobile"]')})
+  assert.equal(await select.inputValue(),'mobile')
+  assert.match(await x.page.getByRole('link',{name:'Suivant',exact:true}).getAttribute('href'),/device=mobile/)
+  await select.selectOption('all');assert.equal(await x.page.evaluate(()=>window.catalogueNavigation),'/games?device=all')
+ }finally{await x.context.close()}
+})

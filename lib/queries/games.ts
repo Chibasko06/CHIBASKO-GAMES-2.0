@@ -1,3 +1,4 @@
+import type {DiscoveryDevice} from '@/lib/gameCompatibility'
 import {readData} from '@/lib/dataAccess'
 import type { GameCapabilities } from '@chibaskogames/sdk'
 import type { GameType } from '@/lib/multiplayer/catalogue'
@@ -66,22 +67,22 @@ export async function getGamePublicStats(gameId?:string){
  return (data??[]) as GamePublicStat[]
 }
 export async function getGames(){return (await getGamesCatalog()).sort((a,b)=>(b.views_count??0)-(a.views_count??0)||b.likes_count-a.likes_count||b.average_rating-a.average_rating||a.id.localeCompare(b.id))}
-export async function getFeaturedGames(limit=8){return (await getCataloguePage({limit})).items}
-export async function getHomepageHighlights(){
+export async function getFeaturedGames(limit=8,device:DiscoveryDevice='all'){return (await getCataloguePage({limit,device})).items}
+export async function getHomepageHighlights(device:DiscoveryDevice='all'){
  const rankings=['popular','favorites','likes','rating','recent']
- const rows=await Promise.all(rankings.map(ranking=>getCataloguePage({ranking,limit:1})))
+ const rows=await Promise.all(rankings.map(ranking=>getCataloguePage({ranking,limit:1,device})))
  if(rows[3].items[0]&&!rows[3].items[0].ratings_count)rows[3]=rows[0]
  const labels=['Le plus vu','Le plus en favori','Le plus like','Meilleure note','Selection equipe']
  return rows.flatMap((page,i)=>page.items.map(game=>({label:labels[i],description:i===0?`${game.views_count} vues`:i===1?`${game.favorites_count} favoris`:i===2?`${game.likes_count} likes`:i===3?`${Number(game.average_rating).toFixed(1)} / 5`:'Choix du moment',game}))) satisfies HomepageHighlight[]
 }
-export async function getGamesByCategory(limitPerCategory=10){
- const {data}=await readData('catalogue_home',supabase.rpc('catalogue_home' as never,{p_limit:limitPerCategory} as never))
+export async function getGamesByCategory(limitPerCategory=10,device:DiscoveryDevice='all'){
+ const {data}=await readData('catalogue_home',supabase.rpc((device==='all'?'catalogue_home':'catalogue_home_for_device') as never,{p_limit:limitPerCategory,...device==='all'?{}:{p_device:device}} as never))
  if(!Array.isArray(data))throw new DataAccessError('unexpected_error')
  return data as {category:Category;games:GameWithCategoriesAndStats[]}[]
 }
 export async function getGameBySlug(slug:string){return (await getCataloguePage({slug,limit:1})).items[0]??null}
-export async function getGameRecommendations(game:GameWithCategories){
- const rows=await Promise.all((game.categories.length?game.categories:[null]).map(category=>getCataloguePage({category:category?.slug??'all',limit:6})))
+export async function getGameRecommendations(game:GameWithCategories,device:DiscoveryDevice='all'){
+ const rows=await Promise.all((game.categories.length?game.categories:[null]).map(category=>getCataloguePage({category:category?.slug??'all',limit:6,device})))
  return rows.flatMap(page=>page.items)
 }
 export async function getGameReviews(gameId:string){

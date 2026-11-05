@@ -1,3 +1,4 @@
+import {requestDevice} from '@/lib/server/requestDevice'
 import type { Metadata } from 'next'
 import GamesCatalog from '@/components/GamesCatalog'
 import { getCategories, getCataloguePage } from '@/lib/queries/games'
@@ -34,8 +35,10 @@ export async function generateMetadata({searchParams}:Props):Promise<Metadata>{
 
 export default async function GamesPage({searchParams}:Props) {
   const query=await searchParams
+  const device=await requestDevice()
+  const effective={...query,device:typeof query.device==='string'?query.device:device}
   const [games, categories] = await Promise.all([
-    getCatalogue(parameters(query)),
+    getCatalogue(parameters(effective)),
     getCatalogueCategories(),
   ])
   const category=categories.find(category=>category.slug===query.category)
@@ -49,7 +52,7 @@ export default async function GamesPage({searchParams}:Props) {
         </p>
       </div>
 
-      <GamesCatalog games={games.items} categories={categories} total={games.total} page={pageNumber(query.page)} />
+      <GamesCatalog games={games.items} categories={categories} total={games.total} page={pageNumber(query.page)} defaultDevice={device} />
     </div>
   )
 }

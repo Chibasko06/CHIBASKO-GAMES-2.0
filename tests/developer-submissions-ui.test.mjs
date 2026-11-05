@@ -36,7 +36,7 @@ test('connected form exposes game reservation, ZIP and editorial separation; sub
  const editor=renderToStaticMarkup(createElement(Editor,{initial:{gameId:'fixture-id',metadata:emptyDraftMetadata,version:'',revision:0,submitted:false,upload:null,file:null,hashes:{}},token:'fixture-token',categories:[],max:524288000,onBack:()=>{}}))
  assert.match(editor,/Informations du nouveau jeu/);assert.doesNotMatch(editor,/Site développeur/)
  assert.match(html,/role="tablist"/);assert.match(html,/Publier un nouveau jeu/);assert.match(html,/Mettre à jour un jeu existant/)
- for(const field of ['Développeur / studio','Date de sortie','Compatible mobile','Technologie','image de couverture','Version du build'])assert.ok(editor.includes(field))
+ for(const field of ['Développeur / studio','Date de sortie','Appareils compatibles','Technologie','image de couverture','Version du build'])assert.ok(editor.includes(field))
  assert.doesNotMatch(html,/Jeu géré|<option value="">Nouveau jeu|Provider|GameMonetize/)
  assert.doesNotMatch(html,/fixture-token|service_role|staging_key/)
  assert.match(renderToStaticMarkup(createElement(Submissions)),/Mes soumissions/)

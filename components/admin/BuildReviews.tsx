@@ -1,4 +1,5 @@
 'use client'
+import {compatibilityLabels,gameCompatibility,mobileCompatibilityHelp} from '@/lib/gameCompatibility'
 import Link from 'next/link'
 import AdminShell from './AdminShell'
 import Image from 'next/image'
@@ -20,6 +21,7 @@ function Panel({id,token}:{id?:string;token?:string}){
  const [rows,setRows]=useState<AdminBuild[]>([]),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true)
  const [reload,setReload]=useState(0),[offset,setOffset]=useState(0),[filter,setFilter]=useState('Tous')
  const [checks,setChecks]=useState<Record<string,boolean>>({}),[reason,setReason]=useState(''),[submission,setSubmission]=useState(''),[decision,setDecision]=useState<'reject'|'archive'|null>(null)
+ const [compatibility,setCompatibility]=useState('unknown')
  const [preview,setPreview]=useState<'local'|'online'|null>(null),[onlineSession,setOnlineSession]=useState('')
  const actionLocked=useRef(false)
  const client=useMemo(()=>httpLaunchClient(async()=>token??null),[token])
@@ -28,7 +30,7 @@ function Panel({id,token}:{id?:string;token?:string}){
   if(!token)return()=>controller.abort()
   fetch(id?'/api/admin/game-builds/'+encodeURIComponent(id):'/api/admin/game-builds?offset='+offset,{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])})
    .then(async r=>{if(!r.ok)throw Error('load');return r.json()})
-   .then(body=>{if(!controller.signal.aborted){const values=id?[body.data]:body.data;setRows(values);setError('');setLoading(false);setChecks(id?values[0].review.checklist:{});setSubmission(id?(values[0].review.submissionId??''):'')}})
+   .then(body=>{if(!controller.signal.aborted){const values=id?[body.data]:body.data;setRows(values);if(id)setCompatibility(gameCompatibility(values[0].submission?.mobile));setError('');setLoading(false);setChecks(id?values[0].review.checklist:{});setSubmission(id?(values[0].review.submissionId??''):'')}})
    .catch(()=>{if(!controller.signal.aborted){setRows([]);setLoading(false);setError('Soumission introuvable ou accès indisponible.')}})
   return()=>controller.abort()
  },[id,token,reload,offset])
@@ -37,10 +39,10 @@ function Panel({id,token}:{id?:string;token?:string}){
   actionLocked.current=true
   setBusy(true);setError('');setNotice('')
   try{
-   const response=await fetch('/api/admin/game-builds/'+encodeURIComponent(id),{method:'POST',signal:AbortSignal.timeout(30000),headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({action,...(action==='review'?{checklist:checks}:{}),...(['reject','archive'].includes(action)?{reason}:{}),...(action==='link_submission'?{submissionId:submission||null}:{})})})
+   const response=await fetch('/api/admin/game-builds/'+encodeURIComponent(id),{method:'POST',signal:AbortSignal.timeout(30000),headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({action,...(action==='compatibility'?{compatibility,expected:build?.submission?.mobile??''}:{}),...(action==='review'?{checklist:checks}:{}),...(['reject','archive'].includes(action)?{reason}:{}),...(action==='link_submission'?{submissionId:submission||null}:{})})})
    if(!response.ok)throw Error('action')
    const {data}=await response.json();setRows([data]);setChecks(data.review.checklist);setSubmission(data.review.submissionId??'');setPreview(null);setDecision(null);setReason('')
-   setNotice(action==='review'?'Revue enregistrée.':action==='publish'?'Cette version a été publiée.':action==='reject'?'Soumission refusée.':action==='archive'?'Version archivée.':'Association mise à jour.')
+   setNotice(action==='compatibility'?'Compatibilité enregistrée.':action==='review'?'Revue enregistrée.':action==='publish'?'Cette version a été publiée.':action==='reject'?'Soumission refusée.':action==='archive'?'Version archivée.':'Association mise à jour.')
   }catch{setError('Action refusée. Vérifiez le statut, la revue et le motif, puis actualisez.')}finally{actionLocked.current=false;setBusy(false)}
  }
  const build=id?rows[0]:null,presentation=build?reviewPresentation(build,checks):null
@@ -63,10 +65,11 @@ function Panel({id,token}:{id?:string;token?:string}){
    <ReviewCard title="Développeur">{build.developerProfile?<dl className="grid gap-3 sm:grid-cols-2">{[['Prénom',build.developerProfile.firstName],['Nom',build.developerProfile.lastName],['Studio / nom public',build.developerProfile.publicName],['Portfolio',build.developerProfile.website??'Non renseigné'],['Autre contact',build.developerProfile.otherContact??'Non renseigné']].map(([label,value])=><div key={label}><dt className="text-sm text-zinc-400">{label}</dt><dd className="break-words">{value}</dd></div>)}<div><dt className="text-sm text-zinc-400">E-mail de contact</dt><dd><a className="break-all text-cyan-300 underline" href={'mailto:'+encodeURIComponent(build.developerProfile.contactEmail)}>{build.developerProfile.contactEmail}</a></dd></div></dl>:<HelpText>Aucune fiche de contact enregistrée pour cette ancienne soumission.</HelpText>}</ReviewCard>
    <ReviewCard title="Informations proposées">
     {build.submission?.kind==='update'?<FormFeedback tone="info" title="Mise à jour du jeu"><p>Cette soumission remplace uniquement le build. Les informations du catalogue restent inchangées.</p></FormFeedback>:<>
-    <div className="grid gap-6 md:grid-cols-[1fr_18rem]"><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">{[['Titre',build.submission?.title||build.game],['Développeur / studio',build.submission?.developer||build.developer],['Date de sortie',build.submission?.releaseDate],['Compatible mobile',build.submission?.mobile],['Technologie',build.submission?.technology],['Catégories',build.submission?.categories?.join(', ')]].map(([label,value])=><div key={label}><dt className="text-sm text-zinc-400">{label}</dt><dd className="mt-1 break-words font-medium">{value||'Non renseigné'}</dd></div>)}</dl>{build.submission?.cover&&<figure><Image src={build.submission.cover} alt={'Couverture proposée pour '+(build.submission.title||build.game)} width={640} height={360} unoptimized className="h-auto w-full rounded-xl border border-zinc-700 object-contain"/><figcaption className="mt-2 text-sm text-zinc-400">Couverture proposée</figcaption></figure>}</div>
+    <div className="grid gap-6 md:grid-cols-[1fr_18rem]"><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">{[['Titre',build.submission?.title||build.game],['Développeur / studio',build.submission?.developer||build.developer],['Date de sortie',build.submission?.releaseDate],['Appareils compatibles',compatibilityLabels[gameCompatibility(build.submission?.mobile)]],['Technologie',build.submission?.technology],['Catégories',build.submission?.categories?.join(', ')]].map(([label,value])=><div key={label}><dt className="text-sm text-zinc-400">{label}</dt><dd className="mt-1 break-words font-medium">{value||'Non renseigné'}</dd></div>)}</dl>{build.submission?.cover&&<figure><Image src={build.submission.cover} alt={'Couverture proposée pour '+(build.submission.title||build.game)} width={640} height={360} unoptimized className="h-auto w-full rounded-xl border border-zinc-700 object-contain"/><figcaption className="mt-2 text-sm text-zinc-400">Couverture proposée</figcaption></figure>}</div>
     <div><h3 className="mb-2 text-sm text-zinc-400">Description</h3><p className="whitespace-pre-wrap break-words leading-7">{build.submission?.description||build.description||'Non renseignée'}</p></div>
     {!build.submission&&<FormFeedback tone="warning" title="Informations éditoriales non associées"><p>Vérifiez leur présence avant la revue. Une ancienne proposition peut être associée dans les détails techniques.</p></FormFeedback>}
     </>}
+    {build.submission?.kind==='new'&&<div className="space-y-3 rounded-xl border border-zinc-700 p-4"><label htmlFor="review-device">Appareils compatibles</label><select id="review-device" disabled={busy} value={compatibility} onChange={e=>setCompatibility(e.target.value)} className={field}>{Object.entries(compatibilityLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><HelpText>{mobileCompatibilityHelp}</HelpText><button type="button" disabled={busy} className={reviewButton} onClick={()=>action('compatibility')}>Enregistrer la compatibilité</button><HelpText>Une correction avant publication impose une nouvelle revue des informations.</HelpText></div>}
     <HelpText>Les informations approuvées sont appliquées lors de la publication. La visibilité dans le catalogue reste gérée depuis la fiche du jeu.</HelpText>
    </ReviewCard>
    <div className="grid items-start gap-6 lg:grid-cols-2">

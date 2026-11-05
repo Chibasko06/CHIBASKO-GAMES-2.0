@@ -70,3 +70,28 @@ Le rendu précis d’une ancienne version en production n’est pas déduit de c
 fixtures locales. Les dialogues natifs et le fullscreen gardent leur top layer.
 
 Validation : npm run test:catalogue-interface et npm run test:game-runtime-browser.
+
+## Appareils et compatibilité
+
+La source commune reste games.mobile_compatible ; game_submissions.mobile_compatibility
+porte la déclaration avant publication. Les valeurs explicites sont platform:desktop,
+platform:mobile, platform:both et platform:unknown. Ce préfixe distingue les nouvelles
+déclarations des textes legacy, qui restent enregistrés sans modification.
+Le classement historique mobile devient « les deux », et le classement ordinateur
+reste ordinateur. Les valeurs ambiguës restent à vérifier, sans certification inventée.
+
+Le catalogue, les catégories, l’accueil, les classements, les recommandations et le
+multijoueur filtrent en SQL avant le comptage et la pagination. Le filtre existant
+permet toujours de consulter toutes les plateformes. Les favoris, historiques et
+notifications conservés ne sont pas amputés : la fiche explique les incompatibilités.
+Une fiche publique reste accessible et partageable. Un avertissement précède le
+lecteur ; un choix explicite permet de continuer sur un appareil hybride. Les previews
+administratives restent accessibles pour qualifier les commandes réelles.
+
+Le premier rendu utilise les indications de requête, avec repli sur toutes les
+plateformes en cas d’incertitude et pour les robots. Le navigateur affine les visites
+suivantes avec le pointeur et le tactile via cg-device, sans rechargement initial.
+Une souris utilisable privilégie ordinateur ; une tablette tactile privilégie mobile.
+La présence d’un clavier physique ne peut pas être déduite de façon fiable par le Web.
+La détection est indicative, n’accorde aucun droit et ne remplace pas le filtre manuel.
+Les rendus dépendant de l’appareil restent dynamiques, sans cache public partagé.

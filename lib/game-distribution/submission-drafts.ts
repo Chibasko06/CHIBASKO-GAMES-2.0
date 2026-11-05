@@ -1,4 +1,5 @@
-export type DraftMetadata={title:string;studio:string;releaseDate:string;description:string;categories:string[];mobile:boolean|null;technology:string}
+import type {GameCompatibility} from '@/lib/gameCompatibility'
+export type DraftMetadata={title:string;studio:string;releaseDate:string;description:string;categories:string[];mobile:boolean|Exclude<GameCompatibility,'unknown'>|null;technology:string}
 export const emptyDraftMetadata:DraftMetadata={title:'',studio:'',releaseDate:'',description:'',categories:[],mobile:null,technology:''}
 export type PublicationDraft={gameId:string;title:string;metadata:DraftMetadata;version:string;revision:number;updatedAt:string;requestId:string;
  file:{name:string;size:number;lastModified:number}|null;hashes:Record<string,string>;submitted:boolean;coverUrl:string|null;

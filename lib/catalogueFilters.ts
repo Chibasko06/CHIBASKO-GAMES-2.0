@@ -1,3 +1,4 @@
+import {supportsDevice} from './gameCompatibility'
 import type { GameWithCategoriesAndStats } from './queries/games'
 
 export type SortOption = 'popular' | 'recent' | 'title-asc' | 'title-desc'
@@ -18,46 +19,12 @@ export function catalogueQueryString(filters: CatalogueFilters) {
   const query = params.toString()
   return '/games' + (query ? '?' + query : '')
 }
-function normalizeCompatibility(value: string | null | undefined) {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-
-function getCompatibilityBucket(value: string | null | undefined): DeviceFilter | 'unknown' {
-  const normalized = normalizeCompatibility(value)
-
-  if (!normalized) {
-    return 'unknown'
-  }
-
-  const mobilePatterns = ['yes', 'oui', 'true', 'mobile', 'smartphone', 'touch', 'tactile', 'compatible']
-  const desktopPatterns = ['no', 'non', 'false', 'pc', 'desktop', 'ordinateur', 'clavier', 'souris']
-
-  const mobileScore = mobilePatterns.filter((pattern) => normalized.includes(pattern)).length
-  const desktopScore = desktopPatterns.filter((pattern) => normalized.includes(pattern)).length
-
-  if (desktopScore > mobileScore) {
-    return 'desktop'
-  }
-
-  if (mobileScore > desktopScore) {
-    return 'mobile'
-  }
-
-  return 'unknown'
-}
-
-
 export function filterCatalogue(games: GameWithCategoriesAndStats[], filters: CatalogueFilters) {
   const { type, category: selectedCategory, device: deviceFilter, sort } = filters
   const normalizedQuery = filters.search.trim().toLowerCase()
   return games
     .filter((game) => {
       if (type !== 'all' && game.game_type !== (type === 'multiplayer' ? 'multiplayer_chibasko' : 'classic')) return false
-      const compatibilityBucket = getCompatibilityBucket(game.mobile_compatible)
       const matchesCategory =
         selectedCategory === 'all' ||
         game.categories.some((category) => category.slug === selectedCategory)
@@ -68,7 +35,7 @@ export function filterCatalogue(games: GameWithCategoriesAndStats[], filters: Ca
 
       const matchesDeviceFilter =
         deviceFilter === 'all' ||
-        compatibilityBucket === deviceFilter
+        supportsDevice(game.mobile_compatible,deviceFilter)
 
       if (!matchesDeviceFilter) {
         return false

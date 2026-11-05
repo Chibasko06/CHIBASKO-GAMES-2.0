@@ -1,3 +1,4 @@
+import {isCompatibilityDeclaration} from '@/lib/gameCompatibility'
 import 'server-only'
 import {authenticateDeveloper} from './developerIdentity'
 import {adminOriginAllowed} from './adminRequest'
@@ -14,7 +15,7 @@ export function draftMetadata(value:unknown):DraftMetadata{
    if(typeof data[key]!=='string'||data[key].length>max)throw new UploadError('invalid_request')
  }
  if(data.releaseDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(data.releaseDate as string)||!Number.isFinite(Date.parse(data.releaseDate as string))||new Date(data.releaseDate as string).toISOString().slice(0,10)!==data.releaseDate))throw new UploadError('invalid_request')
- if(data.mobile!==null&&typeof data.mobile!=='boolean'||!Array.isArray(data.categories)||data.categories.length>8||new Set(data.categories).size!==data.categories.length)throw new UploadError('invalid_request')
+ if((data.mobile!==null&&typeof data.mobile!=='boolean'&&!isCompatibilityDeclaration(data.mobile))||!Array.isArray(data.categories)||data.categories.length>8||new Set(data.categories).size!==data.categories.length)throw new UploadError('invalid_request')
  data.categories.forEach(id=>assertUploadId(String(id)))
  return data as DraftMetadata
 }

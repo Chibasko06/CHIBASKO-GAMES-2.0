@@ -895,3 +895,24 @@ historiques. En cas d’incident, fermer la création dans le portail et suspend
 appels administratifs privilégiés externes ; consulter et lever les décisions reste
 possible via les RPC protégées. Les jetons existants des joueurs sanctionnés restent
 soumis aux restrictions permanentes.
+
+## Compatibilité des appareils
+
+1. Sauvegarder la base et exécuter docs/sql/game-compatibility-preflight.sql en
+   lecture seule ; conserver l’inventaire des déclarations legacy.
+2. Après les migrations antérieures, appliquer uniquement
+   20261108000100_game_device_compatibility.sql. Aucun reclassement de données
+   ni changement de publication n’est effectué par cette migration.
+3. Contrôler la présence des nouvelles RPC et l’absence de droit EXECUTE public
+   sur distribution_admin_compatibility. Comparer les déclarations avant/après.
+4. Déployer le portail : les anciennes signatures et les booléens de soumission
+   restent compatibles pendant la transition. Ne pas déployer le nouveau formulaire
+   avant la migration, car l’ancien SQL refuse les déclarations textuelles.
+5. Vérifier les listes, la pagination et les fiches sur téléphone, ordinateur et
+   tablette. Examiner les classifications unknown via game_compatibility. Corriger
+   explicitement les jeux après test réel, sans traitement automatique de masse.
+
+En cas de retour applicatif, conserver la migration et les classifications ;
+les données textuelles restent lisibles et aucune ressource n’est supprimée.
+Le comportement de filtrage d’un ancien portail peut différer : requalifier ses
+listes et éviter les créations de nouvelles soumissions pendant le retour.

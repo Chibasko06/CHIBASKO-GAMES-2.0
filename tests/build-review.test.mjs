@@ -40,6 +40,9 @@ test('admin endpoint authenticates before RPC, uses verified actor and exposes o
   assert.equal((await adminBuildRequest(req())).status,401)
   assert.equal((await adminBuildRequest(req(bearer))).status,403);assert.equal(rpcCalls,0)
   admin=true
+  const compatibilityRequest=value=>new NextRequest('https://site.example/api/admin/game-builds/'+id,{method:'POST',headers:{Authorization:'Bearer '+bearer,Origin:'https://site.example','Content-Type':'application/json'},body:JSON.stringify({action:'compatibility',compatibility:value,expected:'Oui'})})
+  assert.equal((await adminBuildRequest(compatibilityRequest('mobile'),id)).status,200)
+  assert.equal((await adminBuildRequest(compatibilityRequest('yes'),id)).status,400)
   const response=await adminBuildRequest(req(bearer),id);assert.equal(response.status,200)
   const body=await response.text();assert.match(body,/queued/);assert.doesNotMatch(body,/staging_key|service_role|token|fixture-only|storage_prefix/)
   assert.equal((await adminBuildRequest(req(bearer),'ffffffff-ffff-4fff-8fff-ffffffffffff')).status,404)

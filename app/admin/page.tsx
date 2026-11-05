@@ -1,4 +1,5 @@
 "use client";
+import {compatibilityLabels} from '@/lib/gameCompatibility'
 import { changeGameFormType, gameFormPayload, type GameType } from '@/lib/multiplayer/catalogue'
 import FormField from '@/components/ui/FormField'
 import AdminShell, { type AdminSection } from '@/components/admin/AdminShell'
@@ -778,8 +779,8 @@ function AdminPanel() {
                 <FormField label="Date de sortie">
                   <input value={gameForm.release_date_text} onChange={(e) => handleGameChange('release_date_text', e.target.value)} placeholder="Date de sortie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
                 </FormField>
-                <FormField label="Compatibilite mobile">
-                  <input value={gameForm.mobile_compatible} onChange={(e) => handleGameChange('mobile_compatible', e.target.value)} placeholder="Compatibilite mobile" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+                <FormField label="Appareils compatibles">
+                  <select value={gameForm.mobile_compatible||'platform:unknown'} onChange={e=>handleGameChange('mobile_compatible',e.target.value)} className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500">{gameForm.mobile_compatible&&!gameForm.mobile_compatible.startsWith('platform:')&&<option value={gameForm.mobile_compatible}>Déclaration existante : {gameForm.mobile_compatible}</option>}{Object.entries(compatibilityLabels).map(([value,label])=><option key={value} value={'platform:'+value}>{label}</option>)}</select>
                 </FormField>
                 <FormField label="Technologie">
                   <input value={gameForm.technology} onChange={(e) => handleGameChange('technology', e.target.value)} placeholder="Technologie" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
