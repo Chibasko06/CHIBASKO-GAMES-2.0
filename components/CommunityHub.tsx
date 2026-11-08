@@ -1,7 +1,7 @@
 'use client'
 import AuthRequired from '@/components/AuthRequired'
 import {useEffect,useRef,useState} from 'react'
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import Link from 'next/link'
 import {useAuth} from '@/components/AuthProvider'
 import SharedGames from '@/components/SharedGames'
@@ -58,7 +58,7 @@ function Hub({token,userId,loading,profiles,searching,children}:{token?:string;u
 }
 function MemberLink({profile}:{profile:{username:string;avatar_url?:string|null;bio?:string|null;roles?:PublicProfile['roles']}}){
  return <Link href={publicProfilePath(profile.username)} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-cyan-300">
-  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-cyan-950 font-bold text-cyan-200">{profile.avatar_url?<Image src={profile.avatar_url} alt="" width={44} height={44} unoptimized className="h-full w-full object-cover"/>:profile.username[0]?.toUpperCase()}</span>
+  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-cyan-950 font-bold text-cyan-200">{profile.avatar_url?<Image src={profile.avatar_url} fallback={profile.username[0]} alt="" width={44} height={44} unoptimized className="h-full w-full object-cover"/>:profile.username[0]?.toUpperCase()}</span>
   <span className="min-w-0"><span className="block truncate font-semibold text-white">@{profile.username}</span><RoleBadges roles={profile.roles}/>{profile.bio&&<span className="mt-1 block truncate text-xs text-zinc-400">{profile.bio}</span>}</span>
  </Link>
 }

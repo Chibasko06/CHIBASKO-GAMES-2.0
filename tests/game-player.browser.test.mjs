@@ -27,7 +27,7 @@ before(async()=>{
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())
-async function setup({audioEnabled=false,kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,withRecommendations=false,gameUrl='https://legacy.test/index.html',legacyBody, title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
+async function setup({audioEnabled=false,kind='artifact',availableAccess=[],viewport={width:1366,height:768},signed=false,launchFailures=0,nativeViewport,fixedViewport,developerName='Fixture Studio',headingHeight=36,touch=false,pagePadding=0,withRecommendations=false,withComfortBanner=false,gameUrl='https://legacy.test/index.html',legacyBody, title=kind==='legacy'?'Stickman Fights':'Chibasko Pong'}={}){
  const h=await runtimeHarness('pong-like','published',audioEnabled?'audio':'normal'),context=await browser.newContext({viewport,isMobile:touch,hasTouch:touch,deviceScaleFactor:touch?2:1}),calls=[]
  let snapshot={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',gameId:h.request.gameId,gameVersionId:h.request.gameVersionId,access:'public',status:'waiting',code:'',minPlayers:1,maxPlayers:8,revision:1,startPolicy:'manual',expiresAt:new Date(Date.now()+3600000).toISOString(),onlineSessionReference:null,members:[{id:'opaque-fixture',displayName:'Player',self:true,leader:true,ready:false}]}
  await context.route('**/*',async route=>{
@@ -64,7 +64,7 @@ async function setup({audioEnabled=false,kind='artifact',availableAccess=[],view
  })
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto('https://portal.test/games/fixture');await page.waitForFunction(()=>!!window.gamePlayerFixture,null,{timeout:3000}).catch(()=>{throw Error('Fixture bootstrap: '+JSON.stringify(errors))})
  await page.evaluate(signed=>window.fixtureSignedIn=signed,signed)
- await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,withRecommendations,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title,coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl})
+ await page.evaluate(options=>window.gamePlayerFixture.render(options),{kind,nativeViewport,fixedViewport,developerName,withRecommendations,withComfortBanner,gameId:h.request.gameId,versionId:h.request.gameVersionId,slug:'fixture',title,coverUrl:'https://portal.test/cover.svg',capabilities:h.row.manifest.capabilities,availableAccess,initialLikes:0,initialDislikes:0,gameUrl})
  await page.waitForTimeout(100);assert.deepEqual(errors,[])
  return {page,context,h,calls}
 }
@@ -73,6 +73,22 @@ async function oneDock(page){assert.equal(await page.getByRole('region',{name:'J
 const boxSize=({width,height})=>({width,height})
 const launcher=page=>page.getByLabel('Écran de lancement',{exact:true})
 const startLocal=page=>page.getByRole('button',{name:/^Jouer en local/}).click()
+for(const kind of ['legacy','artifact'])for(const width of [390,1366])test('conseil sous le lecteur '+kind+' à '+width+' : lancement et plein écran inchangés',async()=>{
+ const x=await setup({kind,viewport:{width,height:844},withComfortBanner:true})
+ try{
+  const banner=x.page.getByRole('complementary',{name:'Conseil pour le confort de jeu'})
+  assert.equal(await banner.count(),1)
+  assert.equal(await x.page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).getByRole('complementary').count(),0)
+  if(kind==='legacy')await x.page.getByRole('button',{name:'Jouer',exact:true}).click();else await startLocal(x.page)
+  await x.page.locator('iframe').waitFor();const source=await x.page.locator('iframe').getAttribute('src')
+  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
+  assert.equal(await x.page.evaluate(()=>document.fullscreenElement.contains(document.querySelector('[aria-label="Conseil pour le confort de jeu"]'))),false)
+  await x.page.evaluate(()=>document.exitFullscreen())
+  await banner.getByRole('button',{name:'Masquer ce conseil pendant 30 jours'}).click();assert.equal(await banner.count(),0)
+  assert.equal(await x.page.locator('iframe').getAttribute('src'),source)
+  await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click();await launcher(x.page).waitFor();assert.equal(await x.page.locator('iframe').count(),0)
+ }finally{await x.context.close()}
+})
 test('réaction invitée dans le lecteur mobile : accès Auth visible sans débordement',async()=>{
  const x=await setup({viewport:{width:390,height:844}})
  try{

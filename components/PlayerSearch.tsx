@@ -1,6 +1,6 @@
 'use client'
 import {useEffect,useId,useRef,useState} from 'react'
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import {useRouter} from 'next/navigation'
 import {publicProfilePath} from '@/lib/publicUsername'
 
@@ -42,7 +42,7 @@ export default function PlayerSearch({initialSearch}:{initialSearch:string}){
    {busy&&<p role="status" className="mt-1 text-xs text-zinc-400">Recherche…</p>}
    {open&&<div className="absolute z-30 mt-1 w-full rounded-xl border border-cyan-900 bg-zinc-950 p-2 shadow-xl">
     <ul id={id+'-list'} role="listbox" aria-label="Suggestions de joueurs">{items.map((item,index)=><li key={item.username} id={id+'-'+index} role="option" aria-selected={active===index} onPointerDown={event=>event.preventDefault()} onClick={()=>{dismiss();router.push(publicProfilePath(item.username))}} className={'flex min-h-12 cursor-pointer items-center gap-3 rounded-lg p-2 '+(active===index?'bg-cyan-950 text-cyan-200':'hover:bg-zinc-800')}>
-     {item.avatar_url?<Image src={item.avatar_url} width={32} height={32} unoptimized alt="" className="h-8 w-8 rounded-full object-cover"/>:<span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-950">{item.username[0]?.toUpperCase()}</span>}<span className="truncate">@{item.username}</span>
+     {item.avatar_url?<Image src={item.avatar_url} fallback={item.username[0]} width={32} height={32} unoptimized alt="" className="h-8 w-8 rounded-full object-cover"/>:<span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-950">{item.username[0]?.toUpperCase()}</span>}<span className="truncate">@{item.username}</span>
     </li>)}</ul>
     {!items.length&&<p role="status" className="p-2 text-xs text-zinc-400">{error||'Aucun joueur accessible avec ce pseudo.'}</p>}
    </div>}

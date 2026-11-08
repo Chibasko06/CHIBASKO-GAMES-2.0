@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import { useAuth } from '@/components/AuthProvider'
 import {withTimeout} from '@/lib/asyncOperation'
 import {notificationCall,parseUnread,notificationReadTime,type SocialUpdate} from '@/lib/socialNotifications'
@@ -179,6 +179,7 @@ export function Navbar() {
                         {navigationOwner===userId&&avatarUrl ? (
                           <Image
                             src={avatarUrl}
+                            fallback={user.email?.[0]}
                             alt="Avatar compte"
                             width={40}
                             height={40}

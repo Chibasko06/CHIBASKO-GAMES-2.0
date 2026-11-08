@@ -1,5 +1,5 @@
 import {publicProfilePath} from '@/lib/publicUsername'
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import Link from 'next/link'
 import RoleBadges from '@/components/RoleBadges'
 import type { PublicProfile } from '@/lib/queries/profiles'
@@ -13,7 +13,7 @@ export default function PlayersDirectory({ profiles }: { profiles: PublicProfile
     <li key={profile.id} className="min-w-0">
       <Link href={publicProfilePath(profile.username)} className="group flex h-full min-h-48 flex-col rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition-colors hover:border-cyan-700 focus-visible:outline-2 focus-visible:outline-cyan-300">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-cyan-950 text-lg font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} alt="" width={48} height={48} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-cyan-950 text-lg font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} fallback={profile.username[0]} alt="" width={48} height={48} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
           <h2 className="min-w-0 line-clamp-2 break-words font-bold">{profile.username}</h2>
         </div>
         <div className="mt-3 min-h-7">

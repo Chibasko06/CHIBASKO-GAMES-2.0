@@ -1,3 +1,4 @@
+import AdComfortBanner from '@/components/AdComfortBanner'
 import {gameCompatibility,compatibilityLabels} from '@/lib/gameCompatibility'
 import GameSharingMenu from '@/components/GameSharingMenu'
 import {cache} from 'react'
@@ -114,6 +115,7 @@ export default async function GamePage({
       )}
 
 
+      <AdComfortBanner/>
       </GamePagePlayerLayout>
 
       <p className="text-zinc-400">

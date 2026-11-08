@@ -1,6 +1,6 @@
 "use client";
 
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import { useId,useLayoutEffect,useRef,useState } from 'react'
 import Link from 'next/link'
 import {createPortal} from 'react-dom'
@@ -94,6 +94,7 @@ export default function UserDropdown({
           {avatarUrl ? (
             <Image
               src={avatarUrl}
+              fallback={user.email?.[0]}
               alt="Avatar compte"
               width={32}
               height={32}

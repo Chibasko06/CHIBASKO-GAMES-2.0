@@ -930,9 +930,10 @@ function AdminPanel() {
             <FormField label="Question">
               <input value={faqForm.question} onChange={(event) => setFaqForm((current) => ({ ...current, question: event.target.value }))} placeholder="Question" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             </FormField>
-            <FormField label="Réponse">
-              <textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} placeholder="Reponse" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
+            <FormField label="Réponse" descriptionId="faq-links-help">
+              <textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} aria-describedby="faq-links-help" placeholder="Réponse, avec [un lien](https://exemple.fr) si nécessaire" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             </FormField>
+            <p id="faq-links-help" className="text-xs text-zinc-400">Liens acceptés : [texte](https://adresse) ou URL HTTPS directe. Le HTML reste du texte.</p>
             <FormField label="Ordre d’affichage">
               <input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Ordre d affichage" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             </FormField>

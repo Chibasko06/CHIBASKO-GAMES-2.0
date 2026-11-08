@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import RoleBadges from '@/components/RoleBadges'
 import type { Tables } from '@/types/database'
 import type { ProfileRoles } from '@/lib/profileRoles'

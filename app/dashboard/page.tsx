@@ -8,6 +8,7 @@ import AccountDeletion from '@/components/AccountDeletion'
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import ProfileAvatarImage from '@/components/ProfileAvatarImage'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import RoleBadges from '@/components/RoleBadges'
@@ -274,7 +275,7 @@ export default function DashboardPage() {
       <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6" aria-labelledby="my-profile-title">
         <h2 id="my-profile-title" className="mb-5 text-lg font-bold">Mon profil</h2>
         <div className="flex items-center gap-4">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cyan-950 text-3xl font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} alt="" width={80} height={80} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cyan-950 text-3xl font-bold text-cyan-200">{profile.avatar_url ? <ProfileAvatarImage src={profile.avatar_url} fallback={profile.username[0]} alt="" width={80} height={80} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
           <div className="min-w-0 space-y-2">
             <p className="break-words text-xl font-bold">{profile.username}</p>
             <RoleBadges roles={roles} />

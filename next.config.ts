@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     // The standard Next.js build retains its image optimizer.
     unoptimized: process.env.CHIBASKO_CLOUDFLARE === '1',
     remotePatterns: [
+      {protocol:'https',hostname:'*.googleusercontent.com',pathname:'/**'},
       {
         protocol: 'https',
         hostname: 'assets.chibaskogames.fr',

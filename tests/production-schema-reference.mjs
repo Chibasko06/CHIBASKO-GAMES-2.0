@@ -55,6 +55,7 @@ try {
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261029000200_profile_privacy.sql')]),error=>/profile_public_projection_required/.test(error.stderr));
  assert.deepEqual(await snapshot(),base,'Une fermeture prématurée ne modifie aucun privilège');
  for(const name of migrations) {
+  const googleBefore=name==='20261109000100_google_profile_initialization.sql'?(await query("select md5(coalesce(string_agg(to_jsonb(p)::text,',' order by id),'')) from profiles p")).stdout:null
   const compatibilityBefore=name==='20261108000100_game_device_compatibility.sql'?(await query("select md5(coalesce(string_agg(id::text||coalesce(mobile_compatible,'<null>'),',' order by id),'')) from games")).stdout:null
   if(name==='20261029000200_profile_privacy.sql') {
    await query('grant select(display_name) on public.profiles to anon');
@@ -124,6 +125,7 @@ try {
    await query("delete from public.profiles where id::text like 'fc200000-%'")
   }
   if(compatibilityBefore!==null)assert.equal((await query("select md5(coalesce(string_agg(id::text||coalesce(mobile_compatible,'<null>'),',' order by id),'')) from games")).stdout,compatibilityBefore,'Les classifications existantes restent intactes')
+  if(googleBefore!==null)assert.equal((await query("select md5(coalesce(string_agg(to_jsonb(p)::text,',' order by id),'')) from profiles p")).stdout,googleBefore,'Aucun profil existant modifié à la migration')
   reference.migrations.push({name,sha256:sqlSha256(await readFile(file))})
   const state=await snapshot();snapshots.push(state);reference.stages.push(state.objects)
  }
@@ -238,6 +240,8 @@ try {
  const {moderationIntegration}=await import('./moderation-db.mjs')
  await moderationIntegration(async sql=>(await query(sql)).stdout.trim())
  }
+ const {googleProfileIntegration}=await import('./google-profile-db.mjs')
+ await googleProfileIntegration(async sql=>(await query(sql)).stdout.trim())
  const {gameCompatibilityIntegration}=await import('./game-compatibility-db.mjs')
  await gameCompatibilityIntegration(async sql=>(await query(sql)).stdout.trim())
  const {moderationMeasuresIntegration}=await import('./moderation-measures-db.mjs')

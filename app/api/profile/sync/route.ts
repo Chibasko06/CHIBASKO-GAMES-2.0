@@ -1,3 +1,4 @@
+import {googleProfile} from '@/lib/googleProfile'
 import { NextRequest } from 'next/server'
 import {adminJson} from '@/lib/server/adminResponses'
 import {profileIdentity, profileFailure, PROFILE_BIO_MAX_LENGTH} from '@/lib/server/profileRequest'
@@ -43,7 +44,8 @@ export async function POST(request: NextRequest) {
       if (Object.keys(body).length) throw new InputError('Aucun champ attendu.')
     }
     const metadata = user.user_metadata || {}
-    const requestedUsername = [metadata.user_name, metadata.username, metadata.preferred_username,
+    const google = googleProfile(user)
+    const requestedUsername = [google.name,metadata.user_name, metadata.username, metadata.preferred_username,
       metadata.nickname, metadata.full_name, metadata.name, metadata.global_name, user.email?.split('@')[0]]
       .find(value => typeof value === 'string' && value.trim())
     const requestedBio =
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
         patch.username = await buildUniqueUsername(supabaseAdmin, requestedUsername, user.id)
       }
 
-      if (!existingProfile.bio?.trim() && requestedBio) {
+      if (!google.google && !existingProfile.bio?.trim() && requestedBio) {
         if (requestedBio.length > PROFILE_BIO_MAX_LENGTH || requestedBio.includes('\0')) throw new InputError('Bio invalide ou trop longue.')
         patch.bio = requestedBio
       }
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
           id: user.id,
           username,
           display_name: username,
-          avatar_url: null,
+          avatar_url: google.avatar,
           bio: requestedBio || null,
         })
         .select('id, username, display_name, avatar_url, bio, created_at')

@@ -83,6 +83,13 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    const direct=await worker.dispatchFetch('https://chibaskogames.fr/games/stickman-fights',{headers:{'User-Agent':agent}})
    assert.equal(direct.status,200);const body=await direct.text();assert.match(body,/Stickman Fights/);assert.doesNotMatch(body,/Continuer vers le lecteur/)
   }
+  for(const path of ['/','/games/stickman-fights']){
+   const response=await worker.dispatchFetch('https://chibaskogames.fr'+path)
+   const html=await response.text();assert.equal((html.match(/aria-label="Conseil pour le confort de jeu"/g)??[]).length,1)
+   if(path==='/')assert.ok(html.indexOf('aria-label="Conseil pour le confort de jeu"')<html.indexOf('Jeux populaires'))
+   const hidden=await worker.dispatchFetch('https://chibaskogames.fr'+path,{headers:{Cookie:'cg-advice-until='+(Date.now()+86400000)}})
+   assert.equal(hidden.status,200);assert.doesNotMatch(await hidden.text(),/aria-label="Conseil pour le confort de jeu"/)
+  }
   assert.ok(reads>0,'Le test doit traverser le rendu dynamique et ses lectures.')
   const response=await worker.dispatchFetch('https://chibaskogames.fr/players/@joueur-actuel')
   assert.equal(response.status,200)

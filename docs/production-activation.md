@@ -916,3 +916,23 @@ En cas de retour applicatif, conserver la migration et les classifications ;
 les données textuelles restent lisibles et aucune ressource n’est supprimée.
 Le comportement de filtrage d’un ancien portail peut différer : requalifier ses
 listes et éviter les créations de nouvelles soumissions pendant le retour.
+
+## Initialisation des profils Google
+
+Exécuter docs/sql/google-profile-preflight.sql en lecture seule, puis appliquer
+20261109000100_google_profile_initialization.sql après les migrations précédentes.
+Le trigger utilise le fournisseur dans raw_app_meta_data, le nom Google et une
+photo HTTPS lhN.googleusercontent.com. Les droits directs des rôles publics sur
+les fonctions internes restent révoqués. Aucun profil existant n’est modifié.
+
+Déployer ensuite le portail et vérifier une inscription Google contrôlée, un
+compte sans photo et la personnalisation du Dashboard. Les champs attendus sont
+full_name ou name, puis avatar_url ou picture. L’e-mail reste dans Supabase Auth ;
+il n’est pas ajouté à la projection publique. Les scopes email/profile sont inchangés.
+Les photos sont affichées directement sans référent, sans téléchargement serveur
+ni copie R2. Une image inaccessible est remplacée visuellement par l’initiale.
+
+Les comptes déjà créés, y compris ceux sans photo, ne sont pas repris automatiquement :
+un avatar nul peut correspondre à un choix explicite de suppression. Les paramètres
+Google du fournisseur et les secrets ne changent pas. Un retour applicatif peut
+conserver la migration, qui reste compatible avec les anciens clients.

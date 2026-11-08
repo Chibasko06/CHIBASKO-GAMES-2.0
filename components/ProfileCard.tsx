@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import RoleBadges from '@/components/RoleBadges'
 import type { ProfileRoles } from '@/lib/profileRoles'
 type Profile = { username: string; avatar_url?: string | null; bio?: string | null; roles?: ProfileRoles }
@@ -7,7 +7,7 @@ export default function ProfileCard({ profile, stats, heading = 'h2' }: { profil
   if (!profile) return <div role="status" className="rounded-2xl border border-zinc-800 p-6">Chargement du profil…</div>
   return <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6">
     <div className="flex items-center gap-4">
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cyan-950 text-2xl font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} alt="" width={64} height={64} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cyan-950 text-2xl font-bold text-cyan-200">{profile.avatar_url ? <Image src={profile.avatar_url} fallback={profile.username[0]} alt="" width={64} height={64} unoptimized className="h-full w-full object-cover" /> : profile.username[0]?.toUpperCase()}</div>
       <div className="min-w-0 space-y-2">
         <Title className="break-words text-xl font-bold text-white">{profile.username}</Title>
         <p className="break-words text-sm text-zinc-400">@{profile.username}</p>

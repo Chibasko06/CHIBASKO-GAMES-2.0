@@ -1,7 +1,7 @@
 'use client'
 import AuthRequired from '@/components/AuthRequired'
 
-import Image from 'next/image'
+import Image from '@/components/ProfileAvatarImage'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
@@ -197,6 +197,7 @@ export default function GameReviews({ gameId }: Props) {
                   {review.avatar_url ? (
                     <Image
                       src={review.avatar_url}
+                      fallback={review.username[0]}
                       alt={review.username}
                       width={44}
                       height={44}

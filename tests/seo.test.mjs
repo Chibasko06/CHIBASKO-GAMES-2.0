@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
-import {renderToStaticMarkup} from 'react-dom/server'
+import {renderToReadableStream} from 'react-dom/server'
+async function renderMarkup(node){const stream=await renderToReadableStream(node);await stream.allReady;return new Response(stream).text()}
 import {absoluteUrl,buildPageMetadata,privatePageMetadata,serializeJsonLd} from '../lib/seo.ts'
 import {categoryMetadata,gameMetadata,gameStructuredData} from '../lib/seoCatalogue.ts'
 import sitemap from '../app/sitemap.ts'
@@ -48,7 +49,7 @@ test('real catalogue category pages have unique SSR headings, canonical and craw
  const metadata=await catalogueMetadata(props)
  assert.equal(metadata.alternates.canonical,absoluteUrl('/games?category=action'))
  assert.equal(metadata.title,categoryMetadata(category).title)
- const html=renderToStaticMarkup(await GamesPage(props))
+ const html=await renderMarkup(await GamesPage(props))
  assert.match(html,/<h1[^>]*>Jeux Action<\/h1>/)
  assert.match(html,/href="\/games\?category=action"/)
  assert.match(html,/href="\/games\/jeu-de-precision"/)
@@ -63,7 +64,7 @@ test('published detail has one exact h1, breadcrumb and no eager game iframe',as
  fixture()
  const props={params:Promise.resolve({slug:game.slug})}
  assert.equal((await detailMetadata(props)).title,gameMetadata(game).title)
- const html=renderToStaticMarkup(await GamePage(props))
+ const html=await renderMarkup(await GamePage(props))
  assert.equal((html.match(/<h1\b/g)??[]).length,1)
  assert.match(html,/>Jeu de précision<\/h1>/)
  assert.match(html,/Fil d’Ariane/)
@@ -133,7 +134,7 @@ test('public robots has only the API exclusion and no Host directive',async()=>{
 })
 
 test('home has a single h1 and real category/game/multiplayer links',async()=>{
- fixture();const html=renderToStaticMarkup(await Home())
+ fixture();const html=await renderMarkup(await Home())
  assert.equal((html.match(/<h1\b/g)??[]).length,1)
  for(const url of ['/games','/games?category=action','/games/jeu-de-precision','/multiplayer'])assert.ok(html.includes(`href="${url}"`),url)
  assert.doesNotMatch(html,/<iframe\b/)
