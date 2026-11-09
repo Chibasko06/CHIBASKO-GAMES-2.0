@@ -55,6 +55,8 @@ try {
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261029000200_profile_privacy.sql')]),error=>/profile_public_projection_required/.test(error.stderr));
  assert.deepEqual(await snapshot(),base,'Une fermeture prématurée ne modifie aucun privilège');
  for(const name of migrations) {
+  if(name==='20261110000100_faq_ordering.sql')await query("insert into faq_entries(question,answer,sort_order,is_published) values('FAQ doublon A','[uBlock Origin](https://github.com/gorhill/uBlock#installation)',1,true),('FAQ doublon B','Reponse preservee',1,false),('FAQ zero','Derniere reponse',0,true)")
+  const faqBefore=name==='20261110000100_faq_ordering.sql'?(await query("select md5(coalesce(string_agg((to_jsonb(f)-'sort_order')::text,',' order by id),'')) from faq_entries f")).stdout:null
   const googleBefore=name==='20261109000100_google_profile_initialization.sql'?(await query("select md5(coalesce(string_agg(to_jsonb(p)::text,',' order by id),'')) from profiles p")).stdout:null
   const compatibilityBefore=name==='20261108000100_game_device_compatibility.sql'?(await query("select md5(coalesce(string_agg(id::text||coalesce(mobile_compatible,'<null>'),',' order by id),'')) from games")).stdout:null
   if(name==='20261029000200_profile_privacy.sql') {
@@ -125,6 +127,7 @@ try {
    await query("delete from public.profiles where id::text like 'fc200000-%'")
   }
   if(compatibilityBefore!==null)assert.equal((await query("select md5(coalesce(string_agg(id::text||coalesce(mobile_compatible,'<null>'),',' order by id),'')) from games")).stdout,compatibilityBefore,'Les classifications existantes restent intactes')
+  if(faqBefore!==null)assert.equal((await query("select md5(coalesce(string_agg((to_jsonb(f)-'sort_order')::text,',' order by id),'')) from faq_entries f")).stdout,faqBefore,'Les identifiants, dates, réponses et statuts sont préservés')
   if(googleBefore!==null)assert.equal((await query("select md5(coalesce(string_agg(to_jsonb(p)::text,',' order by id),'')) from profiles p")).stdout,googleBefore,'Aucun profil existant modifié à la migration')
   reference.migrations.push({name,sha256:sqlSha256(await readFile(file))})
   const state=await snapshot();snapshots.push(state);reference.stages.push(state.objects)
@@ -252,6 +255,8 @@ try {
  await moderationHistoryIntegration(async sql=>(await query(sql)).stdout.trim())
  const {moderationFactsIntegration}=await import('./moderation-facts-db.mjs')
  await moderationFactsIntegration(async sql=>(await query(sql)).stdout.trim())
+ const {faqOrderingIntegration}=await import('./faq-order-db.mjs')
+ await faqOrderingIntegration(async sql=>(await query(sql)).stdout.trim())
  const output=join(root,'contracts/production-schema.v1.json')
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')

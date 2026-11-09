@@ -936,3 +936,35 @@ Les comptes déjà créés, y compris ceux sans photo, ne sont pas repris automa
 un avatar nul peut correspondre à un choix explicite de suppression. Les paramètres
 Google du fournisseur et les secrets ne changent pas. Un retour applicatif peut
 conserver la migration, qui reste compatible avec les anciens clients.
+
+## Ordre transactionnel de la FAQ
+
+La migration additive `20261110000100_faq_ordering.sql` normalise les positions
+selon le tri existant (position, date de création, UUID), sans modifier les
+questions, réponses, statuts ou identifiants. Les questions masquées participent
+au même ordre global. Les positions vont de 1 au nombre total de questions.
+
+1. Sauvegarder les lignes FAQ et exécuter en lecture seule
+   `docs/sql/faq-order-preflight.sql`. Les doublons sont corrigés par la migration.
+2. Suspendre les écritures FAQ des administrateurs pendant la bascule. La lecture
+   publique reste compatible ; les anciens formulaires ne le sont plus, notamment
+   leur position zéro et leurs suppressions sans réorganisation.
+3. Appliquer uniquement la nouvelle migration par le circuit SQL autorisé.
+   En cas de verrou concurrent, elle échoue après cinq secondes et se rollback
+   entièrement ; attendre la fin des transactions puis reprendre.
+4. Rejouer le préflight : positions uniques et positives, fonction privilégiée
+   inaccessible à anon/authenticated, exécution réservée à service_role.
+5. Déployer le portail correspondant, rouvrir les écritures puis actualiser les
+   onglets administratifs. Tester une montée, une descente et une position cible,
+   puis vérifier la FAQ publique et les liens Markdown.
+
+Les ajouts vont en fin de liste par défaut ; une position cible insère la nouvelle
+question et décale les suivantes. Une suppression compacte les positions. Les
+mutations passent par `admin_mutate_faq` après authentification administrative
+côté serveur et nouvelle vérification du compte et du rôle en base. Un conflit
+HTTP 409 ou une réponse perdue impose une relecture explicite avant toute autre
+écriture. Aucun retry automatique de mutation n’est effectué.
+
+Un retour à l’ancien portail nécessite de maintenir les écritures FAQ fermées :
+il ne sait pas respecter le nouveau contrat transactionnel. Conserver la migration
+et corriger le portail plutôt que retirer les contraintes ou réécrire les données.

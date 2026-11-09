@@ -31,10 +31,90 @@ before(async()=>{
 })
 after(async()=>browser?.close())
 
-async function fixture({viewport={width:1366,height:768},path='/admin',conflict=false,denied=false}={}){
+for(const width of [390,768,1366])test('FAQ : déplacements accessibles et position cible sur '+width,async()=>{
+ const x=await fixture({path:'/admin?section=faq',viewport:{width,height:900}})
+ try{
+  const order=()=>x.page.locator('tbody tr td:first-child > p').allTextContents()
+  await x.page.getByRole('button',{name:'Monter : D',exact:true}).click()
+  await x.page.waitForFunction(()=>[...document.querySelectorAll('tbody tr td:first-child > p')].map(node=>node.textContent).join('|')==='Comment jouer ?|B|D|C')
+  assert.deepEqual(await order(),['Comment jouer ?','B','D','C'])
+  await x.page.getByRole('button',{name:'Modifier D',exact:true}).click()
+  await x.page.getByLabel('Position cible',{exact:true}).fill('1')
+  await x.page.getByRole('button',{name:'Enregistrer la question',exact:true}).click()
+  await x.page.waitForFunction(()=>document.querySelector('tbody tr td:first-child > p')?.textContent==='D')
+  assert.equal(await x.page.getByRole('button',{name:'Monter : D',exact:true}).isDisabled(),true)
+  assert.equal(await x.page.getByRole('button',{name:'Descendre : C',exact:true}).isDisabled(),true)
+  await x.page.reload();await x.page.getByRole('button',{name:'Modifier D',exact:true}).waitFor()
+  assert.deepEqual(await order(),['D','Comment jouer ?','B','C'])
+  assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+  const writes=x.requests.filter(row=>row.method==='PATCH'&&row.path.includes('/faq/'))
+  assert.equal(writes.length,2);assert.equal(writes[0].body.expected_order.length,4)
+ }finally{await x.context.close()}
+})
+
+test('FAQ : un conflit impose une relecture avant de permettre une nouvelle mutation',async()=>{
+ const x=await fixture({path:'/admin?section=faq',conflict:true})
+ try{
+  await x.page.getByRole('button',{name:'Monter : D',exact:true}).click()
+  await x.page.getByRole('button',{name:'Actualiser la FAQ',exact:true}).waitFor()
+  assert.equal(await x.page.getByRole('button',{name:'Monter : D',exact:true}).isDisabled(),true)
+  await x.page.getByRole('button',{name:'Actualiser la FAQ',exact:true}).click()
+  await x.page.getByRole('button',{name:'Actualiser la FAQ',exact:true}).waitFor({state:'detached'})
+  assert.equal(await x.page.getByRole('button',{name:'Monter : D',exact:true}).isEnabled(),true)
+  assert.equal(x.requests.filter(row=>row.method==='PATCH').length,1)
+ }finally{await x.context.close()}
+})
+
+test('FAQ : déplacement immédiat, clavier et verrouillage pendant une écriture lente',async()=>{
+ const x=await fixture({path:'/admin?section=faq',holdFaq:true})
+ try{
+  const button=x.page.getByRole('button',{name:'Monter : D',exact:true})
+  await button.focus();await button.press('Enter')
+  await x.page.waitForFunction(()=>document.querySelectorAll('tbody tr td:first-child > p')[2]?.textContent==='D')
+  assert.equal(await button.isDisabled(),true)
+  x.releaseFaq()
+  await x.page.getByRole('status').filter({hasText:'FAQ enregistrée'}).waitFor()
+  assert.equal(x.requests.filter(row=>row.method==='PATCH').length,1)
+ }finally{x.releaseFaq();await x.context.close()}
+})
+
+test('FAQ : réponse perdue après écriture, relecture du résultat sans répétition automatique',async()=>{
+ const x=await fixture({path:'/admin?section=faq',lostFaq:true})
+ try{
+  await x.page.getByRole('button',{name:'Monter : D',exact:true}).click()
+  await x.page.getByRole('button',{name:'Actualiser la FAQ',exact:true}).click()
+  await x.page.getByRole('button',{name:'Actualiser la FAQ',exact:true}).waitFor({state:'detached'})
+  assert.deepEqual(await x.page.locator('tbody tr td:first-child > p').allTextContents(),['Comment jouer ?','B','D','C'])
+  assert.equal(x.requests.filter(row=>row.method==='PATCH').length,1)
+ }finally{await x.context.close()}
+})
+
+test('FAQ : création tardive après relecture, reprise manuelle avec la même clé sans doublon',async()=>{
+ const x=await fixture({path:'/admin?section=faq',lateFaqCreate:true})
+ try{
+  await x.page.getByRole('button',{name:'Modifier D',exact:true}).waitFor()
+  await x.page.getByRole('button',{name:'Ajouter une question',exact:true}).click()
+  await x.page.getByLabel('Question',{exact:true}).fill('Nouvelle question')
+  await x.page.getByLabel('Réponse',{exact:true}).fill('[Lien](https://example.test)')
+  await x.page.getByRole('button',{name:'Créer la question',exact:true}).click()
+  await x.page.getByRole('button',{name:'Actualiser la FAQ',exact:true}).click()
+  await x.page.getByRole('button',{name:'Actualiser la FAQ',exact:true}).waitFor({state:'detached'})
+  assert.equal(await x.page.getByLabel('Question',{exact:true}).inputValue(),'Nouvelle question')
+  x.finishFaqCreate()
+  await x.page.getByRole('button',{name:'Créer la question',exact:true}).click()
+  await x.page.getByRole('button',{name:'Modifier Nouvelle question',exact:true}).waitFor()
+  const writes=x.requests.filter(row=>row.path==='/api/admin/faq'&&row.method==='POST')
+  assert.equal(writes.length,2);assert.equal(writes[0].body.operationId,writes[1].body.operationId)
+  assert.equal(await x.page.getByRole('button',{name:'Modifier Nouvelle question',exact:true}).count(),1)
+ }finally{await x.context.close()}
+})
+
+async function fixture({viewport={width:1366,height:768},path='/admin',conflict=false,denied=false,holdFaq=false,lostFaq=false,lateFaqCreate=false}={}){
  const context=await browser.newContext({viewport}),requests=[],users=Array.from({length:103},(_,i)=>({id:id(i+1),username:'Membre '+String(i).padStart(3,'0'),bio:'Création et découverte de jeux.',avatar_url:null,created_at:'2026-01-01T10:00:00Z',email:'private-'+i+'@example.test',roles:{admin:i%4===0||i%4===2,developer:i%4===0||i%4===1}}))
  const games=Array.from({length:53},(_,i)=>({id:id(i+201),title:'Jeu '+String(i).padStart(3,'0'),slug:'jeu-'+i,game_url:'https://games.example.test/'+i,thumbnail_url:'/thumbnail.svg',description:'Description du jeu.',developer_name:'Studio',technology:'HTML5',game_type:i%3?'classic':'multiplayer_chibasko',is_published:i%2===0,is_beta:false,created_at:'2026-01-01',game_categories:[]}))
- const categories=[{id:id(800),name:'Arcade',slug:'arcade',games_count:5}],faqEntries=[{id:id(801),question:'Comment jouer ?',answer:'Choisissez un jeu.',sort_order:0,is_published:true}]
+ const categories=[{id:id(800),name:'Arcade',slug:'arcade',games_count:5}],faqEntries=[{id:id(801),question:'Comment jouer ?',answer:'Choisissez un jeu.',sort_order:1,is_published:true},...['B','C','D'].map((question,i)=>({id:id(810+i),question,answer:'[Lien](https://example.test)',sort_order:i+2,is_published:true}))]
+ let pendingCreate=null,createInterrupted=false
+ let releaseFaq;const faqGate=new Promise(resolve=>{releaseFaq=resolve})
  let jobs=[{id:id(500),state:'review_required',reason:null,attentionRequired:false},{id:id(501),state:'prepared',reason:null,attentionRequired:true}]
  const build={id:id(700),game:'Jeu en revue',version:'1.0.0',developer:'Studio',technicalStatus:'queued',createdAt:'2026-01-01',archiveSize:102400,review:{checklist:{},decision:'pending'},history:[]}
  await context.route('**/*',async route=>{
@@ -68,13 +148,21 @@ async function fixture({viewport={width:1366,height:768},path='/admin',conflict=
    }
    for(const [entity,rows,key] of [['categories',categories,'categories'],['faq',faqEntries,'faqEntries']]){
     if(url.pathname==='/api/admin/'+entity){
-     if(request.method()==='POST')rows.push({id:id(entity==='faq'?803:802),...request.postDataJSON()})
+     if(request.method()==='POST'){
+      const data=request.postDataJSON(),row={id:entity==='faq'?data.operationId:id(802),...data}
+      if(entity==='faq'&&lateFaqCreate&&!createInterrupted){pendingCreate=row;createInterrupted=true;return route.abort('failed')}
+      if(!rows.some(entry=>entry.id===row.id))rows.push(row)
+     }
      return route.fulfill({json:{[key]:rows}})
     }
     if(url.pathname.startsWith('/api/admin/'+entity+'/')){
      const index=rows.findIndex(row=>row.id===url.pathname.split('/')[4])
-     if(request.method()==='DELETE')rows.splice(index,1);else Object.assign(rows[index],request.postDataJSON())
-     return route.fulfill({json:{success:true}})
+     if(entity==='faq'&&holdFaq)await faqGate
+     if(entity==='faq'&&conflict)return route.fulfill({status:409,json:{error:'La FAQ a changé.'}})
+     if(request.method()==='DELETE')rows.splice(index,1);else {const data=request.postDataJSON();if(entity==='faq'){const [row]=rows.splice(index,1);Object.assign(row,data.action==='move'?{}:data);rows.splice(data.sort_order-1,0,row)}else Object.assign(rows[index],data)}
+     if(entity==='faq')rows.forEach((row,i)=>row.sort_order=i+1)
+     if(entity==='faq'&&lostFaq)return route.abort('failed')
+     return route.fulfill({json:{success:true,...(entity==='faq'?{faqEntries:rows}:{})}})
     }
    }
    if(url.pathname==='/api/admin/game-builds')return route.fulfill({json:{data:[build]}})
@@ -92,7 +180,7 @@ async function fixture({viewport={width:1366,height:768},path='/admin',conflict=
   return route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>'})
  })
  const page=await context.newPage();await page.goto('https://portal.test'+path)
- return {page,context,requests}
+ return {page,context,requests,releaseFaq,finishFaqCreate(){faqEntries.push(pendingCreate);pendingCreate=null}}
 }
 
 for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,height:1024},{width:1366,height:768},{width:1920,height:1080}])test('rubriques sans débordement '+viewport.width+'×'+viewport.height,async()=>{

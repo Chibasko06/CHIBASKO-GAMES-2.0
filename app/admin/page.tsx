@@ -468,29 +468,49 @@ function AdminPanel() {
     }
   }
 
+  const faqMutationLocked = useRef(false)
+  const faqOperation = useRef<string | null>(null)
+  const [faqUncertain,setFaqUncertain] = useState(false)
+  const [faqNotice,setFaqNotice] = useState<string | null>(null)
+  const refreshFaqOrder = async () => {
+    if(faqMutationLocked.current)return
+    faqMutationLocked.current=true;setLoadingFaq(true)
+    try {
+      const response=await authorizedFetch('/api/admin/faq');const payload=await response.json()
+      if(!response.ok||!Array.isArray(payload.faqEntries))throw new Error()
+      setFaqEntries(payload.faqEntries);setFaqUncertain(false)
+      // Garde la même clé si une création peut encore se terminer après la relecture.
+      if(!faqOperation.current||payload.faqEntries.some((row:FaqEntry)=>row.id===faqOperation.current)){resetFaqForm();faqOperation.current=null}
+      setErrorMessage(null);setFaqNotice('Liste actualisée. Vérifiez le résultat avant de recommencer.')
+    }catch{setErrorMessage('Impossible de vérifier la FAQ. Réessayez.')}
+    finally{faqMutationLocked.current=false;setLoadingFaq(false)}
+  }
+  const faqExpected = (entry: FaqEntry) => ({question:entry.question,answer:entry.answer,is_published:entry.is_published,sort_order:entry.sort_order})
+  const mutateFaqEntry = async (id: string | null, action: 'save' | 'move' | 'delete', input: Record<string,unknown>) => {
+    if(faqMutationLocked.current || faqUncertain) return
+    faqMutationLocked.current=true;setSavingFaq(true);setFaqNotice(null)
+    if(action==='move'){
+      const ordered=faqEntries.filter(row=>row.id!==id),moved=faqEntries.find(row=>row.id===id)
+      if(moved){ordered.splice(Number(input.sort_order)-1,0,moved);setFaqEntries(ordered.map((row,index)=>({...row,sort_order:index+1})))}
+    }
+    const entry=faqEntries.find(row=>row.id===id)
+    if(!id)faqOperation.current??=crypto.randomUUID()
+    try {
+      const response=await authorizedFetch(id?'/api/admin/faq/'+id:'/api/admin/faq',{method:action==='delete'?'DELETE':id?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...input,...(action==='move'?{action:'move'}:{}),expected:entry?faqExpected(entry):undefined,expected_order:faqEntries.map(row=>row.id),operationId:id?undefined:faqOperation.current})})
+      const payload=await response.json()
+      if(!response.ok)throw new Error(payload.error||'Impossible de modifier la FAQ.')
+      if(!Array.isArray(payload.faqEntries))throw new Error('Réponse FAQ invalide.')
+      setFaqEntries(payload.faqEntries);setErrorMessage(null);setFaqNotice(action==='delete'?'Question supprimée ; positions mises à jour.':'FAQ enregistrée ; positions mises à jour.')
+      if(action!=='move'){resetFaqForm();faqOperation.current=null}
+    } catch(error) {
+      // Une réponse perdue ne prouve pas que la transaction a échoué.
+      setFaqUncertain(true);setFaqEntries(faqEntries)
+      setErrorMessage(error instanceof Error?error.message:'Impossible de modifier la FAQ.')
+    } finally {faqMutationLocked.current=false;setSavingFaq(false)}
+  }
   const handleFaqSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSavingFaq(true)
-    try {
-      const endpoint = editingFaqId ? `/api/admin/faq/${editingFaqId}` : '/api/admin/faq'
-      const method = editingFaqId ? 'PATCH' : 'POST'
-      const response = await authorizedFetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(faqForm),
-      })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error || 'Erreur FAQ.')
-      }
-      resetFaqForm()
-      await loadFaq()
-      setErrorMessage(null)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur FAQ.')
-    } finally {
-      setSavingFaq(false)
-    }
+    await mutateFaqEntry(editingFaqId,'save',faqForm)
   }
 
   const startEditGame = (game: Game) => {
@@ -607,29 +627,7 @@ function AdminPanel() {
     }
   }
 
-  const handleDeleteFaq = async (id: string) => {
-    if (!confirmDeletion('cette entree FAQ')) {
-      return
-    }
-
-    setSavingFaq(true)
-    try {
-      const response = await authorizedFetch(`/api/admin/faq/${id}`, { method: 'DELETE' })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error || 'Erreur suppression FAQ.')
-      }
-      if (editingFaqId === id) {
-        resetFaqForm()
-      }
-      await loadFaq()
-      setErrorMessage(null)
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Erreur suppression FAQ.')
-    } finally {
-      setSavingFaq(false)
-    }
-  }
+  const handleDeleteFaq = async (id:string) => {if(!faqMutationLocked.current && confirmDeletion('cette question'))await mutateFaqEntry(id,'delete',{})}
 
   const handleUserAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -707,7 +705,7 @@ function AdminPanel() {
     {accessStatus === 'error' && <button type="button" onClick={retry} className="mt-4 rounded-xl bg-cyan-400 px-4 py-2 font-bold text-black focus-visible:outline focus-visible:outline-cyan-300">Réessayer</button>}
   </div>
   return (
-    <AdminShell active={section} actions={<>{section==='categories'&&<button disabled={savingCategory} className="admin-action text-cyan-200" onClick={()=>{resetCategoryForm();setCategoryEditorOpen(true)}}>Ajouter une catégorie</button>}{section==='faq'&&<button disabled={savingFaq} className="admin-action text-cyan-200" onClick={()=>{resetFaqForm();setFaqEditorOpen(true)}}>Ajouter une question</button>}{section === 'users' && <button className="admin-action" disabled={loadingUsers || savingUser || uploadingUserAvatar} onClick={() => void loadUsers()}>Actualiser</button>}{section === 'games' && <button className="admin-action" disabled={loadingGames || savingGame || uploadingGameThumbnail} onClick={() => void loadGames()}>Actualiser</button>}{section === 'games' && <>
+    <AdminShell active={section} actions={<>{section==='categories'&&<button disabled={savingCategory} className="admin-action text-cyan-200" onClick={()=>{resetCategoryForm();setCategoryEditorOpen(true)}}>Ajouter une catégorie</button>}{section==='faq'&&<button disabled={savingFaq||faqUncertain} className="admin-action text-cyan-200" onClick={()=>{resetFaqForm();setFaqForm({...emptyFaqForm,sort_order:faqEntries.length+1});faqOperation.current=null;setFaqEditorOpen(true)}}>Ajouter une question</button>}{section === 'users' && <button className="admin-action" disabled={loadingUsers || savingUser || uploadingUserAvatar} onClick={() => void loadUsers()}>Actualiser</button>}{section === 'games' && <button className="admin-action" disabled={loadingGames || savingGame || uploadingGameThumbnail} onClick={() => void loadGames()}>Actualiser</button>}{section === 'games' && <>
       <button className="admin-action" onClick={() => void exportCsv('games')}>Exporter CSV</button>
       <button disabled={savingGame || uploadingGameThumbnail} className="admin-action border-cyan-700 text-cyan-200" onClick={() => { resetGameForm(); setGameEditorOpen(true) }}>Ajouter un jeu</button>
     </>}{section === 'users' && <button className="admin-action" onClick={() => void exportCsv('users')}>Exporter CSV</button>}</>}>
@@ -925,8 +923,8 @@ function AdminPanel() {
         </form></AdminEditor>}
  <section className="admin-table-container min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">{loadingCategories?<p role="status" className="p-5 text-sm text-zinc-400">Chargement des catégories…</p>:categories.length?<table className="admin-table"><caption className="sr-only">Catégories du catalogue</caption><thead><tr><th scope="col">Catégorie</th><th scope="col">Jeux</th><th scope="col">Actions</th></tr></thead><tbody>{categories.map(category=><tr key={category.id}><td><p className="font-semibold text-white">{category.name}</p><p className="text-xs text-zinc-500">{category.slug}</p></td><td className="text-sm text-zinc-400">{category.games_count??0} jeux</td><td><div className="flex flex-wrap gap-2"><button type="button" disabled={savingCategory} className="admin-action" onClick={()=>startEditCategory(category)}>Modifier<span className="sr-only"> {category.name}</span></button><button type="button" disabled={savingCategory} className="admin-action text-rose-300" onClick={()=>void handleDeleteCategory(category.id)}>Supprimer<span className="sr-only"> {category.name}</span></button></div></td></tr>)}</tbody></table>:!errorMessage&&<p className="p-6 text-sm text-zinc-400">Aucune catégorie.</p>}</section>
 </div>}
-      {section==='faq'&&<div className={faqEditorOpen?'grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]':'min-w-0'}>
- {faqEditorOpen&&<AdminEditor identity={editingFaqId??'new-question'}><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-bold">{editingFaqId?'Modifier la question':'Ajouter une question'}</h2><button type="button" disabled={savingFaq} className="admin-action" onClick={resetFaqForm}>Fermer</button></div><form onSubmit={handleFaqSubmit} className="grid grid-cols-1 gap-4">
+      {section==='faq'&&<>{faqNotice&&<p role="status" className="mb-3 text-sm text-cyan-200">{faqNotice}</p>}{faqUncertain&&<div role="alert" className="mb-4 text-sm text-amber-200">Le résultat doit être vérifié avant une nouvelle modification. <button type="button" className="admin-action" disabled={loadingFaq} onClick={()=>void refreshFaqOrder()}>Actualiser la FAQ</button></div>}<div className={faqEditorOpen?'grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]':'min-w-0'}>
+ {faqEditorOpen&&<AdminEditor identity={editingFaqId??'new-question'}><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-bold">{editingFaqId?'Modifier la question':'Ajouter une question'}</h2><button type="button" disabled={savingFaq||faqUncertain} className="admin-action" onClick={resetFaqForm}>Fermer</button></div><form onSubmit={handleFaqSubmit} className="grid grid-cols-1 gap-4">
             <FormField label="Question">
               <input value={faqForm.question} onChange={(event) => setFaqForm((current) => ({ ...current, question: event.target.value }))} placeholder="Question" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             </FormField>
@@ -934,19 +932,19 @@ function AdminPanel() {
               <textarea value={faqForm.answer} onChange={(event) => setFaqForm((current) => ({ ...current, answer: event.target.value }))} aria-describedby="faq-links-help" placeholder="Réponse, avec [un lien](https://exemple.fr) si nécessaire" className="min-h-40 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
             </FormField>
             <p id="faq-links-help" className="text-xs text-zinc-400">Liens acceptés : [texte](https://adresse) ou URL HTTPS directe. Le HTML reste du texte.</p>
-            <FormField label="Ordre d’affichage">
-              <input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Ordre d affichage" type="number" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
+            <FormField label="Position cible">
+              <input value={faqForm.sort_order} onChange={(event) => setFaqForm((current) => ({ ...current, sort_order: Number(event.target.value) || 0 }))} placeholder="Position" type="number" min={1} max={faqEntries.length+(editingFaqId?0:1)} required className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
             </FormField>
             <label className="flex items-center gap-3 text-sm text-zinc-300">
               <input type="checkbox" checked={faqForm.is_published} onChange={(event) => setFaqForm((current) => ({ ...current, is_published: event.target.checked }))} />
               Question publiée sur la page FAQ
             </label>
-            <button type="submit" disabled={savingFaq} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={savingFaq||faqUncertain} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
               {savingFaq ? 'SAUVEGARDE...' : editingFaqId ? 'Enregistrer la question' : 'Créer la question'}
             </button>
           </form></AdminEditor>}
- <section className="admin-table-container min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">{loadingFaq?<p role="status" className="p-5 text-sm text-zinc-400">Chargement des questions…</p>:faqEntries.length?<table className="admin-table"><caption className="sr-only">Questions fréquentes</caption><thead><tr><th scope="col">Question</th><th scope="col">Ordre</th><th scope="col">Statut</th><th scope="col">Actions</th></tr></thead><tbody>{faqEntries.map(entry=><tr key={entry.id}><td><p className="font-semibold text-white">{entry.question}</p><details className="mt-2 text-xs text-zinc-400"><summary className="cursor-pointer text-cyan-300">Voir la réponse</summary><p className="mt-2 whitespace-pre-wrap break-words">{entry.answer}</p></details></td><td><span className="admin-cell-label text-zinc-500">Ordre : </span>{entry.sort_order}</td><td><span className={'text-xs '+(entry.is_published?'text-emerald-300':'text-zinc-500')}>{entry.is_published?'Publiée':'Masquée'}</span></td><td><div className="flex flex-wrap gap-2"><button type="button" disabled={savingFaq} className="admin-action" onClick={()=>startEditFaq(entry)}>Modifier<span className="sr-only"> {entry.question}</span></button><button type="button" disabled={savingFaq} className="admin-action text-rose-300" onClick={()=>void handleDeleteFaq(entry.id)}>Supprimer<span className="sr-only"> {entry.question}</span></button></div></td></tr>)}</tbody></table>:!errorMessage&&<p className="p-6 text-sm text-zinc-400">Aucune question.</p>}</section>
-</div>}
+ <section className="admin-table-container min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">{loadingFaq?<p role="status" className="p-5 text-sm text-zinc-400">Chargement des questions…</p>:faqEntries.length?<table className="admin-table"><caption className="sr-only">Questions fréquentes</caption><thead><tr><th scope="col">Question</th><th scope="col">Ordre</th><th scope="col">Statut</th><th scope="col">Actions</th></tr></thead><tbody>{faqEntries.map((entry,index)=><tr key={entry.id}><td><p className="font-semibold text-white">{entry.question}</p><details className="mt-2 text-xs text-zinc-400"><summary className="cursor-pointer text-cyan-300">Voir la réponse</summary><p className="mt-2 whitespace-pre-wrap break-words">{entry.answer}</p></details></td><td><span className="admin-cell-label text-zinc-500">Ordre : </span>{entry.sort_order}</td><td><span className={'text-xs '+(entry.is_published?'text-emerald-300':'text-zinc-500')}>{entry.is_published?'Publiée':'Masquée'}</span></td><td><div className="flex flex-wrap gap-2"><button type="button" disabled={savingFaq||faqUncertain||faqEditorOpen||index===0} aria-label={`Monter : ${entry.question}`} className="admin-action" onClick={()=>void mutateFaqEntry(entry.id,'move',{sort_order:index})}>Monter</button><button type="button" disabled={savingFaq||faqUncertain||faqEditorOpen||index===faqEntries.length-1} aria-label={`Descendre : ${entry.question}`} className="admin-action" onClick={()=>void mutateFaqEntry(entry.id,'move',{sort_order:index+2})}>Descendre</button><button type="button" disabled={savingFaq||faqUncertain} className="admin-action" onClick={()=>startEditFaq(entry)}>Modifier<span className="sr-only"> {entry.question}</span></button><button type="button" disabled={savingFaq||faqUncertain} className="admin-action text-rose-300" onClick={()=>void handleDeleteFaq(entry.id)}>Supprimer<span className="sr-only"> {entry.question}</span></button></div></td></tr>)}</tbody></table>:!errorMessage&&<p className="p-6 text-sm text-zinc-400">Aucune question.</p>}</section>
+</div></>}
     </AdminShell>
   )
 }

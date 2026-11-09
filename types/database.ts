@@ -90,7 +90,7 @@ export type Database = {
           id?: string
           is_published?: boolean
           question: string
-          sort_order?: number
+          sort_order: number
         }
         Update: {
           answer?: string
@@ -501,6 +501,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_mutate_faq: {Args:{p_actor:string;p_action:string;p_id:string;p_input?:Json;p_expected?:Json;p_order?:string[]};Returns:Json}
       social_navigation: {Args:Record<string,never>;Returns:Json}
       social_notifications_count: {Args:Record<string,never>;Returns:number}
       social_notifications_page: {Args:{p_kind?:string;p_before?:string;p_cursor?:string};Returns:Json}

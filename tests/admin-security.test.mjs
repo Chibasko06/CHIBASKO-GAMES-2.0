@@ -31,6 +31,37 @@ beforeEach(t=>{
 })
 const request=(role,method='GET',path='/api/admin/games',origin)=>new NextRequest('https://site.example'+path,{method,headers:{...(role?{Authorization:'Bearer '+(role==='invalid'?'invalid':token(role))}:{}),...(origin?{Origin:origin}:{}),'Content-Type':'application/json'},...(!['GET','HEAD'].includes(method)?{body:JSON.stringify({title:'Fixture',slug:'fixture',game_url:'https://game.example'})}:{})})
 
+test('FAQ : les vrais handlers refusent les non-administrateurs avant toute écriture',async()=>{
+ const {POST}=await import('../app/api/admin/faq/route.ts')
+ const {PATCH,DELETE}=await import('../app/api/admin/faq/[id]/route.ts')
+ for(const [role,status] of [[null,401],['normal',403]])for(const [method,handler] of [['POST',POST],['PATCH',PATCH],['DELETE',DELETE]]){
+  const response=await handler(request(role,method),{params:Promise.resolve({id:ids.normal})})
+  assert.equal(response.status,status)
+ }
+ assert.deepEqual(calls,[])
+})
+
+test('FAQ : validation, conflit et confidentialité des erreurs de transaction',async t=>{
+ const {POST}=await import('../app/api/admin/faq/route.ts')
+ const {PATCH}=await import('../app/api/admin/faq/[id]/route.ts')
+ const req=body=>{const r=request('admin','PATCH');return new NextRequest(r.url,{method:'PATCH',headers:r.headers,body:JSON.stringify(body)})}
+ const content={question:'Question',answer:'\n[Lien](https://example.test)\n',is_published:true,sort_order:1}
+ let received
+ t.mock.method(privileged,'rpc',async(name,args)=>{received={name,args};return {data:{faqEntries:[]},error:null}})
+ assert.equal((await PATCH(req({...content,sort_order:0}),{params:Promise.resolve({id:ids.normal})})).status,400)
+ assert.equal(received,undefined)
+ assert.equal((await PATCH(req({...content,expected:content,expected_order:[ids.normal]}),{params:Promise.resolve({id:ids.normal})})).status,200)
+ assert.equal(received.name,'admin_mutate_faq');assert.equal(received.args.p_actor,ids.admin)
+ assert.equal(received.args.p_input.answer,content.answer)
+ for(const [code,status] of [['40001',409],['P0002',404],['42501',403],['XX000',503]]){
+  privileged.rpc=async()=>({data:null,error:{code,message:'SQL privé sensible'}})
+  const response=await PATCH(req(content),{params:Promise.resolve({id:ids.normal})})
+  assert.equal(response.status,status);assert.doesNotMatch(await response.text(),/SQL privé/)
+ }
+ const malformed=new NextRequest('https://site.example/api/admin/faq',{method:'POST',headers:request('admin').headers,body:'{'})
+ assert.equal((await POST(malformed)).status,400)
+})
+
 test('les jetons de fixture restent identiques pendant les échanges réseau',t=>{
  const issued=token('normal'),now=Date.now()
  t.mock.method(Date,'now',()=>now+2000)
