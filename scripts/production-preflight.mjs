@@ -64,6 +64,7 @@ export const migrations = Object.freeze([
   '20261108000100_game_device_compatibility.sql',
   '20261109000100_google_profile_initialization.sql',
   '20261110000100_faq_ordering.sql',
+  '20261110000200_build_review_workflow.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']

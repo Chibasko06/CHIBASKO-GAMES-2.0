@@ -43,17 +43,17 @@ export async function inspectZipEntries(reader: ZipReader<unknown>, limits: Buil
       if (++count > limits.maxFiles) throw new BuildValidationError('BUILD_FILE_LIMIT')
       const path = entry.directory ? entry.filename.replace(/\/$/, '') : entry.filename
       assertArtifactPath(path)
-      if (path.split('/').length > maxDepth) throw new BuildValidationError('BUILD_PATH_DEPTH')
+      if (path.split('/').length > maxDepth) throw new BuildValidationError('BUILD_PATH_DEPTH',{path})
       const folded = path.toLowerCase(), mode = (entry.unixMode ?? 0) & 0o170000
       if (entry.encrypted || entry.symlink || entry.diskNumberStart !== 0
         || (mode && mode !== 0o100000 && mode !== 0o040000)
-        || ![0,8].includes(entry.compressionMethod)) throw new BuildValidationError('UNSUPPORTED_ARCHIVE_ENTRY')
-      if (names.has(folded) || directories.has(folded)) throw new BuildValidationError('DUPLICATE_BUILD_PATH')
+        || ![0,8].includes(entry.compressionMethod)) throw new BuildValidationError('UNSUPPORTED_ARCHIVE_ENTRY',{path})
+      if (names.has(folded) || directories.has(folded)) throw new BuildValidationError('DUPLICATE_BUILD_PATH',{path})
       if (entry.directory) {
-        if (entry.uncompressedSize !== 0) throw new BuildValidationError('INVALID_DIRECTORY_ENTRY')
+        if (entry.uncompressedSize !== 0) throw new BuildValidationError('INVALID_DIRECTORY_ENTRY',{path})
         directories.add(folded)
       } else { names.add(folded); entries.push(entry) }
-      if (entry.uncompressedSize > Math.max(1, entry.compressedSize) * limits.maxCompressionRatio) throw new BuildValidationError('ARCHIVE_RATIO_LIMIT')
+      if (entry.uncompressedSize > Math.max(1, entry.compressedSize) * limits.maxCompressionRatio) throw new BuildValidationError('ARCHIVE_RATIO_LIMIT',{path})
     }
     checkFileInventory(entries.map(entry => ({path:entry.filename,size:entry.uncompressedSize})), limits)
     for (const file of names) for (const dir of directories) if (dir.startsWith(file+'/')) throw new BuildValidationError('BUILD_PATH_COLLISION')

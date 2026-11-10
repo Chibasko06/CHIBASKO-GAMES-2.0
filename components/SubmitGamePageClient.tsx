@@ -1,6 +1,7 @@
 'use client'
 import DeveloperContactForm from './DeveloperContactForm'
 import Link from 'next/link'
+import {useSearchParams} from 'next/navigation'
 import {useEffect,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
 import {SubmissionTabs,type SubmissionMode} from './SubmissionGameChoice'
@@ -18,9 +19,10 @@ export default function SubmitGamePageClient({categories}:{categories:Publicatio
 }
 function Workspace({actor,token,categories}:{actor:string;token:string;categories:PublicationCategory[]}){
  const [profileReady,setProfileReady]=useState(false)
- const [mode,setMode]=useState<SubmissionMode>('new')
+ const query=useSearchParams()
+ const [mode,setMode]=useState<SubmissionMode>(()=>query.get('mode')==='update'?'update':'new')
  const [editing,setEditing]=useState(false)
- useEffect(()=>{const upload=new URLSearchParams(window.location.search).get('upload');if(!upload)return;const controller=new AbortController();developerJson('/api/developer/submissions?uploadId='+encodeURIComponent(upload),token,{signal:controller.signal}).then(({data})=>{if(!controller.signal.aborted)setMode(data.kind)}).catch(()=>{});return()=>controller.abort()},[token])
+ useEffect(()=>{const query=new URLSearchParams(window.location.search);const upload=query.get('upload');if(!upload)return;const controller=new AbortController();developerJson('/api/developer/submissions?uploadId='+encodeURIComponent(upload),token,{signal:controller.signal}).then(({data})=>{if(!controller.signal.aborted)setMode(data.kind)}).catch(()=>{});return()=>controller.abort()},[token])
  return <div className="mx-auto max-w-3xl space-y-6 p-6"><h1 className="text-3xl font-bold">Publier un jeu Web</h1>
    <Link className="inline-block text-cyan-300 underline underline-offset-4" href="/developpeurs">Consulter le guide développeur</Link>
    <HelpText>Envoyez un ZIP autonome contenant <code>chibasko.json</code> à sa racine.</HelpText>

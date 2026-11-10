@@ -1,13 +1,18 @@
 /** Canonical relative URL path. Never normalize attacker-controlled paths. */
+import {safeValidationLocation,type ValidationLocation} from './validation-diagnostics'
+export class ArtifactPathError extends Error{
+  readonly diagnosticLocation:ValidationLocation
+  constructor(code:string,path:string){super(code);this.diagnosticLocation=safeValidationLocation({path})}
+}
 export function assertArtifactPath(path: string): void {
   if (typeof path !== 'string' || path.normalize('NFC') !== path || new TextEncoder().encode(path).length > 512
-    || /[\\%?#:\u0000-\u001f\u007f<>"|*]/.test(path)) throw new Error('UNSAFE_ARTIFACT_PATH')
+    || /[\\%?#:\u0000-\u001f\u007f<>"|*]/.test(path)) throw new ArtifactPathError('UNSAFE_ARTIFACT_PATH',path)
   const parts = path.split('/')
   if (parts.some(part => !part || part.startsWith('.') || /[. ]$|^ /.test(part)
     || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)
-    || part.toLowerCase() === '__macosx' || part.toLowerCase() === 'node_modules')) throw new Error('UNSAFE_ARTIFACT_PATH')
+    || part.toLowerCase() === '__macosx' || part.toLowerCase() === 'node_modules')) throw new ArtifactPathError('UNSAFE_ARTIFACT_PATH',path)
   if (/\.(?:exe|dll|so|dylib|php\d*|phtml|asp|aspx|jsp|sh|bat|cmd|ps1|pem|key|p12|pfx)$/i.test(path)
-    || /(?:^|\/)(?:_headers|_redirects|Dockerfile)$/i.test(path)) throw new Error('FORBIDDEN_ARTIFACT_FILE')
+    || /(?:^|\/)(?:_headers|_redirects|Dockerfile)$/i.test(path)) throw new ArtifactPathError('FORBIDDEN_ARTIFACT_FILE',path)
 }
 export function artifactMedia(path: string): { contentType: string; contentEncoding?: 'gzip' | 'br' } {
   const compressed = /\.(gz|br)$/.exec(path)

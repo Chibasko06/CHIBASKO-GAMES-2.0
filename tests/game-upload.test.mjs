@@ -44,12 +44,13 @@ function harness(manifest,bytes) {
       case 'distribution_begin_finalize':if(row.status==='uploading')row.status='finalizing';break
       case 'distribution_resume_upload':row.status='uploading';break
       case 'distribution_enqueue_upload':row.status='queued';row.staging_etag=args.p_etag;break
+      case 'distribution_validation_start':return;
       case 'distribution_claim':if(row.status!=='queued')return null;row.status='validating';row.lease_token=String(++claim);row.attempts++;break
       case 'distribution_checkpoint':row.checkpoint=args.p_checkpoint;break
-      case 'distribution_complete':if(completeFailure){completeFailure=false;throw new UploadError('database_error',503)}
+      case 'distribution_validation_complete':if(completeFailure){completeFailure=false;throw new UploadError('database_error',503)}
         if(versions.has(row.game_id+row.version)){row.status='failed';row.error_code='version_conflict'}
         else{versions.set(row.game_id+row.version,{...row.checkpoint,status:'draft'});row.status='completed'}break
-      case 'distribution_fail':row.status=args.p_retry?'queued':'failed';row.error_code=args.p_code;break
+      case 'distribution_validation_fail':row.status=args.p_retry?'queued':'failed';row.error_code=args.p_code;break
       case 'distribution_pending':return row.status==='queued'?[row]:[]
       case 'distribution_cleanup_candidates':return ['completed','failed','expired'].includes(row.status)?[row]:[]
       case 'distribution_dispatched':return

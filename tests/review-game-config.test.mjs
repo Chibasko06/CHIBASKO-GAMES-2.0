@@ -56,7 +56,7 @@ test('job failure diagnostics preserve retry semantics, redact errors and clean 
    const events=[],failures=[]
    const db={call:async(name,args)=>{
     if(name==='distribution_claim')return {id,staging_key:`staging/uploads/${id}/source.zip`,staging_etag:'fixture-etag',expected_size:1,lease_token:'fixture-private-lease',policy:{jobSeconds:60,maxTotalBytes:mode==='disk'?Number.MAX_SAFE_INTEGER:1}}
-    assert.equal(name,'distribution_fail');failures.push(args)
+    if(name==='distribution_validation_start')return;assert.equal(name,'distribution_validation_fail');failures.push(args)
    }}
    await processUpload(id,db,{read:async()=>{throw new R2RequestError({kind:'http_error',action:'object_read',upstreamStatus:403})}},{bucket:()=>assert.fail()},()=>assert.fail(),{scratchRoot:root,onFailure:entry=>events.push(entry)})
    assert.equal(failures.length,1);assert.equal(failures[0].p_retry,true)

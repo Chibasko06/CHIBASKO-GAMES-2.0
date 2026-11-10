@@ -15,11 +15,11 @@ export function checkFileInventory(files: readonly { path: string; size: number 
   for (const file of files) {
     assertArtifactPath(file.path)
     const folded = file.path.toLowerCase()
-    if (names.has(folded)) throw new BuildValidationError('DUPLICATE_BUILD_PATH')
+    if (names.has(folded)) throw new BuildValidationError('DUPLICATE_BUILD_PATH',{path:file.path})
     names.add(folded)
-    if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > limits.maxFileBytes) throw new BuildValidationError('BUILD_FILE_SIZE')
+    if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > limits.maxFileBytes) throw new BuildValidationError('BUILD_FILE_SIZE',{path:file.path})
     total += file.size
-    if (total > limits.maxTotalBytes) throw new BuildValidationError('BUILD_TOTAL_SIZE')
+    if (total > limits.maxTotalBytes) throw new BuildValidationError('BUILD_TOTAL_SIZE',{path:file.path})
   }
   // File/directory collisions are ambiguous across extractors and URL gateways.
   for (const name of names) for (const [index] of name.split('/').entries()) {

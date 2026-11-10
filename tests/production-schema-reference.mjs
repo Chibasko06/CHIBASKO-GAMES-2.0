@@ -258,6 +258,8 @@ try {
  const {faqOrderingIntegration}=await import('./faq-order-db.mjs')
  await faqOrderingIntegration(async sql=>(await query(sql)).stdout.trim())
  const output=join(root,'contracts/production-schema.v1.json')
+ const {buildReviewWorkflowIntegration}=await import('./build-review-workflow-db.mjs')
+ await buildReviewWorkflowIntegration(async sql=>(await query(sql)).stdout.trim())
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')
  console.log('Schema drift PASS: every migration prefix, RLS/grants/function access/columns/triggers, cleanup fencing/idempotence and browser denial, disposable PostgreSQL only.')

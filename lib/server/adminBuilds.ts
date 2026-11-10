@@ -20,6 +20,21 @@ export async function adminBuildRequest(request:NextRequest,id?:string) {
     }
     if(!id)throw new UploadError('invalid_request',400)
     const body=await readAdminJson(request,4096)
+    if(body.action==='record_playtest'){
+      if(Object.keys(body).some(key=>!['action','requestId','code'].includes(key))||typeof body.code!=='string'||!['hello_timeout','handshake_timeout','game_ready_timeout','launch_expired','launch_unavailable','unexpected_navigation','unknown'].includes(body.code))throw new UploadError('invalid_request',400)
+      assertUploadId(String(body.requestId))
+      await db.call('distribution_record_playtest',{p_actor:auth.user.id,p_id:id,p_request:body.requestId,p_code:body.code})
+      return adminJson({recorded:true})
+    }
+    if(body.action==='retry_validation'){
+      if(Object.keys(body).some(key=>!['action','attempt'].includes(key))||!Number.isSafeInteger(body.attempt)||Number(body.attempt)<0)throw new UploadError('invalid_request',400)
+      await db.call('distribution_retry_validation',{p_actor:auth.user.id,p_id:id,p_attempt:body.attempt})
+      return adminJson({data:await db.call('distribution_admin_builds',{p_actor:auth.user.id,p_id:id,p_offset:0})})
+    }
+    if(body.action==='request_correction'){
+      if(Object.keys(body).some(key=>!['action','reason'].includes(key))||typeof body.reason!=='string'||!body.reason.trim()||body.reason.length>2000)throw new UploadError('invalid_request',400)
+      return adminJson({data:await db.call('distribution_request_build_correction',{p_actor:auth.user.id,p_id:id,p_reason:body.reason.trim()})})
+    }
     if(body.action==='compatibility'){
       if(Object.keys(body).some(k=>!['action','compatibility','expected'].includes(k))||typeof body.compatibility!=='string'||!['desktop','mobile','both','unknown'].includes(body.compatibility)||typeof body.expected!=='string'||body.expected.length>500)throw new UploadError('invalid_request',400)
       return adminJson({data:await db.call('distribution_admin_compatibility',{p_actor:auth.user.id,p_upload:id,p_value:body.compatibility,p_expected:body.expected})})

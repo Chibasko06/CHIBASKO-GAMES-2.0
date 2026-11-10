@@ -1,5 +1,7 @@
 import {UploadError} from '../../lib/game-distribution/uploads/policy'
 import {R2ConfigurationError,R2RequestError} from '../../lib/game-distribution/uploads/r2'
+import {ReviewOutcomeError} from './review-job'
+import {describeValidation} from '../../lib/game-distribution/validation-diagnostics'
 const descriptions:Record<string,string>={
  unauthorized:'Accès Supabase refusé : vérifier la credential serveur locale.',
  forbidden:'Permission refusée : vérifier les droits serveur et les RPC installées.',
@@ -14,6 +16,16 @@ const descriptions:Record<string,string>={
  lease_lost:'Le claim de validation n’est plus disponible. Vérifier une éventuelle exécution concurrente.'
 }
 export function reviewFailureMessage(error:unknown,phase:string){
+ if(error instanceof ReviewOutcomeError){
+  if(error.state.status==='expired')return 'Archive expirée : vérifier sa conservation avant toute reprise.'
+  if(error.state.errorCode==='correction_requested')return 'Correction demandée au développeur. Attendre une nouvelle archive ; cette version ne sera pas relancée automatiquement.'
+  const d=error.state.diagnostic
+  if(!d)return 'Échec : diagnostic indéterminé. Aucun motif précis n’a été conservé pour cette tentative. Ne pas conclure à une archive invalide.'
+  const description=describeValidation(d)
+  const labels:Record<string,string>={forbidden_file:'fichier interdit',manifest:'manifeste incorrect',limit:'limite dépassée',archive:'archive non conforme',infrastructure:'infrastructure indisponible',internal:'incident interne',undetermined:'diagnostic indéterminé',loading:'chargement interrompu',sdk:'incompatibilité SDK démontrée'}
+  return ['Échec : '+labels[description.category],...(d.path?['Fichier : '+d.path]:[]),...(d.field?['Champ : '+d.field]:[]),
+    'Phase : '+description.phase,'Cause : '+description.explanation,'Action : '+description.action,...(error.state.attempts?['Tentative : '+error.state.attempts]:[])].join('\n')
+ }
  if(error instanceof R2ConfigurationError)return 'review_storage_configuration: variables manquantes : '+error.configuration.missing.join(', ')+' ; variables invalides : '+error.configuration.invalid.join(', ')
  if(error instanceof R2RequestError)return 'review_storage_error: '+error.diagnostic.action+' / '+error.diagnostic.kind+(error.diagnostic.upstreamStatus?' / HTTP '+error.diagnostic.upstreamStatus:'')
  if(phase==='scratch_setup')return 'review_scratch_unavailable: impossible de préparer ou écrire le répertoire temporaire local.'

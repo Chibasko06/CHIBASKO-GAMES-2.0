@@ -1,6 +1,6 @@
 # Validation manuelle des builds
 
-Le dispatcher reste sans cron. Aucun service permanent ni traitement lourd dans
+La configuration versionnée du dispatcher conserve son cron toutes les cinq minutes, avec GAME_BUILD_DISPATCHER_ENABLED=0. Le cron n’active donc pas automatiquement la distribution. Aucun service permanent ni traitement lourd dans
 une requête Next.js n'est nécessaire pour la revue manuelle. Le poste de revue
 exécute le même validator que le futur consumer HTTP Pull.
 
@@ -24,9 +24,8 @@ et ses permissions sur le jeu ; les réponses sont des projections explicites.
    La réponse contient `reviewUrl`, vers `/developer/builds/<upload-id>`.
 2. L'admin ouvre **Administration → Publications de jeux**.
    `/admin/game-builds` présente les uploads par pages de 50 ; le filtre de statut
-   porte sur la page courante. Le détail présente en premier le titre proposé,
-   la version, le développeur et la prochaine action, puis les informations
-   destinées au catalogue avec un aperçu de couverture.
+   porte sur la page courante. Le détail présente le titre, la version, le développeur, le résultat et la
+   prochaine action. Les coordonnées et informations éditoriales sont repliées.
 3. Si une proposition catalogue existe, l'admin peut associer son identifiant.
    `game_submissions` n'avait aucune relation avec les uploads : le rapprochement
    est explicite, jamais déduit d'un email, d'un titre ou du manifest.
@@ -34,7 +33,8 @@ et ses permissions sur le jeu ; les réponses sont des projections explicites.
    l'upload, prend le claim existant, télécharge uniquement son archive staging,
    valide/extrait statiquement, écrit les artifacts immuables et finalise la version.
    Un doublon déjà terminé réussit sans réécriture. Une lease active est refusée ;
-   une lease expirée peut être reprise dans la limite des tentatives existantes.
+   une interruption est examinée avant une reprise explicite, dans la limite des
+   tentatives existantes.
 5. Actualiser le détail admin : le résultat technique vient directement de la DB.
    Une réussite crée uniquement une version `draft`, sans publication.
 6. Tester le build dans le GameRuntime isolé depuis la page détail. Le mode online
@@ -138,14 +138,16 @@ npm run review:game -- 12121212-1212-4212-8212-121212121212
 Le script compile un entrypoint local et le parseur, sans créer de deuxième
 validator. Il relit l'état DB après traitement : un rejet technique, un conflit,
 une erreur persistée ou une validation concurrente retourne un code non nul.
-La sortie contient uniquement upload ID, version ID et résultat technique.
+La sortie ordinaire affiche le résultat, le fichier ou champ en cause et la
+correction attendue. `--json` fournit le résultat structuré ; `--details` ajoute
+les événements techniques expurgés.
 Le champ `published:false` indique que la commande n'effectue aucune publication.
 
 Les erreurs locales affichent des codes distincts pour configuration manquante,
 configuration invalide, compilation, lancement, scratch, état incompatible et
 échec de validation. Les diagnostics de traitement ajoutent la phase et les seuls
 codes R2 sûrs, sans exception brute, chemin privé, ticket ou credential. Une erreur
-de configuration intervient avant `distribution_review_job` et `distribution_claim`.
+de configuration intervient avant `distribution_review_state` et `distribution_claim`.
 Le même upload en attente peut être validé après correction, sans nouveau ZIP,
 gameId ou upload. Une validation déjà terminée reste idempotente ; une lease active
 ne peut pas être contournée et un rejet technique persistant exige son traitement
@@ -224,3 +226,17 @@ Modifiés :
 - `services/build-validator/README.md`
 - `tests/game-distribution-db.mjs`
 - `package.json`
+
+## Diagnostic, reprise et build corrigé
+
+La migration additive `20261110000200_build_review_workflow.sql` doit précéder
+le déploiement du portail et la mise à jour du validateur local. Elle conserve
+les anciennes RPC pour les composants déjà déployés. Voir le
+[parcours de revue et ses contrôles](game-review-workflow.md).
+
+Une panne interne, une archive non conforme et un refus administratif sont trois
+résultats distincts. « Demander une correction » conserve la décision `pending`,
+enregistre le motif communicable et ne rejette pas le jeu. « Mes soumissions →
+Préparer un build corrigé » rouvre le brouillon du même jeu avec un nouvel upload.
+Les précédents uploads et soumissions sont conservés. Pour un jeu publié, le
+formulaire existant de nouvelle version reste le chemin de correction.

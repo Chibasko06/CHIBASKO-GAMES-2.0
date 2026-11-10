@@ -30,6 +30,8 @@ const server=createServer(async(request,response)=>{
   if(body.action==='review'){row.review={...row.review,decision:'reviewed',checklist:body.checklist,reviewedAt:'2026-10-20T11:00:00Z'};row.versionStatus='in_review'}
   if(body.action==='compatibility'){row.submission.mobile='platform:'+body.compatibility;row.review.checklist={};row.review.reviewedAt=null}
   if(body.action==='publish'){row.versionStatus='published';row.review.decision='published'}
+  if(body.action==='request_correction'){row.review.reason=body.reason;row.review.decision='pending'}
+  if(body.action==='retry_validation'){row.technicalStatus='queued';row.errorCode=null}
   if(body.action==='reject'||body.action==='archive'){row.review.decision=body.action==='reject'?'rejected':'archived';row.review.reason=body.reason}
   json({data:row});return
  }
@@ -39,15 +41,43 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='h
 let browser
 try{
  browser=await chromium.launch({channel:'chrome',headless:true})
+ await test('Chrome : correction explicite, reprise interne et conservation des étapes',async()=>{
+  row=initial();row.technicalStatus='failed';row.errorCode='validation_failed';row.attempts=1;actions=[]
+  row.history=[{at:'2026-11-10T10:00:00Z',action:'validation_diagnostic:'+JSON.stringify({attempt:1,version:1,kind:'internal',reason:'EXTRACTOR_IO_ERROR'})}]
+  const page=await browser.newPage({viewport:{width:390,height:844}});await page.goto(origin)
+  page.on('dialog',dialog=>dialog.accept())
+  await page.getByRole('button',{name:'Préparer une nouvelle tentative',exact:true}).click()
+  await page.getByText('Nouvelle tentative préparée. Lancez la commande de vérification.',{exact:true}).waitFor()
+  assert.equal(actions[0].attempt,1)
+  await page.getByRole('button',{name:'Demander une correction',exact:true}).click()
+  await page.getByLabel('Motif de la correction demandée',{exact:false}).fill('Corriger le manifeste, sans modifier le jeu.')
+  await page.getByRole('button',{name:'Confirmer la demande de correction',exact:true}).click()
+  await page.getByText('Correction demandée. Le jeu n’est pas refusé.',{exact:true}).waitFor()
+  assert.deepEqual(actions.map(action=>action.action),['retry_validation','request_correction']);assert.equal(row.review.decision,'pending')
+  await page.close();actions=[]
+ })
+ for(const width of [1366,390])await test('Chrome : diagnostic de validation privé et lisible '+width,async()=>{
+  row=initial();row.technicalStatus='failed';row.errorCode='validation_failed';row.attempts=1;
+  row.history=[{at:'2026-11-10T10:00:00Z',action:'validation_diagnostic:'+JSON.stringify({attempt:1,version:1,kind:'internal',reason:'EXTRACTOR_IO_ERROR'})}];
+  const page=await browser.newPage({viewport:{width,height:850}});await page.goto(origin);
+  await page.getByRole('region',{name:'Diagnostic technique',exact:true}).waitFor();await page.getByText('Erreur du disque temporaire',{exact:true}).waitFor();await page.getByRole('region',{name:'Diagnostic technique',exact:true}).getByText('Détails techniques',{exact:true}).click();await page.getByText('Erreur interne du validateur',{exact:false}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true);
+  if(styles)assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  row.history=[{at:'2026-11-10T10:00:00Z',action:'validation_diagnostic:'+JSON.stringify({attempt:1,version:1,kind:'submission',reason:'INVALID_MANIFEST_SCHEMA',path:'chibasko.json',field:'/gameId'})}];
+  await page.reload();await page.getByText('/gameId',{exact:true}).waitFor();await page.getByText('chibasko.json',{exact:true}).waitFor();
+  row.attempts=2;await page.reload();await page.getByText('Le motif précis n’a pas été enregistré pour cette tentative.',{exact:false}).waitFor();
+  row.history=[];await page.reload();await page.getByText('Le motif précis n’a pas été enregistré pour cette tentative.',{exact:false}).waitFor();
+  assert.equal(actions.length,0);await page.close();
+ })
  await test('Chrome : correction de compatibilité dans la revue',async()=>{
   row=initial();actions=[];const page=await browser.newPage();await page.goto(origin)
-  await page.getByLabel('Appareils compatibles',{exact:true}).selectOption('mobile');await page.getByRole('button',{name:'Enregistrer la compatibilité',exact:true}).click()
+  await page.getByText('Informations du jeu',{exact:true}).click();await page.getByLabel('Appareils compatibles',{exact:true}).selectOption('mobile');await page.getByRole('button',{name:'Enregistrer la compatibilité',exact:true}).click()
   await page.getByText('Compatibilité enregistrée.',{exact:true}).waitFor();assert.equal(actions[0].action,'compatibility');assert.equal(actions[0].compatibility,'mobile');assert.equal(actions[0].expected,'Oui');assert.equal(row.submission.mobile,'platform:mobile');await page.close()
  })
  await test('Chrome review: queued build presents four actions; UUIDs and commands remain collapsed',async()=>{
   row=initial();actions=[];const page=await browser.newPage();await page.goto(origin)
   await page.getByRole('heading',{name:'Proposed fixture title',exact:true}).waitFor()
-  for(const title of ['Informations proposées','1. Vérification technique','2. Tester le jeu','3. Revue','4. Décision'])await page.getByRole('heading',{name:title,exact:true}).waitFor()
+  for(const title of ['1. Vérification technique','2. Tester le jeu','3. Revue','4. Décision'])await page.getByRole('heading',{name:title,exact:true}).waitFor()
   assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true)
   assert.equal(await page.getByLabel('Motif du refus',{exact:false}).count(),0)
   const text=await page.locator('body').innerText();assert.ok(!text.includes(id));assert.ok(!text.includes(game));assert.ok(!text.includes('npm run'));assert.ok(!text.includes('credentials'))

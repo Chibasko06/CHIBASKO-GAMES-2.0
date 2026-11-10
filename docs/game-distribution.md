@@ -39,10 +39,7 @@ local facultatif → créer un upload autorisé → transférer le ZIP en quaran
 → review → approved → published → activer. L'interface, la CLI et la CI appellent
 la même API ; elles ne possèdent aucune autorité de publication.
 
-La future relation d'ownership doit relier un principal éditeur (utilisateur ou
-équipe) au jeu et à ses permissions. Elle sera créée avant toute API développeur.
-L'identité du manifest ne prouve jamais cette permission. Aucun compte n'est
-attribué propriétaire/admin par la fondation.
+Les memberships game_developer_members relient les comptes aux jeux et à leurs permissions. Les API développeur et RPC contrôlent ces droits ; l’identité du manifeste ne prouve jamais une permission.
 
 ## 4. Manifest versionné
 
@@ -77,8 +74,7 @@ fiche réellement enregistrée :
   pas une comparaison sémantique automatique.
 - schemaVersion décrit le fichier de distribution. integrationVersion décrit les
   sémantiques plateforme/jeu ; tous deux sont ici 1, sans lien avec SDK 0.1.0.
-  Le protocole wire du futur bridge aura son propre discriminateur/version de
-  handshake. **Le SDK actuel n'est pas encore un bridge iframe.**
+  Le SDK navigateur communique effectivement par Bridge v1/v2. Sa version de protocole est indépendante de celle du package ; voir sdk-browser-bridge-v2.md.
 - Un ou deux entrypoints HTML relatifs ; partager index.html est permis. Les clés
   online/local doivent correspondre exactement aux capacités déclarées.
 - Public/privé sont des accès au même online, pas deux moteurs de gameplay.
@@ -107,16 +103,15 @@ Migration à vérifier dans l’historique de l’environnement cible :
   Suppression interdite ; archive conservée. L'identité d'uploader peut être
   anonymisée par suppression du compte, pas remplacée par une autre identité.
 - set_active_game_version est une opération transactionnelle, invoker, exécutable
-  seulement par service_role, après contrôle d'autorisation dans la future API.
+  seulement par service_role, après contrôle d'autorisation dans les API administratives.
   Concurrence activation/archivage contrôlée par verrous et triggers.
 - Version active et `games.is_published` sont distincts : publication d'une version
   ne rend pas automatiquement la fiche publique.
 - Aucun SELECT/DML navigateur sur game_versions ; RLS activée, tables privées.
-  Un futur resolver expose uniquement la projection publique minimale, pas le
-  manifest brut, created_by, stockage interne ni données de review.
+  Les résolveurs publics exposent une projection minimale ; le manifeste brut, created_by, le stockage interne et les données de revue restent serveur.
 
 Les contraintes DB protègent le tuple/immutabilité/lifecycle ; elles ne remplacent
-pas le validateur complet. Aucun endpoint ne permet aujourd'hui ces insertions.
+pas le validateur complet. Les API d’upload/finalisation et le validateur contrôlent ces insertions via les RPC privilégiées.
 
 La livraison `managed_build` ou `external_url` est distincte des capacités
 local/online. La projection catalogue doit utiliser la version active validée.
@@ -135,8 +130,7 @@ Une version active ne peut être archivée sans changer/vider le pointeur d'abor
 
 Le rapport de validation doit être épinglé à une révision de validateur/politique,
 séparément du contenu. Changer une règle de sécurité impose une re-review ou un
-blocage ; cela ne réécrit jamais le manifest/artifact. Une API transactionnelle de
-publication et un journal d'audit sont requis avant toute mise en service.
+blocage ; cela ne réécrit jamais le manifest/artifact. La publication administrative transactionnelle et son historique sont décrits dans manual-build-review.md.
 
 ## 8. R2, hash et cache
 

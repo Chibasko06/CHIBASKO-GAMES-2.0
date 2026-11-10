@@ -30,7 +30,7 @@ test('guide manifest follows the real validator and upload policy; no private ga
  assert.deepEqual(validateManifest(JSON.parse(manifestCode),manifestExample),manifestExample)
  assert.equal(manifestExample.schemaVersion,1);assert.equal(manifestExample.integrationVersion,1)
  assert.deepEqual(manifestExample.client.entrypoints,{local:'local/index.html'})
- assert.equal(archiveLimitBytes,524288000);assert.equal(sdkInstallCommand,'npm install @chibaskogames/sdk@0.4.0')
+ assert.equal(archiveLimitBytes,524288000);assert.equal(sdkInstallCommand,'npm install @chibaskogames/sdk')
  assert.doesNotMatch(manifestCode,/0509712e|endpoint|credential|email|contactEmail/)
 })
 
@@ -46,6 +46,17 @@ test('guide, legal pages and navigation expose valid internal links without oper
   }
  }
  assert.match(pages[0],/Aucun hébergement multijoueur en libre-service/)
+ assert.match(pages[0],/127\.0\.0\.1:4321/)
+ assert.match(pages[0],/SDK 0\.4\.1 est disponible sur npm/)
+ assert.match(pages[0],/npm exec --yes --package=@chibaskogames\/sdk -- chibasko-create mon-jeu/)
+ assert.doesNotMatch(pages[0],/version est encore candidate|après publication de 0\.4\.1|latest sélectionnera|tarball validé/)
+ assert.match(pages[0],/Aucun template n’est obligatoire/)
+ assert.match(pages[0],/--template example/)
+ assert.match(pages[0],/modèle blank est le défaut/)
+ assert.match(pages[0],/examples\/existing-game/)
+ assert.doesNotMatch(pages[0],/node tools\/create-game\.mjs/)
+ assert.match(pages[0],/ne publie rien/)
+ assert.doesNotMatch(pages[0],/Le SDK ne fournit actuellement aucun CLI officiel de build/)
  assert.doesNotMatch(pages[0],/npm run (?:build:web|validate:web|pack:web)|fixedViewport/)
  assert.match(pages[5],/Consulter le guide développeur/);assert.match(pages[4],/Développeurs/)
  globalThis.__productAuth={session:{user:{id:'fixture-account'},access_token:'fixture-only'},loading:false}

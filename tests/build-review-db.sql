@@ -45,3 +45,19 @@ select public.distribution_expect_failure($s$select public.distribution_review_a
 select public.distribution_review_action('dddddddd-dddd-4ddd-8ddd-dddddddddddd','12121212-1212-4212-8212-121212121212','review','{"tested":true,"content":true,"metadata":true,"behavior":true}');
 select public.distribution_expect_failure($s$update public.game_versions set artifact_sha256=repeat('e',64) where id='14141414-1414-4414-8414-141414141414'$s$);
 reset role;
+-- Diagnostic technique dans le journal privé existant, jamais dans la réponse propriétaire.
+set role service_role;
+insert into public.game_build_review_events(upload_id,action) values
+('12121212-1212-4212-8212-121212121212','validation_diagnostic:{"attempt":1,"version":1,"kind":"internal","reason":"EXTRACTOR_IO_ERROR"}');
+do $$ declare admin_result jsonb; owner_result jsonb; begin
+ admin_result:=public.distribution_admin_builds('dddddddd-dddd-4ddd-8ddd-dddddddddddd','12121212-1212-4212-8212-121212121212');
+ if admin_result::text not like '%EXTRACTOR_IO_ERROR%' then raise exception 'Missing private diagnostic'; end if;
+ owner_result:=public.distribution_developer_review('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','12121212-1212-4212-8212-121212121212');
+ if owner_result::text ~ 'validation_diagnostic|EXTRACTOR_IO_ERROR' then raise exception 'Private diagnostic leaked to owner'; end if;
+ if has_table_privilege('anon','public.game_build_review_events','select') or has_table_privilege('authenticated','public.game_build_review_events','select') then raise exception 'Private event grant leaked'; end if;
+end $$;
+set role authenticated;
+select public.distribution_expect_failure('select * from public.game_build_review_events');
+select public.distribution_expect_failure($s$insert into public.game_build_review_events(upload_id,action) values('12121212-1212-4212-8212-121212121212','spoofed')$s$);
+select public.distribution_expect_failure($s$select public.distribution_review_snapshot('12121212-1212-4212-8212-121212121212')$s$);
+reset role;

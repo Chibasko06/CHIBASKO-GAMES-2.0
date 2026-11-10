@@ -6,10 +6,23 @@ import {chromium} from '@playwright/test'
 import {readFile,readdir,mkdtemp} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
-const game='54545454-5454-4454-8454-545454545454',upload='56565656-5656-4656-8656-565656565656'
+import {ZipReader,Uint8ArrayReader,TextWriter} from '@zip.js/zip.js'
+let game='54545454-5454-4454-8454-545454545454'
+const upload='56565656-5656-4656-8656-565656565656',sdkZipPath=process.env.SDK_TEST_BUILD_ZIP
+let sdkZip,sdkManifest,validateSdkZip,sdkMode=false,receivedSdk=false,partSize=8,uploaded=[]
+if(sdkZipPath){
+ sdkZip=new Uint8Array(await readFile(sdkZipPath))
+ const reader=new ZipReader(new Uint8ArrayReader(sdkZip),{useWebWorkers:false})
+ try{const entry=(await reader.getEntries()).find(e=>e.filename==='chibasko.json');assert.ok(entry);sdkManifest=JSON.parse(await entry.getData(new TextWriter()))}finally{await reader.close()}
+ game=sdkManifest.gameId
+ const validation=await build({stdin:{contents:"export {validateWebBuildZip} from './lib/game-distribution/zip';export {UPLOAD_POLICY} from './lib/game-distribution/uploads/policy';",resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',write:false})
+ const api=await import('data:text/javascript;base64,'+Buffer.from(validation.outputFiles[0].text).toString('base64'))
+ validateSdkZip=bytes=>api.validateWebBuildZip(bytes,{gameId:game,version:sdkManifest.version},api.UPLOAD_POLICY)
+ await validateSdkZip(sdkZip)
+}
 const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Submit from './components/SubmitGamePageClient';createRoot(document.getElementById('root')).render(<Submit categories={[{id:'${game}',name:'Fixture category',slug:'fixture'}]}/>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(api){
- api.onResolve({filter:/^(?:@\/components\/AuthProvider|next\/link)$/},args=>({path:args.path,namespace:'fixture'}))
- api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:`export function useAuth(){return {loading:false,session:new URLSearchParams(location.search).has('anonymous')?null:{user:{id:new URLSearchParams(location.search).has('other')?'other-user':'fixture-user'},access_token:new URLSearchParams(location.search).has('other')?'other-token':'fixture-token'}}}`}))
+ api.onResolve({filter:/^(?:@\/components\/AuthProvider|next\/link|next\/navigation)$/},args=>({path:args.path,namespace:'fixture'}))
+ api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/navigation'?`export function useSearchParams(){return new URLSearchParams(location.search)}`:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:`export function useAuth(){return {loading:false,session:new URLSearchParams(location.search).has('anonymous')?null:{user:{id:new URLSearchParams(location.search).has('other')?'other-user':'fixture-user'},access_token:new URLSearchParams(location.search).has('other')?'other-token':'fixture-token'}}}`}))
 }}]})
 let contact={firstName:'Fixture',lastName:'Developer',contactEmail:'contact@example.test',publicName:'Studio fixture',website:null,otherContact:null}
 let publishedParts=0,submissions=[],requests=[],draft=null,registrations=0,failPart=false,uploadFailure=''
@@ -24,7 +37,7 @@ if(process.env.SUBMISSION_VISUAL_CHECK==='1'){
 const json=(response,body)=>{response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify(body))}
 const storage=createServer((request,response)=>{if(request.method==='OPTIONS'){
  response.writeHead(204,{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'PUT','Access-Control-Allow-Headers':'content-type'});response.end();return
-}if(failPart){failPart=false;response.writeHead(503,{'Access-Control-Allow-Origin':'*'});request.resume();response.end();return}publishedParts++;response.writeHead(200,{'Access-Control-Allow-Origin':'*'});request.resume();request.on('end',()=>response.end())})
+}if(failPart){failPart=false;response.writeHead(503,{'Access-Control-Allow-Origin':'*'});request.resume();response.end();return}publishedParts++;response.writeHead(200,{'Access-Control-Allow-Origin':'*'});request.on('data',chunk=>{if(sdkMode)uploaded.push(chunk)});request.on('end',()=>response.end())})
 await new Promise(resolve=>storage.listen(0,'127.0.0.1',resolve))
 const storageOrigin='http://127.0.0.1:'+storage.address().port
 const server=createServer(async(request,response)=>{
@@ -55,10 +68,10 @@ const server=createServer(async(request,response)=>{
    if(request.headers.referer?.includes('registration-error=1')){response.writeHead(503,{'Content-Type':'application/json'});response.end(JSON.stringify({error:{code:'service_unavailable'}}));return}
    registrations++;draft=freshDraft(JSON.parse(bytes).title);json(response,{data:{gameId:game}});return
  }
- if(url.pathname.endsWith('/uploads')){if(uploadFailure){response.writeHead(400,{'Content-Type':'application/json'});response.end(JSON.stringify({error:{code:uploadFailure}}));return}if(draft){draft.upload={id:upload,status:'uploading',version:draft.version,archiveSize:8,expiresAt:'2099-01-01T00:00:00Z',partSize:33554432};draft.state='uploading'}json(response,{data:{id:upload,status:'uploading',upload:{partSize:33554432}}});return}
+ if(url.pathname.endsWith('/uploads')){if(uploadFailure){response.writeHead(400,{'Content-Type':'application/json'});response.end(JSON.stringify({error:{code:uploadFailure}}));return}partSize=JSON.parse(bytes).archiveSize;if(draft){draft.upload={id:upload,status:'uploading',version:draft.version,archiveSize:partSize,expiresAt:'2099-01-01T00:00:00Z',partSize:33554432};draft.state='uploading'}json(response,{data:{id:upload,status:'uploading',upload:{partSize:33554432}}});return}
  if(url.pathname==='/api/developer/uploads/'+upload){json(response,{data:{id:upload,status:draft?.upload?.status??'uploading',upload:{partSize:33554432}}});return}
- if(url.pathname.endsWith('/parts')){json(response,{data:{parts:request.method==='POST'?[{url:storageOrigin+'/part',headers:{'Content-Length':'8'}}]:[]}});return}
- if(url.pathname.endsWith('/finalize')){if(draft?.upload)draft.upload.status='queued';json(response,{data:{id:upload,status:'queued'}});return}
+ if(url.pathname.endsWith('/parts')){json(response,{data:{parts:request.method==='POST'?[{url:storageOrigin+'/part',headers:{'Content-Length':String(partSize)}}]:[]}});return}
+ if(url.pathname.endsWith('/finalize')){if(sdkMode){const assembled=new Uint8Array(Buffer.concat(uploaded));assert.deepEqual(assembled,sdkZip);await validateSdkZip(assembled);receivedSdk=true}if(draft?.upload)draft.upload.status='queued';json(response,{data:{id:upload,status:'queued'}});return}
  if(url.pathname==='/api/developer/submissions'){
    if(request.headers['content-type']?.startsWith('application/json')){submissions.push({body:JSON.parse(bytes),cover:null});json(response,{data:{submissionId:game}});return}
    const form=await new Request('http://fixture',{method:'POST',headers:request.headers,body:bytes}).formData()
@@ -73,6 +86,33 @@ const origin='http://127.0.0.1:'+server.address().port
 let browser
 try{
  browser=await chromium.launch({channel:'chrome',headless:true})
+ await test('Chrome : le ZIP distribué du SDK traverse le formulaire réel et le validateur, avec stockage simulé',{skip:!sdkZipPath},async()=>{
+  draft=null;sdkMode=true;receivedSdk=false;uploaded=[]
+  const page=await browser.newPage({viewport:{width:390,height:844}})
+  try{
+   await page.goto(origin)
+   await page.getByLabel('Titre',{exact:true}).fill('Cibles SDK')
+   await page.getByRole('button',{name:'Créer le jeu privé et obtenir son gameId'}).click()
+   await page.getByRole('heading',{name:'Identité privée du jeu créée'}).waitFor()
+   await page.getByLabel('Développeur / studio',{exact:true}).fill('Studio de test')
+   await page.getByLabel('Date de sortie',{exact:true}).fill('2026-11-09')
+   await page.getByLabel('Description',{exact:true}).fill('Jeu SDK issu du package candidat, sans publication réelle.')
+   await page.getByRole('checkbox',{name:'Fixture category',exact:true}).check()
+   await page.getByLabel('Appareils compatibles',{exact:true}).selectOption('both')
+   await page.getByLabel('Technologie',{exact:true}).fill('HTML/JS')
+   await page.getByLabel('Version du build (SemVer)',{exact:true}).fill(sdkManifest.version)
+   await page.locator('input[accept^="image/jpeg"]').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6V8AAAAASUVORK5CYII=','base64')})
+   await page.locator('input[accept=".zip,application/zip"]').setInputFiles(sdkZipPath)
+   await page.getByRole('checkbox',{name:'Je dispose des droits nécessaires',exact:false}).check()
+   await page.getByRole('button',{name:'Envoyer le build',exact:true}).click()
+   await page.getByRole('heading',{name:'Jeu reçu — vérification sous 24 à 48 h'}).waitFor()
+   assert.equal(receivedSdk,true);assert.equal(draft.upload.status,'queued')
+   const sent=submissions.at(-1)
+   assert.equal(sent.body.kind,'new');assert.equal(sent.body.metadata.mobile,'both')
+   assert.equal(sent.body.metadata.title,'Cibles SDK');assert.equal(sent.cover,'image/png')
+   assert.equal(sent.body.ownership,true)
+  }finally{sdkMode=false;await page.close()}
+ })
  await test('Chrome: upload errors stay beside their fields/actions and corrections clear them',async()=>{
   draft=null;const page=await browser.newPage();await page.goto(origin)
   await page.getByRole('tab',{name:'Mettre à jour un jeu existant'}).click()

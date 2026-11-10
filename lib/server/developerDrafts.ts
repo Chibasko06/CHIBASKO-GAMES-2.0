@@ -44,6 +44,10 @@ export async function developerDraftRequest(request:Request,deps=defaults){
    const file=body.file as Record<string,unknown>,hashes=body.hashes
    if(!file||Object.keys(file).some(k=>!['name','size','lastModified'].includes(k))||typeof file.name!=='string'||file.name.length<1||file.name.length>255||!Number.isSafeInteger(file.size)||Number(file.size)<1||Number(file.size)>UPLOAD_POLICY.maxArchiveBytes||!Number.isSafeInteger(file.lastModified)||Number(file.lastModified)<0||!hashes||typeof hashes!=='object'||Array.isArray(hashes)||Object.entries(hashes).some(([part,hash])=>!/^[1-9][0-9]{0,3}$/.test(part)||typeof hash!=='string'||!/^[a-f0-9]{64}$/.test(hash)))throw new UploadError('invalid_request')
    result=await db.call('distribution_save_draft_upload',{p_actor:actor,p_game:body.gameId,p_request:body.requestId,p_file:file,p_hashes:hashes})
+  }else if(body.action==='prepare-correction'){
+   if(Object.keys(body).some(key=>!['action','gameId','uploadId'].includes(key)))throw new UploadError('invalid_request')
+   assertUploadId(String(body.uploadId))
+   result=await db.call('distribution_prepare_build_correction',{p_actor:actor,p_game:body.gameId,p_upload:body.uploadId})
   }else if(body.action==='restart-upload'){
    if(Object.keys(body).some(k=>!['action','gameId'].includes(k)))throw new UploadError('invalid_request')
    result=await db.call('distribution_restart_draft_upload',{p_actor:actor,p_game:body.gameId})

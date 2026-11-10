@@ -71,7 +71,7 @@ test('oversize download and shutdown clean scratch and never write final artifac
       if(mode==='shutdown')await assert.rejects(job,/validator_stopping/);else await job
       assert.deepEqual(await readdir(root),[])
       if(mode==='duplicate')assert.equal(calls.length,1)
-      else{const failed=calls.find(([name])=>name==='distribution_fail');assert.ok(failed);assert.equal(failed[1].p_retry,mode==='shutdown')}
+      else{const failed=calls.find(([name])=>name==='distribution_validation_fail');assert.ok(failed);assert.equal(failed[1].p_retry,mode==='shutdown')}
     }finally{await rm(root,{recursive:true,force:true})}
   }
 })
@@ -105,7 +105,7 @@ test('real service handles SIGTERM/SIGINT events during a claimed download witho
         if(url.includes('/messages/pull')){if(pulled)return Response.json({success:true,result:{messages:[]}});pulled=true;return Response.json({success:true,result:{messages:[{lease_id:'fixture-lease',body:JSON.stringify({type:'validate_game_build',uploadId:id})}]}})}
         if(url.includes('/messages/ack')){const body=JSON.parse(init.body);if(body.acks.length)throw new Error('unexpected ack');console.log('fixture_retry_confirmed');return Response.json({success:true,result:{}})}
         if(url.includes('/rpc/distribution_claim'))return Response.json({id,staging_key:'staging/uploads/'+id+'/source.zip',staging_etag:'etag',expected_size:1,lease_token:'lease',policy:{jobSeconds:3600,maxTotalBytes:1024,maxArchiveBytes:1024}});
-        if(url.includes('/rpc/distribution_fail'))return new Response(null,{status:204});
+        if(url.includes('/rpc/distribution_validation_fail'))return new Response(null,{status:204});
         if(url.includes('.r2.cloudflarestorage.com/'))return new Response(new ReadableStream({start(c){setTimeout(()=>{process.emit(${JSON.stringify(event)});c.error(new Error('fixture-private-credential'))},20)}}));
         throw new Error('fixture-private-credential');
       };

@@ -2,7 +2,7 @@ import schema from './game-distribution/chibasko.schema.v1.json' with {type:'jso
 import {validateManifest} from './game-distribution/manifest'
 import {UPLOAD_POLICY} from './game-distribution/uploads/policy'
 
-export const sdkInstallCommand='npm install @chibaskogames/sdk@0.4.0'
+export const sdkInstallCommand='npm install @chibaskogames/sdk'
 // Constants and required sections follow the validator's canonical schema.
 const example={schemaVersion:schema.properties.schemaVersion.const,gameId:'11111111-1111-4111-8111-111111111111',version:'1.0.0',integrationVersion:schema.properties.integrationVersion.const,
  capabilities:{local:{players:{min:schema.$defs.players.properties.min.minimum,max:schema.$defs.players.properties.min.minimum}}},client:{entrypoints:{local:'local/index.html'}}}

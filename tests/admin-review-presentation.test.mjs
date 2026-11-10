@@ -4,6 +4,13 @@ import {reviewPresentation,checklistComplete} from '../lib/game-distribution/adm
 const full={tested:true,content:true,metadata:true,behavior:true}
 const base={technicalStatus:'queued',versionStatus:null,gameVersionId:null,review:{decision:'pending',checklist:{},reviewedAt:null}}
 const completed=()=>({...base,technicalStatus:'completed',versionStatus:'draft',gameVersionId:'fixture-version',review:{...base.review}})
+
+test('incident interne et correction demandée restent distincts d’un refus',()=>{
+ const failed={...base,attempts:1,technicalStatus:'failed',history:[{action:'validation_diagnostic:'+JSON.stringify({attempt:1,version:1,kind:'internal',reason:'EXTRACTOR_IO_ERROR'})}]}
+ assert.equal(reviewPresentation(failed).technical,'Interrompue')
+ assert.equal(reviewPresentation(failed).label,'Incident technique')
+ assert.equal(reviewPresentation({...failed,review:{...failed.review,reason:'Corriger le manifeste'}}).label,'Correction demandée')
+})
 test('admin presentation distinguishes technical processing, testing and persisted review without altering backend states',()=>{
  assert.equal(reviewPresentation(base).label,'À vérifier');assert.equal(reviewPresentation(base).technical,'En attente')
  assert.equal(reviewPresentation({...base,technicalStatus:'validating'}).technical,'En cours')

@@ -8,6 +8,20 @@ import {uploadBuild} from '../lib/game-distribution/browser-upload.ts'
 const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const initial={metadata:{...emptyDraftMetadata,title:'Initial'},version:'',revision:0}
 const request=(body)=>new Request('https://site.example/api/developer/drafts'+(body?'':'?gameId='+id),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})
+
+test('une correction réutilise le brouillon avec identité vérifiée et refuse les données étrangères',async()=>{
+ const calls=[],deps={authenticate:async()=>id,db:()=>({call:async(name,args)=>{calls.push({name,args});return {gameId:id}}})}
+ const body={action:'prepare-correction',gameId:id,uploadId:id}
+ const response=await developerDraftRequest(request(body),deps)
+ assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/private, no-store/)
+ assert.deepEqual(calls,[{name:'distribution_prepare_build_correction',args:{p_actor:id,p_game:id,p_upload:id}}])
+ for(const invalid of [{...body,actor:id},{...body,uploadId:'../private'}])assert.equal((await developerDraftRequest(request(invalid),deps)).status,400)
+ const denied={...deps,db:()=>({call:async()=>{throw new UploadError('forbidden',403)}})}
+ assert.equal((await developerDraftRequest(request(body),denied)).status,403)
+ const cross=new Request('https://site.example/api/developer/drafts',{method:'POST',headers:{origin:'https://attacker.example','content-type':'application/json'},body:JSON.stringify(body)})
+ assert.equal((await developerDraftRequest(cross,deps)).status,403)
+ assert.equal(calls.length,1)
+})
 test('draft API derives actor from verified authentication; private no-store and stable IDOR refusal',async()=>{
  const calls=[],deps={authenticate:async()=>id,db:()=>({call:async(name,args)=>{calls.push({name,args});return initial}})}
  const response=await developerDraftRequest(request(),deps)
