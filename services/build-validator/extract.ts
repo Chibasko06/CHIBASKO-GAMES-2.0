@@ -39,6 +39,10 @@ export async function extractBuild(archive: string, directory: string, target: U
     try{json=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(manifestChunks)))}catch{throw new BuildValidationError('INVALID_MANIFEST_JSON',{path:'chibasko.json'})}
     const declared=json&&typeof json==='object'&&!Array.isArray(json)?json as Record<string,unknown>:{}
     const manifest=validateManifest(json,target??{gameId:declared.gameId as string,version:declared.version as string})
+    for(const path of Object.values(manifest.client.entrypoints)) {
+      const entry=entries.find(file=>file.filename===path)
+      if(!entry?.uncompressedSize || entry.uncompressedSize>1024*1024)throw new BuildValidationError('ENTRYPOINT_MISSING',{path})
+    }
     const kept=new Set(['chibasko.json',...Object.values(manifest.client.entrypoints)])
     const files: (ArtifactFile & {spool:string})[]=[],scan=integrationScanner();let total=0
     for(const [index,entry] of entries.entries()) {
@@ -58,8 +62,7 @@ export async function extractBuild(archive: string, directory: string, target: U
       files.push({path:entry.filename,size,sha256:hash.digest('hex'),...artifactMedia(entry.filename),spool})
     }
     for(const path of Object.values(manifest.client.entrypoints)) {
-      const entry=files.find(f=>f.path===path)
-      if(!entry || !entry.size || entry.size>1024*1024)throw new BuildValidationError('ENTRYPOINT_MISSING',{path})
+      const entry=files.find(f=>f.path===path)!
       try{new TextDecoder('utf-8',{fatal:true}).decode(await readFile(join(directory,entry.spool)))}catch{throw new BuildValidationError('ENTRYPOINT_INVALID_UTF8',{path})}
     }
     files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0)

@@ -1,0 +1,11 @@
+{
+  "name": "@chibaskogames/cli",
+  "version": "0.1.0",
+  "description": "Vérifie localement les ZIP de jeux HTML5 pour Chibasko Games.",
+  "type": "module",
+  "bin": { "chibasko": "dist/cli.mjs" },
+  "engines": { "node": "^24.0.0" },
+  "license": "SEE LICENSE IN LICENSE",
+  "files": ["dist/cli.mjs", "dist/child.mjs", "THIRD-PARTY-NOTICES.txt"],
+  "publishConfig": { "access": "public" }
+}

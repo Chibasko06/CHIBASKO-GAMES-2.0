@@ -43,6 +43,8 @@ yarn-error.log*
 /.open-next/
 /.wrangler/
 .distribution/
+/tools/public-cli/dist/
+/tools/public-cli/THIRD-PARTY-NOTICES.txt
 /public/optimized-game-images/
 .dev.vars*
 

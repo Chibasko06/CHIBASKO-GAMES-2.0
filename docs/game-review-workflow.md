@@ -129,6 +129,11 @@ npm run validate:game -- chemin/jeu.zip
 npm run validate:game -- chemin/jeu.zip --game <gameId> --version 1.0.0
 ```
 
+Le [guide du validateur public](../tools/public-cli/README.md) décrit la commande
+`npx @chibaskogames/cli validate mon-jeu.zip`. Elle sera disponible après
+publication du package. Le CLI réutilise le parseur isolé de la revue et la
+politique du dépôt. Il ne demande ni SDK, ni compte, ni accès au stockage distant.
+
 Il n'utilise ni compte, ni Supabase, ni R2, ni SDK. Il accepte un ZIP déjà construit
 quelle que soit la structure du projet. Le parseur s'exécute sans réseau, sans
 processus enfant supplémentaire autorisé et avec accès limité à sa copie

@@ -1,4 +1,6 @@
-import {mkdir,open,rename,chmod,unlink,mkdtemp,copyFile,rm,readFile,lstat,statfs} from 'node:fs/promises'
+import {mkdir,open,rename,chmod,unlink,mkdtemp,rm,readFile,lstat,statfs} from 'node:fs/promises'
+import {createReadStream,createWriteStream} from 'node:fs'
+import {pipeline} from 'node:stream/promises'
 import {join,resolve} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createHash} from 'node:crypto'
@@ -6,7 +8,6 @@ import {DistributionR2,r2EnvironmentReport,R2ConfigurationError} from '../../lib
 import {assertUploadId,UPLOAD_POLICY} from '../../lib/game-distribution/uploads/policy'
 import type {UploadPolicy} from '../../lib/game-distribution/uploads/policy'
 import {isolatedExtract} from './job'
-import {hashFile} from './extract'
 import {ExtractionFailure} from './extraction-diagnostics'
 import {isBuildVersion} from '../../lib/game-distribution/version'
 
@@ -46,6 +47,24 @@ export async function downloadReviewArchive(storage:ReadStorage,id:string,expect
     return {uploadId:id,bytes,sha256:hash.digest('hex'),etag:metadata.etag}
   }finally{await file.close().catch(()=>{});if(!complete)await unlink(partial).catch(()=>{})}
 }
+async function inspectSource(source:string,size:number,signal:AbortSignal,destination?:string){
+  const hash=createHash('sha256')
+  let bytes=0
+  const input=createReadStream(source,{signal})
+  async function* checked(chunks:AsyncIterable<Buffer>){
+    for await(const chunk of chunks){
+      bytes+=chunk.length
+      if(bytes>size)throw new Error('local_archive_changed_during_inspection')
+      hash.update(chunk)
+      yield chunk
+    }
+    if(bytes!==size)throw new Error('local_archive_changed_during_inspection')
+  }
+  if(destination)await pipeline(input,checked,createWriteStream(destination,{flags:'wx',mode:0o600}),{signal})
+  else for await(const chunk of checked(input))void chunk
+  return hash.digest('hex')
+}
+
 export async function inspectReviewArchive(archive:string,target:{gameId:string;version:string}|null,policy:UploadPolicy,signal:AbortSignal,childModule?:string){
   if(target){assertUploadId(target.gameId);if(!isBuildVersion(target.version))throw new Error('invalid_archive_command')}
   if(policy?.revision!==1)throw new Error('invalid_inspection_policy')
@@ -56,9 +75,10 @@ export async function inspectReviewArchive(archive:string,target:{gameId:string;
   if(!info.isFile()||info.isSymbolicLink()||info.size>policy.maxArchiveBytes)throw new Error('invalid_local_archive')
   const space=await statfs(tmpdir())
   if(space.bavail*space.bsize<info.size+3*1024**2+1024**3)throw new Error('inspection_disk_space_insufficient')
-  const before=await hashFile(source),directory=await mkdtemp(join(tmpdir(),'chibasko-readonly-inspection-'))
+  const directory=await mkdtemp(join(tmpdir(),'chibasko-readonly-inspection-'))
+  let before:string|undefined
   try{
-    await copyFile(source,join(directory,'archive.zip'))
+    before=await inspectSource(source,info.size,signal,join(directory,'archive.zip'))
     const request=await open(join(directory,'request.json'),'wx',0o600)
     try{await request.writeFile(JSON.stringify({target,policy,spoolAssets:false}))}finally{await request.close()}
     try{
@@ -68,6 +88,6 @@ export async function inspectReviewArchive(archive:string,target:{gameId:string;
     }catch(error){if(error instanceof ExtractionFailure)return {status:'invalid_or_incomplete',sourceSha256:before,diagnostic:error.diagnostic};throw error}
   }finally{
     await rm(directory,{recursive:true,force:true,maxRetries:3})
-    if(await hashFile(source)!==before)throw new Error('local_archive_changed_during_inspection')
+    if(before&&!signal.aborted&&await inspectSource(source,info.size,signal)!==before)throw new Error('local_archive_changed_during_inspection')
   }
 }

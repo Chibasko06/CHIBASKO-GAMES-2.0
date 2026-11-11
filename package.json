@@ -92,6 +92,8 @@
     "test:game-compatibility": "node --import ./tests/reliability-register.mjs --test tests/game-compatibility.test.mjs && node --test tests/catalogue-interface.browser.test.mjs",
     "test:final-ux": "node --import ./tests/reliability-register.mjs --test tests/final-ux.test.mjs && node --test tests/final-ux.browser.test.mjs",
     "review:archive": "node scripts/review-archive.mjs",
+    "build:public-cli": "node scripts/build-public-cli.mjs",
+    "test:public-cli": "npm run build:public-cli && node --test tests/public-cli.test.mjs",
     "validate:game": "node scripts/validate-game.mjs",
     "test:review-workflow": "npm run build:validator && npm run test:build-reviews && node --import ./tests/register.mjs --test tests/extraction-diagnostics.test.mjs tests/review-archive-readonly.test.mjs tests/submission-drafts.test.mjs tests/admin-review-presentation.test.mjs && node --test tests/build-review-cli.test.mjs"
   },
