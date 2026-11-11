@@ -6,7 +6,7 @@ import {chromium} from '@playwright/test'
 import {readFile,readdir,mkdtemp} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
-import {ZipReader,Uint8ArrayReader,TextWriter} from '@zip.js/zip.js'
+import {ZipReader,Uint8ArrayReader,TextWriter,ZipWriter,Uint8ArrayWriter,TextReader} from '@zip.js/zip.js'
 let game='54545454-5454-4454-8454-545454545454'
 const upload='56565656-5656-4656-8656-565656565656',sdkZipPath=process.env.SDK_TEST_BUILD_ZIP
 let sdkZip,sdkManifest,validateSdkZip,sdkMode=false,receivedSdk=false,partSize=8,uploaded=[]
@@ -19,6 +19,15 @@ if(sdkZipPath){
  const api=await import('data:text/javascript;base64,'+Buffer.from(validation.outputFiles[0].text).toString('base64'))
  validateSdkZip=bytes=>api.validateWebBuildZip(bytes,{gameId:game,version:sdkManifest.version},api.UPLOAD_POLICY)
  await validateSdkZip(sdkZip)
+}
+async function fixtureZip(version) {
+ const writer=new ZipWriter(new Uint8ArrayWriter(),{useWebWorkers:false})
+ await writer.add('chibasko.json',new TextReader(JSON.stringify({
+  schemaVersion:1,integrationVersion:1,gameId:game,version,integration:{mode:'classic'},
+  capabilities:{local:{players:{min:1,max:1}}},client:{entrypoints:{local:'index.html'}},
+ })))
+ await writer.add('index.html',new TextReader('<p>Fixture HTML5</p>'))
+ return {name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from(await writer.close())}
 }
 const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Submit from './components/SubmitGamePageClient';createRoot(document.getElementById('root')).render(<Submit categories={[{id:'${game}',name:'Fixture category',slug:'fixture'}]}/>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(api){
  api.onResolve({filter:/^(?:@\/components\/AuthProvider|next\/link|next\/navigation)$/},args=>({path:args.path,namespace:'fixture'}))
@@ -118,7 +127,7 @@ try{
   await page.getByRole('tab',{name:'Mettre à jour un jeu existant'}).click()
   await page.getByLabel('Jeu géré',{exact:true}).selectOption(game)
   const version=page.getByLabel('Version du build (SemVer)',{exact:true}),zip=page.locator('input[accept=".zip,application/zip"]')
-  await version.fill('0.3.1');await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')})
+  await version.fill('0.3.1');await zip.setInputFiles(await fixtureZip('0.3.1'))
   await page.getByRole('checkbox',{name:'Je dispose des droits nécessaires',exact:false}).check()
   for(const code of ['invalid_version','version_conflict','invalid_archive_size','storage_error','developer_profile_required']){
    uploadFailure=code
@@ -130,13 +139,13 @@ try{
     if(code==='version_conflict')assert.match(await alert.innerText(),/0\.3\.1/)
     await version.fill('0.3.2');await alert.waitFor({state:'detached'});await version.fill('0.3.1')
    }else if(code==='invalid_archive_size'){
-    assert.equal(await zip.getAttribute('aria-invalid'),'true');await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')});await alert.waitFor({state:'detached'})
+    assert.equal(await zip.getAttribute('aria-invalid'),'true');await zip.setInputFiles(await fixtureZip('0.3.1'));await alert.waitFor({state:'detached'})
    }else if(code==='developer_profile_required'){
     assert.equal(await page.locator('#developer-contact-errors [role=alert]').count(),1)
-    await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')});await alert.waitFor({state:'detached'})
+    await zip.setInputFiles(await fixtureZip('0.3.1'));await alert.waitFor({state:'detached'})
    }else{
     const bounds=await alert.boundingBox(),button=await page.getByRole('button',{name:'Reprendre et finaliser'}).boundingBox()
-    assert.ok(bounds.y+ bounds.height<=button.y);await zip.setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')});await alert.waitFor({state:'detached'})
+    assert.ok(bounds.y+ bounds.height<=button.y);await zip.setInputFiles(await fixtureZip('0.3.1'));await alert.waitFor({state:'detached'})
    }
   }
   uploadFailure='';await page.close()
@@ -164,7 +173,7 @@ try{
    assert.equal(await page.getByLabel('Développeur / studio',{exact:true}).count(),0)
    await page.getByLabel('Jeu géré',{exact:true}).selectOption(game)
    await page.getByLabel('Version du build (SemVer)',{exact:true}).fill('1.1.0')
-   await page.locator('input[accept=".zip,application/zip"]').setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')})
+   await page.locator('input[accept=".zip,application/zip"]').setInputFiles(await fixtureZip('1.1.0'))
    await page.getByRole('checkbox',{name:'Je dispose des droits nécessaires',exact:false}).check()
    await page.getByRole('button',{name:'Envoyer le build',exact:true}).click()
    await page.getByRole('heading',{name:'Jeu reçu — vérification sous 24 à 48 h'}).waitFor()
@@ -185,7 +194,19 @@ try{
    await page.getByLabel('Technologie',{exact:true}).fill('Godot Web')
    await page.locator('input[accept^="image/jpeg"]').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:Buffer.from('fixture-image')})
    await page.getByLabel('Version du build (SemVer)',{exact:true}).fill('1.0.0')
-   await page.locator('input[accept=".zip,application/zip"]').setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')})
+   await page.getByRole('radio',{name:'Jeu HTML5 classique'}).check()
+   await page.getByText('Préparer chibasko.json',{exact:true}).click()
+   const download=page.waitForEvent('download')
+   await page.getByRole('button',{name:'Télécharger chibasko.json'}).click()
+   const generated=JSON.parse(await readFile(await (await download).path(),'utf8'))
+   assert.equal(generated.gameId,game)
+   assert.equal(generated.version,'1.0.0')
+   assert.equal(generated.integration.mode,'classic')
+   const zipInput=page.locator('input[accept=".zip,application/zip"]')
+   await zipInput.setInputFiles({name:'broken.zip',mimeType:'application/zip',buffer:Buffer.from('broken')})
+   await page.getByText('ZIP à corriger',{exact:true}).waitFor()
+   assert.equal(await page.getByLabel('Développeur / studio',{exact:true}).inputValue(),'Fixture studio')
+   await page.locator('input[accept=".zip,application/zip"]').setInputFiles(await fixtureZip('1.0.0'))
    await page.getByRole('checkbox',{name:'Je dispose des droits nécessaires',exact:false}).check()
    await page.getByRole('button',{name:'Envoyer le build',exact:true}).click()
    await page.getByRole('heading',{name:'Jeu reçu — vérification sous 24 à 48 h'}).waitFor()
@@ -218,7 +239,7 @@ try{
    await page.getByLabel('Appareils compatibles',{exact:true}).selectOption('desktop')
    await page.getByLabel('Technologie',{exact:true}).fill('HTML/JS')
    await page.locator('input[accept^="image/jpeg"]').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:Buffer.from('fixture-image')})
-   await page.locator('input[accept=".zip,application/zip"]').setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('abcdefgh')})
+   await page.locator('input[accept=".zip,application/zip"]').setInputFiles(await fixtureZip('0.3.0'))
    await page.getByRole('checkbox',{name:'Je dispose des droits nécessaires',exact:false}).check()
    failPart=true;await page.getByRole('button',{name:'Envoyer le build',exact:true}).click()
    await page.getByRole('alert').waitFor();assert.equal(draft.upload.id,upload)
