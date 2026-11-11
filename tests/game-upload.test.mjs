@@ -45,6 +45,7 @@ function harness(manifest,bytes) {
       case 'distribution_resume_upload':row.status='uploading';break
       case 'distribution_enqueue_upload':row.status='queued';row.staging_etag=args.p_etag;break
       case 'distribution_validation_start':return;
+      case 'distribution_record_integration_scan':assert.equal(typeof args.p_scan.signals,'boolean');assert.ok(args.p_scan.bytes<=8388608);return;
       case 'distribution_claim':if(row.status!=='queued')return null;row.status='validating';row.lease_token=String(++claim);row.attempts++;break
       case 'distribution_checkpoint':row.checkpoint=args.p_checkpoint;break
       case 'distribution_validation_complete':if(completeFailure){completeFailure=false;throw new UploadError('database_error',503)}

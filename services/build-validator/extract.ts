@@ -8,6 +8,7 @@ import { validateManifest, BuildValidationError } from '../../lib/game-distribut
 import { artifactMedia } from '../../lib/game-distribution/paths'
 import type { UploadPolicy } from '../../lib/game-distribution/uploads/policy'
 import type { UploadTarget, ArtifactFile } from '../../lib/game-distribution/types'
+import {integrationScanner} from './integration-scan'
 
 class DiskReader extends Reader<string> {
   constructor(private path: string, size: number) { super(path); this.size=size }
@@ -39,14 +40,16 @@ export async function extractBuild(archive: string, directory: string, target: U
     const declared=json&&typeof json==='object'&&!Array.isArray(json)?json as Record<string,unknown>:{}
     const manifest=validateManifest(json,target??{gameId:declared.gameId as string,version:declared.version as string})
     const kept=new Set(['chibasko.json',...Object.values(manifest.client.entrypoints)])
-    const files: (ArtifactFile & {spool:string})[]=[];let total=0
+    const files: (ArtifactFile & {spool:string})[]=[],scan=integrationScanner();let total=0
     for(const [index,entry] of entries.entries()) {
+      const scanBytes=scan.file(entry.filename)
       const spool=String(index)+'.bin', file=spoolAssets||kept.has(entry.filename)?await open(join(directory,spool),'wx',0o600):null, hash=createHash('sha256');let size=0
       try {
         await entry.getData(new WritableStream<Uint8Array>({async write(bytes) {
           size+=bytes.length;total+=bytes.length
           if(size>entry.uncompressedSize || size>policy.maxFileBytes || total>policy.maxTotalBytes)throw new BuildValidationError('ARCHIVE_EXPANSION_LIMIT',{path:entry.filename})
           hash.update(bytes)
+          scanBytes(bytes)
           let offset=0
           while(file&&offset<bytes.length) {const written=await file.write(bytes,offset,bytes.length-offset);offset+=written.bytesWritten}
         }}))
@@ -62,7 +65,7 @@ export async function extractBuild(archive: string, directory: string, target: U
     files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0)
     const inventory=files.map(({path,size,sha256,contentType,contentEncoding})=>({path,size,sha256,contentType,...(contentEncoding?{contentEncoding}:{})}))
     const artifactSha256=createHash('sha256').update(JSON.stringify(inventory.map(({path,size,sha256})=>({path,size,sha256})))).digest('hex')
-    return {checkpoint:{manifest,files:inventory,artifactSha256,artifactSize:total,archiveSize,archiveSha256:await hashFile(archive)},spools:files.filter(file=>spoolAssets||kept.has(file.path)).map(({path,spool})=>({path,spool}))}
+    return {checkpoint:{manifest,files:inventory,artifactSha256,artifactSize:total,archiveSize,archiveSha256:await hashFile(archive),integrationScan:scan.result()},spools:files.filter(file=>spoolAssets||kept.has(file.path)).map(({path,spool})=>({path,spool}))}
   } finally {await reader.close()}
 }
 // This module is bundled separately; importing it in tests never starts a process.

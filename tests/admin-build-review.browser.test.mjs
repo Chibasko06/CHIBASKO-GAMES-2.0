@@ -41,6 +41,19 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='h
 let browser
 try{
  browser=await chromium.launch({channel:'chrome',headless:true})
+ await test('Chrome : un seul état d’intégration, détails séparés et vérification avant publication',async()=>{
+  row={...initial(),technicalStatus:'completed',versionStatus:'draft',gameVersionId:game,manifest:{integration:{mode:'sdk'},capabilities:{local:{players:{min:1,max:1}}}},integration:{declaredMode:'sdk',declaredVersion:'0.4.2',scan:{signals:true,complete:true,bytes:100},observation:null}};actions=[]
+  const page=await browser.newPage({viewport:{width:390,height:844}});await page.goto(origin)
+  await page.getByText('Intégration : Indéterminée — initialisation SDK non observée',{exact:true}).waitFor()
+  assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true)
+  await page.getByText('Détails de l’intégration',{exact:true}).click();await page.getByText('Version déclarée : 0.4.2, non attestée.',{exact:true}).waitFor()
+  row.integration.observation={mode:'sdk',protocol:2,at:'2026-11-10T12:00:00Z'};await page.reload()
+  await page.getByText('Intégration : SDK Chibasko Games — dialogue confirmé, version indéterminée',{exact:true}).waitFor()
+  row.integration={declaredMode:'classic',declaredVersion:null,scan:{signals:false,complete:true,bytes:100},observation:{mode:'classic',protocol:null,at:'2026-11-10T12:00:00Z'}};row.manifest.integration.mode='classic';await page.reload()
+  await page.getByText('Intégration : HTML5 classique — chargement observé, sans SDK requis',{exact:true}).waitFor()
+  if(styles)assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+  await page.close()
+ })
  await test('Chrome : correction explicite, reprise interne et conservation des étapes',async()=>{
   row=initial();row.technicalStatus='failed';row.errorCode='validation_failed';row.attempts=1;actions=[]
   row.history=[{at:'2026-11-10T10:00:00Z',action:'validation_diagnostic:'+JSON.stringify({attempt:1,version:1,kind:'internal',reason:'EXTRACTOR_IO_ERROR'})}]

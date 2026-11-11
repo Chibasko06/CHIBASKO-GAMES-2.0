@@ -11,8 +11,9 @@ export type ResolvedGameVersion = Readonly<{
 export type GameLaunchDescriptor = Readonly<{
   gameId:string;gameVersionId:string;integrationVersion:1;execution:Execution;entrypointUrl:string
   capabilities:GameBuildManifest['capabilities'];contentOrigin:string
+  integrationMode?:'classic'|'sdk'
 }>
-export type GatewayConfiguration = Readonly<{publicBase:string;previewBase:string;contentBase?:string;portalOrigins:readonly string[]}>
+export type GatewayConfiguration = Readonly<{stableOrigins?:boolean;publicBase:string;previewBase:string;contentBase?:string;portalOrigins:readonly string[]}>
 export type PreviewRecord = {id:string;version_id:string;execution:Execution;expires_at:string}
 export const PREVIEW_POLICY = Object.freeze({ticketSeconds:60,sessionSeconds:900,maxIssuePerMinute:30})
 export const PREVIEW_COOKIE='__Host-cg-preview'

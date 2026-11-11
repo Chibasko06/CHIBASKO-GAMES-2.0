@@ -28,9 +28,11 @@ export type SafeLaunchContext=Readonly<{
 export type RuntimeLaunchDescriptor=GameLaunchDescriptor & Readonly<{
   launchId:string;generation:string;expiresAt:string;bridgeVersion:1|2
   iframeProfile:'web-v1'|'web-isolated-v1'|'web-legacy-v1';context:SafeLaunchContext
+  delivery?:Readonly<{mode:'stable-public';ticket:string}>
 }>
 /** Portal-only handle. controlToken never reaches iframe/SDK or URL. */
 export type LaunchHandle={descriptor:RuntimeLaunchDescriptor;controlToken:string}
+export type IntegrationObservation={handle:LaunchHandle;mode:'classic'|'sdk';protocol:1|2|null}
 export type LaunchLease=Readonly<{launchId:string;generation:string;expiresAt:string}>
 export type LaunchClient={start?(handle:LaunchHandle,signal:AbortSignal):Promise<GameStartContext>;create(request:LaunchRequest,signal:AbortSignal):Promise<LaunchHandle>;renew(handle:LaunchHandle,signal:AbortSignal):Promise<LaunchLease>;release(handle:LaunchHandle):Promise<void>}
 export type GameMessageType='GAME_HELLO'|'GAME_READY'|'LEAVE_REQUEST'|'GAME_ERROR'|'GAME_PONG'|'GAME_AUDIO_SUPPORT'

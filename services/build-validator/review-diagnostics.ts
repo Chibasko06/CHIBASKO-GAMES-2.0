@@ -23,7 +23,7 @@ export function reviewFailureMessage(error:unknown,phase:string){
   if(!d)return 'Échec : diagnostic indéterminé. Aucun motif précis n’a été conservé pour cette tentative. Ne pas conclure à une archive invalide.'
   const description=describeValidation(d)
   const labels:Record<string,string>={forbidden_file:'fichier interdit',manifest:'manifeste incorrect',limit:'limite dépassée',archive:'archive non conforme',infrastructure:'infrastructure indisponible',internal:'incident interne',undetermined:'diagnostic indéterminé',loading:'chargement interrompu',sdk:'incompatibilité SDK démontrée'}
-  return ['Échec : '+labels[description.category],...(d.path?['Fichier : '+d.path]:[]),...(d.field?['Champ : '+d.field]:[]),
+  return ['Échec : '+labels[description.category],'Code : '+description.code,...(d.path?['Fichier : '+d.path]:[]),...(d.field?['Champ : '+d.field]:[]),
     'Phase : '+description.phase,'Cause : '+description.explanation,'Action : '+description.action,...(error.state.attempts?['Tentative : '+error.state.attempts]:[])].join('\n')
  }
  if(error instanceof R2ConfigurationError)return 'review_storage_configuration: variables manquantes : '+error.configuration.missing.join(', ')+' ; variables invalides : '+error.configuration.invalid.join(', ')

@@ -26,7 +26,7 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
   compatibilityDate:'2026-10-07',compatibilityFlags:['nodejs_compat'],
   bindings:{NEXT_PUBLIC_SUPABASE_URL:'https://supabase.example.test',NEXT_PUBLIC_SUPABASE_ANON_KEY:'fixture-public-key',
    NEXT_PUBLIC_SITE_URL:'https://chibaskogames.fr',CHIBASKO_CLOUDFLARE:'1',CONTACT_FORM_ENABLED:'0',
-   GAME_ACCOUNT_DELETIONS_ENABLED:'0',GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'0'},
+   GAME_ACCOUNT_DELETIONS_ENABLED:'0',GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'0',GAME_CONTENT_BASE_DOMAIN:'chibaskogames-play.fr'},
   serviceBindings:{ASSETS:()=>new Response(null,{status:404})},
   // Les lectures publiques sont simulées ; aucun service réel n’est appelé.
   outboundService:async request=>{
@@ -58,6 +58,13 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
  const references=new Set(['supabase',new URL(publicConfiguration.vars.NEXT_PUBLIC_SUPABASE_URL).hostname.split('.')[0]])
  const cookie=[...references].map(ref=>'sb-'+ref+'-auth-token=base64-'+Buffer.from(JSON.stringify(session)).toString('base64url')).join('; ')
  try{
+  const diagnosticReads=reads+profileReads
+  const diagnostic=await worker.dispatchFetch('https://chibaskogames.fr/diagnostics/game-storage')
+  assert.equal(diagnostic.status,200)
+  const diagnosticHtml=await diagnostic.text()
+  assert.ok(diagnosticHtml.includes('Lancer le diagnostic'))
+  assert.ok(diagnosticHtml.includes('diagnostics.chibaskogames-play.fr'))
+  assert.equal(reads+profileReads,diagnosticReads,'Le diagnostic ne doit pas charger de données Supabase.')
   for(const path of ['/','/games/stickman-fights']){
    const response=await worker.dispatchFetch('https://chibaskogames.fr'+path)
    const html=await response.text()

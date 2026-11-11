@@ -3,14 +3,20 @@ import { GatewayError } from './contracts'
 import type { ArtifactRange } from '../storage'
 
 /** URL parsers normalize dot segments. Check the available raw path BEFORE URL(). */
-export function artifactRequestPath(url:string) {
+export function artifactRequestPath(url:string,allowDirectory=false,prefix='') {
   const raw=/^https:\/\/[^/?#]+(\/[^?#]*)?(?:\?[^#]*)?$/.exec(url)
   if(!raw)throw new GatewayError('invalid_artifact_path',400)
   const path=(raw[1] ?? '/').slice(1)
   if(/%(?:2e|2f|5c|25|00)/i.test(path))throw new GatewayError('invalid_artifact_path',400)
   let decoded:string
   try{decoded=decodeURIComponent(path)}catch{throw new GatewayError('invalid_artifact_path',400)}
-  try{assertArtifactPath(decoded)}catch{throw new GatewayError('invalid_artifact_path',400)}
+  if(prefix){
+    if(decoded===prefix)decoded=''
+    else if(decoded.startsWith(prefix+'/'))decoded=decoded.slice(prefix.length+1)
+    else throw new GatewayError('invalid_artifact_path',400)
+  }
+  if(allowDirectory&&decoded==='')return ''
+  try{assertArtifactPath(allowDirectory&&decoded.endsWith('/')?decoded.slice(0,-1):decoded)}catch{throw new GatewayError('invalid_artifact_path',400)}
   return decoded
 }
 export function parseByteRange(value:string|null,size:number):ArtifactRange|undefined {

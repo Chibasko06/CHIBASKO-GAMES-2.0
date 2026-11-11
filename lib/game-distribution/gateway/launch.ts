@@ -5,6 +5,7 @@ import { resolveGameVersion, launchDescriptor, validateGatewayConfiguration } fr
 import { GatewayError, type GatewayConfiguration } from './contracts'
 import { RUNTIME_POLICY, safeContext, type LaunchHandle, type LaunchLease, type LaunchRequest, type SafeLaunchContext } from '../../game-runtime/contracts'
 import { parse } from 'tldts'
+import {publicGameHost} from './public-origin'
 
 type Configuration=GatewayConfiguration & {contentBase:string}
 export type LaunchPhase='version_authorization'|'version_resolution'|'online_authorization'|'launch_session_creation'|'artifact_gateway_resolution'|'launch_session_control'
@@ -15,7 +16,7 @@ export type OnlineLaunchAuthorizer=(actor:string,request:LaunchRequest)=>Promise
 function randomHex(bytes:number){return [...crypto.getRandomValues(new Uint8Array(bytes))].map(b=>b.toString(16).padStart(2,'0')).join('')}
 export async function launchHash(value:string){return sha256(new TextEncoder().encode(value))}
 export function validateLaunchConfiguration(config:Configuration) {
-  // Launch authorization uses a random host capability, never same-site cookies.
+  // Le site de contenu doit rester distinct du portail, quel que soit le mode de livraison.
   const suffix=parse(config.contentBase,{allowPrivateDomains:true})
   if(suffix.domain!==config.contentBase && !(suffix.isPrivate && suffix.publicSuffix===config.contentBase))throw new GatewayError('invalid_gateway_configuration',503)
   validateGatewayConfiguration({...config,publicBase:'l-'+ 'a'.repeat(48)+'.'+config.contentBase,previewBase:'l-'+ 'a'.repeat(48)+'.'+config.contentBase})
@@ -54,9 +55,11 @@ export function launchService(db:UploadRepository,configuration:Configuration,au
       if(!session || !UUID.test(session.id) || !UUID.test(session.generation) || session.version_id!==request.gameVersionId
         || !Number.isFinite(Date.parse(session.expires_at)))throw new GatewayError('invalid_launch_session',503)
       phase('artifact_gateway_resolution')
-      const origin=`https://l-${capability}.${config.contentBase}`
+      const stable=config.stableOrigins===true&&request.audience==='published'
+      if(stable)await db.call('distribution_issue_public_delivery',{p_launch:session.id,p_control_hash:await launchHash(control),p_ticket_hash:await launchHash(capability)})
+      const origin='https://'+(stable?publicGameHost(request.gameId,config.contentBase):`l-${capability}.${config.contentBase}`)
       return {descriptor:{...launchDescriptor(version,request.execution,origin),launchId:session.id,generation:session.generation,
-        expiresAt:session.expires_at,bridgeVersion:2,iframeProfile:version.policy.profile,context},controlToken:control}
+        expiresAt:session.expires_at,bridgeVersion:2,iframeProfile:version.policy.profile,context,...(stable?{delivery:{mode:'stable-public' as const,ticket:capability}}:{})},controlToken:control}
     },
     async authorize(capability:string) {
       if(!/^[a-f0-9]{48}$/.test(capability))throw new GatewayError('launch_expired',403)

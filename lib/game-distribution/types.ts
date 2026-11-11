@@ -5,6 +5,7 @@ export type GameBuildManifest = Readonly<{
   gameId: string
   version: string
   integrationVersion: 1
+  integration?: Readonly<{mode:'classic'|'sdk';sdkVersion?:string}>
   capabilities: Readonly<{
     local?: Readonly<{ players: Readonly<{ min: number; max: number }> }>
     online?: Readonly<{ access: readonly ('public' | 'private')[]; players: Readonly<{ min: number; max: number }> }>

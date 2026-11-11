@@ -8,7 +8,7 @@ export type Upload = {
   expires_at: string; policy: UploadPolicy; lease_token: string | null; attempts: number
   error_code: string | null; checkpoint: CheckpointSummary | null; cleaned_at: string | null
 }
-export type Checkpoint = ValidatedWebBuild & { archiveSha256: string; archiveSize: number }
+export type Checkpoint = ValidatedWebBuild & { archiveSha256: string; archiveSize: number;integrationScan?:{signals:boolean;complete:boolean;bytes:number} }
 export type CheckpointSummary = Omit<Checkpoint,'files'> & {fileCount:number}
 export type Part = { number: number; size: number; etag: string }
 export type StagingStorage = {

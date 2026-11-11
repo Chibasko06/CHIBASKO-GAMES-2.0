@@ -1,4 +1,5 @@
 import { validateManifest } from '../manifest'
+import {effectiveIntegration} from '../integration'
 import { gameArtifactKeys } from '../keys'
 import { UUID } from '../uploads/policy'
 import { getDomain, parse } from 'tldts'
@@ -45,7 +46,7 @@ export function launchDescriptor(version:ResolvedGameVersion,execution:Execution
   const path=version.entrypoints[execution]
   if(!path || !version.manifest.capabilities[execution])throw new GatewayError('unsupported_execution',400)
   return Object.freeze({gameId:version.gameId,gameVersionId:version.versionId,integrationVersion:version.manifest.integrationVersion,
-    execution,entrypointUrl:new URL(path,origin+'/').href,capabilities:version.manifest.capabilities,contentOrigin:origin})
+    execution,entrypointUrl:new URL(path,origin+'/').href,capabilities:version.manifest.capabilities,contentOrigin:origin,...(version.manifest.integration?{integrationMode:effectiveIntegration(version.manifest)}:{})})
 }
 export function validateGatewayConfiguration(config:GatewayConfiguration) {
   if(!config.portalOrigins.length)throw new GatewayError('invalid_gateway_configuration',503)

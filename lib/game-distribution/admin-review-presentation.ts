@@ -10,7 +10,9 @@ export function reviewPresentation(build:AdminBuild,checks=build.review.checklis
  const complete=build.technicalStatus==='completed'
  const canTest=complete&&!!build.gameVersionId&&['draft','in_review','approved','published'].includes(build.versionStatus??'')&&!archived&&!rejected
  const canReview=complete&&!!build.gameVersionId&&['draft','in_review'].includes(build.versionStatus??'')&&!terminal
- const canPublish=canReview&&build.versionStatus==='in_review'&&build.review.decision==='reviewed'&&!!build.review.reviewedAt&&checklistComplete(build.review.checklist)&&checklistComplete(checks)
+ const declared=(build.manifest?.integration as {mode?:string}|undefined)?.mode
+ const integrationVerified=!declared||build.integration?.observation?.mode===declared
+ const canPublish=canReview&&integrationVerified&&build.versionStatus==='in_review'&&build.review.decision==='reviewed'&&!!build.review.reviewedAt&&checklistComplete(build.review.checklist)&&checklistComplete(checks)
  const diagnostic=(build.history??[]).map(event=>parseValidationEvent(event.action)).filter(event=>event?.attempt===build.attempts).at(-1)?.diagnostic
  const incident=diagnostic&&['internal','infrastructure'].includes(diagnostic.kind)
  const correction=build.review.decision==='pending'&&!!build.review.reason

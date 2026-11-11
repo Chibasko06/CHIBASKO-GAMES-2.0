@@ -19,7 +19,8 @@ export function launchConfiguration(env:Record<string,string|undefined>){
  try{const url=new URL(env.NEXT_PUBLIC_SUPABASE_URL!);if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw Error()}catch{report.invalid.push('NEXT_PUBLIC_SUPABASE_URL')}
  if(env.SUPABASE_SERVICE_ROLE_KEY?.startsWith('sb_publishable_'))report.invalid.push('SUPABASE_SERVICE_ROLE_KEY')
  if(report.invalid.length)throw new LaunchConfigurationError(report,'invalid_environment')
- const config={publicBase:env.GAME_CONTENT_PUBLIC_BASE??'',previewBase:env.GAME_CONTENT_PREVIEW_BASE??'',contentBase:env.GAME_CONTENT_BASE_DOMAIN!,portalOrigins:env.GAME_PORTAL_ORIGINS!.split(',').map(s=>s.trim()).filter(Boolean)}
+ if(env.GAME_STABLE_ORIGINS_ENABLED!==undefined&&!['0','1'].includes(env.GAME_STABLE_ORIGINS_ENABLED))throw new LaunchConfigurationError({...report,invalid:['GAME_STABLE_ORIGINS_ENABLED']},'invalid_environment')
+ const config={stableOrigins:env.GAME_STABLE_ORIGINS_ENABLED==='1',publicBase:env.GAME_CONTENT_PUBLIC_BASE??'',previewBase:env.GAME_CONTENT_PREVIEW_BASE??'',contentBase:env.GAME_CONTENT_BASE_DOMAIN!,portalOrigins:env.GAME_PORTAL_ORIGINS!.split(',').map(s=>s.trim()).filter(Boolean)}
  try{return validateLaunchConfiguration(config)}catch{
   throw new LaunchConfigurationError({...report,invalid:['GAME_CONTENT_BASE_DOMAIN','GAME_PORTAL_ORIGINS']},'invalid_content_origin')
  }

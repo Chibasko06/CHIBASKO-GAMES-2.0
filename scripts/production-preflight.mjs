@@ -65,6 +65,10 @@ export const migrations = Object.freeze([
   '20261109000100_google_profile_initialization.sql',
   '20261110000100_faq_ordering.sql',
   '20261110000200_build_review_workflow.sql',
+  '20261110000300_build_integrations.sql',
+  '20261110000400_public_game_origins.sql',
+  '20261110000500_public_delivery_sessions.sql',
+  '20261110000600_versioned_public_delivery.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']
@@ -85,6 +89,7 @@ export function environmentChecks(component, env) {
   const checks = environments[component].map(name => ({ check: name, ok: typeof env[name] === 'string' && env[name].trim().length > 0 }))
   const add = (check, ok) => checks.push({ check, ok: Boolean(ok) })
   if(component==='portal'){
+    if(env.GAME_STABLE_ORIGINS_ENABLED!==undefined)add('GAME_STABLE_ORIGINS_ENABLED:boolean',['0','1'].includes(env.GAME_STABLE_ORIGINS_ENABLED))
     if(env.MODERATION_MEASURES_ENABLED!==undefined)add('MODERATION_MEASURES_ENABLED:boolean',['0','1'].includes(env.MODERATION_MEASURES_ENABLED))
     if(env.MODERATION_MEASURES_ENABLED==='1')add('MODERATION_MEASURES_RETENTION_DAYS:policy',/^[1-9][0-9]{0,3}$/.test(env.MODERATION_MEASURES_RETENTION_DAYS??'')&&Number(env.MODERATION_MEASURES_RETENTION_DAYS)<=3650)
   }

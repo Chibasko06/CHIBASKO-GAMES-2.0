@@ -1,5 +1,10 @@
 # Revue des jeux : diagnostic et correction
 
+Le [guide des intégrations HTML5 et SDK](build-integrations.md) distingue le
+manifeste de distribution, le SDK facultatif et les observations du lecteur.
+Il décrit la migration additive et le déploiement coordonné du Gateway et du
+portail nécessaires aux nouveaux modes explicites.
+
 ## Parcours courant
 
 1. Ouvrir Administration → Publications de jeux, puis le dossier du build.

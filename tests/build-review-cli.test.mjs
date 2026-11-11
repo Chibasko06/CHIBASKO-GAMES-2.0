@@ -34,6 +34,7 @@ test('compiled local review uses real parser/R2 adapter, final DB state and clea
             case 'distribution_claim':assert.equal(state,'queued');state='validating';return Response.json({id,game_id:manifest.gameId,version:manifest.version,version_id:id,
               staging_key:'staging/uploads/'+id+'/source.zip',staging_etag:'fixture-etag',expected_size:bytes.length,lease_token:'fixture-lease',
               policy:{revision:1,jobSeconds:120,maxArchiveBytes:1048576,maxTotalBytes:1048576,maxFileBytes:1048576,maxFiles:100,maxManifestBytes:65536,maxCompressionRatio:200,maxPathDepth:32,validationMs:30000}});
+            case 'distribution_record_integration_scan':return new Response(null,{status:204});
             case 'distribution_checkpoint':assert.equal(body.p_checkpoint.manifest.gameId,manifest.gameId);return new Response(null,{status:204});
             case 'distribution_validation_complete':assert.ok(puts>=4);state='completed';return Response.json({status:state});
             case 'distribution_validation_fail':assert.equal(body.p_retry,false);diagnostic=body.p_diagnostic;state='failed';return new Response(null,{status:204});

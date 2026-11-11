@@ -2,7 +2,7 @@ import {DEFAULT_AUDIO,safeAudio,type PlayerAudioState} from './audio'
 import { BRIDGE_CHANNEL, objectWithKeys, runtimePolicy, validGameMessage, type RuntimePolicy, type RuntimeLaunchDescriptor, type RuntimePhase } from './contracts'
 import type { GameStartContext } from '../online-session/contracts'
 
-type Options={getAudioState?:()=>PlayerAudioState;onAudioSupport?:(supported:boolean)=>void;host:Window;source:()=>Window|null;descriptor:RuntimeLaunchDescriptor;onPhase:(phase:RuntimePhase)=>void;onFailure:(code:string)=>void;onLeave:()=>void;onDocument?:()=>void;policy?:Partial<RuntimePolicy>;getStartContext?:()=>Promise<GameStartContext>}
+type Options={onReady?:(protocol:1|2)=>void;getAudioState?:()=>PlayerAudioState;onAudioSupport?:(supported:boolean)=>void;host:Window;source:()=>Window|null;descriptor:RuntimeLaunchDescriptor;onPhase:(phase:RuntimePhase)=>void;onFailure:(code:string)=>void;onLeave:()=>void;onDocument?:()=>void;policy?:Partial<RuntimePolicy>;getStartContext?:()=>Promise<GameStartContext>}
 /** Independent document, HELLO/INIT acknowledgement and game-ready budgets.
  * PONG acknowledges INIT without introducing a new wire message. */
 export function createGameBridge(options:Options) {
@@ -74,7 +74,7 @@ export function createGameBridge(options:Options) {
     if(message.type==='GAME_PONG' && pending && message.payload.sequence===pending){pending=0;deadline=0;acknowledge();return}
     if(message.type==='GAME_READY') {
       if(ready)return
-      acknowledge();ready=true;clearTimeout(readyTimer);options.onPhase('ready');if(!host.document.hidden)start();return
+      acknowledge();ready=true;clearTimeout(readyTimer);options.onReady?.(protocol);options.onPhase('ready');if(!host.document.hidden)start();return
     }
     if(message.type==='GAME_ERROR'){fail('game_error');return}
     if(ready && message.type==='LEAVE_REQUEST')options.onLeave()

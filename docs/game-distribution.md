@@ -81,6 +81,24 @@ fiche réellement enregistrée :
   Les capacités locales/online peuvent avoir des capacités joueurs différentes.
 - crossOriginIsolation signale un besoin technique, jamais une permission accordée.
 
+### Chemins des builds hébergés
+
+Un build doit fonctionner depuis un sous-répertoire, avec des ressources relatives.
+Le Gateway des origines stables sert les fichiers sous
+`/__chibasko_build__/<UUID-version>/`. L'origine du jeu reste inchangée : les
+sauvegardes localStorage/IndexedDB sont donc communes aux versions du même jeu.
+Les prévisualisations privées et les URL externes conservent leur distribution.
+
+Les chemins absolus de même origine sont redirigés vers la version indiquée par
+leur référent de même origine. Ce référent sert au routage, jamais à l'autorisation.
+Une requête absolue sans contexte de version est refusée ; un build imposant
+`no-referrer` doit utiliser des chemins relatifs déjà épinglés. Les requêtes vers
+une autre origine ne reçoivent pas ce référent. Aucun HTML ou JavaScript du jeu
+n'est réécrit par le Gateway et aucune nouvelle version du SDK n'est requise.
+
+Voir [la qualification des origines stables](stable-origins-final-qualification.md)
+avant toute activation : le flag de production reste désactivé.
+
 ## 5. Exclusions volontaires
 
 Titre, description, catégories, miniature, éditeur affiché, modération et publication

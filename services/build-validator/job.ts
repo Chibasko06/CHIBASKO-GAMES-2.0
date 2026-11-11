@@ -88,6 +88,7 @@ export async function processUpload(id: string, db: UploadRepository, staging: S
     signal.throwIfAborted()
     phase='checkpoint'
     await db.call('distribution_checkpoint',{p_id:id,p_lease:upload.lease_token,p_checkpoint:summary})
+    if(checkpoint.integrationScan)await db.call('distribution_record_integration_scan',{p_id:id,p_lease:upload.lease_token,p_scan:checkpoint.integrationScan})
     phase='artifacts'
     const keys=gameArtifactKeys(upload.game_id,upload.version_id,checkpoint.artifactSha256), bucket=artifacts.bucket(signal)
     async function put(key: string,size: number,sha256: string,makeBody: ()=>Uint8Array | ReadableStream<Uint8Array>, media={contentType:'application/octet-stream'} as {contentType:string;contentEncoding?:'gzip'|'br'}) {

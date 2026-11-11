@@ -132,6 +132,14 @@ try {
   reference.migrations.push({name,sha256:sqlSha256(await readFile(file))})
   const state=await snapshot();snapshots.push(state);reference.stages.push(state.objects)
  }
+ if(process.argv.includes('--focus-public-versions')){
+  const {publicVersionBrowserIntegration}=await import('./public-version-browser-db.mjs')
+  await publicVersionBrowserIntegration(async sql=>(await query(sql)).stdout.trim())
+ }else if(process.argv.includes('--focus-public-origins')){
+  const {publicOriginsIntegration}=await import('./public-origins-db.mjs')
+  await publicOriginsIntegration(async sql=>(await query(sql)).stdout.trim())
+  await run('psql',[...args,'-f',join(root,'scripts/sql/public-game-origins-preflight.sql')])
+ }else{
  const final=await snapshot()
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261024000100_account_deletion.sql')]))
  assert.equal(compareSchema(base,reference).status,'MIGRATIONS_REQUIRED',JSON.stringify(compareSchema(base,reference).rows.filter(row=>row.status==='BLOCKING_DRIFT')))
@@ -260,7 +268,13 @@ try {
  const output=join(root,'contracts/production-schema.v1.json')
  const {buildReviewWorkflowIntegration}=await import('./build-review-workflow-db.mjs')
  await buildReviewWorkflowIntegration(async sql=>(await query(sql)).stdout.trim())
+ const {buildReviewPipelineIntegration}=await import('./build-review-pipeline-db.mjs')
+ await buildReviewPipelineIntegration(async sql=>(await query(sql)).stdout.trim())
+ const {publicOriginsIntegration}=await import('./public-origins-db.mjs')
+ await publicOriginsIntegration(async sql=>(await query(sql)).stdout.trim())
+ await run('psql',[...args,'-f',join(root,'scripts/sql/public-game-origins-preflight.sql')])
  if(process.argv.includes('--write')){await mkdir(join(root,'contracts'),{recursive:true});await writeFile(output,JSON.stringify(reference)+'\n')}
  else assert.deepEqual(JSON.parse(await readFile(output,'utf8')),reference,'Regenerate the reviewed schema reference after a migration change')
  console.log('Schema drift PASS: every migration prefix, RLS/grants/function access/columns/triggers, cleanup fencing/idempotence and browser denial, disposable PostgreSQL only.')
+ }
 } finally {if(started)await run('pg_ctl',['-D',data,'-m','fast','-w','stop'])}

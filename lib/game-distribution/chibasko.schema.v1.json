@@ -10,6 +10,10 @@
     "gameId": { "$ref": "#/$defs/id" },
     "version": { "$ref": "#/$defs/version" },
     "integrationVersion": { "const": 1 },
+    "integration": {
+      "type":"object","additionalProperties":false,"required":["mode"],
+      "properties":{"mode":{"enum":["classic","sdk"]},"sdkVersion":{"$ref":"#/$defs/version"}}
+    },
     "capabilities": {
       "type": "object", "additionalProperties": false, "minProperties": 1,
       "properties": {
@@ -38,6 +42,10 @@
     }
   },
   "allOf": [
+    {
+      "if":{"required":["integration"],"properties":{"integration":{"properties":{"mode":{"const":"classic"}}}}},
+      "then":{"properties":{"capabilities":{"not":{"required":["online"]}},"integration":{"not":{"required":["sdkVersion"]}}}}
+    },
     {
       "if": { "properties": { "capabilities": { "required": ["local"] } } },
       "then": { "properties": { "client": { "properties": { "entrypoints": { "required": ["local"] } } } } },

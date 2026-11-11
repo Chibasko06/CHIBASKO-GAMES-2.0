@@ -2,20 +2,24 @@ import type {PlayerAudioState} from './audio'
 import { getDomain, parse } from 'tldts'
 import { createGameBridge } from './bridge'
 import {GAME_SANDBOX,gameFramePermissions} from './iframePolicy'
-import { objectWithKeys, safeContext, RuntimeError, RUNTIME_POLICY, runtimePolicy, type RuntimePolicy, type LaunchClient, type LaunchHandle, type LaunchRequest, type RuntimeState } from './contracts'
+import {PUBLIC_BOOTSTRAP} from '../game-distribution/gateway/public-origin'
+import { objectWithKeys, safeContext, RuntimeError, RUNTIME_POLICY, runtimePolicy, type RuntimePolicy, type LaunchClient, type LaunchHandle, type LaunchRequest, type RuntimeState,type IntegrationObservation } from './contracts'
 
 export const IFRAME_SANDBOX=GAME_SANDBOX
 export function validateLaunchHandle(value:unknown,request:LaunchRequest,parentOrigin:string):LaunchHandle {
   if(!objectWithKeys(value,['descriptor','controlToken']) || typeof value.controlToken!=='string' || !/^[a-f0-9]{64}$/.test(value.controlToken))throw new RuntimeError('invalid_descriptor')
   const h=value as LaunchHandle,d=h.descriptor
-  const keys=['gameId','gameVersionId','integrationVersion','execution','entrypointUrl','capabilities','contentOrigin','launchId','generation','expiresAt','bridgeVersion','iframeProfile','context']
+  const keys=['gameId','gameVersionId','integrationVersion','execution','entrypointUrl','capabilities','contentOrigin','launchId','generation','expiresAt','bridgeVersion','iframeProfile','context',...(Object.hasOwn(d,'integrationMode')?['integrationMode']:[]),...(Object.hasOwn(d,'delivery')?['delivery']:[])]
   if(!objectWithKeys(d,keys) || d.gameId!==request.gameId || d.gameVersionId!==request.gameVersionId || d.execution!==request.execution
     || ![1,2].includes(d.bridgeVersion) || d.integrationVersion!==1 || !/^[a-f0-9-]{36}$/.test(d.launchId) || !/^[a-f0-9-]{36}$/.test(d.generation)
+    || (d.integrationMode!==undefined&&!['classic','sdk'].includes(d.integrationMode)) || (d.integrationMode==='classic'&&d.execution!=='local')
     || !['web-v1','web-isolated-v1','web-legacy-v1'].includes(d.iframeProfile) || !safeContext(d.context)
     || d.context.gameId!==d.gameId || d.context.gameVersionId!==d.gameVersionId || d.context.execution!==d.execution)throw new RuntimeError('invalid_descriptor')
   const parent=new URL(parentOrigin),url=new URL(d.entrypointUrl),origin=new URL(d.contentOrigin)
   const launchHost=/^l-[a-f0-9]{48}\.(.+)$/.exec(origin.hostname)
-  const base=launchHost?.[1],suffix=base?parse(base,{allowPrivateDomains:true}):undefined
+  const stableHost=/^g-([a-f0-9]{32})\.(.+)$/.exec(origin.hostname)
+  if(Object.hasOwn(d,'delivery')&&(!objectWithKeys(d.delivery,['mode','ticket'])||d.delivery.mode!=='stable-public'||typeof d.delivery.ticket!=='string'||!/^[a-f0-9]{48}$/.test(d.delivery.ticket)||request.audience!=='published'||stableHost?.[1]!==d.gameId.replaceAll('-','')))throw new RuntimeError('invalid_descriptor')
+  const base=d.delivery?stableHost?.[2]:launchHost?.[1],suffix=base?parse(base,{allowPrivateDomains:true}):undefined
   const parentSite=getDomain(parent.hostname,{allowPrivateDomains:true}),contentSite=getDomain(origin.hostname,{allowPrivateDomains:true})
   if(origin.origin!==d.contentOrigin || url.origin!==origin.origin || url.hash || url.search || url.username || url.password || origin.protocol!=='https:' || origin.port
     || !base || !suffix || !(suffix.domain===base || (suffix.isPrivate && suffix.publicSuffix===base))
@@ -24,7 +28,7 @@ export function validateLaunchHandle(value:unknown,request:LaunchRequest,parentO
   if(Date.parse(d.expiresAt)>Date.now()+RUNTIME_POLICY.sessionSeconds*1000+5000)throw new RuntimeError('invalid_descriptor')
   return h
 }
-type Options={getAudioState?:()=>PlayerAudioState;onAudioSupport?:(supported:boolean)=>void;container:HTMLElement;request:LaunchRequest;client:LaunchClient;onState:(state:RuntimeState)=>void;onLeave:()=>void;policy?:Partial<RuntimePolicy>}
+type Options={onIntegration?:(observation:IntegrationObservation)=>void;getAudioState?:()=>PlayerAudioState;onAudioSupport?:(supported:boolean)=>void;container:HTMLElement;request:LaunchRequest;client:LaunchClient;onState:(state:RuntimeState)=>void;onLeave:()=>void;policy?:Partial<RuntimePolicy>}
 /** DOM host, reusable without React. A retry must create a completely new launch. */
 export function mountGameRuntime(options:Options) {
   const {container,client,request}=options,host=container.ownerDocument.defaultView!,policy=runtimePolicy(options.policy),abort=new AbortController()
@@ -33,7 +37,7 @@ export function mountGameRuntime(options:Options) {
   const descriptorTimer=setTimeout(()=>fail('descriptor_timeout'),policy.descriptorMs)
   const state=(phase:RuntimeState['phase'],error?:string)=>{if(!disposed)options.onState({phase,...(error?{error}:{})})}
   const release=(h:LaunchHandle)=>{void client.release(h).catch(()=>{})}
-  function detach(){clearTimeout(descriptorTimer);clearTimeout(loadTimer);clearTimeout(expiryTimer);clearTimeout(leaseTimer);clearTimeout(renewTimer);abort.abort();renewAbort?.abort();host.document.removeEventListener('visibilitychange',visibility);bridge?.dispose();iframe?.removeEventListener('load',loaded);iframe?.removeEventListener('error',iframeError);iframe?.remove();if(handle){release(handle);handle=undefined}}
+  function detach(){clearTimeout(descriptorTimer);clearTimeout(loadTimer);clearTimeout(expiryTimer);clearTimeout(leaseTimer);clearTimeout(renewTimer);abort.abort();renewAbort?.abort();host.removeEventListener('message',deliveryMessage);host.document.removeEventListener('visibilitychange',visibility);bridge?.dispose();iframe?.removeEventListener('load',loaded);iframe?.removeEventListener('error',iframeError);iframe?.remove();if(handle){release(handle);handle=undefined}}
   function fail(code:string){if(disposed || failed)return;failed=true;detach();state('failed',code)}
   function close(){if(disposed)return;detach();state('closed');disposed=true;options.onLeave()}
   function armLease(expires:string){expiresAt=Date.parse(expires);clearTimeout(expiryTimer);expiryTimer=setTimeout(()=>fail('launch_expired'),Math.max(0,expiresAt-Date.now()));bridge?.renew(expires)}
@@ -56,7 +60,14 @@ export function mountGameRuntime(options:Options) {
     } finally {clearTimeout(renewTimer);renewAbort=undefined;renewing=false}
   }
   function visibility(){if(!host.document.hidden && !disposed && !failed){if(expiresAt<=Date.now())fail('launch_expired');else void renew()}}
-  function loaded(){if(disposed || failed)return;if(++loads>1){fail('unexpected_navigation');return}clearTimeout(loadTimer);bridge?.loaded()}
+  function deliveryMessage(event:MessageEvent){const d=handle?.descriptor;if(!d?.delivery||event.source!==iframe?.contentWindow||event.origin!==d.contentOrigin||!objectWithKeys(event.data,['channel','type','launchId','generation']))return
+    if(event.data.channel==='chibasko.delivery'&&event.data.launchId===d.launchId&&event.data.generation===d.generation){
+      if(event.data.type==='failed')fail('delivery_cookie_unavailable')
+      if(event.data.type==='version_conflict')fail('delivery_version_conflict')
+    }}
+  function loaded(){if(disposed || failed)return;loads++;const expected=handle?.descriptor.delivery?2:1;if(loads>expected){fail('unexpected_navigation');return}if(loads<expected)return;clearTimeout(loadTimer)
+    if(handle?.descriptor.integrationMode==='classic'){state('running');options.onIntegration?.({handle,mode:'classic',protocol:null});return}
+    bridge?.loaded()}
   function iframeError(){fail('iframe_error')}
   state('resolving')
   void client.create(request,abort.signal).then(value=>{
@@ -70,12 +81,13 @@ export function mountGameRuntime(options:Options) {
     // Only the host container may fullscreen, keeping its exit control visible.
     iframe.setAttribute('allow',gameFramePermissions(d.contentOrigin,d.iframeProfile==='web-isolated-v1'))
     iframe.referrerPolicy='no-referrer';iframe.style.cssText='width:100%;height:100%;border:0;display:block;min-width:0'
-    const src=new URL(d.entrypointUrl)
-    src.hash=new URLSearchParams({cgLaunch:d.launchId,cgGeneration:d.generation,cgParent:host.location.origin}).toString()
+    const src=new URL(d.delivery?PUBLIC_BOOTSTRAP:d.entrypointUrl,d.contentOrigin)
+    src.hash=new URLSearchParams({cgLaunch:d.launchId,cgGeneration:d.generation,cgParent:host.location.origin,...(d.delivery?{ticket:d.delivery.ticket}:{})}).toString()
     iframe.src=src.href
     iframe.addEventListener('load',loaded)
     iframe.addEventListener('error',iframeError)
-    bridge=createGameBridge({getAudioState:options.getAudioState,onAudioSupport:options.onAudioSupport,host,source:()=>iframe?.contentWindow ?? null,descriptor:d,policy,
+    if(d.delivery)host.addEventListener('message',deliveryMessage)
+    if(d.integrationMode!=='classic')bridge=createGameBridge({onReady:protocol=>{if(handle)options.onIntegration?.({handle,mode:'sdk',protocol})},getAudioState:options.getAudioState,onAudioSupport:options.onAudioSupport,host,source:()=>iframe?.contentWindow ?? null,descriptor:d,policy,
       getStartContext:async()=>{if(!handle || !client.start)throw new RuntimeError('online_session_unavailable');return client.start(handle,abort.signal)},
       onDocument:()=>clearTimeout(loadTimer),onPhase:phase=>{state(phase)},onFailure:fail,onLeave:close})
     loadTimer=setTimeout(()=>fail('iframe_load_timeout'),policy.loadMs)

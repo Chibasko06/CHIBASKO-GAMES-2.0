@@ -1,19 +1,23 @@
 import test,{before,after} from 'node:test'
 import assert from 'node:assert/strict'
 import {build} from 'esbuild'
-import {chromium} from '@playwright/test'
+import {chromium,firefox,webkit} from '@playwright/test'
 import {readFileSync} from 'node:fs'
+import {randomUUID} from 'node:crypto'
 import {runtimeHarness} from './helpers/runtime-harness.mjs'
 import {gameLaunchRequest} from '../lib/server/gameLaunches.ts'
 import {assertPlayerLayout} from './helpers/player-layout.mjs'
+import {localHTTPSFixture} from './helpers/local-https.mjs'
 
 let browser,js,css
 before(async()=>{
   const result=await build({entryPoints:['tests/fixtures/runtime-host.tsx'],bundle:true,platform:'browser',format:'iife',jsx:'automatic',write:false,metafile:true,outdir:'.distribution/runtime-browser',define:{'process.env.NODE_ENV':'"production"'}})
   assert.ok(!Object.keys(result.metafile.inputs).some(path=>/node_modules\/(?:next|@chibaskogames)|^games\/|game-server\//.test(path)))
   js=result.outputFiles.find(f=>f.path.endsWith('.js')).contents;css=result.outputFiles.find(f=>f.path.endsWith('.css')).contents
-  browser=await chromium.launch({channel:process.env.RUNTIME_BROWSER_CHANNEL ?? 'chrome',headless:true,args:['--test-third-party-cookie-phaseout']})
-  console.log('Real browser:',browser.version(),'; third-party-cookie blocking flag enabled; all HTTPS routes intercepted locally.')
+  const engine=process.env.RUNTIME_BROWSER_ENGINE??'chromium',type={chromium,firefox,webkit}[engine]
+  if(!type)throw Error('RUNTIME_BROWSER_ENGINE doit valoir chromium, firefox ou webkit')
+  browser=await type.launch({headless:true,proxy:{server:'http://127.0.0.1:9'},...(engine==='chromium'?{channel:process.env.RUNTIME_BROWSER_CHANNEL ?? 'chrome',args:['--test-third-party-cookie-phaseout']}: {})})
+  console.log('Navigateur réel :',engine,browser.version(),'; proxy local fermé ou routes interceptées ; aucune connexion distante. WebKit de test ne remplace pas Safari Apple.')
 })
 after(async()=>{await browser?.close()})
 test('non-PSL sibling cookies cannot authorize a revoked launch; origins retain separate storage',async()=>{
@@ -44,34 +48,147 @@ test('non-PSL sibling cookies cannot authorize a revoked launch; origins retain 
     assert.ok(cookies.some(cookie=>cookie.includes('shared_fixture=yes')))
   }finally{await context.close()}
 })
-async function setup(kind='solo',audience='published',behavior='normal',viewport={width:1366,height:768},clock=false,base='github.io') {
-  const h=await runtimeHarness(kind,audience,behavior,{publicBase:base,previewBase:base,contentBase:base,portalOrigins:['https://portal.test']}),context=await browser.newContext({viewport,serviceWorkers:'block'}),requests=[]
-  await context.addCookies([{name:'portal-auth-fixture',value:'not-a-real-session',domain:'portal.test',path:'/',secure:true,sameSite:'None'}])
-  await context.route('**/*',async route=>{
-    const r=route.request(),url=new URL(r.url()),headers=await r.allHeaders();requests.push({host:url.hostname,path:url.pathname,cookie:headers.cookie ?? ''})
+async function setup(kind='solo',audience='published',behavior='normal',viewport={width:1366,height:768},clock=false,base='github.io',integration,stableOrigins=false,blockCookie=false,concurrent=false) {
+  const prepareBuild=async(files,manifest)=>{
+  if(behavior==='real-sdk'||behavior==='real-sdk-hidden'||behavior==='sdk-uninitialized'){
+    const script=await build({stdin:{contents:behavior!=='sdk-uninitialized'?"import {connectPlatform} from '@chibaskogames/sdk/client';connectPlatform().then(c=>{c.onStart(()=>document.body.dataset.started='yes');c.ready()})":"import * as sdk from '@chibaskogames/sdk/client';window.unusedSdk=sdk",resolveDir:process.cwd(),loader:'js'},bundle:true,platform:'browser',format:'iife',write:false})
+    const bytes=behavior==='real-sdk-hidden'?new TextEncoder().encode("const s=document.createElement('script');s.src=URL.createObjectURL(new Blob([atob('"+Buffer.from(script.outputFiles[0].contents).toString('base64')+"')],{type:'text/javascript'}));document.head.append(s)"):new Uint8Array(script.outputFiles[0].contents);
+    if(behavior==='real-sdk-hidden'){const {integrationScanner}=await import('../services/build-validator/integration-scan.ts');const scan=integrationScanner();scan.file('actual-sdk.js')(bytes);assert.equal(scan.result().signals,false)}
+    files.set('actual-sdk.js',bytes);for(const path of Object.values(manifest.client.entrypoints))files.set(path,new TextEncoder().encode('<!doctype html><title>SDK réel</title><script src="/actual-sdk.js"></script>'))
+  }
+  }
+  const h=await runtimeHarness(kind,audience,behavior,{publicBase:base,previewBase:base,contentBase:base,portalOrigins:['https://portal.test'],stableOrigins},integration,prepareBuild),requests=[],routes=new Map();let page
+  const transport=await localHTTPSFixture(host=>host==='portal.test'||/^[lg]-[a-f0-9]+\./.test(host)&&host.endsWith('.'+base),async request=>{
+    const url=new URL(request.url),headers=Object.fromEntries(request.headers),trace={host:url.hostname,path:url.pathname,cookie:headers.cookie ?? '',method:request.method};requests.push(trace)
+    if(routes.has(url.origin))return routes.get(url.origin)(request)
     let response
     if(url.hostname==='portal.test') {
-      if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:'<!doctype html><html><head><link rel="stylesheet" href="/host.css"></head><body style="margin:0"><script src="/host.js"></script></body></html>'})
-      if(url.pathname==='/host.js')return route.fulfill({contentType:'text/javascript',body:Buffer.from(js)})
-      if(url.pathname==='/host.css')return route.fulfill({contentType:'text/css',body:Buffer.from(css)})
-      if(url.pathname==='/logo-chibaskogames-rond.ico')return route.fulfill({contentType:'image/x-icon',body:readFileSync('public/logo-chibaskogames-rond.ico')})
+      if(url.pathname==='/')return new Response('<!doctype html><html><head><link rel="stylesheet" href="/host.css"></head><body style="margin:0"><script src="/host.js"></script></body></html>',{headers:{'Content-Type':'text/html'}})
+      if(url.pathname==='/host.js')return new Response(Buffer.from(js),{headers:{'Content-Type':'text/javascript'}})
+      if(url.pathname==='/host.css')return new Response(Buffer.from(css),{headers:{'Content-Type':'text/css'}})
+      if(url.pathname==='/logo-chibaskogames-rond.ico')return new Response(readFileSync('public/logo-chibaskogames-rond.ico'),{headers:{'Content-Type':'image/x-icon'}})
       if(url.pathname.startsWith('/api/game-launches')) {
-        const req=new Request(r.url(),{method:r.method(),headers,...(r.postData()?{body:r.postData()}: {})})
         const id=url.pathname.split('/')[3]
-        response=await gameLaunchRequest(req,id,{actor:async req=>req.headers.has('authorization')?'owner':null,service:()=>h.service})
+        response=await gameLaunchRequest(request,id,{actor:async req=>req.headers.has('authorization')?'owner':null,service:()=>h.service})
       }
-    }else if(url.hostname.startsWith('l-') && url.hostname.endsWith('.'+base)) {
-      response=await h.gateway(new Request(r.url(),{method:r.method(),headers}))
+    }else if((url.hostname.startsWith('l-')||url.hostname.startsWith('g-')) && url.hostname.endsWith('.'+base)) {
+      response=await h.gateway(request)
     }
-    if(!response)return route.fulfill({status:404,body:''})
-    await route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())})
+    if(!response)return new Response(null,{status:404})
+    if(concurrent&&url.pathname==='/_launch/exchange'&&!trace.cookie){
+      await page.waitForFunction(()=>document.querySelectorAll('iframe').length===2)
+      await Promise.all((await page.locator('iframe').elementHandles()).map(async element=>{const frame=await element.contentFrame();await frame.waitForURL(/\/_launch\/bootstrap/);await frame.waitForLoadState('load')}))
+    }
+    trace.status=response.status
+    if(blockCookie)response.headers.delete('set-cookie')
+    return response
   })
-  const page=await context.newPage();if(clock){await page.clock.install();h.clock.fixed=Date.now()}
+  let context;try{context=await browser.newContext({viewport,serviceWorkers:'block',proxy:{server:transport.proxy},ignoreHTTPSErrors:true})}catch(error){await transport.close();throw error}
+  const close=context.close.bind(context);context.close=async(...args)=>{try{await close(...args)}finally{await transport.close()}}
+  await context.addCookies([{name:'portal-auth-fixture',value:'not-a-real-session',domain:'portal.test',path:'/',secure:true,sameSite:'None'}])
+  page=await context.newPage();if(clock){await page.clock.install();h.clock.fixed=Date.now()}
   // Server and browser virtual time must not diverge with the host test's wall time.
   await page.goto('https://portal.test/');await page.waitForFunction(()=>!!window.runtimeFixture)
-  await page.evaluate(request=>window.runtimeFixture.open(request),h.request)
-  return {h,context,page,requests,async running(){await page.locator('[data-phase="running"]').waitFor();return page.frames().find(f=>new URL(f.url()).hostname.startsWith('l-'))}}
+  await page.evaluate(({request,count})=>{for(let i=0;i<count;i++)window.runtimeFixture.open(request)},{request:h.request,count:concurrent?2:1})
+  return {h,context,page,requests,routes,async running(){
+    try{await page.locator('[data-phase="running"]').waitFor()}catch(error){
+      console.error('Diagnostic navigateur sans jeton :',JSON.stringify({phase:await page.locator('[data-phase]').first().getAttribute('data-phase'),requests:requests.map(({host,path,method,status,cookie})=>({host,path,method,status,cookiePresent:Boolean(cookie)})),cookies:(await context.cookies()).map(({name,domain,httpOnly,secure})=>({name,domain,httpOnly,secure}))}));throw error
+    }
+    return page.frames().find(f=>/^[lg]-/.test(new URL(f.url()).hostname))}}
 }
+
+test('Navigateur : origine publique stable, sauvegardes conservées après une nouvelle session',async()=>{
+ const x=await setup('solo','published','normal',{width:390,height:844},false,'chibaskogames-play.fr','classic',true)
+ try{
+  const first=await x.running(),origin=new URL(first.url()).origin
+  assert.match(origin,/https:\/\/g-[a-f0-9]{32}\./)
+  await first.evaluate(async()=>{
+   localStorage.setItem('save','partie 42')
+   await new Promise((resolve,reject)=>{const q=indexedDB.open('save',1);q.onupgradeneeded=()=>q.result.createObjectStore('data');q.onerror=()=>reject(q.error);q.onsuccess=()=>{const db=q.result,t=db.transaction('data','readwrite');t.objectStore('data').put(42,'score');t.oncomplete=()=>{db.close();resolve()}}})
+  })
+  const cookies=await x.context.cookies();assert.ok(cookies.some(c=>c.name==='__Host-cg-public'&&c.httpOnly&&c.secure))
+  assert.doesNotMatch(await first.evaluate(()=>document.cookie),/__Host-cg-public/)
+  await x.page.reload();await x.page.waitForFunction(()=>!!window.runtimeFixture)
+  await x.page.evaluate(request=>runtimeFixture.open(request),x.h.request)
+  const second=await x.running();assert.equal(new URL(second.url()).origin,origin)
+  assert.equal(await second.evaluate(()=>localStorage.getItem('save')),'partie 42')
+  assert.equal(await second.evaluate(()=>new Promise((resolve,reject)=>{const q=indexedDB.open('save',1);q.onerror=()=>reject(q.error);q.onsuccess=()=>{const db=q.result,r=db.transaction('data').objectStore('data').get('score');r.onsuccess=()=>{db.close();resolve(r.result)}}})),42)
+  const direct=await x.context.newPage();const response=await direct.goto(origin+'/');assert.ok([403,404].includes(response.status()),'Le cookie partitionné du portail ne donne pas un accès hors de sa partition')
+ }finally{await x.context.close()}
+})
+
+test('Navigateur : origine stable et SDK réel conservent le protocole existant',async()=>{
+ const x=await setup('solo','published','real-sdk',{width:1366,height:768},false,'chibaskogames-play.fr','sdk',true)
+ try{const frame=await x.running();await frame.waitForFunction(()=>document.body.dataset.started==='yes');assert.equal((await x.page.evaluate(()=>runtimeFixture.observations))[0].mode,'sdk')}finally{await x.context.close()}
+})
+
+test('Navigateur : refus du cookie de livraison sans accès de secours au jeu',async()=>{
+ const x=await setup('solo','published','normal',{width:390,height:844},false,'chibaskogames-play.fr','classic',true,true)
+ try{await x.page.locator('[data-phase="failed"]').waitFor();await x.page.getByText(/L’accès au jeu n’a pas pu être établi/).waitFor();assert.equal(await x.page.locator('iframe').count(),0);assert.equal((await x.page.evaluate(()=>runtimeFixture.observations)).length,0)}finally{await x.context.close()}
+})
+
+test('Navigateur : le conflit de versions est distingué du refus de stockage',async()=>{
+ const x=await setup('solo','published','version-conflict',{width:390,height:844},false,'chibaskogames-play.fr','classic',true)
+ try{await x.page.locator('[data-phase="failed"]').waitFor();await x.page.getByText('Une mise à jour de ce jeu attend la fin des sessions précédentes. Réessayez plus tard.',{exact:true}).waitFor();assert.equal(await x.page.locator('iframe').count(),0)}finally{await x.context.close()}
+})
+
+test('Navigateur : fermer un second lecteur du même jeu conserve l’accès du premier',async()=>{
+ const x=await setup('solo','published','normal',{width:1366,height:768},false,'chibaskogames-play.fr','classic',true)
+ try{
+  const first=await x.running()
+  await x.page.evaluate(request=>runtimeFixture.open(request),x.h.request)
+  await x.page.waitForFunction(()=>document.querySelectorAll('[data-phase="running"]').length===2)
+  await Promise.all([x.page.waitForResponse(r=>r.request().method()==='DELETE'&&r.url().includes('/api/game-launches/')),x.page.getByRole('button',{name:'Quitter le jeu'}).nth(1).click()])
+  assert.equal(await first.evaluate(async()=>(await fetch('/asset.data')).status),200)
+ }finally{await x.context.close()}
+})
+
+test('Navigateur : deux premiers lancements simultanés partagent une livraison sans perdre leur révocation',async()=>{
+ const x=await setup('solo','published','normal',{width:1366,height:768},false,'chibaskogames-play.fr','classic',true,false,true)
+ try{
+  await x.page.waitForFunction(()=>document.querySelectorAll('[data-phase="running"]').length===2)
+  const exchanges=x.requests.filter(r=>r.path==='/_launch/exchange');assert.equal(exchanges.length,2);assert.equal(Boolean(exchanges[0].cookie),false);assert.equal(Boolean(exchanges[1].cookie),true)
+  const first=x.page.frames().find(f=>f.url().startsWith('https://g-')&&f.url().includes('/play/'))
+  await Promise.all([x.page.waitForResponse(r=>r.request().method()==='DELETE'&&r.url().includes('/api/game-launches/')),x.page.getByRole('button',{name:'Quitter le jeu'}).nth(1).click()])
+  assert.equal(await first.evaluate(async()=>(await fetch('/asset.data')).status),200)
+ }finally{await x.context.close()}
+})
+
+test('Navigateur : deux jeux publiés gardent des stockages séparés sur le même site de contenu',async()=>{
+ const x=await setup('solo','published','normal',{width:1366,height:768},false,'chibaskogames-play.fr','classic',true)
+ try{
+  const first=await x.running();await first.evaluate(async()=>{localStorage.setItem('secret','jeu A');await new Promise(resolve=>{const r=indexedDB.open('jeu-A',1);r.onupgradeneeded=()=>r.result.createObjectStore('data');r.onsuccess=()=>{r.result.close();resolve()}})})
+  const other=await runtimeHarness('solo','published','normal',{publicBase:'chibaskogames-play.fr',previewBase:'chibaskogames-play.fr',contentBase:'chibaskogames-play.fr',portalOrigins:['https://portal.test'],stableOrigins:true},'classic',(files,manifest)=>{manifest.gameId=randomUUID();files.set('chibasko.json',new TextEncoder().encode(JSON.stringify(manifest)))})
+  const launch=await other.client.create(other.request),d=launch.descriptor
+  x.routes.set(d.contentOrigin,request=>other.gateway(request))
+  const src=new URL('/_launch/bootstrap',d.contentOrigin);src.hash=new URLSearchParams({ticket:d.delivery.ticket,cgLaunch:d.launchId,cgGeneration:d.generation,cgParent:'https://portal.test'})
+  await x.page.evaluate(src=>{const frame=document.createElement('iframe');frame.id='other-game';frame.sandbox='allow-scripts allow-same-origin allow-pointer-lock';frame.src=src;document.body.append(frame)},src.href)
+  await x.page.frameLocator('#other-game').getByRole('button',{name:'Jouer',exact:true}).waitFor()
+  const second=x.page.frames().find(f=>f.url().startsWith(d.contentOrigin+'/')&&new URL(f.url()).pathname.endsWith('/play/start.html'))
+  assert.notEqual(new URL(first.url()).origin,new URL(second.url()).origin)
+  assert.equal(await second.evaluate(()=>localStorage.getItem('secret')),null)
+  assert.ok(!(await second.evaluate(async()=>(await indexedDB.databases()).map(d=>d.name))).includes('jeu-A'))
+  await second.evaluate(()=>{document.cookie='__Host-cg-public='+ 'f'.repeat(64)+'; Domain=chibaskogames-play.fr; Path=/; Secure; SameSite=None'})
+  assert.ok(!(await x.context.cookies()).some(c=>c.name==='__Host-cg-public'&&c.value==='f'.repeat(64)))
+  assert.equal(await second.evaluate(()=>{try{return parent.document.body.innerHTML}catch{return 'interdit'}}),'interdit')
+  await second.evaluate(()=>{try{document.domain='chibaskogames-play.fr'}catch{}})
+  await first.evaluate(()=>{document.body.dataset.isolation='jeu A';try{document.domain='chibaskogames-play.fr'}catch{}})
+  assert.equal(await second.evaluate(()=>{try{return parent.frames[0].document.body.dataset.isolation}catch{return 'interdit'}}),'interdit')
+  assert.equal(await second.evaluate(()=>{try{return parent.frames[0].localStorage.getItem('secret')}catch{return 'interdit'}}),'interdit')
+ }finally{await x.context.close()}
+})
+test('Navigateur : jeu classique sans SDK, commandes jouables et aucune attente de bridge',async()=>{
+ const x=await setup('solo','preview','normal',{width:390,height:844},false,'chibaskogames-play.fr','classic')
+ try{const frame=await x.running();await frame.getByRole('button',{name:'Jouer',exact:true}).click();await frame.getByRole('button',{name:'Partie démarrée',exact:true}).waitFor();assert.deepEqual(await x.page.evaluate(()=>runtimeFixture.observations),[{mode:'classic',protocol:null}]);assert.equal((await x.page.getByRole('button',{name:'Ce jeu ne prend pas en charge le contrôle audio'}).count())>0,true)}finally{await x.context.close()}
+})
+for(const behavior of ['real-sdk','real-sdk-hidden'])test('Navigateur : SDK npm réel initialise le bridge — '+behavior,async()=>{
+ const x=await setup('solo','preview',behavior,{width:1366,height:768},false,'chibaskogames-play.fr','sdk')
+ try{const frame=await x.running();await frame.waitForFunction(()=>document.body.dataset.started==='yes');const observations=await x.page.evaluate(()=>runtimeFixture.observations);assert.equal(observations.length,1);assert.equal(observations[0].mode,'sdk');assert.ok([1,2].includes(observations[0].protocol))}finally{await x.context.close()}
+})
+test('Navigateur : SDK embarqué mais non initialisé ne confirme aucune intégration',async()=>{
+ const x=await setup('solo','preview','sdk-uninitialized',{width:390,height:844},true,'chibaskogames-play.fr','sdk')
+ try{await x.page.waitForFunction(()=>document.querySelector('iframe'));await x.page.clock.runFor(16000);assert.deepEqual(await x.page.evaluate(()=>runtimeFixture.observations),[]);assert.equal(await x.page.locator('[data-phase="running"]').count(),0)}finally{await x.context.close()}
+})
 test('browser non-PSL preview descriptor creates iframe, loads entrypoint and completes Bridge v2',async()=>{
   const x=await setup('solo','preview','normal',{width:1366,height:768},false,'chibaskogames-play.fr')
   try {
