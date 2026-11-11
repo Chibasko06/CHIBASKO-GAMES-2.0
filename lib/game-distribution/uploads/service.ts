@@ -1,3 +1,4 @@
+import { developerBuildDetails } from '../developer-build-preview'
 import { UPLOAD_POLICY, UploadError, assertUploadId, expectedPartSize } from './policy'
 import { publicUpload, type Upload, type UploadRepository, type StagingStorage } from './contracts'
 import { isBuildVersion } from '../version'
@@ -34,7 +35,9 @@ export function createUploadService(db: UploadRepository, storage: StagingStorag
     async status(actor: string, id: string) { return publicUpload(await get(actor,id)) },
     async review(actor:string,id:string) {
       assertUploadId(id)
-      return db.call<import('../review').ReviewSummary>('distribution_developer_review',{p_actor:actor,p_id:id})
+      const summary = await db.call<import('../review').ReviewSummary>('distribution_developer_review',{p_actor:actor,p_id:id})
+      const snapshot = await db.call<import('../review').AdminBuild>('distribution_review_snapshot',{p_id:id})
+      return developerBuildDetails(summary, snapshot)
     },
     async parts(actor: string, id: string, numbers?: unknown) {
       const row = await get(actor,id)

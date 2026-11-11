@@ -9,13 +9,15 @@ import styles from './GameRuntime.module.css'
 import GamePlayerError from './GamePlayerError'
 import PlayerFrame,{type PlayerViewport} from './PlayerFrame'
 const defaultClient=httpLaunchClient()
-type Props=LaunchRequest & {onIntegration?:(observation:IntegrationObservation)=>void;onFailure?:(code:string)=>void;onAudioSupport?:(supported:boolean)=>void;onLeave:()=>void;client?:LaunchClient;socialControls?:ReactNode;audioControl?:PlayerAudioControl;embedded?:boolean;fixedViewport?:PlayerViewport}
-export default function GameRuntime({gameId,gameVersionId,execution,audience,locale,onlineSessionReference,onLeave,client=defaultClient,socialControls,audioControl,embedded=false,fixedViewport,onAudioSupport,onFailure,onIntegration}:Props){
+type Props=LaunchRequest & {onRuntimeState?:(state:RuntimeState)=>void;onIntegration?:(observation:IntegrationObservation)=>void;onFailure?:(code:string)=>void;onAudioSupport?:(supported:boolean)=>void;onLeave:()=>void;client?:LaunchClient;socialControls?:ReactNode;audioControl?:PlayerAudioControl;embedded?:boolean;fixedViewport?:PlayerViewport}
+export default function GameRuntime({gameId,gameVersionId,execution,audience,locale,onlineSessionReference,onLeave,client=defaultClient,socialControls,audioControl,embedded=false,fixedViewport,onAudioSupport,onFailure,onIntegration,onRuntimeState}:Props){
   const {audio,toggle}=usePlayerAudio(),audioRef=useRef(audio),support=useRef(onAudioSupport)
   const [audioSupported,setAudioSupported]=useState(false)
   useEffect(()=>{support.current=onAudioSupport},[onAudioSupport])
   const container=useRef<HTMLDivElement>(null),leave=useRef(onLeave)
   const failure=useRef(onFailure)
+  const runtimeState=useRef(onRuntimeState)
+  useEffect(()=>{runtimeState.current=onRuntimeState},[onRuntimeState])
   const integration=useRef(onIntegration)
   useEffect(()=>{integration.current=onIntegration},[onIntegration])
   useEffect(()=>{failure.current=onFailure},[onFailure])
@@ -23,7 +25,7 @@ export default function GameRuntime({gameId,gameVersionId,execution,audience,loc
   const [state,setState]=useState<RuntimeState>({phase:'resolving'}),[attempt,setAttempt]=useState(0)
   useEffect(()=>{leave.current=onLeave},[onLeave])
   useEffect(()=>{
-    const runtime=mountGameRuntime({onIntegration:value=>integration.current?.(value),container:container.current!,getAudioState:()=>audioRef.current,onAudioSupport:value=>{setAudioSupported(value);support.current?.(value)},request:{gameId,gameVersionId,execution,audience,locale,onlineSessionReference},client,onState:value=>{setState(value);if(value.phase==='failed')failure.current?.(value.error??'unknown')},onLeave:()=>leave.current()})
+    const runtime=mountGameRuntime({onIntegration:value=>integration.current?.(value),container:container.current!,getAudioState:()=>audioRef.current,onAudioSupport:value=>{setAudioSupported(value);support.current?.(value)},request:{gameId,gameVersionId,execution,audience,locale,onlineSessionReference},client,onState:value=>{setState(value);runtimeState.current?.(value);if(value.phase==='failed')failure.current?.(value.error??'unknown')},onLeave:()=>leave.current()})
     controller.current=runtime
     return()=>{runtime.dispose();controller.current=null}
   },[gameId,gameVersionId,execution,audience,locale,onlineSessionReference,client,attempt])
