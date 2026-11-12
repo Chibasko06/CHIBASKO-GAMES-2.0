@@ -18,7 +18,7 @@ before(async()=>{
  auth:"const value={user:null,session:null,loading:false};export function useAuth(){return value}",
  supabase:"export const supabase={auth:{async signInWithPassword(){window.authenticationCalls=(window.authenticationCalls??0)+1;return {data:{session:{}},error:null}},async signOut(){}},from(){return {select(){return this},eq(){return this},async maybeSingle(){return {data:null,error:null}}}},async rpc(){return {data:[],error:null}}}",
  profile:"export async function ensureProfile(){return {ok:true}}",reviews:"export async function getGameReviewsPage(){return {items:[],total:0,average:0}}",
- navigation:"export function useRouter(){return {replace(){window.navigationCalls=(window.navigationCalls??0)+1},push(){}}}export function useSearchParams(){return new URLSearchParams(location.search)}",
+ navigation:"export function useRouter(){return {replace(){window.navigationCalls=(window.navigationCalls??0)+1},push(){}}}export function useSearchParams(){return new URLSearchParams(location.search)}export function usePathname(){return location.pathname}",
  link:"import {createElement} from 'react';export default function Link(props){return createElement('a',props)}",
  image:"import {createElement} from 'react';export default function Image({fill,priority,unoptimized,...props}){return createElement('img',props)}",
  }[path]}))
@@ -46,6 +46,10 @@ async function setup(kind='contact',{viewport={width:390,height:844},send=async 
 async function fill(page){for(const [label,text] of [['Nom','Test'],['Prénom','Élodie'],['Adresse e-mail','sender@example.test'],['Ton message','Bonjour']])await page.getByLabel(label,{exact:true}).fill(text)}
 for(const viewport of [{width:390,height:844},{width:1366,height:768}])test(`contact clavier, labels, erreurs et confirmation ${viewport.width}`,async()=>{
  const x=await setup('contact',{viewport});try{
+  const directContact=x.page.getByRole('link',{name:'contact@chibaskogames.fr',exact:true})
+  assert.equal(await directContact.isVisible(),true)
+  assert.equal(await directContact.getAttribute('href'),'mailto:contact@chibaskogames.fr')
+  assert.deepEqual(await x.page.locator('a[href^="mailto:"]').evaluateAll(links=>links.map(link=>link.getAttribute('href'))),['mailto:contact@chibaskogames.fr'])
   await x.page.keyboard.press('Tab');assert.equal(await x.page.locator(':focus').textContent(),'Aller au contenu')
   await x.page.keyboard.press('Enter');assert.equal(await x.page.locator('main').evaluate(el=>el===document.activeElement),true)
   await x.page.getByRole('button',{name:'Envoyer le message'}).click();await x.page.getByRole('alert').waitFor()
