@@ -8,7 +8,7 @@ import ts from 'typescript'
 test('le Worker reprend une alerte de modération sans nouveau cron et attend son acquittement',async()=>{
  const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'ts',contents:`import worker from './cloudflare/session-maintenance';export default {async fetch(request,env){await worker.scheduled({},env);return new Response('completed')}}`},bundle:true,write:false,platform:'browser',format:'esm'})
  const calls=[];let claimed=false,message
- const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-10-18',script:bundle.outputFiles[0].text,bindings:{SUPABASE_URL:'https://db.example.test',SUPABASE_SERVICE_ROLE_KEY:'fixture-only',MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture-only',RESEND_FROM_EMAIL:'noreply@example.test',GAME_SUBMISSION_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test'},outboundService:async request=>{
+ const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-10-18',script:bundle.outputFiles[0].text,bindings:{SUPABASE_URL:'https://db.example.test',SUPABASE_SERVICE_ROLE_KEY:'fixture-only',MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture-only',RESEND_FROM_EMAIL:'noreply@example.test',CONTACT_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test'},outboundService:async request=>{
   const url=new URL(request.url),body=await request.json();calls.push(url.pathname)
   if(url.hostname==='api.resend.com'){assert.equal(request.headers.get('Idempotency-Key'),'moderation/fa800000-0000-4000-8000-000000000001');assert.deepEqual(body,message);return Response.json({id:'fixture-only'})}
   assert.equal(url.hostname,'db.example.test')
@@ -37,9 +37,12 @@ test('les configurations de production conservent les ressources et les activati
   for(const secret of ['SUPABASE_SERVICE_ROLE_KEY','RESEND_API_KEY','PASSWORD_RESET_CODE_SECRET','CONTACT_HASH_SECRET','GAME_BUILDS_R2_ACCESS_KEY_ID','GAME_BUILDS_R2_SECRET_ACCESS_KEY'])assert.equal(Object.hasOwn(cfg.vars,secret),false)
  }
  for(const flag of ['CONTACT_FORM_ENABLED','GAME_DISTRIBUTION_UPLOADS_ENABLED','GAME_ARTIFACT_PREVIEWS_ENABLED','GAME_SUBMISSION_NOTIFICATIONS_ENABLED','GAME_RUNTIME_LAUNCHES_ENABLED'])assert.equal(portal.vars[flag],'1')
- assert.equal(portal.vars.CONTACT_NOTIFY_EMAIL,'chibasko06@gmail.com')
+ assert.equal(portal.vars.CONTACT_NOTIFY_EMAIL,'contact@chibaskogames.fr')
  assert.equal(maintenance.vars.SUPABASE_URL,portal.vars.NEXT_PUBLIC_SUPABASE_URL)
- for(const name of ['RESEND_FROM_EMAIL','GAME_SUBMISSION_NOTIFY_EMAIL','NEXT_PUBLIC_SITE_URL'])assert.equal(maintenance.vars[name],portal.vars[name])
+ assert.equal(portal.vars.GAME_SUBMISSION_NOTIFY_EMAIL,'developers@chibaskogames.fr')
+ assert.equal(portal.vars.RESEND_FROM_EMAIL,'noreply@chibaskogames.fr')
+ assert.equal(portal.vars.MODERATION_APPEAL_EMAIL,portal.vars.CONTACT_NOTIFY_EMAIL)
+ for(const name of ['RESEND_FROM_EMAIL','CONTACT_NOTIFY_EMAIL','GAME_SUBMISSION_NOTIFY_EMAIL','MODERATION_APPEAL_EMAIL','NEXT_PUBLIC_SITE_URL'])assert.equal(maintenance.vars[name],portal.vars[name])
  for(const cfg of [portal,maintenance])assert.deepEqual(cfg.r2_buckets.map(({binding,bucket_name})=>[binding,bucket_name]).sort(),[
   ['CHIBASKO_ASSETS','chibasko-assets'],['GAME_BUILDS_ARTIFACTS','chibasko-game-artifacts'],['GAME_BUILDS_STAGING','chibasko-game-staging']])
  const dispatcher=await config('cloudflare/wrangler.dispatcher.production.jsonc')

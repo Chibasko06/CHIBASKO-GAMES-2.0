@@ -2,13 +2,14 @@ import {moderationEmailHtml,moderationAccountNavigation,reportReason} from './mo
 import type {ReportKind} from './moderation'
 import type {UploadRepository} from '@/lib/game-distribution/uploads/contracts'
 import {withTimeout} from '@/lib/asyncOperation'
+import {contactEmail} from './siteContacts'
 
-export type ModerationMailEnvironment={MODERATION_MAINTENANCE_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;GAME_SUBMISSION_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string;MODERATION_APPEAL_EMAIL?:string}
+export type ModerationMailEnvironment={MODERATION_MAINTENANCE_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;CONTACT_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string;MODERATION_APPEAL_EMAIL?:string}
 type Job={stream?:'measure';notice?:{title:string;text:string};adminPath?:string;id:string;lease:string;kind:'admin'|'receipt'|'decision'|'correction';message:Record<string,unknown>|null;case:{id:string;number:number;category:string;target_kind:string;target_locator:string;contact_email:string|null};decision:string|null}
 export async function deliverModeration(db:UploadRepository,env:ModerationMailEnvironment,options:{fetcher?:typeof fetch;signal?:AbortSignal;log?:(event:{event:'moderation_mail';outcome:string;phase:string})=>void}={}){
  if(env.MODERATION_MAINTENANCE_ENABLED!=='1')return 0
  const log=(outcome:string,phase:string)=>{try{(options.log??console.info)({event:'moderation_mail',outcome,phase})}catch{}}
- const from=env.RESEND_FROM_EMAIL,to=env.GAME_SUBMISSION_NOTIFY_EMAIL,appeal=env.MODERATION_APPEAL_EMAIL
+ const from=env.RESEND_FROM_EMAIL,to=env.CONTACT_NOTIFY_EMAIL??contactEmail,appeal=env.MODERATION_APPEAL_EMAIL??contactEmail
  if(!env.RESEND_API_KEY||![from,to,appeal].every(value=>typeof value==='string'&&/^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(value))){log('configuration_missing','configuration');throw Error('moderation_configuration_missing')}
  let sent=0
  for(let i=0;i<2;i++){
@@ -24,7 +25,7 @@ export async function deliverModeration(db:UploadRepository,env:ModerationMailEn
     if(adminUrl.protocol!=='https:'||adminUrl.username||adminUrl.password)throw Error('moderation_site_invalid')
     const destination=job.kind==='admin'?to:job.case.contact_email
     if(!destination||!/^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(destination))throw Error('moderation_recipient_missing')
-    message={from,to:[destination],subject:job.kind==='admin'?'Nouveau signalement sur Chibasko Games':job.kind==='receipt'?'Chibasko Games — signalement reçu':'Chibasko Games — décision sur le signalement',text:job.kind==='admin'
+    message={from,to:[destination],...(job.kind==='admin'?{}:{reply_to:appeal}),subject:job.kind==='admin'?'Nouveau signalement sur Chibasko Games':job.kind==='receipt'?'Chibasko Games — signalement reçu':'Chibasko Games — décision sur le signalement',text:job.kind==='admin'
      ?`Dossier #${job.case.number}\nType : ${job.case.target_kind==='player'?'Joueur':'Jeu'}\nMotif : ${reportReason(job.case.target_kind as ReportKind,job.case.category)}\nConsulter le dossier privé : ${adminUrl.href}`
      :job.kind==='receipt'?`Le signalement #${job.case.number} a été enregistré et sera examiné par Chibasko Games.\nAucune sanction n’est automatique.\nPour compléter le dossier ou contester une décision : ${appeal}, en précisant ce numéro.`
       :`Décision relative au signalement #${job.case.number}\n\n${job.decision??''}\n\nCette réponse concerne le suivi du dossier et n’atteste pas une sanction automatique.\nPour demander un réexamen : ${appeal}, en précisant ce numéro. Les voies judiciaires restent ouvertes ; les autres voies applicables dépendent de la qualification du service.`}

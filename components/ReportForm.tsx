@@ -1,4 +1,5 @@
 'use client'
+import {contactEmail,contactMailto} from '@/lib/siteContacts'
 import {useEffect,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
 import {reportCategories,type ReportKind} from '@/lib/moderation'
@@ -49,7 +50,7 @@ export default function ReportForm({kind,target='',editable=false,siteKey}:{kind
    {needsContact&&!sensitive&&<div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Nom ou dénomination<input required minLength={2} maxLength={160} autoComplete="name" value={name} onChange={event=>setName(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-zinc-700 bg-black p-3"/></label><label className="text-sm">E-mail de contact<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-zinc-700 bg-black p-3"/></label></div>}
    <div hidden aria-hidden="true"><label>Site web<input tabIndex={-1} autoComplete="off" value={website} onChange={event=>setWebsite(event.target.value)}/></label></div>
   </fieldset>
-  {!user&&<><div ref={challenge}/>{(!siteKey||botError)&&<p role="status" className="text-sm text-amber-200">Vérification invité indisponible. Contact direct : <a href="mailto:chibasko06@gmail.com" className="underline">chibasko06@gmail.com</a>.</p>}{botError&&<button type="button" className={socialButton} onClick={()=>{if(!window.turnstile)document.querySelector('script[data-moderation-challenge]')?.remove();setChallengeRevision(value=>value+1)}}>Relancer la vérification</button>}</>}
+  {!user&&<><div ref={challenge}/>{(!siteKey||botError)&&<p role="status" className="text-sm text-amber-200">Vérification invité indisponible. Contact direct : <a href={contactMailto} className="underline">{contactEmail}</a>.</p>}{botError&&<button type="button" className={socialButton} onClick={()=>{if(!window.turnstile)document.querySelector('script[data-moderation-challenge]')?.remove();setChallengeRevision(value=>value+1)}}>Relancer la vérification</button>}</>}
   {error&&<p role="alert" className="text-sm text-red-300">{error}</p>}
   <button type="submit" disabled={busy||loading||(!user&&!botToken)} className={socialButton}>{busy?'Enregistrement…':uncertain?'Vérifier la même demande':'Envoyer le signalement'}</button>
   {uncertain&&<><p className="text-xs text-amber-200">La première demande peut avoir été reçue. Vérifie-la avant de créer un signalement différent.</p><button type="button" className={socialButton+' ml-2'} onClick={()=>{setUncertain(false);operation.current=null;setError('')}}>Modifier la demande</button></>}

@@ -1,4 +1,5 @@
 'use client'
+import {contactEmail,contactMailto} from '@/lib/siteContacts'
 import {useEffect,useRef,useState,type FormEvent} from 'react'
 import FormField from './ui/FormField'
 import {FormFeedback} from './ui/FormFeedback'
@@ -48,6 +49,6 @@ export default function ContactPageClient(){
    <div hidden aria-hidden="true"><label>Site web<input name="website" tabIndex={-1} autoComplete="off" value={website} onChange={event=>setWebsite(event.target.value)}/></label></div>
    {feedback?<div className="md:col-span-2"><FormFeedback tone={phase==='accepted'?'success':phase==='unconfirmed'?'warning':'error'} title={phase==='accepted'?'Message pris en charge':phase==='unconfirmed'?'Envoi non confirmé':'Envoi impossible'} announce>{feedback}</FormFeedback></div>:null}
    <button type="submit" disabled={phase==='sending'} className="rounded-full bg-cyan-400 px-6 py-4 font-black uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2">{phase==='sending'?'Envoi en cours…':phase==='unconfirmed'?'Vérifier l’envoi':'Envoyer le message'}</button>
-  </form><p className="mt-6 text-sm text-zinc-400">Adresse directe : <a className="text-cyan-300 underline" href="mailto:chibasko06@gmail.com">chibasko06@gmail.com</a></p>
+  </form><p className="mt-6 text-sm text-zinc-400">Adresse directe : <a className="text-cyan-300 underline" href={contactMailto}>{contactEmail}</a></p>
  </div>
 }

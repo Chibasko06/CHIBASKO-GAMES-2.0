@@ -33,7 +33,7 @@ function fixture(){
  const calls=[],logs=[],job={id:'fa600000-0000-4000-8000-000000000001',lease:'fa600000-0000-4000-8000-000000000002',kind:'admin',message:null,case:{id:'fa600000-0000-4000-8000-000000000003',number:42,target_kind:'player',category:'spam',contact_email:'private@example.test'},decision:null}
  let claim=true,sender=async()=>Response.json({id:'mail-fixture'}),state='pending'
  const db={async call(name,args){calls.push({name,args});if(name==='distribution_moderation_claim_mail'){if(!claim)return null;claim=false;return structuredClone(job)}if(name==='distribution_moderation_prepare_mail'){job.message??=args.p_message;return job.message}if(name==='distribution_moderation_finish_mail'){state=args.p_success?'sent':args.p_permanent?'attention_required':'pending';return null}throw Error('unexpected') }}
- const env={MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture-key',RESEND_FROM_EMAIL:'noreply@example.test',GAME_SUBMISSION_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test',NEXT_PUBLIC_SITE_URL:'https://portal.test'}
+ const env={MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture-key',RESEND_FROM_EMAIL:'noreply@example.test',CONTACT_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test',NEXT_PUBLIC_SITE_URL:'https://portal.test'}
  const sent=[],options={log:event=>logs.push(event),fetcher:async(url,init)=>{assert.equal(url,'https://api.resend.com/emails');sent.push(init);return sender(url,init)}}
  return {db,env,options,job,calls,logs,sent,state:()=>state,retry(){claim=true},sender(value){sender=value}}
 }

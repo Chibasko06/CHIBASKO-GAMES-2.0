@@ -38,6 +38,33 @@ function outbox(){
 }
 const env={RESEND_API_KEY:'fixture-resend',RESEND_FROM_EMAIL:'Chibasko Games <from@example.test>',GAME_SUBMISSION_NOTIFY_EMAIL:'admin@example.test'}
 
+for(const mode of ['classic','sdk','external']){
+ test(`notification interne en file commune : ${mode}`,async()=>{
+  const external=mode==='external'
+  const job={id,lease:id,message:null,title:'Fixture',kind:'new',studio:'Studio',
+   contact:{contactEmail:'creator@example.test'},uploadId:external?null:id,
+   version:external?null:'1.0.0',externalRevisionId:external?id:null}
+  const calls=[]
+  const db={call:async(name,args)=>{
+   calls.push(name)
+   if(name==='distribution_claim_submission_email')return job
+   if(name==='distribution_prepare_submission_email')return args.p_message
+   if(name==='distribution_finish_submission_email')assert.equal(args.p_success,true)
+  }}
+  const fetcher=async(_url,init)=>{
+   const message=JSON.parse(init.body)
+   assert.deepEqual(message.to,['developers@chibaskogames.fr'])
+   assert.equal(message.reply_to,'creator@example.test')
+   assert.equal(init.headers['Idempotency-Key'],'submission-review/'+id)
+   assert.ok(message.text.endsWith(external?'/admin/game-builds':'/admin/game-builds/'+id))
+   assert.ok(message.text.includes(external?'Révision URL : '+id:'Version : 1.0.0'))
+   return Response.json({id:'fixture-email'})
+  }
+  assert.equal(await deliverSubmissionNotifications(db,{...env,GAME_SUBMISSION_NOTIFY_EMAIL:'developers@chibaskogames.fr'},{fetcher,log:()=>{}}),1)
+  assert.deepEqual(calls,['distribution_claim_submission_email','distribution_prepare_submission_email','distribution_finish_submission_email'])
+ })
+}
+
 test('missing recipient leaves development submissions pending without claiming or exposing configuration',async()=>{
  const logs=[];let claims=0
  assert.equal(await deliverSubmissionNotifications({call:async()=>{claims++}}, {...env,GAME_SUBMISSION_NOTIFY_EMAIL:undefined},{log:e=>logs.push(e)}),0)

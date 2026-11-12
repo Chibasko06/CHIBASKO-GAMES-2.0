@@ -2,7 +2,7 @@ import type {UploadRepository} from './uploads/contracts'
 import type {DeveloperContact} from './developer-profile'
 import {withTimeout} from '../asyncOperation'
 export type NotificationEnvironment={GAME_SUBMISSION_NOTIFICATIONS_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;GAME_SUBMISSION_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string}
-type Job={id:string;lease:string;message:Record<string,unknown>|null;contact:DeveloperContact;title:string;version:string;kind:string;uploadId:string;studio:string}
+type Job={id:string;lease:string;message:Record<string,unknown>|null;contact:DeveloperContact;title:string;version:string|null;kind:string;uploadId:string|null;externalRevisionId?:string|null;studio:string}
 type Log={event:'submission_email_delivery';outcome:'sent'|'failed'|'attention_required'|'configuration_missing';phase:'configuration'|'claim'|'prepare'|'send'|'ack'}
 export async function deliverSubmissionNotifications(db:UploadRepository,env:NotificationEnvironment,options:{submissionId?:string;limit?:number;fetcher?:typeof fetch;log?:(entry:Log)=>void;operationMs?:number;signal?:AbortSignal}={}){
  if(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='0')return 0
@@ -20,10 +20,12 @@ export async function deliverSubmissionNotifications(db:UploadRepository,env:Not
    phase='prepare'
    let message=job.message
    if(!message){
-    const url=new URL('/admin/game-builds/'+encodeURIComponent(job.uploadId),env.NEXT_PUBLIC_SITE_URL||'https://chibaskogames.fr')
+    const path=job.externalRevisionId?'/admin/game-builds':'/admin/game-builds/'+encodeURIComponent(job.uploadId??'')
+    const build=job.externalRevisionId?'Révision URL : '+job.externalRevisionId:'Version : '+job.version
+    const url=new URL(path,env.NEXT_PUBLIC_SITE_URL||'https://chibaskogames.fr')
     if(url.protocol!=='https:'||url.username||url.password)throw Error('invalid_site_configuration')
     message={from,to:[to],reply_to:job.contact.contactEmail,subject:'Nouvelle soumission de jeu sur Chibasko Games',text:
-     ['Nouvelle soumission de jeu sur Chibasko Games','', 'Jeu : '+job.title,'Version : '+job.version,'Type : '+(job.kind==='update'?'Mise à jour':'Nouveau jeu'),'Développeur : '+job.contact.firstName+' '+job.contact.lastName,'Studio : '+job.studio,'E-mail : '+job.contact.contactEmail,'',url.href].join('\n')}
+     ['Nouvelle soumission de jeu sur Chibasko Games','', 'Jeu : '+job.title,build,'Type : '+(job.kind==='update'?'Mise à jour':'Nouveau jeu'),'Développeur : '+job.contact.firstName+' '+job.contact.lastName,'Studio : '+job.studio,'E-mail : '+job.contact.contactEmail,'',url.href].join('\n')}
    }
    message=await withTimeout(db.call<Record<string,unknown>>('distribution_prepare_submission_email',{p_id:job.id,p_lease:job.lease,p_message:message}),15_000)
    phase='send';options.signal?.throwIfAborted()

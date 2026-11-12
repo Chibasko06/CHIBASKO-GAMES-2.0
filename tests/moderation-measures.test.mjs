@@ -71,7 +71,7 @@ test('e-mail de mesure : même moteur durable, HTML échappé et confirmation du
  const job={id:measure.operationId,lease:player,stream:'measure',kind:'decision',notice:{title:'Suspension temporaire',text:'Motif <script>danger</script>\nFin : demain.'},case:{id:measure.operationId,number:1,category:'other',target_kind:'player',contact_email:'player@example.test'},message:null}
  const events=[];let claimed=false
  const db={async call(name,args){events.push(name);if(name==='distribution_moderation_claim_mail'){if(claimed)return null;claimed=true;return job}if(name==='distribution_moderation_prepare_measure_mail')return args.p_message;if(name==='distribution_moderation_finish_measure_mail'){assert.equal(args.p_success,true);return null}assert.fail(name)}}
- const env={MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture',RESEND_FROM_EMAIL:'noreply@example.test',GAME_SUBMISSION_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test',NEXT_PUBLIC_SITE_URL:'https://portal.test'}
+ const env={MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture',RESEND_FROM_EMAIL:'noreply@example.test',CONTACT_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test',NEXT_PUBLIC_SITE_URL:'https://portal.test'}
  const sent=await deliverModeration(db,env,{log(){},fetcher:async(input,init)=>{const body=JSON.parse(init.body);assert.match(body.html,/&lt;script&gt;/);assert.doesNotMatch(body.html,/<script>/);assert.match(body.text,/appeal@example.test/);assert.match(body.text,/account\/moderation/);assert.match(body.text,/Dashboard → Paramètres avancés → Mes avertissements et sanctions/);assert.match(body.html,/Dashboard → Paramètres avancés → Mes avertissements et sanctions/);assert.match(body.html,/Consulter ma décision/);assert.match(body.html,/href="https:\/\/portal.test\/account\/moderation"/);return Response.json({id:'mail-fixture'})}})
  assert.equal(sent,1);assert.ok(events.includes('distribution_moderation_finish_measure_mail'));assert.equal(events.includes('distribution_moderation_finish_mail'),false)
 })
@@ -86,7 +86,7 @@ test('e-mail de mesure : une panne conserve le message et la même clé lors de 
   if(name==='distribution_moderation_finish_measure_mail'){acknowledgements.push(args.p_success);return null}
   assert.fail(name)
  }}
- const env={MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture',RESEND_FROM_EMAIL:'noreply@example.test',GAME_SUBMISSION_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test',NEXT_PUBLIC_SITE_URL:'https://portal.test'}
+ const env={MODERATION_MAINTENANCE_ENABLED:'1',RESEND_API_KEY:'fixture',RESEND_FROM_EMAIL:'noreply@example.test',CONTACT_NOTIFY_EMAIL:'admin@example.test',MODERATION_APPEAL_EMAIL:'appeal@example.test',NEXT_PUBLIC_SITE_URL:'https://portal.test'}
  const fetcher=async(input,init)=>{sent.push({key:new Headers(init.headers).get('Idempotency-Key'),body:init.body});return sent.length===1?Response.json({message:'unavailable'},{status:503}):Response.json({id:'receipt-fixture'})}
  assert.equal(await deliverModeration(db,env,{fetcher,log(){}}),0)
  available=true

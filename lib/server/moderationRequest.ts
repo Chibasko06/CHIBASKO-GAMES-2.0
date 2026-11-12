@@ -1,3 +1,4 @@
+import {contactEmail} from '@/lib/siteContacts'
 import {moderationPresentation} from './moderationPresentation'
 import 'server-only'
 import {createHmac} from 'node:crypto'
@@ -16,7 +17,7 @@ export async function moderationRequest(request:Request,admin=false){
  try{
   if(!['GET','POST'].includes(request.method)||(!admin&&request.method!=='POST'))return adminJson({error:'Méthode non autorisée.'},{status:405})
   if(request.method==='POST'&&(!adminOriginAllowed(request)||(!admin&&request.headers.get('origin')!==new URL(request.url).origin)))throw new InputError('Origine refusée.',403)
-  if(!admin&&process.env.MODERATION_ENABLED!=='1')throw new InputError('Les signalements intégrés ne sont pas encore disponibles. Contact : chibasko06@gmail.com.',503)
+  if(!admin&&process.env.MODERATION_ENABLED!=='1')throw new InputError('Les signalements intégrés ne sont pas encore disponibles. Contact : '+contactEmail+'.',503)
   const token=request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1]
   let actor:string|null=null
   if(admin){
@@ -77,7 +78,7 @@ export async function moderationRequest(request:Request,admin=false){
    client=hash(actor?'account:'+actor:'guest:'+(isIP(ip)?ip:'shared-untrusted-ingress'))
    if(!actor){
     const botSecret=process.env.MODERATION_TURNSTILE_SECRET
-    if(!botSecret)throw new InputError('Le formulaire invité doit être configuré. Contact : chibasko06@gmail.com.',503)
+    if(!botSecret)throw new InputError('Le formulaire invité doit être configuré. Contact : '+contactEmail+'.',503)
     if(typeof input.botToken!=='string'||!input.botToken||input.botToken.length>2048)throw new InputError('Vérification anti-robot requise.')
     const verification=await withTimeout(fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{method:'POST',body:new URLSearchParams({secret:botSecret,response:input.botToken as string,idempotency_key:input.operationId as string,...(isIP(ip)?{remoteip:ip}:{})}),signal:AbortSignal.timeout(8000)}),8000)
     const result=await verification.json()
@@ -88,7 +89,7 @@ export async function moderationRequest(request:Request,admin=false){
    fingerprint=hash(JSON.stringify(Object.fromEntries(Object.keys(content).sort().map(key=>[key,typeof content[key]==='string'?(key==='contactEmail'?String(content[key]).trim().toLowerCase():String(content[key]).trim().normalize('NFC')):content[key]]))))
    input={...content,operationId:input.operationId}
   }
-  if(!admin){const retention=Number(process.env.MODERATION_CLOSED_RETENTION_DAYS);if(!Number.isInteger(retention)||retention<1||retention>3650)throw new InputError('La configuration de conservation des signalements doit être finalisée. Contact : chibasko06@gmail.com.',503)}
+  if(!admin){const retention=Number(process.env.MODERATION_CLOSED_RETENTION_DAYS);if(!Number.isInteger(retention)||retention<1||retention>3650)throw new InputError('La configuration de conservation des signalements doit être finalisée. Contact : '+contactEmail+'.',503)}
   const db=uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??'')
   const result=admin?await db.call('distribution_moderation_admin',{p_actor:actor,p_input:input}):await db.call('distribution_moderation_submit',{p_actor:actor,p_input:input,p_client:client,p_fingerprint:fingerprint})
   if(!result)throw new InputError('Dossier introuvable.',404)

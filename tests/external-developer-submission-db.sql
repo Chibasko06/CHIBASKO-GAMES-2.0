@@ -9,7 +9,7 @@ do $$
 declare owner_id uuid:='ef410000-0000-4000-8000-000000000001';
  stranger uuid:='ef410000-0000-4000-8000-000000000002'; admin_id uuid:='ef410000-0000-4000-8000-000000000003';
  revision uuid:='ef410000-0000-4000-8000-000000000005'; next_revision uuid:='ef410000-0000-4000-8000-000000000006';
- g uuid; sid uuid; next_sid uuid; before_row jsonb;
+ g uuid; sid uuid; next_sid uuid; before_row jsonb; job jsonb;
  cover text:='https://assets.chibaskogames.fr/game-thumbnails/ef410000-0000-4000-8000-000000000008.png';
  origin text:='https://play.example.com';
 begin
@@ -23,11 +23,22 @@ begin
  sid:=public.distribution_submit_external(owner_id,g,revision,origin||'/old',origin,cover);
  if public.distribution_submit_external(owner_id,g,revision,origin||'/old',origin,cover)<>sid then
    raise exception 'idempotence failure'; end if;
+ if (select count(*) from public.game_submission_notifications where submission_id=sid)<>1
+   then raise exception 'external notification missing or duplicated'; end if;
+ job:=public.distribution_claim_submission_email(sid);
+ if job->>'externalRevisionId' is distinct from revision::text
+   or job->'contact'->>'contactEmail' is distinct from 'fixture@example.com'
+   or public.distribution_claim_submission_email(sid) is not null
+   then raise exception 'invalid external notification claim'; end if;
+ perform public.distribution_finish_submission_email(sid,(job->>'lease')::uuid,true);
+ if public.distribution_claim_submission_email(sid) is not null then raise exception 'external notification replayed'; end if;
  if public.distribution_developer_external(stranger,0)<>'[]'::jsonb
    or public.distribution_developer_external(owner_id,0)->0->>'url'<>origin||'/old' then
    raise exception 'incorrect visibility'; end if;
  perform public.distribution_external_review(admin_id,revision,'correction','Remplacer l’URL');
  next_sid:=public.distribution_submit_external(owner_id,g,next_revision,origin||'/new',origin,cover);
+ if (select count(*) from public.game_submission_notifications where submission_id=next_sid)<>1
+   then raise exception 'external resubmission did not create its own notification'; end if;
  if next_sid=sid or not exists(select 1 from public.game_external_revisions where id=revision and submitted_url=origin||'/old')
    or not exists(select 1 from public.game_external_review_events where revision_id=revision and action='correction')
    then raise exception 'revision history changed'; end if;
