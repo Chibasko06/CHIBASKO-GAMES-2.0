@@ -64,7 +64,7 @@ export default function GamesCatalog({
         <fieldset>
           <legend className="mb-3 text-xs font-semibold text-zinc-400">Type de jeu</legend>
           <div className="flex flex-wrap gap-2">
-            {([['all', 'Tous'], ['classic', 'Classiques'], ['multiplayer', 'Multijoueur']] as const).map(([type, label]) => <button key={type} type="button" aria-pressed={filters.type === type} onClick={() => updateFilters({ type: type as CatalogueType })} className={`rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${filters.type === type ? 'border-cyan-400 bg-cyan-400 text-black' : 'border-zinc-700 text-zinc-300 hover:border-cyan-700'}`}>{label}</button>)}
+            {([['all', 'Tous'], ['classic', 'Par URL'], ['multiplayer', 'Par build']] as const).map(([type, label]) => <button key={type} type="button" aria-pressed={filters.type === type} onClick={() => updateFilters({ type: type as CatalogueType })} className={`rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${filters.type === type ? 'border-cyan-400 bg-cyan-400 text-black' : 'border-zinc-700 text-zinc-300 hover:border-cyan-700'}`}>{label}</button>)}
           </div>
         </fieldset>
         <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.4fr)_240px_240px]">

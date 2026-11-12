@@ -18,7 +18,8 @@ import { siteConfig, serializeJsonLd } from '@/lib/seo'
 import { gameMetadata, gameStructuredData } from '@/lib/seoCatalogue'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { publishedOnlineAccess } from '@/lib/server/publishedOnlineAccess'
+import {catalogueOnlineAccess} from '@/lib/server/catalogueMultiplayer'
+import {GameBadges} from '@/components/multiplayer/GameBadges'
 
 const getGame=cache(getGameBySlug)
 export const dynamic = 'force-dynamic'
@@ -56,12 +57,7 @@ export default async function GamePage({
     notFound()
   }
 
-  const availableAccess=game.active_version_id && game.runtime_capabilities?.online
-    ? await Promise.all(game.runtime_capabilities.online.access.map(async access=>{
-      try{return await publishedOnlineAccess(game.id,game.active_version_id!,access) ? access : null}
-      catch{console.error(JSON.stringify({event:'game_availability_failed',gameId:game.id,code:'availability_unavailable'}));return null}
-    }))
-    : []
+  const availableAccess=await catalogueOnlineAccess(game)
 
   const structuredData = gameStructuredData(game)
   const standalone = !game.active_version_id && isClassicGame(game)
@@ -84,6 +80,7 @@ export default async function GamePage({
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4"><h1 className="text-3xl font-black uppercase text-cyan-400 sm:text-4xl">{game.title}</h1><GameSharingMenu gameId={game.id} title={game.title} url={siteConfig.url+'/games/'+game.slug}/></div>
           {game.developer_name && <p className="text-sm text-zinc-400">{game.developer_name}</p>}
+          <GameBadges game={{...game,availableOnline:availableAccess}}/>
           <div className="flex flex-wrap gap-2">
             {game.categories?.map((category) => (
               <Link
@@ -118,7 +115,7 @@ export default async function GamePage({
           developerName={game.developer_name}
           coverUrl={game.thumbnail_url}
           capabilities={game.runtime_capabilities}
-          availableAccess={availableAccess.filter(access=>access!==null)}
+          availableAccess={availableAccess}
           initialLikes={game.likes_count}
           initialDislikes={game.dislikes_count}
         />

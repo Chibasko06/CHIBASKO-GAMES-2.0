@@ -7,6 +7,7 @@ import {pageNumber} from '@/lib/pagination'
 import { buildPageMetadata } from '@/lib/seo'
 import {categoryDescription, categoryMetadata} from '@/lib/seoCatalogue'
 import {cache} from 'react'
+import {withCatalogueOnlineAccess} from '@/lib/server/catalogueMultiplayer'
 
 export const dynamic = 'force-dynamic'
 const getCatalogueCategories=cache(getCategories)
@@ -52,7 +53,7 @@ export default async function GamesPage({searchParams}:Props) {
         </p>
       </div>
 
-      <GamesCatalog games={games.items} categories={categories} total={games.total} page={pageNumber(query.page)} defaultDevice={device} />
+      <GamesCatalog games={await Promise.all(games.items.map(withCatalogueOnlineAccess))} categories={categories} total={games.total} page={pageNumber(query.page)} defaultDevice={device} />
     </div>
   )
 }

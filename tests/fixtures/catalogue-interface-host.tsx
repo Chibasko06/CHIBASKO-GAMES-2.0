@@ -7,11 +7,12 @@ import HorizontalScroller from '../../components/HorizontalScroller'
 import {GameCard} from '../../components/GameCard'
 import GamePagePlayerLayout from '../../components/GamePagePlayerLayout'
 import GameViewport from '../../components/GameViewport'
-type FixtureGame=import('react').ComponentProps<typeof GameCard>['game'] & {is_published:boolean;categories:{id:string;slug:string;name:string}[]}
+type FixtureGame=import('react').ComponentProps<typeof GameCard>['game'] & {is_published:boolean;game_type:string;categories:{id:string;slug:string;name:string}[]}
 const games=Array.from({length:16},(_,i):FixtureGame=>({
  id:'fixture-'+i,slug:'fixture-'+i,title:i===4?'Chibasko Pong':'Jeu '+(i+1),thumbnail_url:i%4===1?null:'/cover.svg',
  categories:[{id:'action',slug:'action',name:'Action'},{id:'arcade',slug:'arcade',name:'Arcade'}],is_published:true,
- game_type:i===4?'multiplayer_chibasko':'classic',is_beta:i===4,
+ game_type:i===4||i===0?'multiplayer_chibasko':'classic',is_beta:i===4,
+ active_version_id:i===4||i===0?'fixture-version':null,availableOnline:i===4?['public']:[],
  runtime_capabilities:i===4?{online:{access:['public','private'],players:{min:2,max:2}}}:undefined,
  description:i%3===0?'Une description volontairement longue pour vérifier la limite de deux lignes sans agrandir la carte. '.repeat(4):undefined,
  developer_name:i===4?'Chibasko Games':i%2?'Studio de développement avec un nom long':undefined,technology:i%2?'HTML5':undefined,

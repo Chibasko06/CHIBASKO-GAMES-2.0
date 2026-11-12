@@ -8,8 +8,8 @@ export default function GameTypeFields({ type, gameUrl, gameId, onType, onUrl, o
   return <fieldset className="space-y-4 rounded-2xl border border-cyan-900/60 bg-black/30 p-4 md:col-span-2">
     <legend className="px-2 font-bold text-cyan-200">Source du lancement</legend>
     <div className="grid gap-3 sm:grid-cols-2">
-      {([{ value: 'classic', title: 'URL externe', detail: 'Lecteur HTML5 historique' },
-        { value: 'multiplayer_chibasko', title: 'Build Chibasko Games', detail: 'Lancement depuis une version validée sur R2' }] as const).map(option => <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-700 p-3 focus-within:border-cyan-400">
+      {([{ value: 'classic', title: 'Jeu hébergé à l’extérieur', detail: 'Le lecteur ouvre l’URL fournie par l’hébergeur.' },
+        { value: 'multiplayer_chibasko', title: 'Jeu hébergé par Chibasko Games', detail: 'Le lecteur utilise le build actif validé et stocké sur R2.' }] as const).map(option => <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-700 p-3 focus-within:border-cyan-400">
         <input type="radio" name="game_type" value={option.value} checked={type === option.value} onChange={() => onType(option.value)} className="mt-1 accent-cyan-400" />
         <span><span className="block text-sm font-bold">{option.title}</span><span className="block text-xs text-zinc-400">{option.detail}</span></span>
       </label>)}

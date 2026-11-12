@@ -23,10 +23,11 @@ test('single local mode renders the launcher without loading a runtime or accoun
  assert.match(html,/Écran de lancement/);assert.match(html,/Commandes du lecteur/)
  assert.doesNotMatch(html,/Chargement du jeu|Se connecter|href="[^\"]*\/local/)
 })
-test('multiple modes are integrated into one player with unavailable modes disabled',()=>{
+test('le lanceur affiche uniquement les modes disponibles',()=>{
  const html=render({local:{players:{min:2,max:2}},online:{access:['public','private'],players:{min:2,max:2}}},['public'])
  assert.match(html,/Écran de lancement/)
  assert.equal((html.match(/aria-label="Jeu Chibasko Games"/g)??[]).length,1)
- assert.match(html,/Serveur indisponible/)
+ assert.match(html,/Jouer en ligne/)
+ assert.doesNotMatch(html,/Serveur indisponible|Partie privée/)
  assert.doesNotMatch(html,/href="[^\"]*\/(online|private|local)"/)
 })

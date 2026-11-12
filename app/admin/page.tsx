@@ -736,22 +736,17 @@ function AdminPanel() {
           </FormField>
           <button type="submit" className="admin-action bg-cyan-400 !text-black">Rechercher</button>
         </form>
-        <div className={gameEditorOpen ? 'grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]' : 'min-w-0'}>
-          {gameEditorOpen && <AdminEditor identity={editingGameId ?? 'new-game'}>{!editingGameId && <div className="mb-3 text-right">
+        <div className="min-w-0 space-y-4">
+          {gameEditorOpen && <AdminEditor wide identity={editingGameId ?? 'new-game'}>{!editingGameId && <div className="mb-3 text-right">
             <button className="admin-action" disabled={savingGame || uploadingGameThumbnail} onClick={resetGameForm}>Fermer le formulaire</button>
           </div>}<div className="min-w-0">
               <div className="mb-6 flex items-center justify-between gap-4">
                 <h2 className="text-lg font-black uppercase text-white">
                   {editingGameId ? 'Modifier un jeu' : 'Ajouter un jeu'}
                 </h2>
-                {editingGameId ? (
-                  <button type="button" disabled={savingGame || uploadingGameThumbnail} onClick={resetGameForm} className="border border-zinc-700 px-3 py-2 text-xs font-bold text-zinc-300">
-                    Annuler
-                  </button>
-                ) : null}
               </div>
 
-              <form onSubmit={handleGameSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <form onSubmit={handleGameSubmit} className="grid min-w-0 gap-4">
                 {editingGameId && editingGame && (editingGame.active_version_id || editingGame.external_revision_id) ? (
                   <fieldset className="rounded-xl border border-zinc-700 p-4 md:col-span-2">
                     <legend className="px-2 font-semibold">Configuration validée</legend>
@@ -768,8 +763,8 @@ function AdminPanel() {
                 ) : <GameTypeFields type={gameForm.game_type} gameUrl={gameForm.game_url} gameId={gameForm.multiplayer_game_id}
                   onType={type => setGameForm(current => changeGameFormType(current, type, !!editingGameId))}
                   onUrl={url => handleGameChange('game_url', url)} onGameId={id => handleGameChange('multiplayer_game_id', id)} />}
-                <label className="flex items-center gap-3 md:col-span-2">
-                  <input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Afficher le badge bêta</label>
+                <fieldset className="grid min-w-0 grid-cols-1 gap-4 rounded-xl border border-zinc-800 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] [&_input]:min-w-0 [&_select]:min-w-0">
+                <legend className="px-2 font-semibold">Informations générales</legend>
                 <FormField label="Titre">
                   <input aria-label="Titre" value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
                 </FormField>
@@ -807,10 +802,11 @@ function AdminPanel() {
                 <FormField className="md:col-span-2" label="Description">
                   <textarea aria-label="Description" value={gameForm.description} onChange={(e) => handleGameChange('description', e.target.value)} placeholder="Description" className="min-h-36 bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" />
                 </FormField>
+                </fieldset>
 
-                <div className="border border-zinc-800 bg-black/40 p-4 md:col-span-2">
+                <fieldset className="min-w-0 rounded-xl border border-zinc-800 bg-black/40 p-4">
+                  <legend className="px-2 font-semibold">Catégories</legend>
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-300">Categories du jeu</p>
                     <span className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">
                       {gameForm.category_ids.length} selection
                     </span>
@@ -829,17 +825,25 @@ function AdminPanel() {
                       ))}
                     </div>
                   )}
-                </div>
+                </fieldset>
 
+                <fieldset className="min-w-0 space-y-3 rounded-xl border border-zinc-800 p-4">
+                <legend className="px-2 font-semibold">Visibilité publique</legend>
                 <label className="flex items-center gap-3 text-sm text-zinc-300 md:col-span-2">
                   <input type="checkbox" disabled={Boolean(editingGameId&&editingGame?.external_revision_id)} checked={gameForm.is_published} onChange={(e) => handleGameChange('is_published', e.target.checked)} />
                   Visible au public
                 </label>
+                <label className="flex items-center gap-3 text-sm">
+                  <input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Afficher le badge bêta</label>
                 {editingGameId&&editingGame?.external_revision_id&&<p className="text-sm text-zinc-400 md:col-span-2">La mise en ligne, la suspension et le retrait de cette révision se font dans les soumissions.</p>}
                 <p className="text-sm text-zinc-400 md:col-span-2">{!gameForm.is_published ? 'Non publié : invisible dans le catalogue public.' : gameForm.is_beta ? 'Publié en Bêta : visible avec le badge Bêta.' : 'Publié : visible dans le catalogue public.'}</p>
-                <button type="submit" disabled={savingGame} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2">
+                </fieldset>
+                <div className="sticky bottom-0 z-10 flex flex-wrap justify-end gap-3 border-t border-zinc-800 bg-zinc-950 py-3">
+                <button type="button" disabled={savingGame || uploadingGameThumbnail} onClick={resetGameForm} className="admin-action">Annuler</button>
+                <button type="submit" disabled={savingGame} className="rounded bg-cyan-600 px-4 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60">
                   {savingGame ? 'SAUVEGARDE...' : editingGameId ? 'Enregistrer le jeu' : 'Créer le jeu'}
                 </button>
+                </div>
               </form>
             </div>
           </AdminEditor>}

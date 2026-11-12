@@ -2,6 +2,7 @@ import AdComfortBanner from '@/components/AdComfortBanner'
 import HorizontalScroller from '@/components/HorizontalScroller'
 import MultiplayerSection from '@/components/multiplayer/MultiplayerSection'
 import { GameBadges } from '@/components/multiplayer/GameBadges'
+import {withCatalogueOnlineAccess} from '@/lib/server/catalogueMultiplayer'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import GameThumbnail from '@/components/GameThumbnail'
@@ -27,10 +28,13 @@ export default async function Home() {
     getHomepageHighlights(),
     getCataloguePage({type:'multiplayer',limit:10}),
   ])
-  const featuredGames=featuredRows.map(withHomeImage)
-  const categorySections=categoryRows.map(section=>({...section,games:section.games.map(withHomeImage)}))
-  const homepageHighlights=highlightRows.map(highlight=>({...highlight,game:withHomeImage(highlight.game)}))
-  const multiplayerGames=multiplayerRows.items.map(withHomeImage)
+  const decorate=async(game:typeof featuredRows[number])=>withHomeImage(await withCatalogueOnlineAccess(game))
+  const [featuredGames,categorySections,homepageHighlights,multiplayerGames]=await Promise.all([
+    Promise.all(featuredRows.map(decorate)),
+    Promise.all(categoryRows.map(async section=>({...section,games:await Promise.all(section.games.map(decorate))}))),
+    Promise.all(highlightRows.map(async highlight=>({...highlight,game:await decorate(highlight.game)}))),
+    Promise.all(multiplayerRows.items.map(decorate)),
+  ])
 
   return (
     <div className="space-y-12 xl:space-y-14">

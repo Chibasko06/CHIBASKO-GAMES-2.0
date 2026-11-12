@@ -12,6 +12,7 @@ let script,css,browser
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0')
 before(async()=>{
  const bundled=await build({entryPoints:['tests/fixtures/admin-console-host.tsx'],write:false,bundle:true,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env':'{}','process.env.NODE_ENV':'"production"'},plugins:[{name:'services-isoles',setup(b){
+  b.onResolve({filter:/\.module\.css$/},()=>({path:'styles',namespace:'fixture'}))
   b.onResolve({filter:/^next\/(link|image|navigation|dynamic)$/},({path})=>({path:path.split('/')[1],namespace:'fixture'}))
   b.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}))
   b.onResolve({filter:/supabaseClient$/},()=>({path:'db',namespace:'fixture'}))
@@ -22,7 +23,7 @@ before(async()=>{
    navigation:`import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('popstate',cb);return()=>window.removeEventListener('popstate',cb)};export function useSearchParams(){return new URLSearchParams(useSyncExternalStore(subscribe,()=>location.search))}const router={push(path){history.pushState({},'',path);dispatchEvent(new PopStateEvent('popstate'))},replace(path){history.replaceState({},'',path);dispatchEvent(new PopStateEvent('popstate'))}};export function useRouter(){return router}`,
    link:`import {createElement} from 'react';export default function Link(props){return createElement('a',{...props,onClick:event=>{if(props.href.startsWith('/')){event.preventDefault();history.pushState({},'',props.href);dispatchEvent(new PopStateEvent('popstate'))}}})}`,
    image:`import {createElement} from 'react';export default function Image({unoptimized,fill,priority,...props}){return createElement('img',props)}`,
-   dynamic:`export default function dynamic(){return ()=>null}`,runtime:`export default function Runtime(){return null}`,
+   dynamic:`export default function dynamic(){return ()=>null}`,runtime:`export default function Runtime(){return null}`,styles:'export default {}',
   }[path]}))
  }}]})
  script=bundled.outputFiles[0].contents
@@ -112,6 +113,7 @@ test('FAQ : création tardive après relecture, reprise manuelle avec la même c
 async function fixture({viewport={width:1366,height:768},path='/admin',conflict=false,denied=false,holdFaq=false,lostFaq=false,lateFaqCreate=false}={}){
  const context=await browser.newContext({viewport}),requests=[],users=Array.from({length:103},(_,i)=>({id:id(i+1),username:'Membre '+String(i).padStart(3,'0'),bio:'Création et découverte de jeux.',avatar_url:null,created_at:'2026-01-01T10:00:00Z',email:'private-'+i+'@example.test',roles:{admin:i%4===0||i%4===2,developer:i%4===0||i%4===1}}))
  const games=Array.from({length:53},(_,i)=>({id:id(i+201),title:'Jeu '+String(i).padStart(3,'0'),slug:'jeu-'+i,game_url:'https://games.example.test/'+i,thumbnail_url:'/thumbnail.svg',description:'Description du jeu.',developer_name:'Studio',technology:'HTML5',game_type:i%3?'classic':'multiplayer_chibasko',is_published:i%2===0,is_beta:false,created_at:'2026-01-01',game_categories:[]}))
+ Object.assign(games[0],{active_version_id:id(900),game_url:null,multiplayer_game_id:'fixture-sdk',runtime:{version:'1.0.0',integration:'sdk',declaredOnline:[],availableOnline:[],availabilityUnknown:false}})
  const categories=[{id:id(800),name:'Arcade',slug:'arcade',games_count:5}],faqEntries=[{id:id(801),question:'Comment jouer ?',answer:'Choisissez un jeu.',sort_order:1,is_published:true},...['B','C','D'].map((question,i)=>({id:id(810+i),question,answer:'[Lien](https://example.test)',sort_order:i+2,is_published:true}))]
  let pendingCreate=null,createInterrupted=false
  let releaseFaq;const faqGate=new Promise(resolve=>{releaseFaq=resolve})
@@ -145,6 +147,11 @@ async function fixture({viewport={width:1366,height:768},path='/admin',conflict=
     if(url.searchParams.get('status')==='hidden')rows=rows.filter(game=>!game.is_published)
     if(['classic','multiplayer_chibasko'].includes(url.searchParams.get('type')))rows=rows.filter(game=>game.game_type===url.searchParams.get('type'))
     return route.fulfill({json:{games:rows.slice((page-1)*50,page*50),total:rows.length}})
+   }
+   if(url.pathname.startsWith('/api/admin/games/')&&request.method()==='PATCH'){
+    const game=games.find(game=>game.id===url.pathname.split('/').at(-1))
+    Object.assign(game,request.postDataJSON())
+    return route.fulfill({json:{game}})
    }
    for(const [entity,rows,key] of [['categories',categories,'categories'],['faq',faqEntries,'faqEntries']]){
     if(url.pathname==='/api/admin/'+entity){
@@ -287,3 +294,29 @@ test('revue de suppression : référence obligatoire, confirmation et reprise no
   const write=x.requests.find(request=>request.method==='POST');assert.deepEqual(write.body,{reviewReference:'decision/2026-001'})
  }finally{await x.context.close()}
 })
+
+for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
+ test('éditeur de jeu large et sauvegarde sans changement de source '+viewport.width,async()=>{
+  const x=await fixture({viewport,path:'/admin?section=games'})
+  try{
+   await x.page.getByRole('button',{name:'Modifier Jeu 000',exact:true}).click()
+   const panel=x.page.getByRole('complementary',{name:'Panneau de modification'})
+   const bounds=await panel.boundingBox()
+   assert.ok(bounds.width<=Math.min(viewport.width,960))
+   assert.ok(bounds.width>=(viewport.width===390?320:800),JSON.stringify(bounds))
+   assert.equal(await panel.getByRole('radio',{name:/hébergé/}).count(),0)
+   await panel.getByLabel('Titre',{exact:true}).fill('Modification à annuler')
+   await panel.getByRole('button',{name:'Annuler',exact:true}).click()
+   await x.page.getByRole('button',{name:'Modifier Jeu 000',exact:true}).click()
+   assert.equal(await panel.getByLabel('Titre',{exact:true}).inputValue(),'Jeu 000')
+   await panel.getByLabel('Titre',{exact:true}).fill('Titre corrigé')
+   await panel.getByRole('button',{name:'Enregistrer le jeu'}).click()
+   await x.page.getByRole('button',{name:'Modifier Titre corrigé',exact:true}).waitFor()
+   const patch=x.requests.find(r=>r.method==='PATCH'&&r.path==='/api/admin/games/'+id(201))
+   assert.equal(patch.body.multiplayer_game_id,'fixture-sdk')
+   assert.equal(patch.body.game_url,null)
+   await x.page.getByRole('button',{name:'Modifier Jeu 001',exact:true}).click()
+   await panel.getByRole('radio',{name:/Jeu hébergé à l’extérieur/}).waitFor()
+  }finally{await x.context.close()}
+ })
+}

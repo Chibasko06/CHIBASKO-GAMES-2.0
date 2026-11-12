@@ -4,6 +4,7 @@ import {pageNumber} from '@/lib/pagination'
 import Link from 'next/link'
 import { buildPageMetadata } from '@/lib/seo'
 import MultiplayerSection from '@/components/multiplayer/MultiplayerSection'
+import {withCatalogueOnlineAccess} from '@/lib/server/catalogueMultiplayer'
 
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +22,7 @@ export default async function MultiplayerPage({searchParams}:{searchParams:Promi
       <h1 className="mt-3 text-3xl font-black uppercase text-white sm:text-4xl">Multijoueur</h1>
       <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-300">Joue avec tes amis sur Chibasko Games.</p>
     </header>
-    <MultiplayerSection games={games.items} />
+    <MultiplayerSection games={await Promise.all(games.items.map(withCatalogueOnlineAccess))} />
     <nav aria-label="Pages des jeux multijoueurs" className="flex justify-center gap-6">{page>1&&<Link href={`/multiplayer?page=${page-1}`}>Précédent</Link>}{page*24<games.total&&<Link href={`/multiplayer?page=${page+1}`}>Suivant</Link>}</nav>
 
   </div>
