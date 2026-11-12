@@ -1,7 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import type { Tables } from '@/types/database'
-export type AdminGame = Tables<'games'> & { game_categories?: { category_id: string }[] }
+import {catalogueGameLabels,type CatalogueRuntime} from '@/lib/admin-game-catalogue'
+export type AdminGame = Tables<'games'> & { game_categories?: { category_id: string }[];external_revision_id?:string|null;runtime?:CatalogueRuntime|null }
 export default function AdminGameTable({ games, busy, onEdit, onDelete }: { games: AdminGame[]; busy: boolean; onEdit: (game: AdminGame) => void; onDelete: (id: string) => void }) {
   return <table className="admin-table">
     <caption className="sr-only">Catalogue administré</caption>
@@ -9,7 +10,7 @@ export default function AdminGameTable({ games, busy, onEdit, onDelete }: { game
       <tr>
         <th scope="col">Jeu</th>
         <th scope="col">Statut</th>
-        <th scope="col">Type</th>
+        <th scope="col">Hébergement et capacités</th>
         <th scope="col">Actions</th>
       </tr>
     </thead>
@@ -24,9 +25,10 @@ export default function AdminGameTable({ games, busy, onEdit, onDelete }: { game
           </div>
         </td>
         <td>
-          <span className={'inline-flex rounded-md border px-2 py-1 text-xs ' + (game.is_published ? 'border-emerald-900 bg-emerald-950/30 text-emerald-300' : 'border-zinc-700 text-zinc-400')}>{game.is_published ? (game.is_beta ? 'Bêta publiée' : 'Publié') : 'Masqué'}</span>
+          <span className={'inline-flex rounded-md border px-2 py-1 text-xs ' + (game.is_published ? 'border-emerald-900 bg-emerald-950/30 text-emerald-300' : 'border-zinc-700 text-zinc-400')}>{game.is_published ? 'Visible au public' : 'Masqué au public'}</span>
+          {game.is_beta&&<p className="mt-1 text-xs text-zinc-400">Bêta</p>}
         </td>
-        <td className="text-xs text-zinc-400">{game.game_type === 'multiplayer_chibasko' ? 'SDK / multijoueur' : game.technology || 'HTML5'}</td>
+        <td className="text-xs text-zinc-400">{Object.entries(catalogueGameLabels(game)).map(([key,label])=><p key={key}>{label}</p>)}</td>
         <td>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="admin-action" disabled={busy} onClick={() => onEdit(game)}>Modifier<span className="sr-only"> {game.title}</span>

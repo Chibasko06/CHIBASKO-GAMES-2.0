@@ -13,7 +13,7 @@ type Revision={
 }
 
 const labels:Record<Action,string>={
-  approve:'Approuver la révision',publish:'Publier cette révision',correction:'Demander une correction',
+  approve:'Approuver la révision',publish:'Mettre cette révision en ligne',correction:'Demander une correction',
   reject:'Refuser la révision',suspend:'Suspendre le jeu',withdraw:'Retirer le jeu',
 }
 const requiresReason=new Set<Action>(['correction','reject','suspend','withdraw'])

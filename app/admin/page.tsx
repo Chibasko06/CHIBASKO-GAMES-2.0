@@ -6,7 +6,8 @@ import AdminShell, { type AdminSection } from '@/components/admin/AdminShell'
 import AdminOverview from '@/components/admin/AdminOverview'
 import AdminEditor from '@/components/admin/AdminEditor'
 import AdminUserTable from '@/components/admin/AdminUserTable'
-import AdminGameTable from '@/components/admin/AdminGameTable'
+import {catalogueGameLabels} from '@/lib/admin-game-catalogue'
+import AdminGameTable,{type AdminGame} from '@/components/admin/AdminGameTable'
 import AdminPagination from '@/components/admin/AdminPagination'
 import type { ProfileRoles } from '@/lib/profileRoles'
 
@@ -19,9 +20,7 @@ import { useAdminAccess } from '@/components/admin/useAdminAccess'
 import { uploadAdminAvatar, uploadAdminGameThumbnail } from '@/lib/avatarUpload'
 import { Tables } from '@/types/database'
 
-type Game = Tables<'games'> & {
-  game_categories?: { category_id: string }[]
-}
+type Game = AdminGame
 type AdminUser = Tables<'profiles'> & { email: string | null; roles?: ProfileRoles }
 type Category = Tables<'categories'> & { games_count?: number; game_categories?: { game_id: string }[] }
 type FaqEntry = Tables<'faq_entries'>
@@ -188,6 +187,7 @@ function AdminPanel() {
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm)
   const [faqForm, setFaqForm] = useState<FaqFormState>(emptyFaqForm)
+  const [editingGame,setEditingGame]=useState<Game|null>(null)
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
@@ -515,6 +515,7 @@ function AdminPanel() {
 
   const startEditGame = (game: Game) => {
     setGameEditorOpen(true)
+    setEditingGame(game)
     setEditingGameId(game.id)
     setGameForm(toGameFormState(game))
     setErrorMessage(null)
@@ -730,7 +731,7 @@ function AdminPanel() {
             <select value={gameTypeFilter} onChange={event => { setGameTypeFilter(event.target.value); setGamesPage(1) }} className="border border-zinc-700 bg-black px-3">
               <option value="all">Tous les types</option>
               <option value="classic">HTML5 legacy</option>
-              <option value="multiplayer_chibasko">SDK / multijoueur</option>
+              <option value="multiplayer_chibasko">Lancement par build (type historique)</option>
             </select>
           </FormField>
           <button type="submit" className="admin-action bg-cyan-400 !text-black">Rechercher</button>
@@ -751,12 +752,24 @@ function AdminPanel() {
               </div>
 
               <form onSubmit={handleGameSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <GameTypeFields type={gameForm.game_type} gameUrl={gameForm.game_url} gameId={gameForm.multiplayer_game_id}
+                {editingGameId && editingGame && (editingGame.active_version_id || editingGame.external_revision_id) ? (
+                  <fieldset className="rounded-xl border border-zinc-700 p-4 md:col-span-2">
+                    <legend className="px-2 font-semibold">Configuration validée</legend>
+                    <dl className="grid gap-3 sm:grid-cols-3">
+                      {Object.entries(catalogueGameLabels(editingGame)).map(([key,label])=><div key={key}>
+                        <dt className="text-sm text-zinc-400">{key==='hosting'?'Hébergement':key==='integration'?'Intégration':'Multijoueur'}</dt>
+                        <dd>{label}</dd>
+                      </div>)}
+                    </dl>
+                    {editingGame.runtime&&<p className="mt-2 text-sm">Version active {editingGame.runtime.version}</p>}
+                    {editingGame.external_revision_id&&<p className="mt-2 break-all text-sm">URL approuvée : {editingGame.game_url}</p>}
+                    <p className="mt-2 text-sm text-zinc-400">La configuration de lancement provient de la version ou de la révision examinée dans les soumissions.</p>
+                  </fieldset>
+                ) : <GameTypeFields type={gameForm.game_type} gameUrl={gameForm.game_url} gameId={gameForm.multiplayer_game_id}
                   onType={type => setGameForm(current => changeGameFormType(current, type, !!editingGameId))}
-                  onUrl={url => handleGameChange('game_url', url)} onGameId={id => handleGameChange('multiplayer_game_id', id)} />
-                {editingGameId && <p className="text-sm text-zinc-400 md:col-span-2">Changer le type conserve ce jeu et ses données. Les anciens champs de lancement sont effacés ; renseigne ceux du nouveau type.</p>}
+                  onUrl={url => handleGameChange('game_url', url)} onGameId={id => handleGameChange('multiplayer_game_id', id)} />}
                 <label className="flex items-center gap-3 md:col-span-2">
-                  <input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Bêta</label>
+                  <input type="checkbox" checked={gameForm.is_beta} onChange={event => handleGameChange('is_beta', event.target.checked)} />Afficher le badge bêta</label>
                 <FormField label="Titre">
                   <input aria-label="Titre" value={gameForm.title} onChange={(e) => handleGameChange('title', e.target.value)} placeholder="Titre" className="bg-black border border-zinc-800 p-3 text-white outline-none focus:border-cyan-500" required />
                 </FormField>
@@ -819,9 +832,10 @@ function AdminPanel() {
                 </div>
 
                 <label className="flex items-center gap-3 text-sm text-zinc-300 md:col-span-2">
-                  <input type="checkbox" checked={gameForm.is_published} onChange={(e) => handleGameChange('is_published', e.target.checked)} />
-                  Visible dans le catalogue
+                  <input type="checkbox" disabled={Boolean(editingGameId&&editingGame?.external_revision_id)} checked={gameForm.is_published} onChange={(e) => handleGameChange('is_published', e.target.checked)} />
+                  Visible au public
                 </label>
+                {editingGameId&&editingGame?.external_revision_id&&<p className="text-sm text-zinc-400 md:col-span-2">La mise en ligne, la suspension et le retrait de cette révision se font dans les soumissions.</p>}
                 <p className="text-sm text-zinc-400 md:col-span-2">{!gameForm.is_published ? 'Non publié : invisible dans le catalogue public.' : gameForm.is_beta ? 'Publié en Bêta : visible avec le badge Bêta.' : 'Publié : visible dans le catalogue public.'}</p>
                 <button type="submit" disabled={savingGame} className="bg-cyan-600 py-3 font-black text-black disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2">
                   {savingGame ? 'SAUVEGARDE...' : editingGameId ? 'Enregistrer le jeu' : 'Créer le jeu'}

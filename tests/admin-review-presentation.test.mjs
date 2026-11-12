@@ -24,13 +24,13 @@ test('publish stays disabled until exact persisted review/version prerequisites;
  assert.equal(reviewPresentation(base,full).canPublish,false)
  assert.equal(reviewPresentation(completed(),full).canPublish,false)
  const ready={...completed(),versionStatus:'in_review',review:{decision:'reviewed',reviewedAt:'2026-10-20T10:00:00Z',checklist:full}}
- assert.equal(reviewPresentation(ready).label,'Prêt à publier');assert.equal(reviewPresentation(ready).canPublish,true)
+ assert.equal(reviewPresentation(ready).label,'Prêt à accepter');assert.equal(reviewPresentation(ready).canPublish,true)
  for(const change of [{versionStatus:'approved'},{technicalStatus:'validating'},{gameVersionId:null},{review:{...ready.review,reviewedAt:null}},{review:{...ready.review,checklist:{}}}])assert.equal(reviewPresentation({...ready,...change}).canPublish,false)
  assert.equal(reviewPresentation(ready,{...full,tested:false}).canPublish,false)
 })
 test('terminal decisions have explicit badges and safe action eligibility',()=>{
  const build=completed()
- assert.equal(reviewPresentation({...build,versionStatus:'published'}).label,'Publié')
+ assert.equal(reviewPresentation({...build,versionStatus:'published'}).label,'Version acceptée')
  assert.equal(reviewPresentation({...build,review:{...build.review,decision:'rejected'}}).label,'Refusé')
  assert.equal(reviewPresentation({...build,versionStatus:'archived'}).label,'Archivé')
  assert.equal(reviewPresentation({...build,versionStatus:'published'}).canReject,false)

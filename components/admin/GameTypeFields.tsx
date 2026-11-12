@@ -6,10 +6,10 @@ export default function GameTypeFields({ type, gameUrl, gameId, onType, onUrl, o
   onType(type: GameType): void; onUrl(url: string): void; onGameId(id: string): void
 }) {
   return <fieldset className="space-y-4 rounded-2xl border border-cyan-900/60 bg-black/30 p-4 md:col-span-2">
-    <legend className="px-2 font-bold text-cyan-200">Type de jeu</legend>
+    <legend className="px-2 font-bold text-cyan-200">Source du lancement</legend>
     <div className="grid gap-3 sm:grid-cols-2">
-      {([{ value: 'classic', title: 'Jeu classique', detail: 'HTML5, URL ou iframe' },
-        { value: 'multiplayer_chibasko', title: 'Multijoueur Chibasko Games', detail: 'Salle d’attente et jeu intégrés' }] as const).map(option => <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-700 p-3 focus-within:border-cyan-400">
+      {([{ value: 'classic', title: 'URL externe', detail: 'Lecteur HTML5 historique' },
+        { value: 'multiplayer_chibasko', title: 'Build Chibasko Games', detail: 'Lancement depuis une version validée sur R2' }] as const).map(option => <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-700 p-3 focus-within:border-cyan-400">
         <input type="radio" name="game_type" value={option.value} checked={type === option.value} onChange={() => onType(option.value)} className="mt-1 accent-cyan-400" />
         <span><span className="block text-sm font-bold">{option.title}</span><span className="block text-xs text-zinc-400">{option.detail}</span></span>
       </label>)}
@@ -18,7 +18,7 @@ export default function GameTypeFields({ type, gameUrl, gameId, onType, onUrl, o
       <input type="url" required value={gameUrl} onChange={e => onUrl(e.target.value)} placeholder="https://…" className="block w-full rounded-xl border border-zinc-700 bg-black p-3 focus:border-cyan-400 focus:outline-none" />
     </label> : <div className="space-y-3">
       <p className="text-sm text-zinc-300">Ce jeu est chargé directement par Chibasko Games. Aucune URL de jeu n’est nécessaire.</p>
-      <label className="block space-y-2"><span className="text-sm">Multiplayer Game ID <span className="text-zinc-400">(obligatoire)</span></span>
+      <label className="block space-y-2"><span className="text-sm">Identifiant historique du catalogue <span className="text-zinc-400">(obligatoire)</span></span>
         <input required value={gameId} onChange={e=>onGameId(e.target.value)} className="block w-full rounded-xl border border-zinc-700 bg-black p-3" />
       </label>
       <p className="text-sm text-zinc-400">Les modes et capacités proviennent de la version active validée. Cet identifiant catalogue ne sélectionne aucun code de jeu.</p>

@@ -73,11 +73,11 @@ try{
     const iframe=page.getByTitle('Prévisualisation du jeu externe')
     await iframe.waitFor()
     assert.equal(await iframe.getAttribute('sandbox'),'allow-scripts allow-pointer-lock')
-    assert.equal(await page.getByRole('button',{name:'Publier cette révision'}).count(),0)
+    assert.equal(await page.getByRole('button',{name:'Mettre cette révision en ligne'}).count(),0)
     await page.getByLabel('Origine HTTPS examinée').fill(external.origin)
     await page.getByRole('checkbox',{name:/effectué les contrôles/}).check()
     await page.getByRole('button',{name:'Approuver la révision',exact:true}).click()
-    await page.getByRole('button',{name:'Publier cette révision',exact:true}).click()
+    await page.getByRole('button',{name:'Mettre cette révision en ligne',exact:true}).click()
     await page.getByLabel('Motif de la décision').fill('Motif de suspension')
     await page.getByRole('button',{name:'Suspendre le jeu',exact:true}).click()
     await page.getByLabel('Motif de la décision').fill('Motif de retrait')
@@ -91,7 +91,7 @@ try{
   row={...initial(),technicalStatus:'completed',versionStatus:'draft',gameVersionId:game,manifest:{integration:{mode:'sdk'},capabilities:{local:{players:{min:1,max:1}}}},integration:{declaredMode:'sdk',declaredVersion:'0.4.2',scan:{signals:true,complete:true,bytes:100},observation:null}};actions=[]
   const page=await browser.newPage({viewport:{width:390,height:844}});await page.goto(origin)
   await page.getByText('Intégration : Indéterminée — initialisation SDK non observée',{exact:true}).waitFor()
-  assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true)
+  assert.equal(await page.getByRole('button',{name:'Accepter et activer le build',exact:true}).isDisabled(),true)
   await page.getByText('Détails de l’intégration',{exact:true}).click();await page.getByText('Version déclarée : 0.4.2, non attestée.',{exact:true}).waitFor()
   row.integration.observation={mode:'sdk',protocol:2,at:'2026-11-10T12:00:00Z'};await page.reload()
   await page.getByText('Intégration : SDK Chibasko Games — dialogue confirmé, version indéterminée',{exact:true}).waitFor()
@@ -120,7 +120,7 @@ try{
   row.history=[{at:'2026-11-10T10:00:00Z',action:'validation_diagnostic:'+JSON.stringify({attempt:1,version:1,kind:'internal',reason:'EXTRACTOR_IO_ERROR'})}];
   const page=await browser.newPage({viewport:{width,height:850}});await page.goto(origin);
   await page.getByRole('region',{name:'Diagnostic technique',exact:true}).waitFor();await page.getByText('Erreur du disque temporaire',{exact:true}).waitFor();await page.getByRole('region',{name:'Diagnostic technique',exact:true}).getByText('Détails techniques',{exact:true}).click();await page.getByText('Erreur interne du validateur',{exact:false}).waitFor();
-  assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true);
+  assert.equal(await page.getByRole('button',{name:'Accepter et activer le build',exact:true}).isDisabled(),true);
   if(styles)assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   row.history=[{at:'2026-11-10T10:00:00Z',action:'validation_diagnostic:'+JSON.stringify({attempt:1,version:1,kind:'submission',reason:'INVALID_MANIFEST_SCHEMA',path:'chibasko.json',field:'/gameId'})}];
   await page.reload();await page.getByText('/gameId',{exact:true}).waitFor();await page.getByText('chibasko.json',{exact:true}).waitFor();
@@ -137,7 +137,7 @@ try{
   row=initial();actions=[];const page=await browser.newPage();await page.goto(origin)
   await page.getByRole('heading',{name:'Proposed fixture title',exact:true}).waitFor()
   for(const title of ['1. Vérification technique','2. Tester le jeu','3. Revue','4. Décision'])await page.getByRole('heading',{name:title,exact:true}).waitFor()
-  assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true)
+  assert.equal(await page.getByRole('button',{name:'Accepter et activer le build',exact:true}).isDisabled(),true)
   assert.equal(await page.getByLabel('Motif du refus',{exact:false}).count(),0)
   const text=await page.locator('body').innerText();assert.ok(!text.includes(id));assert.ok(!text.includes(game));assert.ok(!text.includes('npm run'));assert.ok(!text.includes('credentials'))
   await page.getByText('Voir les instructions de vérification',{exact:true}).click()
@@ -153,13 +153,13 @@ try{
   await page.getByRole('button',{name:'Lancer le jeu de test',exact:true}).click();await page.getByText('Jeu de test chargé',{exact:true}).waitFor()
   await page.getByRole('button',{name:'Fermer le test'}).click();assert.equal(await page.getByText('Jeu de test chargé',{exact:true}).count(),0)
   for(const label of ['Jeu lancé et fonctionnel','Contenu vérifié','Informations et description correctes','Aucun comportement suspect'])await page.getByRole('checkbox',{name:label,exact:true}).check()
-  await page.getByText('Revue complète',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true)
-  await page.getByRole('button',{name:'Enregistrer la revue',exact:true}).click();await page.getByText('Prêt à publier',{exact:true}).waitFor()
-  await page.getByRole('checkbox',{name:'Contenu vérifié',exact:true}).uncheck();assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true)
+  await page.getByText('Revue complète',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Accepter et activer le build',exact:true}).isDisabled(),true)
+  await page.getByRole('button',{name:'Enregistrer la revue',exact:true}).click();await page.getByText('Prêt à accepter',{exact:true}).waitFor()
+  await page.getByRole('checkbox',{name:'Contenu vérifié',exact:true}).uncheck();assert.equal(await page.getByRole('button',{name:'Accepter et activer le build',exact:true}).isDisabled(),true)
   await page.getByRole('checkbox',{name:'Contenu vérifié',exact:true}).check()
   if(styles){const directory=await mkdtemp(join(tmpdir(),'chibasko-admin-review-'));await page.screenshot({path:join(directory,'review-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:join(directory,'review-mobile.png'),fullPage:true});console.log('Admin review visual fixtures:',directory)}
-  await page.getByRole('button',{name:'Publier',exact:true}).click();await page.getByText('Publié',{exact:true}).waitFor();assert.deepEqual(actions.map(action=>action.action),['review','publish'])
-  assert.equal(await page.getByRole('button',{name:'Publier',exact:true}).isDisabled(),true);await page.close()
+  await page.getByRole('button',{name:'Accepter et activer le build',exact:true}).click();await page.getByText('Version acceptée',{exact:true}).waitFor();assert.deepEqual(actions.map(action=>action.action),['review','publish'])
+  assert.equal(await page.getByRole('button',{name:'Accepter et activer le build',exact:true}).isDisabled(),true);await page.close()
  })
  await test('Chrome review: explicit rejection reason and historical proposals share the publications area',async()=>{
   row=initial();actions=[];const page=await browser.newPage();await page.goto(origin)
