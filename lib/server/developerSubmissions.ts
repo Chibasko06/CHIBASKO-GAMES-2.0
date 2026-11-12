@@ -1,4 +1,5 @@
 import {after} from 'next/server'
+import {externalGameUrl} from '../game-distribution/external-game-url'
 import {deliverSubmissionNotifications} from '../game-distribution/submission-notifications'
 import 'server-only'
 import {authenticateDeveloper} from './developerIdentity'
@@ -30,7 +31,7 @@ const defaults:Dependencies={
   db:requestId=>uploadRepository(process.env.NEXT_PUBLIC_SUPABASE_URL??'',process.env.SUPABASE_SERVICE_ROLE_KEY??'',fetch,{requestId}),
   enabled:()=>process.env.GAME_DISTRIBUTION_UPLOADS_ENABLED==='1',cover:uploadGameThumbnail
 }
-export async function developerSubmissionRequest(request:Request,operation:'games'|'submissions',deps=defaults) {
+export async function developerSubmissionRequest(request:Request,operation:'games'|'submissions'|'external',deps=defaults) {
   const requestId=crypto.randomUUID()
   const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','X-Request-Id':requestId}
   function submitted(id:string){try{deps.notify?.(id)}catch{/* The committed submission and outbox remain authoritative. */}return Response.json({data:{submissionId:id}},{status:201,headers})}
@@ -41,6 +42,30 @@ export async function developerSubmissionRequest(request:Request,operation:'game
     if(request.method!=='GET'&&!adminOriginAllowed(request))throw new UploadError('forbidden',403)
     phase='repository_configuration'
     const db=deps.db(requestId)
+    if(operation==='external'){
+      if(request.method==='GET'){
+        const offset=Number(new URL(request.url).searchParams.get('offset')??0)
+        if(!Number.isInteger(offset)||offset<0||offset>100000)throw new UploadError('invalid_request')
+        return Response.json({data:await db.call('distribution_developer_external',{p_actor:actor,p_offset:offset})},{headers})
+      }
+      if(!deps.enabled())throw new UploadError('service_unavailable',503)
+      const {body,cover}=request.headers.get('content-type')?.startsWith('multipart/form-data')
+        ? await readCatalogueForm(request) : {body:await readJsonObject(request,4096),cover:null}
+      if(body.ownership!==true||Object.keys(body).some(key=>!['gameId','revisionId','url','ownership'].includes(key))
+        ||typeof body.gameId!=='string'||typeof body.revisionId!=='string')throw new UploadError('invalid_request')
+      assertUploadId(body.gameId);assertUploadId(body.revisionId)
+      let external
+      try{external=externalGameUrl(body.url)}catch{throw new UploadError('invalid_external_game_url')}
+      let coverUrl=null
+      if(cover){
+        await db.call('distribution_owned_draft',{p_actor:actor,p_game:body.gameId})
+        try{await validateGameThumbnail(cover)}catch{throw new UploadError('invalid_cover')}
+        if(!deps.cover)throw new UploadError('service_unavailable',503)
+        coverUrl=await deps.cover(cover)
+      }
+      return submitted(await db.call<string>('distribution_submit_external',{p_actor:actor,p_game:body.gameId,
+        p_revision:body.revisionId,p_url:external.url,p_origin:external.origin,p_cover:coverUrl}))
+    }
     if(request.method==='GET'){
       phase='rpc'
       const uploadId=new URL(request.url).searchParams.get('uploadId')

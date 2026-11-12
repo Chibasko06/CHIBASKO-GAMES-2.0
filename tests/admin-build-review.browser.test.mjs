@@ -9,11 +9,17 @@ import {join} from 'node:path'
 const id='56565656-5656-4656-8656-565656565656',game='54545454-5454-4454-8454-545454545454'
 const initial=()=>({id,gameId:game,game:'Fixture game',developer:'Fixture developer',description:'Description',version:'1.0.0',createdAt:'2026-10-20T10:00:00Z',updatedAt:'2026-10-20T10:00:00Z',archiveSize:123456,technicalStatus:'queued',errorCode:null,attempts:0,gameVersionId:null,versionStatus:null,manifest:null,validatedAt:null,publishedAt:null,active:false,review:{decision:'pending',checklist:{},reviewedAt:null,reason:null,submissionId:game},submission:{id:game,title:'Proposed fixture title',developer:'Studio fixture',description:'Editorial description',status:'pending',kind:'new',releaseDate:'2026-10-20',technology:'HTML/JS',mobile:'Oui',categories:['Arcade'],cover:'/cover.svg'},history:[]})
 let row=initial(),actions=[],legacyCalls=0,styles=''
+const external={id:'56565656-5656-4656-8656-565656565657',title:'Fixture externe',developer:'Studio externe',
+ url:'https://play.example.com/game',origin:'https://play.example.com',createdAt:'2026-11-12T10:00:00Z',
+ status:'pending',current:false,published:false,latest:true,history:[]}
+const externalActions=[]
 if(process.env.ADMIN_REVIEW_VISUAL==='1'){
  const root=join(process.cwd(),'.next/static');const files=(await readdir(root,{recursive:true})).filter(file=>file.endsWith('.css'))
  styles=(await Promise.all(files.map(file=>readFile(join(root,file),'utf8')))).join('\n');assert.ok(styles)
 }
 const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Reviews from './components/admin/BuildReviews';createRoot(document.getElementById('root')).render(<Reviews id={location.pathname==='/list'?undefined:'${id}'}/>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(api){
+ api.onResolve({filter:/\.module\.css$/},args=>({path:args.path,namespace:'fixture-css'}))
+ api.onLoad({filter:/.*/,namespace:'fixture-css'},()=>({contents:'export default {}'}))
  api.onResolve({filter:/^(?:next\/link|next\/image|next\/dynamic|next\/navigation|@\/components\/AuthProvider|@\/components\/game-runtime\/GameRuntime)$/},args=>({path:args.path,namespace:'fixture'}))
  api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/navigation'?`export function useRouter(){return {push(path){location.href=path}}}`:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:args.path==='next/image'?`import React from 'react';export default function Image({unoptimized,...props}){return <img {...props}/>} `:args.path==='@/components/AuthProvider'?`export function useAuth(){return {session:{user:{id:'fixture-admin'},access_token:'fixture-token'}}}`:`import React from 'react';export default function dynamic(){return function Runtime(props){return <p role="status" data-execution={props.execution}>Jeu de test chargé</p>}}`}))
 }}]})
@@ -24,6 +30,20 @@ const server=createServer(async(request,response)=>{
  if(url.pathname==='/cover.svg'){response.setHeader('Content-Type','image/svg+xml');response.end('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="640" height="360" fill="#164e63"/><text x="40" y="190" fill="white" font-size="40">Fixture cover</text></svg>');return}
  if(url.pathname.startsWith('/api/')){
   assert.equal(request.headers.authorization,'Bearer fixture-token')
+  if(url.pathname==='/api/developer/submissions/external/'+external.id+'/preview'){
+    json({data:{revisionId:external.id,url:external.url}});return
+  }
+  if(url.pathname==='/api/admin/game-builds/external'){
+    if(request.method==='GET'){json({data:[external]});return}
+    const chunks=[];for await(const chunk of request)chunks.push(chunk)
+    const body=JSON.parse(Buffer.concat(chunks));externalActions.push(body)
+    assert.equal(body.revisionId,external.id)
+    if(body.action==='approve')external.status='accepted'
+    if(body.action==='publish'){external.current=true;external.published=true}
+    if(body.action==='suspend'||body.action==='withdraw')external.published=false
+    external.history.unshift({...body,at:external.createdAt})
+    json({data:{revisionId:external.id}});return
+  }
   if(url.pathname==='/api/admin/game-submissions'){legacyCalls++;json({submissions:[{id:game,game_title:'Historical fixture',name_or_studio:'Old studio',status:'pending',email:'fixture@example.test',description:'Legacy',category_names:[],updated_at:'2026-10-20',build_upload_id:null},{...row.submission,build_upload_id:id,game_title:'Linked editorial entry'}]});return}
   if(request.method==='GET'){json({data:url.pathname.endsWith('/'+id)?row:[row]});return}
   const chunks=[];for await(const chunk of request)chunks.push(chunk);const body=JSON.parse(Buffer.concat(chunks));actions.push(body)
@@ -41,6 +61,32 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='h
 let browser
 try{
  browser=await chromium.launch({channel:'chrome',headless:true})
+ await test('Chrome : revue externe, prévisualisation stricte, approbation, publication et retrait',async()=>{
+  const page=await browser.newPage()
+  try{
+    page.on('dialog',dialog=>dialog.accept())
+    await page.route(external.url,route=>route.fulfill({contentType:'text/html',body:'<p>Jeu fixture</p>'}))
+    await page.goto(origin+'/list')
+    await page.getByRole('button',{name:/Fixture externe/}).click()
+    await page.getByRole('button',{name:'Ouvrir la prévisualisation privée'}).click()
+    await page.getByRole('button',{name:'Lancer la prévisualisation'}).click()
+    const iframe=page.getByTitle('Prévisualisation du jeu externe')
+    await iframe.waitFor()
+    assert.equal(await iframe.getAttribute('sandbox'),'allow-scripts allow-pointer-lock')
+    assert.equal(await page.getByRole('button',{name:'Publier cette révision'}).count(),0)
+    await page.getByLabel('Origine HTTPS examinée').fill(external.origin)
+    await page.getByRole('checkbox',{name:/effectué les contrôles/}).check()
+    await page.getByRole('button',{name:'Approuver la révision',exact:true}).click()
+    await page.getByRole('button',{name:'Publier cette révision',exact:true}).click()
+    await page.getByLabel('Motif de la décision').fill('Motif de suspension')
+    await page.getByRole('button',{name:'Suspendre le jeu',exact:true}).click()
+    await page.getByLabel('Motif de la décision').fill('Motif de retrait')
+    await page.getByRole('button',{name:'Retirer le jeu',exact:true}).click()
+    await page.getByRole('button',{name:'Retirer le jeu',exact:true}).waitFor({state:'detached'})
+    assert.deepEqual(externalActions.map(entry=>entry.action),['approve','publish','suspend','withdraw'])
+    assert.ok(externalActions.every(entry=>!Object.hasOwn(entry,'url')))
+  }finally{await page.close()}
+ })
  await test('Chrome : un seul état d’intégration, détails séparés et vérification avant publication',async()=>{
   row={...initial(),technicalStatus:'completed',versionStatus:'draft',gameVersionId:game,manifest:{integration:{mode:'sdk'},capabilities:{local:{players:{min:1,max:1}}}},integration:{declaredMode:'sdk',declaredVersion:'0.4.2',scan:{signals:true,complete:true,bytes:100},observation:null}};actions=[]
   const page=await browser.newPage({viewport:{width:390,height:844}});await page.goto(origin)

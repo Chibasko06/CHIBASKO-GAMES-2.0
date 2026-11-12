@@ -13,6 +13,7 @@ import {ADMIN_REVIEW_LABELS,checklistComplete,reviewDate,reviewPresentation} fro
 import {FormFeedback,HelpText} from '@/components/ui/FormFeedback'
 import {ReviewBadge,ReviewCard,reviewButton,reviewPrimary} from './ReviewPrimitives'
 import LegacySubmissions from './LegacySubmissions'
+import ExternalBuildReviews from './ExternalBuildReviews'
 import BuildValidationDiagnostic from './BuildValidationDiagnostic'
 import {parseValidationEvent,parsePlaytestEvent,describeValidation} from '@/lib/game-distribution/validation-diagnostics'
 import {integrationLabel} from '@/lib/game-distribution/integration'
@@ -84,6 +85,7 @@ function Panel({id,token}:{id?:string;token?:string}){
    <div className="admin-table-container overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950"><table className="admin-table"><caption className="sr-only">Soumissions de jeux</caption><thead><tr><th scope="col">Jeu / version</th><th scope="col">Statut</th><th scope="col">Développeur</th><th scope="col">Réception</th></tr></thead><tbody>{rows.filter(r=>filter==='Tous'||reviewPresentation(r).label===filter).map(r=>{const status=reviewPresentation(r);return <tr key={r.id}><td><Link className="font-semibold text-cyan-200 underline underline-offset-4" href={'/admin/game-builds/'+r.id}>{r.submission?.title||r.game}</Link><p className="mt-1 text-xs text-zinc-500">Version {r.version} · {(r.archiveSize/1024**2).toLocaleString('fr-FR',{maximumFractionDigits:1})} Mio</p></td><td><ReviewBadge tone={status.tone}>{status.label}</ReviewBadge></td><td className="text-sm text-zinc-400">{r.developer||'Non renseigné'}</td><td className="text-xs text-zinc-500">{reviewDate(r.createdAt)}</td></tr>})}</tbody></table></div>
    {!loading&&!error&&!rows.filter(r=>filter==='Tous'||reviewPresentation(r).label===filter).length&&<HelpText>Aucune soumission dans cette sélection.</HelpText>}
    <div className="flex gap-3"><button className={reviewButton} disabled={!offset||busy} onClick={()=>setOffset(n=>Math.max(0,n-50))}>Précédent</button><button className={reviewButton} disabled={rows.length<50||busy} onClick={()=>setOffset(n=>n+50)}>Suivant</button></div>
+   <ExternalBuildReviews token={token} refresh={reload}/>
    <LegacySubmissions token={token}/>
   </>}
   {build&&presentation&&<>

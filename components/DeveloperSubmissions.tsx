@@ -1,5 +1,6 @@
 'use client'
 import AuthRequired from '@/components/AuthRequired'
+import ExternalSubmissions from './ExternalSubmissions'
 import Link from 'next/link'
 import {useEffect,useState,useRef} from 'react'
 import {useRouter} from 'next/navigation'
@@ -25,6 +26,8 @@ function List({token}:{token:string}){
   const [rows,setRows]=useState<Row[]>([]),[offset,setOffset]=useState(0),[reload,setReload]=useState(0),[error,setError]=useState('')
   useEffect(()=>{const c=new AbortController();developerJson('/api/developer/submissions?offset='+offset,token,{signal:c.signal}).then(b=>{if(!c.signal.aborted){setRows(b.data);setError('')}}).catch(()=>{if(!c.signal.aborted){setRows([]);setError('Impossible de charger les soumissions.')}});return()=>c.abort()},[token,offset,reload])
   return <div className="mx-auto max-w-4xl space-y-5 p-6"><h1 className="text-3xl">Mes soumissions</h1><p>{REVIEW_NOTICE}</p><Link href="/publier-un-jeu">Envoyer un jeu ou une nouvelle version</Link>
+    <ExternalSubmissions token={token}/>
+    <h2 className="text-xl">Hébergement Chibasko Games (ZIP)</h2>
     <p>Les anciennes propositions sans build restent conservées dans l’administration. Elles ne sont pas rattachées automatiquement à un compte par email.</p>
     <button onClick={()=>setReload(n=>n+1)}>Actualiser</button>{error&&<p role="alert">{error}</p>}
     {!rows.length&&!error&&<p>Aucun build sur cette page.</p>}

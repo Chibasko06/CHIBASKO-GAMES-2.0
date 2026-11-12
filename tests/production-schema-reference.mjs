@@ -132,7 +132,21 @@ try {
   reference.migrations.push({name,sha256:sqlSha256(await readFile(file))})
   const state=await snapshot();snapshots.push(state);reference.stages.push(state.objects)
  }
- if(process.argv.includes('--focus-public-versions')){
+ if(process.argv.includes('--focus-external-publication')){
+  await run('psql',[...args,'-f',join(root,'tests/external-game-publication-db.sql')])
+  await run('psql',[...args,'-f',join(root,'tests/external-developer-submission-db.sql')])
+  const fixture=await readFile(join(root,'tests/external-game-publication-db.sql'),'utf8')
+  await query(fixture.split('do $$')[0]+'commit;')
+  const actor='ef400000-0000-4000-8000-000000000001',revision='ef400000-0000-4000-8000-000000000005'
+  const review=(action,tail='')=>query("set role service_role;select public.distribution_external_review('"+actor+"','"+revision+"','"+action+"'"+tail+")")
+  for(const [action,tail] of [['approve',",null,'https://play.example.com',true"],['publish','']]){
+    const races=await Promise.allSettled([review(action,tail),review(action,tail)])
+    assert.equal(races.filter(result=>result.status==='fulfilled').length,1,JSON.stringify(races))
+    assert.match(races.find(result=>result.status==='rejected').reason.stderr,/external_review_conflict/)
+  }
+  if(process.argv.includes('--write'))await writeFile(join(root,'contracts/production-schema.v1.json'),JSON.stringify(reference)+'\n')
+  console.log('External submission, review, catalogue, launch and concurrent decisions SQL PASS')
+ }else if(process.argv.includes('--focus-public-versions')){
   const {publicVersionBrowserIntegration}=await import('./public-version-browser-db.mjs')
   await publicVersionBrowserIntegration(async sql=>(await query(sql)).stdout.trim())
  }else if(process.argv.includes('--focus-public-origins')){

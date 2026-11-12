@@ -10,6 +10,8 @@ import { catalogueSource } from '@/lib/catalogueSource'
 import type { Metadata } from 'next'
 import GameReviews from '@/components/GameReviews'
 import GameViewport from '@/components/GameViewport'
+import ExternalGamePlayer from '@/components/game-runtime/ExternalGamePlayer'
+import {publicExternalGameKind} from '@/lib/server/externalGamePlayer'
 import PlaySessionTracker from '@/components/PlaySessionTracker'
 import { getGameBySlug, getGameRecommendations } from '@/lib/queries/games'
 import { siteConfig, serializeJsonLd } from '@/lib/seo'
@@ -62,6 +64,10 @@ export default async function GamePage({
     : []
 
   const structuredData = gameStructuredData(game)
+  const standalone = !game.active_version_id && isClassicGame(game)
+  const standaloneKind = standalone
+    ? await publicExternalGameKind(game.id).catch(()=>'unavailable' as const)
+    : null
 
   return (
     <div className="space-y-6 xl:space-y-8">
@@ -96,8 +102,12 @@ export default async function GamePage({
 
       <GamePagePlayerLayout recommendations={selectGameRecommendations(game,await getGameRecommendations(game))} primaryCategoryId={game.categories[0]?.id}>
 
-      {!game.active_version_id && isClassicGame(game) ? (
+      {standaloneKind==='external' ? (
+        <ExternalGamePlayer key={game.id} gameId={game.id} title={game.title} developerName={game.developer_name} coverUrl={game.thumbnail_url}/>
+      ) : standaloneKind==='legacy' && typeof game.game_url==='string' ? (
         <GameViewport title={game.title} developerName={game.developer_name} coverUrl={game.thumbnail_url} gameId={game.id} gameUrl={game.game_url} initialLikes={game.likes_count} initialDislikes={game.dislikes_count} />
+      ) : standalone ? (
+        <p role="status">Ce jeu est indisponible pour le moment.</p>
       ) : (
         <ArtifactGamePlayer
           key={game.id+':'+game.active_version_id}

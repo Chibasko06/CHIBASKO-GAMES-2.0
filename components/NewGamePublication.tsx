@@ -4,7 +4,7 @@ import {developerJson,SubmissionError,submissionError} from '@/lib/game-distribu
 import {publicationDraftLabel,type PublicationDraft} from '@/lib/game-distribution/submission-drafts'
 import NewGameDraftEditor,{type PublicationCategory} from './NewGameDraftEditor'
 import {FormFeedback,HelpText} from './ui/FormFeedback'
-export default function NewGamePublication({token,categories,onEditingChange}:{token:string;categories:PublicationCategory[];onEditingChange?:(editing:boolean)=>void}){
+export default function NewGamePublication({token,categories,onEditingChange,external=false}:{token:string;categories:PublicationCategory[];onEditingChange?:(editing:boolean)=>void;external?:boolean}){
  const [rows,setRows]=useState<PublicationDraft[]>([]),[active,setActive]=useState<PublicationDraft|null>(null),[generation,setGeneration]=useState(0)
  const [title,setTitle]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[max,setMax]=useState(0),[offset,setOffset]=useState(0),[reload,setReload]=useState(0)
  useEffect(()=>{onEditingChange?.(!!active);return()=>onEditingChange?.(false)},[active,onEditingChange])
@@ -48,7 +48,7 @@ export default function NewGamePublication({token,categories,onEditingChange}:{t
  const button='rounded-lg border border-cyan-700 px-4 py-2 disabled:opacity-40'
  return <div className="space-y-5">
    {error&&<FormFeedback id="publication-error" tone="error" title="Impossible de terminer cette action"><p>{error}</p></FormFeedback>}
-   {active?<NewGameDraftEditor key={active.gameId+':'+generation} initial={active} token={token} categories={categories} max={max} onBack={back}/>:<>
+   {active?<NewGameDraftEditor key={active.gameId+':'+generation} initial={active} token={token} categories={categories} max={max} onBack={back} external={external}/>:<>
      <section className="space-y-4 rounded-xl border border-zinc-700 p-4"><h2 className="text-xl font-semibold">Publications en cours</h2>
        <HelpText>Vos brouillons privés sont enregistrés sur votre compte. Reprendre conserve leur gameId.</HelpText>
        {loading?<p role="status">Chargement des brouillons…</p>:!rows.length?<HelpText>Aucune publication en cours sur cette page.</HelpText>:<ul className="space-y-3">{rows.map(row=><li key={row.gameId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 p-3"><div><h3 className="font-medium">{row.title}</h3><HelpText>{publicationDraftLabel(row)}{row.version?' · '+row.version:''}</HelpText></div><button type="button" className={button} disabled={busy} onClick={()=>resume(row.gameId)}>{row.submitted?'Consulter':'Reprendre'}</button></li>)}</ul>}

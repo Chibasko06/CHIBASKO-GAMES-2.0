@@ -10,7 +10,9 @@ export async function GET(request: NextRequest) {
   }
 
   const { supabaseAdmin } = adminCheck
-  const {data,error}=await readAllRows('admin_historical_submissions',(from,to)=>supabaseAdmin.from('game_submissions').select('*',{count:'exact'}).order('created_at',{ascending:false}).order('id').range(from,to)).then(data=>({data,error:null}),error=>({data:[],error}))
+  const {data,error}=await readAllRows('admin_historical_submissions',(from,to)=>supabaseAdmin.from('game_submissions')
+    .select('*,game_external_revisions()',{count:'exact'}).is('game_external_revisions',null)
+    .order('created_at',{ascending:false}).order('id').range(from,to)).then(data=>({data,error:null}),error=>({data:[],error}))
 
   if (error) {
     return adminJson({ error: adminErrorMessage(error) }, { status: 500 })

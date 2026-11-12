@@ -10,11 +10,13 @@ import {DraftAutosave} from '@/lib/game-distribution/draft-autosave'
 import type {DraftMetadata,PublicationDraft} from '@/lib/game-distribution/submission-drafts'
 import {developerJson,uploadBuild,putPart,zipFileAllowed,SubmissionError,submissionError,uploadFailureMessage,type UploadDraft} from '@/lib/game-distribution/browser-upload'
 export type PublicationCategory={id:string;name:string;slug:string}
-export default function NewGameDraftEditor({initial,token,categories,max,onBack}:{initial:PublicationDraft;token:string;categories:PublicationCategory[];max:number;onBack:()=>void}){
+export default function NewGameDraftEditor({initial,token,categories,max,onBack,external=false}:{initial:PublicationDraft;token:string;categories:PublicationCategory[];max:number;onBack:()=>void;external?:boolean}){
  const [live,setLive]=useState(initial),[metadata,setMetadata]=useState<DraftMetadata>(initial.metadata),[version,setVersion]=useState(initial.version)
+ const [externalUrl,setExternalUrl]=useState('')
  const [file,setFile]=useState<File|null>(null),[cover,setCover]=useState<File|null>(null),[ownership,setOwnership]=useState(false)
  const [busy,setBusy]=useState(false),[done,setDone]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState(0)
  const zip=usePublicationZip(file,initial.gameId,version,max)
+ const externalRequest=useRef<string|null>(null)
  const tokenRef=useRef(token),controller=useRef<AbortController|null>(null)
  const [errorCode,setErrorCode]=useState('')
  function clearError(){setError('');setErrorCode('')}
@@ -51,13 +53,21 @@ export default function NewGameDraftEditor({initial,token,categories,max,onBack}
  }catch{setError('Impossible de préparer une nouvelle session d’envoi.')}finally{setBusy(false)}}
  async function submit(){
    clearError()
-   if(!received&&(!file||!zipFileAllowed(file,max))){const code=file&&file.size>max?'file_too_large':'invalid_zip';setErrorCode(code);setError(submissionError(code));return}
-   if(!received&&!zip.canUpload)return
-   if(!version||!ownership||!metadata.title.trim()||!metadata.studio.trim()||!metadata.releaseDate||!metadata.description.trim()||!metadata.categories.length||metadata.mobile===null||!metadata.technology.trim()||!cover){setError('Complétez les informations, la couverture et la confirmation des droits.');return}
+   if(!external&&!received&&(!file||!zipFileAllowed(file,max))){const code=file&&file.size>max?'file_too_large':'invalid_zip';setErrorCode(code);setError(submissionError(code));return}
+   if(!external&&!received&&!zip.canUpload)return
+   if((external?!externalUrl.trim():!version)||!ownership||!metadata.title.trim()||!metadata.studio.trim()||!metadata.releaseDate||!metadata.description.trim()||!metadata.categories.length||metadata.mobile===null||!metadata.technology.trim()||!cover){setError('Complétez les informations, la couverture et la confirmation des droits.');return}
    if(cover.size>8*1024**2){setError('La couverture dépasse 8 Mio.');return}
    setBusy(true);const abort=new AbortController();controller.current=abort
    try{
      await autosave.flush()
+     if(external){
+       const body=new FormData()
+       body.set('metadata',JSON.stringify({gameId:initial.gameId,revisionId:externalRequest.current??=crypto.randomUUID(),url:externalUrl,ownership}))
+       body.set('cover',cover)
+       await developerJson('/api/developer/submissions/external',tokenRef.current,{method:'POST',body,signal:abort.signal})
+       setDone(true)
+       return
+     }
      let uploadId=received?live.upload!.id:null
      if(!uploadId&&file){
        const draft:UploadDraft={requestId:live.requestId,gameId:initial.gameId,version,mode:'new',name:live.file?.name??file.name,size:live.file?.size??file.size,lastModified:file.lastModified,hashes:{...live.hashes},...(!live.upload||live.upload.status==='created'?{}:{uploadId:live.upload.id})}
@@ -67,7 +77,7 @@ export default function NewGameDraftEditor({initial,token,categories,max,onBack}
      const body=new FormData();body.set('metadata',JSON.stringify({uploadId,kind:'new',metadata,ownership}));body.set('cover',cover)
      await developerJson('/api/developer/submissions',tokenRef.current,{method:'POST',body,signal:abort.signal})
      setDone(true)
-   }catch(cause){const code=cause instanceof SubmissionError?cause.code:'';setErrorCode(code);setError(code==='draft_conflict'?'Le brouillon a été modifié dans une autre session. Revenez à la liste puis reprenez-le.':code==='invalid_cover'?'Couverture invalide. Choisissez une image valide.':uploadFailureMessage(code))}
+   }catch(cause){const code=cause instanceof SubmissionError?cause.code:'';setErrorCode(code);setError(code==='draft_conflict'?'Le brouillon a été modifié dans une autre session. Revenez à la liste puis reprenez-le.':code==='invalid_external_game_url'?'Saisissez une URL HTTPS publique valide.':code==='invalid_cover'?'Couverture invalide. Choisissez une image valide.':uploadFailureMessage(code))}
    finally{setBusy(false);controller.current=null}
  }
  const input='mt-2 block w-full rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-base focus:border-cyan-500'
@@ -90,19 +100,19 @@ export default function NewGameDraftEditor({initial,token,categories,max,onBack}
      <div><label htmlFor="draft-mobile">Appareils compatibles</label><select id="draft-mobile" aria-describedby="draft-mobile-help" className={input} value={metadata.mobile===null?'':typeof metadata.mobile==='boolean'?gameCompatibility(metadata.mobile):metadata.mobile} required onChange={e=>field('mobile',e.target.value===''?null:e.target.value as Exclude<GameCompatibility,'unknown'>)}><option value="">Choisir</option><option value="desktop">Ordinateur uniquement</option><option value="mobile">Mobile uniquement</option><option value="both">Ordinateur et mobile</option></select><p id="draft-mobile-help" className="mt-2 text-sm text-zinc-400">{mobileCompatibilityHelp}</p></div>
      <label>Technologie<input className={input} value={metadata.technology} maxLength={120} required onChange={e=>field('technology',e.target.value)}/></label>
      {initial.coverUrl?<p>Couverture enregistrée : <a href={initial.coverUrl} target="_blank" rel="noopener noreferrer">Voir l’image</a></p>:<><label>Miniature / image de couverture<input className={input} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml" required onChange={e=>setCover(e.target.files?.[0]??null)}/></label><HelpText>La couverture n’est envoyée qu’à la soumission finale. Resélectionnez-la après votre retour. Aucun chemin local n’est conservé. 8 Mio maximum.</HelpText></>}
-     <label>Version du build (SemVer)<input className={input} value={version} maxLength={64} required disabled={!!live.upload} aria-invalid={!!error&&publicationErrorLocation(errorCode)==='version'} aria-describedby={error&&publicationErrorLocation(errorCode)==='version'?'draft-error':undefined} onChange={e=>{setVersion(e.target.value);clearError()}}/></label>
+     {!external&&<label>Version du build (SemVer)<input className={input} value={version} maxLength={64} required disabled={!!live.upload} aria-invalid={!!error&&publicationErrorLocation(errorCode)==='version'} aria-describedby={error&&publicationErrorLocation(errorCode)==='version'?'draft-error':undefined} onChange={e=>{setVersion(e.target.value);clearError()}}/></label>}
      {feedback('version')}
    </fieldset>
    {!initial.submitted&&<>
      <HelpText>Le brouillon enregistré n’est ni soumis à l’administration ni publié. Les statistiques de communauté sont calculées automatiquement.</HelpText>
-     {unavailable?<FormFeedback tone="warning" title="Session d’envoi expirée ou échouée"><p>Les métadonnées et le gameId sont conservés.</p><button type="button" className={button} onClick={restart} disabled={busy}>Préparer un nouvel envoi pour ce jeu</button></FormFeedback>:received?<FormFeedback tone="info" title="ZIP déjà reçu"><p>Complétez les métadonnées et la couverture pour terminer la soumission.</p></FormFeedback>:<label className="block">ZIP du build<input className={input} type="file" accept=".zip,application/zip" disabled={busy} aria-invalid={!!error&&publicationErrorLocation(errorCode)==='zip'} aria-describedby={error&&publicationErrorLocation(errorCode)==='zip'?'draft-error':undefined} onChange={e=>{setFile(e.target.files?.[0]??null);clearError()}}/><HelpText>Maximum {max/1024**2} Mio. {live.file||live.upload?'Resélectionnez le même fichier ZIP pour reprendre l’envoi.':'Le fichier ZIP reste sur cet appareil tant que l’envoi n’est pas terminé.'}</HelpText></label>}
+     {external?<><label className="block">URL HTTPS du jeu<input className={input} type="url" required maxLength={2048} value={externalUrl} disabled={busy} onChange={e=>{setExternalUrl(e.target.value);externalRequest.current=null;clearError()}}/></label><HelpText>Jeu HTML5 classique hébergé chez vous. Votre hébergeur doit autoriser l’affichage dans une iframe Chibasko Games. La compatibilité sera examinée en revue.</HelpText></>:unavailable?<FormFeedback tone="warning" title="Session d’envoi expirée ou échouée"><p>Les métadonnées et le gameId sont conservés.</p><button type="button" className={button} onClick={restart} disabled={busy}>Préparer un nouvel envoi pour ce jeu</button></FormFeedback>:received?<FormFeedback tone="info" title="ZIP déjà reçu"><p>Complétez les métadonnées et la couverture pour terminer la soumission.</p></FormFeedback>:<label className="block">ZIP du build<input className={input} type="file" accept=".zip,application/zip" disabled={busy} aria-invalid={!!error&&publicationErrorLocation(errorCode)==='zip'} aria-describedby={error&&publicationErrorLocation(errorCode)==='zip'?'draft-error':undefined} onChange={e=>{setFile(e.target.files?.[0]??null);clearError()}}/><HelpText>Maximum {max/1024**2} Mio. {live.file||live.upload?'Resélectionnez le même fichier ZIP pour reprendre l’envoi.':'Le fichier ZIP reste sur cet appareil tant que l’envoi n’est pas terminé.'}</HelpText></label>}
      {feedback('zip')}
-     {!unavailable&&!received&&<PublicationManifest gameId={initial.gameId} version={version} zip={zip} busy={busy}/>}
+     {!external&&!unavailable&&!received&&<PublicationManifest gameId={initial.gameId} version={version} zip={zip} busy={busy}/>}
      {live.upload&&<HelpText>État de l’envoi : {live.upload.status}. Version : {live.upload.version}.</HelpText>}
      <label className="block"><input type="checkbox" checked={ownership} disabled={busy} onChange={e=>setOwnership(e.target.checked)}/> Je dispose des droits nécessaires pour soumettre ce jeu.</label>
      <progress className="w-full" aria-label="Progression de l’envoi" value={progress} max={file?.size||1}/>
      {feedback('profile')}{feedback('upload')}
-     <div className="flex flex-wrap gap-3"><button className={button} type="submit" disabled={busy||!!unavailable||!ownership||(!received&&!zip.canUpload)||!max}>{busy?'Envoi…':received?'Terminer la soumission':live.upload||live.file?'Reprendre et finaliser':'Envoyer le build'}</button>{busy&&<button type="button" className={button} onClick={()=>controller.current?.abort()}>Interrompre</button>}</div>
+     <div className="flex flex-wrap gap-3"><button className={button} type="submit" disabled={busy||!ownership||(external?!externalUrl.trim():!!unavailable||(!received&&!zip.canUpload)||!max)}>{busy?'Envoi…':external?'Soumettre URL':received?'Terminer la soumission':live.upload||live.file?'Reprendre et finaliser':'Envoyer le build'}</button>{busy&&<button type="button" className={button} onClick={()=>controller.current?.abort()}>Interrompre</button>}</div>
    </>}
    </form>
  </div>

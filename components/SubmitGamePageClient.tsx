@@ -9,6 +9,7 @@ import {FormFeedback,HelpText} from './ui/FormFeedback'
 import {REVIEW_NOTICE} from '@/lib/game-distribution/review'
 import {developerJson} from '@/lib/game-distribution/browser-upload'
 import NewGamePublication from './NewGamePublication'
+import ExternalSubmissions from './ExternalSubmissions'
 import UpdateGamePublication from './UpdateGamePublication'
 import type {PublicationCategory} from './NewGameDraftEditor'
 export default function SubmitGamePageClient({categories}:{categories:PublicationCategory[]}){
@@ -21,18 +22,24 @@ function Workspace({actor,token,categories}:{actor:string;token:string;categorie
  const [profileReady,setProfileReady]=useState(false)
  const query=useSearchParams()
  const [mode,setMode]=useState<SubmissionMode>(()=>query.get('mode')==='update'?'update':'new')
+ const [external,setExternal]=useState(()=>query.get('hosting')==='external')
  const [editing,setEditing]=useState(false)
  useEffect(()=>{const query=new URLSearchParams(window.location.search);const upload=query.get('upload');if(!upload)return;const controller=new AbortController();developerJson('/api/developer/submissions?uploadId='+encodeURIComponent(upload),token,{signal:controller.signal}).then(({data})=>{if(!controller.signal.aborted)setMode(data.kind)}).catch(()=>{});return()=>controller.abort()},[token])
  return <div className="mx-auto max-w-3xl space-y-6 p-6"><h1 className="text-3xl font-bold">Publier un jeu Web</h1>
    <Link className="inline-block text-cyan-300 underline underline-offset-4" href="/developpeurs">Consulter le guide développeur</Link>
-   <HelpText>Envoyez un ZIP autonome contenant <code>chibasko.json</code> à sa racine.</HelpText>
+   <fieldset disabled={editing} className="space-y-2">
+     <legend className="font-semibold">Hébergement du jeu</legend>
+     <label className="block"><input type="radio" name="hosting" checked={!external} onChange={()=>setExternal(false)}/> Envoyer un jeu HTML5 par ZIP</label>
+     <label className="block"><input type="radio" name="hosting" checked={external} onChange={()=>setExternal(true)}/> Fournir une URL HTTPS</label>
+   </fieldset>
+   <HelpText>{external?'Jeu HTML5 classique hébergé chez vous. Vérifiez que votre hébergeur autorise les iframes.':<>Envoyez un ZIP autonome contenant <code>chibasko.json</code> à sa racine.</>}</HelpText>
    <FormFeedback tone="warning" title="Chaque version fait l’objet d’une revue"><p>{REVIEW_NOTICE} Chibasko Games peut refuser un jeu.</p></FormFeedback>
    <Link className="inline-block text-cyan-300 underline underline-offset-4" href="/developer/submissions">Mes soumissions</Link>
    <DeveloperContactForm token={token} onReady={setProfileReady}/>
    {!profileReady&&<FormFeedback tone="info" title="Complétez votre fiche développeur avant d’envoyer une soumission"><p>Les coordonnées sont conservées pour les prochaines soumissions. Vos brouillons restent privés et enregistrés séparément.</p></FormFeedback>}
    <SubmissionTabs mode={mode} disabled={editing} onChange={setMode}/>
    <fieldset disabled={!profileReady} className="min-w-0 border-0 p-0"><legend className="sr-only">Soumission du build</legend><section role="tabpanel" id="submission-panel" aria-labelledby={'tab-'+mode}>
-     {mode==='new'?<NewGamePublication token={token} categories={categories} onEditingChange={setEditing}/>:<UpdateGamePublication actor={actor} token={token}/>}
+     {mode==='new'?<NewGamePublication token={token} categories={categories} onEditingChange={setEditing} external={external}/>:external?<ExternalSubmissions token={token} updatesOnly/>:<UpdateGamePublication actor={actor} token={token}/>}
    </section></fieldset>
  </div>
 }

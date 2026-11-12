@@ -66,3 +66,25 @@ test('direct multipart progress, resume hashes, finalization and no ZIP in porta
  assert.equal(await uploadBuild(file,draft,new AbortController().signal,{...deps,api:async()=>{requests++;return {data:{id,status:'queued'}}},put:()=>assert.fail('Already finalized')}),id)
  assert.equal(requests,1)
 })
+
+test('external submission derives actor, normalizes HTTPS and refuses invalid input before RPC',async()=>{
+ const calls=[]
+ const deps={authenticate:async()=>id,enabled:()=>true,db:()=>({call:async(name,args)=>{calls.push({name,args});return id}})}
+ const post=(url,extra={})=>new Request('https://chibaskogames.fr/api/developer/submissions/external',{
+   method:'POST',headers:{origin:'https://chibaskogames.fr','content-type':'application/json'},
+   body:JSON.stringify({gameId:id,revisionId:id,ownership:true,url,...extra})
+ })
+ assert.equal((await developerSubmissionRequest(post('http://play.example.com/'),'external',deps)).status,400)
+ assert.equal((await developerSubmissionRequest(post('https://127.0.0.1/'),'external',deps)).status,400)
+ assert.equal((await developerSubmissionRequest(post('https://play.example.com/',{actor:id}),'external',deps)).status,400)
+ assert.equal((await developerSubmissionRequest(post('https://play.example.com/'),'external',{
+   ...deps,authenticate:async()=>{throw new UploadError('unauthorized',401)}
+ })).status,401)
+ assert.equal(calls.length,0)
+ const result=await developerSubmissionRequest(post('https://PLAY.example.com:443/game'),'external',deps)
+ assert.equal(result.status,201)
+ assert.equal(result.headers.get('cache-control'),'private, no-store')
+ assert.deepEqual(calls,[{name:'distribution_submit_external',args:{
+   p_actor:id,p_game:id,p_revision:id,p_url:'https://play.example.com/game',p_origin:'https://play.example.com',p_cover:null
+ }}])
+})

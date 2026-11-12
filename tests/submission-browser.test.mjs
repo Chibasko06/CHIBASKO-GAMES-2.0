@@ -29,12 +29,15 @@ async function fixtureZip(version) {
  await writer.add('index.html',new TextReader('<p>Fixture HTML5</p>'))
  return {name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from(await writer.close())}
 }
-const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Submit from './components/SubmitGamePageClient';createRoot(document.getElementById('root')).render(<Submit categories={[{id:'${game}',name:'Fixture category',slug:'fixture'}]}/>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(api){
+const bundle=await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Submit from './components/SubmitGamePageClient';import ExternalGamePlayer from './components/game-runtime/ExternalGamePlayer';createRoot(document.getElementById('root')).render(location.search.includes('preview-fixture')?<ExternalGamePlayer title='Fixture externe' revisionId='56565656-5656-4656-8656-565656565656' token='fixture-token'/>:<Submit categories={[{id:'${game}',name:'Fixture category',slug:'fixture'}]}/>);`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,platform:'browser',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'fixtures',setup(api){
+ api.onResolve({filter:/\.module\.css$/},args=>({path:args.path,namespace:'fixture-css'}))
+ api.onLoad({filter:/.*/,namespace:'fixture-css'},()=>({contents:'export default {}'}))
  api.onResolve({filter:/^(?:@\/components\/AuthProvider|next\/link|next\/navigation)$/},args=>({path:args.path,namespace:'fixture'}))
  api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/navigation'?`export function useSearchParams(){return new URLSearchParams(location.search)}`:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:`export function useAuth(){return {loading:false,session:new URLSearchParams(location.search).has('anonymous')?null:{user:{id:new URLSearchParams(location.search).has('other')?'other-user':'fixture-user'},access_token:new URLSearchParams(location.search).has('other')?'other-token':'fixture-token'}}}`}))
 }}]})
 let contact={firstName:'Fixture',lastName:'Developer',contactEmail:'contact@example.test',publicName:'Studio fixture',website:null,otherContact:null}
 let publishedParts=0,submissions=[],requests=[],draft=null,registrations=0,failPart=false,uploadFailure=''
+let externalSubmission
 const freshDraft=title=>({gameId:game,title,metadata:{title,studio:'',releaseDate:'',description:'',categories:[],mobile:null,technology:''},version:'',revision:0,updatedAt:'2026-10-20T10:00:00Z',requestId:'57575757-5757-4757-8757-575757575757',file:null,hashes:{},submitted:false,coverUrl:null,state:'draft',upload:null})
 let styles=''
 if(process.env.SUBMISSION_VISUAL_CHECK==='1'){
@@ -57,6 +60,9 @@ const server=createServer(async(request,response)=>{
  if(!url.pathname.startsWith('/api/')){response.end('<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/styles.css"><div id="root"></div><script src="/bundle.js"></script>');return}
  requests.push(url.pathname)
  assert.ok(['Bearer fixture-token','Bearer other-token'].includes(request.headers.authorization))
+ if(url.pathname==='/api/developer/submissions/external/'+upload+'/preview'){
+   json(response,{data:{revisionId:upload,url:'https://play.example.com/game'}});return
+ }
  if(url.pathname==='/api/developer/profile'&&request.method==='GET'){json(response,{data:request.headers.authorization==='Bearer fixture-token'?contact:null});return}
  if(url.pathname==='/api/developer/drafts'&&request.method==='GET'){
   const owned=request.headers.authorization==='Bearer fixture-token'?draft:null
@@ -85,6 +91,12 @@ const server=createServer(async(request,response)=>{
    if(request.headers['content-type']?.startsWith('application/json')){submissions.push({body:JSON.parse(bytes),cover:null});json(response,{data:{submissionId:game}});return}
    const form=await new Request('http://fixture',{method:'POST',headers:request.headers,body:bytes}).formData()
    submissions.push({body:JSON.parse(form.get('metadata')),cover:form.get('cover')?.type??null});if(draft&&submissions.at(-1).body.kind==='new')draft.submitted=true
+   json(response,{data:{submissionId:game}});return
+ }
+ if(url.pathname==='/api/developer/submissions/external'&&request.method==='POST'){
+   const form=await new Request('http://fixture',{method:'POST',headers:request.headers,body:bytes}).formData()
+   externalSubmission=JSON.parse(form.get('metadata'))
+   assert.equal(form.get('cover')?.type,'image/png')
    json(response,{data:{submissionId:game}});return
  }
  response.writeHead(404);response.end()
@@ -180,6 +192,48 @@ try{
    assert.equal(submissions.at(-1).body.kind,'update');assert.deepEqual(submissions.at(-1).body.metadata,{})
    assert.equal(submissions.at(-1).cover,null);assert.ok(publishedParts>0)
    await page.close()
+ })
+ await test('Chrome: external preview mounts an opaque iframe from the authorized revision',async()=>{
+   const page=await browser.newPage()
+   try{
+     await page.route('https://play.example.com/game',route=>{
+       assert.equal(route.request().headers().authorization,undefined)
+       return route.fulfill({contentType:'text/html',body:'<p>Fixture externe</p>'})
+     })
+     await page.goto(origin+'/?preview-fixture=1')
+     await page.getByRole('button',{name:'Lancer la prévisualisation'}).click()
+     const iframe=page.getByTitle('Prévisualisation du jeu externe')
+     await iframe.waitFor()
+     assert.equal(await iframe.getAttribute('src'),'https://play.example.com/game')
+     assert.equal(await iframe.getAttribute('sandbox'),'allow-scripts allow-pointer-lock')
+     assert.equal(await iframe.getAttribute('referrerpolicy'),'no-referrer')
+     await page.getByText('Événement de chargement reçu.',{exact:false}).waitFor()
+   }finally{await page.close()}
+ })
+ await test('Chrome: external HTTPS submission reuses the private draft without sending a ZIP',async()=>{
+   draft=null;const before=publishedParts
+   const page=await browser.newPage()
+   try{
+     await page.goto(origin)
+     await page.getByRole('radio',{name:'Fournir une URL HTTPS'}).check()
+     await page.getByLabel('Titre',{exact:true}).fill('External fixture')
+     await page.getByRole('button',{name:'Créer le jeu privé et obtenir son gameId'}).click()
+     await page.getByLabel('Développeur / studio',{exact:true}).fill('Fixture studio')
+     await page.getByLabel('Date de sortie',{exact:true}).fill('2026-10-20')
+     await page.getByLabel('Description',{exact:true}).fill('Fixture description')
+     await page.getByRole('checkbox',{name:'Fixture category',exact:true}).check()
+     await page.getByLabel('Appareils compatibles',{exact:true}).selectOption('both')
+     await page.getByLabel('Technologie',{exact:true}).fill('HTML5')
+     await page.locator('input[accept^="image/jpeg"]').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:Buffer.from('fixture-image')})
+     await page.getByLabel('URL HTTPS du jeu').fill('https://play.example.com/game')
+     await page.getByRole('checkbox',{name:'Je dispose des droits nécessaires',exact:false}).check()
+     assert.equal(await page.locator('input[accept=".zip,application/zip"]').count(),0)
+     await page.getByRole('button',{name:'Soumettre URL',exact:true}).click()
+     await page.getByRole('heading',{name:'Jeu reçu — vérification sous 24 à 48 h'}).waitFor()
+     assert.equal(externalSubmission.url,'https://play.example.com/game')
+     assert.equal(externalSubmission.gameId,game)
+     assert.equal(publishedParts,before)
+   }finally{await page.close()}
  })
  await test('Chrome: new game reserves private identity, sends editorial metadata and actual image with separate direct ZIP PUT',async()=>{
    draft=null;const page=await browser.newPage();await page.goto(origin)

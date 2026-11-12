@@ -1,8 +1,15 @@
 import {getDomain} from 'tldts'
+import {externalGameUrl} from '../game-distribution/external-game-url'
 
 export const GAME_SANDBOX='allow-scripts allow-same-origin allow-pointer-lock'
 const opaqueSandbox='allow-scripts allow-pointer-lock'
 const loopback=(host:string)=>host==='localhost'||host==='127.0.0.1'||host==='[::1]'
+
+export function externalFramePolicy(value:unknown) {
+  const {url}=externalGameUrl(value)
+  return {src:url,sandbox:opaqueSandbox,referrerPolicy:'no-referrer' as const,
+    allow:"fullscreen 'none'; autoplay 'none'; gamepad 'none'; cross-origin-isolated 'none'; camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; payment 'none'; usb 'none'"}
+}
 
 /** Les URL du catalogue ne peuvent pas choisir les permissions du navigateur. */
 export function legacyFramePolicy(value:unknown,parentOrigin:string){

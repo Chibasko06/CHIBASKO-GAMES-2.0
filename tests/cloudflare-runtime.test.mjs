@@ -25,7 +25,7 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
    .map(name=>({type:'CompiledWasm',path:join(dirname(bundle),name)}))],
   compatibilityDate:'2026-10-07',compatibilityFlags:['nodejs_compat'],
   bindings:{NEXT_PUBLIC_SUPABASE_URL:'https://supabase.example.test',NEXT_PUBLIC_SUPABASE_ANON_KEY:'fixture-public-key',
-   NEXT_PUBLIC_SITE_URL:'https://chibaskogames.fr',CHIBASKO_CLOUDFLARE:'1',CONTACT_FORM_ENABLED:'0',
+   NEXT_PUBLIC_SITE_URL:'https://chibaskogames.fr',CHIBASKO_CLOUDFLARE:'1',CONTACT_FORM_ENABLED:'0',SUPABASE_SERVICE_ROLE_KEY:'fixture-service-key',
    GAME_ACCOUNT_DELETIONS_ENABLED:'0',GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'0',GAME_CONTENT_BASE_DOMAIN:'chibaskogames-play.fr'},
   serviceBindings:{ASSETS:()=>new Response(null,{status:404})},
   // Les lectures publiques sont simulées ; aucun service réel n’est appelé.
@@ -38,6 +38,10 @@ test('le Worker OpenNext démarre et rend les pages dynamiques sans accès dista
     reads++;const input=await request.json();devices.push(input.p_device)
     const items=input.p_device==='mobile'||input.p_slug&&input.p_slug!==game.slug?[]:[game]
     return Response.json({items,total:items.length})
+   }
+   if(request.method==='POST'&&path==='/rest/v1/rpc/distribution_external_public_launch'){
+    const {p_game}=await request.json()
+    return Response.json(p_game===game.id?{kind:'legacy'}:{kind:'unavailable'})
    }
    if(request.method==='POST'&&(path==='/rest/v1/rpc/catalogue_home'||path==='/rest/v1/rpc/catalogue_home_for_device')){
     reads++;devices.push((await request.json()).p_device??'all');return Response.json([{category,games:[game]}])
