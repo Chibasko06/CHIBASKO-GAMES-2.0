@@ -24,25 +24,41 @@ export function connectAnalyticsConsent(target:Window):Controller{
  const win=target as ConsentWindow
  let state:ConsentState={...DENIED_CONSENT},privatePage=privateLobbyPath(win.location.pathname),configured=false,subscribed=false,decisionPending=false,revision=0,refreshTimer:number|undefined
  const disabledKey='ga-disable-'+analyticsId
+ let lastPage:string|undefined,previousLocation:string|undefined
  const allowed=()=>state.analytics_storage==='granted'&&!decisionPending&&!privatePage&&!privateLobbyPath(win.location.pathname)
  function disable(value:boolean){Reflect.set(win,disabledKey,value)}
- function safeUrl(value:string){try{const url=new URL(value);url.search='';url.hash='';url.pathname=url.pathname.replace(/(\/games\/[^/]+\/lobby\/)[^/]+/,'$1private');return url.href}catch{return ''}}
+ function pageLocation(){
+  const {origin,pathname}=win.location
+  if(/^\/(?:auth|admin|account|dashboard|developer|reset-password)(?:\/|$)/.test(pathname))return undefined
+  if(/^\/players\//.test(pathname))return origin+'/players/profile'
+  return /^\/(?:games(?:\/[a-z0-9-]+(?:\/(?:local|online))?)?|players|faq|contact|developpeurs|publier-un-jeu|a-propos|login|register|favorites|multiplayer|mentions-legales|confidentialite|cookies)?\/?$/.test(pathname)?origin+pathname:undefined
+ }
+ function acquisitionReferrer(){try{const url=new URL(win.document.referrer);return ['https:','http:'].includes(url.protocol)&&url.origin!==win.location.origin?url.origin+'/':''}catch{return ''}}
  function configure(){
-  disable(!allowed())
-  if(!allowed()||configured||!win.__chibaskoConsentDefault)return
-  configured=true
-  win.gtag?.('js',new Date())
-  win.gtag?.('config',analyticsId,{page_location:safeUrl(win.location.href),page_referrer:safeUrl(win.document.referrer)})
-  if(!win.document.getElementById('chibasko-google-analytics-tag')){
-   const script=win.document.createElement('script');script.id='chibasko-google-analytics-tag';script.async=true
-   script.src='https://www.googletagmanager.com/gtag/js?id='+analyticsId
-   win.document.head.append(script)
+  const location=pageLocation()
+  disable(!allowed()||!location)
+  if(!location){lastPage=undefined;return}
+  if(!allowed()||!win.__chibaskoConsentDefault)return
+  if(!configured){
+   configured=true
+   win.gtag?.('js',new Date())
+   win.gtag?.('config',analyticsId,{send_page_view:false,allow_google_signals:false,allow_ad_personalization_signals:false,page_location:location,page_referrer:acquisitionReferrer(),page_title:''})
+   if(!win.document.getElementById('chibasko-google-analytics-tag')){
+    const script=win.document.createElement('script');script.id='chibasko-google-analytics-tag';script.async=true
+    script.referrerPolicy='no-referrer'
+    script.src='https://www.googletagmanager.com/gtag/js?id='+analyticsId
+    win.document.head.append(script)
+   }
   }
+  if(lastPage===win.location.pathname)return
+  lastPage=win.location.pathname
+  win.gtag?.('event','page_view',{send_to:analyticsId,page_location:location,page_referrer:previousLocation??acquisitionReferrer(),page_title:''})
+  previousLocation=location
  }
  function apply(next:ConsentState){
   state=next
   // Disable collection before a revocation update can reach an already loaded tag.
-  disable(!allowed())
+  disable(!allowed()||!pageLocation())
   win.gtag?.('consent','update',next)
   configure()
  }
@@ -60,7 +76,7 @@ export function connectAnalyticsConsent(target:Window):Controller{
  // One subscription/configuration per document, including React StrictMode remounts.
  controllers.set(target,controller)
  disable(true)
- refresh()
+ refresh(false,revision)
  fc.callbackQueue.push({CONSENT_API_READY:()=>{
   if(subscribed||typeof win.__tcfapi!=='function')return
   subscribed=true

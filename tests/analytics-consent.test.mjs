@@ -36,3 +36,16 @@ test('document head initializes defaults before the unchanged AdSense tag',async
  assert.ok(layout.indexOf('id="analytics-consent-default"')<layout.indexOf('src="https://pagead2.googlesyndication.com'))
  assert.match(layout,/ca-pub-9977547315559489/);assert.doesNotMatch(component,/gtag\('config'|googletagmanager.com\/gtag/)
 })
+test('manual page views follow path changes once and omit private routes, queries and titles',async()=>{
+ const x=fixture();try{
+  const views=()=>x.commands().filter(c=>c[0]==='event'&&c[1]==='page_view')
+  assert.equal(views().length,0)
+  await x.choose(values(1))
+  assert.equal(x.commands().find(c=>c[0]==='config')[2].send_page_view,false)
+  const navigate=path=>{x.win.history.pushState({},'',path);x.controller.setPrivatePage(false)}
+  navigate('/games/test?ignored=1');navigate('/players/example-player');navigate('/dashboard');navigate('/faq')
+  assert.deepEqual(Array.from(views(),c=>c[2].page_location),['https://portal.example/games/test','https://portal.example/players/profile','https://portal.example/faq'])
+  assert.ok(views().every(c=>c[2].page_title===''))
+  await x.choose(values(2));navigate('/contact');assert.equal(views().length,3)
+ }finally{x.dom.window.close()}
+})
