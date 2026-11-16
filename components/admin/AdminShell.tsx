@@ -8,6 +8,7 @@ export const adminSections = [
   { id: 'games', label: 'Jeux', href: '/admin?section=games', icon: '▷' },
   { id: 'submissions', label: 'Soumissions', href: '/admin/game-builds', icon: '⇥' },
   { id: 'moderation', label: 'Modération', href: '/admin/moderation', icon: '⚑' },
+  { id: 'mail', label: 'Messagerie', href: '/admin/messagerie', icon: '✉' },
   { id: 'users', label: 'Utilisateurs', href: '/admin?section=users', icon: '♙' },
   { id: 'deletions', label: 'Suppressions de comptes', href: '/admin/account-deletions', icon: '⊘' },
   { id: 'categories', label: 'Catégories', href: '/admin?section=categories', icon: '▦' },

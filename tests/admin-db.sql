@@ -68,3 +68,5 @@ do $$ declare r text;t text;p text; begin
 end $$;
 
 \ir admin-catalogue-db.sql
+\ir ../supabase/migrations/20261116000100_admin_mail.sql
+\ir admin-mail-db.sql
