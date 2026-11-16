@@ -72,10 +72,30 @@ test('shared template preserves French text, line breaks and the three identitie
   assert.ok(message.text.includes(signature))
   assert.ok(message.html.includes(emailLogo))
   assert.match(message.html,/width="54" height="54" alt="Logo Chibasko Games"/)
+  assert.match(message.html,/width="54"[^>]+color-scheme:light only/)
+  assert.match(message.html,/<meta name="color-scheme" content="light only">/)
+  assert.doesNotMatch(message.html,/(?:^|[;"\s])(?:-webkit-)?filter\s*:/i)
   assert.match(message.html,/Élodie<br>Suite<\/p><p[^>]+>Autre paragraphe/)
   assert.match(message.html,/Réponse &lt;test&gt;/)
   assert.equal(message.html.includes('Aucune réponse n’est attendue.'),identity==='noreply')
  }
+})
+test('deleting a history entry validates access and ID, and never calls the provider',async()=>{
+ const f=fixture()
+ const remove=(query,token='fixture')=>new Request(url+'?'+query,{method:'DELETE',headers:{Authorization:'Bearer '+token}})
+ assert.equal((await adminMailRequest(remove('id='+input.id,'outsider'),f.deps)).status,403)
+ assert.equal((await adminMailRequest(remove('id=bad'),f.deps)).status,400)
+ assert.equal((await adminMailRequest(remove('id='+input.id+'&id='+input.id),f.deps)).status,400)
+ assert.equal(f.calls.length,0)
+ f.deps.db=()=>({call:async(name,args)=>{
+  assert.equal(name,'distribution_admin_mail_remove')
+  assert.deepEqual(args,{p_actor:'admin',p_id:input.id})
+  return true
+ }})
+ assert.deepEqual(await (await adminMailRequest(remove('id='+input.id),f.deps)).json(),{removed:true})
+ f.deps.db=()=>({call:async()=>{throw Error('private')}})
+ assert.equal((await adminMailRequest(remove('id='+input.id),f.deps)).status,503)
+ assert.equal(f.messages.length,0)
 })
 test('the email asset preserves every pixel of the official logo inside an opaque border',async()=>{
  const original=sharp('public/chibaskogames-logo.png')

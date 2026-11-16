@@ -16,10 +16,11 @@ const defaults = {
   apiKey: ()=>process.env.RESEND_API_KEY?.trim(),
   send: (...args:Parameters<typeof fetch>)=>fetch(...args),
 }
+const mailId=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 function mailInput(input:Record<string,unknown>) {
   const {id,sender,recipient,subject,text}=input
-  if(Object.keys(input).length!==5||typeof id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id))
+  if(Object.keys(input).length!==5||typeof id!=='string'||!mailId.test(id))
     throw new InputError('Identifiant d’envoi invalide.')
   if(typeof sender!=='string'||!Object.hasOwn(adminMailSenders,sender))throw new InputError('Expéditeur invalide.')
   if(typeof recipient!=='string'||recipient.length>254||recipient.split('@')[0].length>64||
@@ -39,6 +40,13 @@ export async function adminMailRequest(request:Request,deps=defaults) {
     if(!token)throw new AdminAccessError(401)
     const actor=await deps.actor(token)
     const db=deps.db()
+    if(request.method==='DELETE'){
+      const query=new URL(request.url).searchParams
+      const id=query.get('id')
+      if(query.size!==1||!id||!mailId.test(id))throw new InputError('Identifiant d’envoi invalide.')
+      const removed=await db.call<boolean>('distribution_admin_mail_remove',{p_actor:actor,p_id:id})
+      return removed?adminJson({removed}):adminJson({error:'Cette entrée est introuvable.'},{status:404})
+    }
     if(request.method==='GET'){
       const page=new URL(request.url).searchParams.get('page')??'0'
       if(!/^\d{1,5}$/.test(page)||Number(page)>10000)throw new InputError('Page invalide.')
@@ -81,6 +89,10 @@ export async function adminMailRequest(request:Request,deps=defaults) {
     return adminJson({status})
   }catch(error){
     if(error instanceof InputError||error instanceof AdminAccessError)return adminJson({error:error.message},{status:error.status})
+    if(request.method==='DELETE'){
+      if(error instanceof UploadError&&error.status===403)return adminJson({error:'Accès refusé.'},{status:403})
+      return adminJson({error:'La suppression n’a pas pu être confirmée.'},{status:503})
+    }
     if(error instanceof UploadError&&error.status===429)return adminJson({error:'Limite d’envoi atteinte. Réessaie plus tard.'},{status:429})
     if(error instanceof UploadError&&error.status===409)return adminJson({error:'Cette confirmation ne correspond plus au message.'},{status:409})
     return adminJson({error:'Résultat indisponible. Vérifie l’historique avant tout nouvel envoi.'},{status:503})

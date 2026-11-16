@@ -78,6 +78,7 @@ export const migrations = Object.freeze([
   '20261116000100_admin_mail.sql',
   '20261116000200_contact_email_template.sql',
   '20261116000300_contact_email_logo.sql',
+  '20261116000400_admin_mail_history_and_logo.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']

@@ -20,12 +20,12 @@ type Email = {
   action?:{url:URL;label:string}
   automatic?:'reply'|'no-reply'
   code?:string
-  logoVersion?:1|2
+  logoVersion?:1|2|3
 }
 
 const escape = (value:string) => value.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]!))
 
-export function brandedEmail({identity,subject,text,action,automatic,code,logoVersion=2}:Email) {
+export function brandedEmail({identity,subject,text,action,automatic,code,logoVersion=3}:Email) {
   const {service,signature}=identities[identity]
   const note=automatic==='no-reply'?'Message automatique. Aucune réponse n’est attendue.':
     automatic==='reply'?'Message automatique. Vous pouvez répondre à cet e-mail.':''
@@ -34,9 +34,9 @@ export function brandedEmail({identity,subject,text,action,automatic,code,logoVe
     return `<p style="margin:0 0 16px;font-size:16px;line-height:25px;overflow-wrap:anywhere;word-wrap:break-word">${escape(paragraph).replaceAll('\n','<br>')}</p>`
   }).join('')
   const link=action?.url
-  const colorScheme=logoVersion===2?'<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">':''
-  const logo=logoVersion===2
-    ? `<img src="${emailLogo}" width="54" height="54" alt="Logo Chibasko Games" style="display:block;border:0;color:#ffffff;font-size:11px;background-color:#09090b;color-scheme:only light">`
+  const colorScheme=logoVersion>=2?`<meta name="color-scheme" content="${logoVersion===3?'light only':'light'}"><meta name="supported-color-schemes" content="light">`:''
+  const logo=logoVersion>=2
+    ? `<img src="${emailLogo}" width="54" height="54" alt="Logo Chibasko Games" style="display:block;border:0;color:#ffffff;font-size:11px;${logoVersion===2?'background-color:#09090b;color-scheme:only light':'color-scheme:light only'}">`
     : `<img src="${legacyLogo}" width="48" height="48" alt="Logo Chibasko Games" style="display:block;border:0;color:#ffffff;font-size:11px">`
   const button=action&&link?.protocol==='https:'&&!link.username&&!link.password
     ? `<p style="margin:24px 0"><a href="${escape(link.href)}" style="display:inline-block;padding:13px 18px;background-color:#155e75;color:#ffffff;text-decoration:none;font-weight:bold">${escape(action.label)}</a></p>`
@@ -51,7 +51,7 @@ export function brandedEmail({identity,subject,text,action,automatic,code,logoVe
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;border:1px solid #d4d4d8">
 <tr><td bgcolor="#09090b" style="padding:20px 24px;color:#ffffff">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-<td valign="middle" width="64">${logo}</td>
+<td valign="middle" width="64">${logoVersion===3?`<table role="presentation" width="54" cellpadding="0" cellspacing="0" border="0" style="color-scheme:light only"><tr><td bgcolor="#09090b" style="color-scheme:light only;background-color:#09090b;background-image:linear-gradient(#09090b,#09090b)">${logo}</td></tr></table>`:logo}</td>
 <td valign="middle" style="color:#ffffff"><strong style="font-size:20px">Chibasko <span style="color:#67e8f9">Games</span></strong><br><span style="color:#e4e4e7;font-size:13px;line-height:20px">${escape(service)}</span></td>
 </tr></table>
 </td></tr>

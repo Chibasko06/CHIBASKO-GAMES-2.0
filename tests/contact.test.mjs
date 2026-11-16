@@ -56,7 +56,7 @@ test('une réservation HTML antérieure conserve le premier logo et le même con
  const html=JSON.parse(h.calls[0].init.body).html
  assert.match(html,/chibaskogames-logo\.png/)
  assert.equal(createHash('sha256').update(html).digest('hex'),'71777d98dbc8cdd984d4fd4345ac1217e7d8ab986f56999bb8372ed1050d8bdc')
- assert.equal(h.rpc[0].args.p_format,2)
+ assert.equal(h.rpc[0].args.p_format,3)
 })
 test('contact : timeout, succès tardif et reprise utilisent la même clé et le même contenu',async()=>{
  const h=harness(),value=body();let resolve

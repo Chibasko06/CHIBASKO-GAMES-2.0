@@ -4,6 +4,8 @@ Dans **Administration → Messagerie**, choisir l’expéditeur, saisir une adre
 
 L’historique contient l’expéditeur, le destinataire, l’objet, la date et le résultat connu. Le corps du message reste hors du journal. Les échecs de Resend sont visibles avec le code HTTP disponible. « Accepté par Resend » signifie que le fournisseur a confirmé la prise en charge.
 
+La corbeille efface le destinataire et l’objet de l’entrée et la retire de l’historique après confirmation. Le journal conserve les données techniques de la réservation pour que les quotas et l’idempotence continuent à s’appliquer. Un envoi en cours peut toujours enregistrer son résultat et une suppression répétée renvoie le même succès.
+
 La limite est partagée par les administrateurs. Elle est de cinq tentatives par minute et cinquante sur 24 heures. Une confirmation répétée avec le même identifiant ne déclenche aucun nouvel envoi. Si le résultat reste en attente ou non confirmé, vérifier dans Resend avant de créer un nouvel envoi. Un délai d’attente peut survenir alors que Resend a déjà accepté le message.
 
 ## Mise en production

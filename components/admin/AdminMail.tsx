@@ -31,6 +31,10 @@ function MailWorkspace({token}:{token:string}){
   const [revision,setRevision]=useState(0)
   const [history,setHistory]=useState<{rows:MailEntry[];more:boolean}|null>(null)
   const [historyError,setHistoryError]=useState('')
+  const [removing,setRemoving]=useState<string|null>(null)
+  const [removeNotice,setRemoveNotice]=useState('')
+  const [removeError,setRemoveError]=useState('')
+  const removal=useRef(false)
   const sending=useRef(false)
   const historyRead=useCallback(async(page:number)=>{
     const {response,payload}=await fetchJson('/api/admin/mail?page='+page,{headers:{Authorization:'Bearer '+token}})
@@ -42,6 +46,31 @@ function MailWorkspace({token}:{token:string}){
     void historyRead(index).then(data=>{if(current){setHistory(data);setHistoryError('')}}).catch(()=>{if(current)setHistoryError('Impossible de charger l’historique.')})
     return ()=>{current=false}
   },[historyRead,index,revision])
+
+  async function remove(entry:MailEntry){
+    if(removal.current||!window.confirm('Supprimer cette entrée de l’historique ? L’envoi du message ne sera pas annulé.'))return
+    removal.current=true
+    setRemoving(entry.id)
+    setRemoveNotice('')
+    setRemoveError('')
+    try{
+      const {response,payload}=await fetchJson('/api/admin/mail?id='+encodeURIComponent(entry.id),{
+        method:'DELETE',headers:{Authorization:'Bearer '+token},
+      })
+      if(!response.ok||payload.removed!==true){
+        setRemoveError(payload.error??'La suppression n’a pas pu être confirmée.')
+        return
+      }
+      setHistory(current=>current&&({...current,rows:current.rows.filter(row=>row.id!==entry.id)}))
+      setRemoveNotice('Entrée supprimée de l’historique.')
+      setRevision(value=>value+1)
+    }catch{
+      setRemoveError('La suppression n’a pas pu être confirmée.')
+    }finally{
+      removal.current=false
+      setRemoving(null)
+    }
+  }
 
   async function send(){
     if(!preview||sending.current)return
@@ -110,17 +139,23 @@ function MailWorkspace({token}:{token:string}){
       {error&&<p role="alert" className="text-red-300">{error}</p>}
     </form>
     <section className="space-y-3 rounded-xl border border-zinc-800 p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">Historique des envois</h2>
-        <button className="admin-action" onClick={()=>setRevision(value=>value+1)}>Actualiser</button></div>
+      <h2 className="text-lg font-semibold">Historique des envois</h2>
       <p className="text-sm text-zinc-400">L’acceptation par Resend ne confirme pas la livraison au destinataire.</p>
       {historyError&&<p role="alert">{historyError}</p>}
+      {removeNotice&&<p role="status">{removeNotice}</p>}
+      {removeError&&<p role="alert" className="text-red-300">{removeError}</p>}
       {!history&&!historyError&&<p role="status">Chargement…</p>}
       {history?.rows.length===0&&<p>Aucun envoi sur cette page.</p>}
-      <ul className="divide-y divide-zinc-800">{history?.rows.map(row=><li key={row.id} className="space-y-1 break-words py-3">
+      <ul className="divide-y divide-zinc-800">{history?.rows.map(row=><li key={row.id} className="flex items-start justify-between gap-3 py-3">
+        <div className="min-w-0 space-y-1 break-words">
         <p className="font-semibold">{row.subject}</p>
         <p className="text-sm text-zinc-300">{adminMailSenders[row.sender].address} → {row.recipient}</p>
         <p className="text-sm text-zinc-400"><time dateTime={row.created_at}>{dateFormat.format(new Date(row.created_at))}</time>
-          {' · '+mailStatusLabels[row.status]}{row.status!=='accepted'&&row.provider_status?' (HTTP '+row.provider_status+')':''}</p>
+          {' · '+mailStatusLabels[row.status]}{row.status!=='accepted'&&row.provider_status?' (HTTP '+row.provider_status+')':''}</p></div>
+        <button type="button" aria-label={'Supprimer de l’historique : '+row.subject} title="Supprimer de l’historique"
+          disabled={removing!==null} onClick={()=>void remove(row)} className="admin-action shrink-0 text-red-400 hover:text-red-200">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>
+        </button>
       </li>)}</ul>
       <div className="flex gap-2">
         <button className="admin-action" disabled={!history||index===0} onClick={()=>{setHistory(null);setIndex(index-1)}}>Précédente</button>

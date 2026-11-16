@@ -229,6 +229,7 @@ try {
  await run('psql',[...args,'-f',join(root,'tests/account-deletion-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/account-storage-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/contact-db.sql')])
+ await run('psql',[...args,'-f',join(root,'tests/admin-mail-removal-db.sql')])
  await run('psql',[...args,'-f',join(root,'tests/maintenance-db.sql')])
  const catalogueTest=await run('psql',[...args,'-f',join(root,'tests/catalogue-pagination-db.sql')])
  console.log(catalogueTest.stdout)
