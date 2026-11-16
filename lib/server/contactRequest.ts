@@ -4,6 +4,7 @@ import {isIP} from 'node:net'
 import {CONTACT_LIMITS,CONTACT_WINDOW_MS,contactErrors,type ContactMessage} from '../contact'
 import {readJsonObject,InputError,isEmail} from './inputValidation'
 import {withTimeout} from '../asyncOperation'
+import {automaticEmailSender,brandedEmail} from '../brandedEmail'
 import type {UploadRepository} from '../game-distribution/uploads/contracts'
 
 type Environment={CONTACT_FORM_ENABLED?:string;CONTACT_NOTIFY_EMAIL?:string;CONTACT_HASH_SECRET?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;CHIBASKO_CLOUDFLARE?:string}
@@ -33,16 +34,19 @@ export async function contactRequest(request:Request,deps:Dependencies){
   const hash=(value:string)=>createHmac('sha256',env.CONTACT_HASH_SECRET!).update(value).digest('hex')
   const client=env.CHIBASKO_CLOUDFLARE==='1'?request.headers.get('cf-connecting-ip')??'':''
   const db=deps.db(),fingerprint=hash(JSON.stringify([data,env.RESEND_FROM_EMAIL,env.CONTACT_NOTIFY_EMAIL]))
-  const reservation=await db.call<{state:string;id?:string;lease?:string}>('contact_reserve',{p_id:attempt.id,p_fingerprint:fingerprint,p_client:hash('client:'+(isIP(client)?client:'shared-untrusted-ingress')),p_email:hash('email:'+data.email)})
+  const reservation=await db.call<{state:string;id?:string;lease?:string;templateFormat?:number}>('contact_reserve',{p_id:attempt.id,p_fingerprint:fingerprint,p_client:hash('client:'+(isIP(client)?client:'shared-untrusted-ingress')),p_email:hash('email:'+data.email),p_format:1})
   if(reservation.state==='accepted')return response(200,{status:'accepted'})
   if(reservation.state==='rate_limited')return response(429,{error:{code:'rate_limited'}})
   if(reservation.state==='conflict')return response(409,{error:{code:'attempt_conflict'}})
   if(reservation.state!=='send')return response(202,{status:'unconfirmed'})
   if(!reservation.id||!reservation.lease)throw Error('invalid_receipt')
+  const subject='Contact Chibasko Games'
+  const text=`Prénom : ${data.firstName}\nNom : ${data.lastName}\nE-mail : ${data.email}\n\n${data.message}`
+  const html=reservation.templateFormat===1?brandedEmail({identity:'noreply',subject,text,automatic:'reply'}).html:undefined
   let accepted=false
   try{
    accepted=await withTimeout((async()=>{
-   const result=await (deps.fetcher??fetch)('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'Content-Type':'application/json','Idempotency-Key':'contact/'+reservation.id},signal:AbortSignal.timeout(deps.sendTimeoutMs??10_000),body:JSON.stringify({from:env.RESEND_FROM_EMAIL,to:[env.CONTACT_NOTIFY_EMAIL],reply_to:data.email,subject:'Contact Chibasko Games',text:`Prénom : ${data.firstName}\nNom : ${data.lastName}\nE-mail : ${data.email}\n\n${data.message}`})})
+   const result=await (deps.fetcher??fetch)('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'Content-Type':'application/json','Idempotency-Key':'contact/'+reservation.id},signal:AbortSignal.timeout(deps.sendTimeoutMs??10_000),body:JSON.stringify({from:html?automaticEmailSender(env.RESEND_FROM_EMAIL!):env.RESEND_FROM_EMAIL,to:[env.CONTACT_NOTIFY_EMAIL],reply_to:data.email,subject,text,html})})
    const resultBody=await result.json().catch(()=>null)
    return result.ok&&typeof resultBody?.id==='string'&&resultBody.id.length>0
    })(),deps.sendTimeoutMs??10_000)

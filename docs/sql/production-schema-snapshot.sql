@@ -9,7 +9,7 @@ set local search_path=pg_catalog,public;
 with managed as (
  select c.* from pg_class c join pg_namespace n on n.oid=c.relnamespace
  where n.nspname='public' and c.relkind in ('r','p') and c.relname ~
- '^(moderation_|social_|profile_username_reservations$|contact_dispatches$|games$|profiles$|categories$|game_categories$|favorites$|play_history$|game_reviews$|game_reactions$|faq_entries$|admin_users$|password_reset_|developer_contacts$|game_account_|game_management_authorities$|game_platform_management$|game_submissions$|game_submission_|game_developer_|game_versions$|game_build_|game_reviewers$|game_version_delivery_policies$|game_preview_sessions$|game_launch_sessions$|game_server_|game_online_|game_connection_tickets$|game_exchange_limits$|multiplayer_)'
+ '^(moderation_|social_|profile_username_reservations$|contact_dispatches$|admin_mail_log$|game_external_revisions$|games$|profiles$|categories$|game_categories$|favorites$|play_history$|game_reviews$|game_reactions$|faq_entries$|admin_users$|password_reset_|developer_contacts$|game_account_|game_management_authorities$|game_platform_management$|game_submissions$|game_submission_|game_developer_|game_versions$|game_build_|game_reviewers$|game_version_delivery_policies$|game_preview_sessions$|game_launch_sessions$|game_server_|game_online_|game_connection_tickets$|game_exchange_limits$|multiplayer_)'
 ), objects as (
  select 'table:'||c.relname as key,jsonb_build_object(
   'owner',pg_get_userbyid(c.relowner),'rls',c.relrowsecurity,'forceRls',c.relforcerowsecurity,
@@ -106,7 +106,7 @@ with managed as (
     and i.indnkeyatts=1 and i.indkey[0]=(select attnum from pg_attribute where attrelid=i.indrelid and attname='slug')),
   'serviceProfileRead',case when to_regclass('public.profiles') is null then false else has_table_privilege('service_role','public.profiles','SELECT') end,
   'legacyTriggers',coalesce((select jsonb_agg(jsonb_build_object('name',t.tgname,'definition',pg_get_triggerdef(t.oid),'enabled',t.tgenabled) order by t.tgname)
-    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname not in ('guard_active_game_version','account_asset_guard','moderation_game_publication_guard')),'[]'::jsonb),
+    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname not in ('guard_active_game_version','account_asset_guard','moderation_game_publication_guard','distribution_guard_external_catalogue')),'[]'::jsonb),
   'gamesRls',(select relrowsecurity from pg_class where oid=to_regclass('public.games')),
   'adminRls',(select relrowsecurity from pg_class where oid=to_regclass('public.admin_users')),
   'browserCatalogueWrites',coalesce((select bool_or(has_column_privilege(r.role_name,c.oid,a.attnum,'INSERT') or has_column_privilege(r.role_name,c.oid,a.attnum,'UPDATE')

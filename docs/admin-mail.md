@@ -1,6 +1,6 @@
 # Messagerie administrative
 
-Dans **Administration → Messagerie**, choisir l’expéditeur, saisir une adresse, puis écrire l’objet et le message. L’aperçu conserve les paragraphes du texte. Confirmer depuis cet aperçu pour envoyer. Les réponses arrivent dans la boîte LWS sélectionnée.
+Dans **Administration → Messagerie**, choisir l’expéditeur, saisir une adresse, puis écrire l’objet et le message. L’aperçu affiche le modèle HTML avec les paragraphes et la signature du service. Confirmer depuis cet aperçu pour envoyer. La version texte est incluse et les réponses arrivent dans la boîte LWS sélectionnée.
 
 L’historique contient l’expéditeur, le destinataire, l’objet, la date et le résultat connu. Le corps du message reste hors du journal. Les échecs de Resend sont visibles avec le code HTTP disponible. « Accepté par Resend » signifie que le fournisseur a confirmé la prise en charge.
 

@@ -1,3 +1,4 @@
+import {brandedEmail} from '../brandedEmail'
 import { createHmac, randomInt } from 'node:crypto'
 import { isIP } from 'node:net'
 import { Resend } from 'resend'
@@ -53,39 +54,13 @@ export async function deliverPasswordReset(requestId: string, email: string, cod
     const apiKey = process.env.RESEND_API_KEY?.trim()
     const from = process.env.RESEND_FROM_EMAIL?.trim()
     if (!apiKey || !from) throw new Error('Email configuration missing')
+    const text= `Chibasko Games\n\nRéinitialisation de ton mot de passe\n\nUne demande de réinitialisation a été faite pour ton compte Chibasko Games. Saisis ce code sur la page de réinitialisation pour choisir un nouveau mot de passe :\n\n${code}\n\nCe code expire après 10 minutes. Ne le partage avec personne.\n\nSi tu n’es pas à l’origine de cette demande, ignore cet email. Ton mot de passe reste inchangé.\n\nChibasko Games`
     const { data, error } = await new Resend(apiKey).emails.send({
       from: `Chibasko Games <${from.replace(/^.*<([^<>]+)>$/, '$1')}>`,
       to: email,
       subject: 'Ton code de réinitialisation Chibasko Games',
-      text: `Chibasko Games\n\nRéinitialisation de ton mot de passe\n\nUne demande de réinitialisation a été faite pour ton compte Chibasko Games. Saisis ce code sur la page de réinitialisation pour choisir un nouveau mot de passe :\n\n${code}\n\nCe code expire après 10 minutes. Ne le partage avec personne.\n\nSi tu n’es pas à l’origine de cette demande, ignore cet email. Ton mot de passe reste inchangé.\n\nChibasko Games`,
-      html: `<!DOCTYPE html>
-<html lang="fr">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Réinitialisation de ton mot de passe</title></head>
-<body style="margin:0;padding:0;background-color:#f1f3f7;color:#202838;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f3f7;">
-    <tr><td align="center" style="padding:32px 12px;">
-      <!--[if mso]><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e1e5ed;border-radius:16px;">
-        <tr><td style="padding:28px 24px;background-color:#111827;border-radius:16px 16px 0 0;">
-          <p style="margin:0;color:#ffffff;font-size:22px;font-weight:bold;line-height:30px;">Chibasko <span style="color:#67e8f9;">Games</span></p>
-        </td></tr>
-        <tr><td style="padding:28px 24px;">
-          <h1 style="margin:0 0 20px;font-size:24px;line-height:32px;color:#111827;">Réinitialisation de ton mot de passe</h1>
-          <p style="margin:0 0 12px;font-size:16px;line-height:25px;">Une demande de réinitialisation a été faite pour ton compte Chibasko Games.</p>
-          <p style="margin:0 0 24px;font-size:16px;line-height:25px;">Saisis ce code sur la page de réinitialisation pour choisir un nouveau mot de passe :</p>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:22px 8px;background-color:#ecfeff;border:1px solid #a5f3fc;border-radius:12px;">
-            <p style="margin:0;font-family:'Courier New',monospace;font-size:32px;font-weight:bold;letter-spacing:5px;line-height:44px;color:#155e75;white-space:nowrap;">${code}</p>
-          </td></tr></table>
-          <p style="margin:20px 0 0;font-size:14px;line-height:22px;color:#475569;">Ce code expire après <strong>10 minutes</strong>. Ne le partage avec personne.</p>
-          <p style="margin:24px 0 0;padding-top:20px;border-top:1px solid #e1e5ed;font-size:14px;line-height:22px;color:#475569;">Si tu n’es pas à l’origine de cette demande, ignore cet email. Ton mot de passe reste inchangé.</p>
-        </td></tr>
-      </table>
-      <!--[if mso]></td></tr></table><![endif]-->
-      <p style="margin:20px 0 0;font-size:12px;line-height:20px;color:#64748b;">Chibasko Games</p>
-    </td></tr>
-  </table>
-</body>
-</html>`,
+      text,
+      html: brandedEmail({identity:'noreply',subject:'Réinitialisation de ton mot de passe',text,code,automatic:'no-reply'}).html,
     }, { idempotencyKey: `password-reset/${requestId}` })
     if (error || !data?.id) throw new Error('Email delivery rejected')
   } catch {

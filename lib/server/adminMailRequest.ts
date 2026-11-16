@@ -1,5 +1,6 @@
 import 'server-only'
 import {createHash} from 'node:crypto'
+import {brandedEmail} from '../brandedEmail'
 import {adminMailSenders,type MailSender,type MailStatus,type MailEntry} from '../adminMail'
 import {uploadRepository} from '../game-distribution/uploads/repository'
 import {UploadError} from '../game-distribution/uploads/policy'
@@ -59,7 +60,7 @@ export async function adminMailRequest(request:Request,deps=defaults) {
       await withTimeout((async()=>{
         const response=await deps.send('https://api.resend.com/emails',{
           method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json','Idempotency-Key':'admin-mail/'+id},
-          body:JSON.stringify({from:identity.label+' <'+identity.address+'>',to:[recipient],reply_to:identity.address,subject,text}),
+          body:JSON.stringify({from:identity.label+' <'+identity.address+'>',to:[recipient],reply_to:identity.address,subject,...brandedEmail({identity:sender,subject,text})}),
           signal:AbortSignal.timeout(8000),
         })
         providerStatus=response.status

@@ -6,13 +6,13 @@ import {readJsonObject} from '../lib/server/inputValidation.ts'
 const env={CONTACT_FORM_ENABLED:'1',CONTACT_NOTIFY_EMAIL:'admin@example.test',CONTACT_HASH_SECRET:'fixture-secret-'.repeat(4),RESEND_API_KEY:'fixture-resend-only',RESEND_FROM_EMAIL:'contact@example.test',CHIBASKO_CLOUDFLARE:'1'}
 const body=()=>({firstName:'Élodie',lastName:'Test',email:'sender@example.test',message:'Bonjour <script>fixture</script>',website:'',attempt:{id:randomUUID(),createdAt:Date.now()}})
 const request=(value,headers={})=>new Request('https://portal.test/api/contact',{method:'POST',headers:{Origin:'https://portal.test','Content-Type':'application/json','cf-connecting-ip':'192.0.2.1',...headers},body:typeof value==='string'?value:JSON.stringify(value)})
-function harness(){
+function harness(templateFormat=1){
  const records=new Map(),calls=[],logs=[],rpc=[];let sender=async()=>Response.json({id:'provider-fixture'}),finishFailure=false
  const db={async call(name,args){rpc.push({name,args});if(name==='contact_reserve'){
   let row=records.get(args.p_id);if(row&&row.hash!==args.p_fingerprint)return {state:'conflict'}
   row??=[...records.values()].find(row=>row.hash===args.p_fingerprint)
   if(row?.accepted)return {state:'accepted'}
-  row??={id:args.p_id,hash:args.p_fingerprint};row.lease=randomUUID();records.set(row.id,row);return {state:'send',id:row.id,lease:row.lease}
+  row??={id:args.p_id,hash:args.p_fingerprint};row.lease=randomUUID();records.set(row.id,row);return {state:'send',id:row.id,lease:row.lease,templateFormat}
  }if(finishFailure)throw Error('private SQL fixture');const row=records.get(args.p_id);if(row.lease!==args.p_lease)return false;row.accepted=args.p_accepted;return true}}
  const deps={env,db:()=>db,sendTimeoutMs:10,fetcher:async(url,init)=>{calls.push({url,init});return sender(url,init)},log:entry=>logs.push(entry)}
  return {deps,calls,logs,records,rpc,setSender:value=>sender=value,setFinishFailure:value=>finishFailure=value}
@@ -35,9 +35,17 @@ test('contact : envoi confirmé, double clic et retry HTTP ne renvoient pas un e
  assert.equal((await contactRequest(request({...value,attempt:{...value.attempt,id:randomUUID()}}),h.deps)).status,200)
  assert.equal(h.calls.length,1)
  const outgoing=JSON.parse(h.calls[0].init.body)
- assert.equal(outgoing.reply_to,value.email);assert.equal(outgoing.subject,'Contact Chibasko Games');assert.equal(outgoing.html,undefined)
+ assert.equal(outgoing.reply_to,value.email);assert.equal(outgoing.subject,'Contact Chibasko Games')
+ assert.match(outgoing.html,/Élodie/)
+ assert.match(outgoing.html,/&lt;script&gt;/)
+ assert.doesNotMatch(outgoing.html,/<script>/)
  assert.ok(h.calls[0].init.headers['Idempotency-Key'].startsWith('contact/'))
  assert.ok(!JSON.stringify(h.rpc).includes(value.email));assert.ok(!JSON.stringify(h.rpc).includes(value.message))
+})
+test('une reprise de formulaire réservée avant la migration conserve le texte brut',async()=>{
+ const h=harness(0)
+ assert.equal((await contactRequest(request(body()),h.deps)).status,200)
+ assert.equal(JSON.parse(h.calls[0].init.body).html,undefined)
 })
 test('contact : timeout, succès tardif et reprise utilisent la même clé et le même contenu',async()=>{
  const h=harness(),value=body();let resolve

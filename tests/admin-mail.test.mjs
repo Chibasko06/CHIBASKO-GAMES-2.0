@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {adminMailRequest} from '../lib/server/adminMailRequest.ts'
 import {AdminAccessError} from '../lib/server/adminAuthorization.ts'
+import {brandedEmail,emailLogo} from '../lib/brandedEmail.ts'
 
 const url='https://portal.example/api/admin/mail'
 const input={id:'142d83d5-6e31-4b58-bcc9-9096708e4284',sender:'contact',recipient:'player@example.test',subject:'Bonjour',text:'Bonjour\n\n<script>exemple</script>'}
@@ -52,10 +53,28 @@ for(const [sender,label] of [['contact','Contact'],['developers','Developers']])
  assert.equal(mail.from,'Chibasko Games — '+label+' <'+sender+'@chibaskogames.fr>')
  assert.equal(mail.reply_to,sender+'@chibaskogames.fr')
  assert.deepEqual(mail.to,[input.recipient])
- assert.equal(mail.text,input.text)
- assert.equal(mail.html,undefined)
+ const preview=brandedEmail({identity:sender,subject:input.subject,text:input.text})
+ assert.equal(mail.text,preview.text)
+ assert.equal(mail.html,preview.html)
+ assert.match(mail.html,/&lt;script&gt;/)
+ assert.doesNotMatch(mail.html,/<script>/)
  assert.equal(headers['Idempotency-Key'],'admin-mail/'+input.id)
  assert.equal(JSON.stringify(f.calls).includes(input.text),false)
+})
+test('shared template preserves French text, line breaks and the three identities',()=>{
+ for(const [identity,signature] of [
+  ['contact','Équipe Chibasko Games — Contact & Assistance'],
+  ['developers','Équipe Chibasko Games — Relations Développeurs'],
+  ['noreply','Équipe Chibasko Games'],
+ ]){
+  const message=brandedEmail({identity,subject:'Réponse <test>',text:'Élodie\nSuite\n\nAutre paragraphe',automatic:identity==='noreply'?'no-reply':undefined})
+  assert.ok(message.text.includes(signature))
+  assert.ok(message.html.includes(emailLogo))
+  assert.match(message.html,/width="48" height="48" alt="Logo Chibasko Games"/)
+  assert.match(message.html,/Élodie<br>Suite<\/p><p[^>]+>Autre paragraphe/)
+  assert.match(message.html,/Réponse &lt;test&gt;/)
+  assert.equal(message.html.includes('Aucune réponse n’est attendue.'),identity==='noreply')
+ }
 })
 for(const [status,response] of [['rejected',()=>Response.json({message:'private'},{status:429})],['unconfirmed',()=>{throw Error('private')}],['unconfirmed',()=>Response.json({}, {status:200})]])test('provider failure recorded as '+status,async()=>{
  const f=fixture(response)

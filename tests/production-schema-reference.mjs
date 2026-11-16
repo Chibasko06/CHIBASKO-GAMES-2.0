@@ -158,7 +158,8 @@ try {
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261024000100_account_deletion.sql')]))
  assert.equal(compareSchema(base,reference).status,'MIGRATIONS_REQUIRED',JSON.stringify(compareSchema(base,reference).rows.filter(row=>row.status==='BLOCKING_DRIFT')))
  assert.equal(compareSchema(base,reference).rows.some(row=>row.status==='DIFFERENCE_EXPECTED'),true)
- assert.equal(compareSchema(final,reference).status,'PASS')
+ const finalComparison=compareSchema(final,reference)
+ assert.equal(finalComparison.status,'PASS',JSON.stringify(finalComparison.rows.filter(row=>row.status==='BLOCKING_DRIFT')))
  for(const [index,state] of snapshots.entries()) {
   const result=compareSchema(state,reference)
   assert.equal(result.status,index===migrations.length?'PASS':'MIGRATIONS_REQUIRED');assert.equal(result.matchedMigrationCount,index)

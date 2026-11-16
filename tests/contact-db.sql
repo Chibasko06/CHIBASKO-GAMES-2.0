@@ -48,4 +48,23 @@ begin
  perform public.contact_cleanup();
  if exists(select 1 from public.contact_dispatches) then raise exception 'Reçus expirés conservés'; end if;
 end $$;
+do $$
+declare legacy uuid:=gen_random_uuid(); branded uuid:=gen_random_uuid(); item jsonb;
+begin
+ item:=public.contact_reserve(legacy,repeat('ab',32),repeat('ac',32),repeat('bc',32));
+ if item->>'templateFormat' is distinct from '0' then raise exception 'Format historique incorrect'; end if;
+ perform public.contact_finish(legacy,(item->>'lease')::uuid,false);
+ update public.contact_dispatches set next_attempt_at=now() where id=legacy;
+ item:=public.contact_reserve(legacy,repeat('ab',32),repeat('ac',32),repeat('bc',32),1);
+ if item->>'templateFormat' is distinct from '0' then raise exception 'Format modifié lors de la reprise'; end if;
+ item:=public.contact_reserve(branded,repeat('cd',32),repeat('ac',32),repeat('bc',32),1);
+ if item->>'templateFormat' is distinct from '1' then raise exception 'Format HTML absent'; end if;
+ perform public.contact_finish(branded,(item->>'lease')::uuid,false);
+ update public.contact_dispatches set next_attempt_at=now() where id=branded;
+ if public.contact_reserve(branded,repeat('cd',32),repeat('ac',32),repeat('bc',32))->>'state' is distinct from 'waiting'
+  then raise exception 'Ancien portail autorisé à reprendre un envoi HTML'; end if;
+ if has_function_privilege('anon','public.contact_reserve(uuid,text,text,text,integer)','execute')
+  or has_function_privilege('authenticated','public.contact_reserve(uuid,text,text,text,integer)','execute')
+  then raise exception 'Réservation HTML accessible publiquement'; end if;
+end $$;
 rollback;

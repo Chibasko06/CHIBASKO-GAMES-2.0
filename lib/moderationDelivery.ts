@@ -1,4 +1,5 @@
-import {moderationEmailHtml,moderationAccountNavigation,reportReason} from './moderationEmail'
+import {moderationAccountNavigation,reportReason} from './moderationEmail'
+import {automaticEmailSender,brandedEmail} from './brandedEmail'
 import type {ReportKind} from './moderation'
 import type {UploadRepository} from '@/lib/game-distribution/uploads/contracts'
 import {withTimeout} from '@/lib/asyncOperation'
@@ -25,14 +26,19 @@ export async function deliverModeration(db:UploadRepository,env:ModerationMailEn
     if(adminUrl.protocol!=='https:'||adminUrl.username||adminUrl.password)throw Error('moderation_site_invalid')
     const destination=job.kind==='admin'?to:job.case.contact_email
     if(!destination||!/^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(destination))throw Error('moderation_recipient_missing')
-    message={from,to:[destination],...(job.kind==='admin'?{}:{reply_to:appeal}),subject:job.kind==='admin'?'Nouveau signalement sur Chibasko Games':job.kind==='receipt'?'Chibasko Games — signalement reçu':'Chibasko Games — décision sur le signalement',text:job.kind==='admin'
+    message={from:automaticEmailSender(from!),to:[destination],...(job.kind==='admin'?{}:{reply_to:appeal}),subject:job.kind==='admin'?'Nouveau signalement sur Chibasko Games':job.kind==='receipt'?'Chibasko Games — signalement reçu':'Chibasko Games — décision sur le signalement',text:job.kind==='admin'
      ?`Dossier #${job.case.number}\nType : ${job.case.target_kind==='player'?'Joueur':'Jeu'}\nMotif : ${reportReason(job.case.target_kind as ReportKind,job.case.category)}\nConsulter le dossier privé : ${adminUrl.href}`
      :job.kind==='receipt'?`Le signalement #${job.case.number} a été enregistré et sera examiné par Chibasko Games.\nAucune sanction n’est automatique.\nPour compléter le dossier ou contester une décision : ${appeal}, en précisant ce numéro.`
       :`Décision relative au signalement #${job.case.number}\n\n${job.decision??''}\n\nCette réponse concerne le suivi du dossier et n’atteste pas une sanction automatique.\nPour demander un réexamen : ${appeal}, en précisant ce numéro. Les voies judiciaires restent ouvertes ; les autres voies applicables dépendent de la qualification du service.`}
     if(job.notice){if(typeof job.notice.title!=='string'||typeof job.notice.text!=='string')throw Error('moderation_notice_invalid');message.subject='Chibasko Games — '+job.notice.title;message.text=job.notice.text+'\n\nPour demander un réexamen : '+appeal+'. Décisions et recours : '+new URL('/account/moderation',adminUrl).href}
     const personal=job.stream==='measure'&&job.kind!=='admin'?new URL('/account/moderation',adminUrl):undefined
     if(personal)message.text=String(message.text)+'\n\n'+moderationAccountNavigation
-    message.html=moderationEmailHtml(String(message.subject),String(message.text),adminUrl,job.kind==='admin'?adminUrl:personal,personal?'Consulter ma décision':undefined)
+    const actionUrl=job.kind==='admin'?adminUrl:personal
+    message.html=brandedEmail({
+     identity:'noreply',subject:String(message.subject),text:String(message.text),
+     automatic:job.kind==='admin'?'no-reply':'reply',
+     action:actionUrl?{url:actionUrl,label:personal?'Consulter ma décision':'Examiner le dossier'}:undefined,
+    }).html
    }
    message=await withTimeout(db.call<Record<string,unknown>>(job.stream==='measure'?'distribution_moderation_prepare_measure_mail':'distribution_moderation_prepare_mail',{p_id:job.id,p_lease:job.lease,p_message:message}),8000)
    phase='send';options.signal?.throwIfAborted()

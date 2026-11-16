@@ -152,7 +152,9 @@ test('reset email has branded sender, matching plain text and accessible inline 
   assert.match(payload.html, /<html lang="fr">/)
   assert.match(payload.html, /role="presentation"/)
   assert.match(payload.html, /max-width:560px/)
-  assert.doesNotMatch(payload.html, /<script|<img|<a\s|https?:\/\//i)
+  assert.doesNotMatch(payload.html, /<script|<form/i)
+  assert.match(payload.html, /src="https:\/\/chibaskogames\.fr\/chibaskogames-logo\.png"/)
+  assert.deepEqual([...payload.html.matchAll(/href="([^"]+)"/g)].map(match=>match[1]),['https://chibaskogames.fr'])
   assert.equal(globalThis.__phase0.calls.length, 0)
 })
 

@@ -6,6 +6,7 @@ import {useAdminAccess} from './useAdminAccess'
 import AdminShell from './AdminShell'
 import {adminMailSenders,mailStatusLabels,type MailEntry,type MailSender,type MailStatus} from '@/lib/adminMail'
 import {fetchJson} from '@/lib/asyncOperation'
+import {brandedEmail} from '@/lib/brandedEmail'
 
 const field='mt-1 block w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-white'
 const dateFormat=new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Paris'})
@@ -92,7 +93,9 @@ function MailWorkspace({token}:{token:string}){
         <p>De {sender.label} ({sender.address})</p>
         <p>À {draft.recipient}</p>
         <p className="font-semibold">{draft.subject}</p>
-        <p className="whitespace-pre-wrap rounded-lg bg-zinc-950 p-4">{draft.text}</p>
+        <iframe title="Rendu HTML de l’e-mail" sandbox="" referrerPolicy="no-referrer"
+          className="h-[32rem] w-full rounded-lg border border-zinc-800 bg-white"
+          srcDoc={brandedEmail({identity:draft.sender,subject:draft.subject,text:draft.text}).html}/>
         {attempted&&<p className="text-sm text-zinc-400">Vérifie le résultat avant de composer un autre message au même destinataire.</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" className="admin-action" disabled={busy} onClick={()=>void send()}>{busy?'Traitement…':attempted?'Reprendre la même demande':'Confirmer et envoyer'}</button>

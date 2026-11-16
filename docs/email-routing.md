@@ -19,7 +19,15 @@ Dans les déploiements actifs du portail et du Worker de maintenance, contrôler
 
 Vérifier l’expéditeur SMTP et les modèles d’e-mail dans Supabase Auth. Contrôler ensuite, avec des comptes de test, l’expéditeur, le destinataire et l’adresse de réponse sur un message de chaque circuit concerné. Les reprises de modération gardent les destinataires enregistrés lors de la préparation du message afin de conserver le contenu associé à sa clé d’idempotence.
 
-## Coordonnées affichées sur le site
+## Modèles d’e-mail
+
+Les envois Resend du portail partagent le modèle de `lib/brandedEmail.ts`. Le logo PNG officiel est hébergé sur le site. Les intitulés et signatures distinguent Contact, Relations Développeurs et les notifications automatiques.
+
+Appliquer `20261116000200_contact_email_template.sql` avant de déployer le portail et son Worker de maintenance. La migration conserve le format des formulaires de contact déjà réservés. Les notifications de soumission et de modération déjà préparées conservent leur contenu. Lors d’une future refonte du modèle, conserver le rendu du format 1 pour les reprises en cours et utiliser un nouveau numéro pour le nouveau rendu.
+
+Les confirmations envoyées par Supabase Auth sont configurées séparément dans **Authentication → Email Templates**. Pour leur appliquer cette présentation, adapter chaque modèle dans Supabase en conservant ses variables et liens de confirmation existants, puis vérifier chaque parcours avec un compte de test. Le code de réinitialisation envoyé par le portail utilise déjà le modèle partagé.
+
+## Vérification des coordonnées publiques
 
 Ouvrir `/contact` en navigation privée et vérifier le texte et le lien « Adresse directe ». Le destinataire du formulaire dépend de `CONTACT_NOTIFY_EMAIL`. Le lien public vient de `lib/siteContacts.ts`, inclus dans le build du portail. Si les deux diffèrent, comparer la réponse du document dans l’onglet Réseau avec le lien du DOM et vérifier le commit associé au déploiement actif du portail dans Cloudflare. En cas de déploiement progressif, vérifier la répartition du trafic entre versions.
 
