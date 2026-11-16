@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {adminMailRequest} from '../lib/server/adminMailRequest.ts'
 import {AdminAccessError} from '../lib/server/adminAuthorization.ts'
 import {brandedEmail,emailLogo} from '../lib/brandedEmail.ts'
+import sharp from 'sharp'
 
 const url='https://portal.example/api/admin/mail'
 const input={id:'142d83d5-6e31-4b58-bcc9-9096708e4284',sender:'contact',recipient:'player@example.test',subject:'Bonjour',text:'Bonjour\n\n<script>exemple</script>'}
@@ -70,11 +71,20 @@ test('shared template preserves French text, line breaks and the three identitie
   const message=brandedEmail({identity,subject:'Réponse <test>',text:'Élodie\nSuite\n\nAutre paragraphe',automatic:identity==='noreply'?'no-reply':undefined})
   assert.ok(message.text.includes(signature))
   assert.ok(message.html.includes(emailLogo))
-  assert.match(message.html,/width="48" height="48" alt="Logo Chibasko Games"/)
+  assert.match(message.html,/width="54" height="54" alt="Logo Chibasko Games"/)
   assert.match(message.html,/Élodie<br>Suite<\/p><p[^>]+>Autre paragraphe/)
   assert.match(message.html,/Réponse &lt;test&gt;/)
   assert.equal(message.html.includes('Aucune réponse n’est attendue.'),identity==='noreply')
  }
+})
+test('the email asset preserves every pixel of the official logo inside an opaque border',async()=>{
+ const original=sharp('public/chibaskogames-logo.png')
+ const email=sharp('public/chibaskogames-email-logo-v2.png')
+ const {width,height,hasAlpha}=await email.metadata()
+ assert.deepEqual({width,height,hasAlpha},{width:576,height:576,hasAlpha:false})
+ assert.deepEqual(await email.clone().extract({left:32,top:32,width:512,height:512}).raw().toBuffer(),
+  await original.removeAlpha().raw().toBuffer())
+ assert.deepEqual([...await email.extract({left:0,top:0,width:1,height:1}).raw().toBuffer()],[9,9,11])
 })
 for(const [status,response] of [['rejected',()=>Response.json({message:'private'},{status:429})],['unconfirmed',()=>{throw Error('private')}],['unconfirmed',()=>Response.json({}, {status:200})]])test('provider failure recorded as '+status,async()=>{
  const f=fixture(response)

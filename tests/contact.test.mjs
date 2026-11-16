@@ -1,12 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {randomUUID} from 'node:crypto'
+import {createHash,randomUUID} from 'node:crypto'
 import {contactRequest} from '../lib/server/contactRequest.ts'
 import {readJsonObject} from '../lib/server/inputValidation.ts'
 const env={CONTACT_FORM_ENABLED:'1',CONTACT_NOTIFY_EMAIL:'admin@example.test',CONTACT_HASH_SECRET:'fixture-secret-'.repeat(4),RESEND_API_KEY:'fixture-resend-only',RESEND_FROM_EMAIL:'contact@example.test',CHIBASKO_CLOUDFLARE:'1'}
 const body=()=>({firstName:'Élodie',lastName:'Test',email:'sender@example.test',message:'Bonjour <script>fixture</script>',website:'',attempt:{id:randomUUID(),createdAt:Date.now()}})
 const request=(value,headers={})=>new Request('https://portal.test/api/contact',{method:'POST',headers:{Origin:'https://portal.test','Content-Type':'application/json','cf-connecting-ip':'192.0.2.1',...headers},body:typeof value==='string'?value:JSON.stringify(value)})
-function harness(templateFormat=1){
+function harness(templateFormat=2){
  const records=new Map(),calls=[],logs=[],rpc=[];let sender=async()=>Response.json({id:'provider-fixture'}),finishFailure=false
  const db={async call(name,args){rpc.push({name,args});if(name==='contact_reserve'){
   let row=records.get(args.p_id);if(row&&row.hash!==args.p_fingerprint)return {state:'conflict'}
@@ -46,6 +46,17 @@ test('une reprise de formulaire réservée avant la migration conserve le texte 
  const h=harness(0)
  assert.equal((await contactRequest(request(body()),h.deps)).status,200)
  assert.equal(JSON.parse(h.calls[0].init.body).html,undefined)
+})
+test('une réservation HTML antérieure conserve le premier logo et le même contenu',async()=>{
+ const h=harness(1),value=body()
+ h.setSender(async()=>new Response(null,{status:500}))
+ assert.equal((await contactRequest(request(value),h.deps)).status,202)
+ assert.equal((await contactRequest(request(value),h.deps)).status,202)
+ assert.equal(h.calls[0].init.body,h.calls[1].init.body)
+ const html=JSON.parse(h.calls[0].init.body).html
+ assert.match(html,/chibaskogames-logo\.png/)
+ assert.equal(createHash('sha256').update(html).digest('hex'),'71777d98dbc8cdd984d4fd4345ac1217e7d8ab986f56999bb8372ed1050d8bdc')
+ assert.equal(h.rpc[0].args.p_format,2)
 })
 test('contact : timeout, succès tardif et reprise utilisent la même clé et le même contenu',async()=>{
  const h=harness(),value=body();let resolve

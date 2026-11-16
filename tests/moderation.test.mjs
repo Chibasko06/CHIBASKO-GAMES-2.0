@@ -60,7 +60,7 @@ test('maintenance de modération désactivée puis activée avec configuration i
 
 test('e-mail HTML de marque : motif français, lien privé et échappement du contenu',async()=>{
  const x=fixture();await deliverModeration(x.db,x.env,x.options);const message=JSON.parse(x.sent[0].body)
- assert.match(message.html,/Chibasko/);assert.match(message.html,/chibaskogames-logo.png/);assert.match(message.html,/Examiner le dossier/);assert.match(message.text,/Type : Joueur/);assert.match(message.text,/Motif : Spam/)
+ assert.match(message.html,/Chibasko/);assert.match(message.html,/chibaskogames-email-logo-v2.png/);assert.match(message.html,/Examiner le dossier/);assert.match(message.text,/Type : Joueur/);assert.match(message.text,/Motif : Spam/)
  const y=fixture();y.job.kind='decision';y.job.case.contact_email='guest@example.test';y.job.decision='<img src=x onerror=alert(1)> & motif';await deliverModeration(y.db,y.env,y.options)
  const decision=JSON.parse(y.sent[0].body);assert.match(decision.html,/&lt;img/);assert.doesNotMatch(decision.html,/<img src=x/);assert.match(decision.text,/<img src=x/)
 })

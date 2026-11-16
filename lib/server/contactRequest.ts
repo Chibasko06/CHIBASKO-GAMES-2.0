@@ -34,7 +34,7 @@ export async function contactRequest(request:Request,deps:Dependencies){
   const hash=(value:string)=>createHmac('sha256',env.CONTACT_HASH_SECRET!).update(value).digest('hex')
   const client=env.CHIBASKO_CLOUDFLARE==='1'?request.headers.get('cf-connecting-ip')??'':''
   const db=deps.db(),fingerprint=hash(JSON.stringify([data,env.RESEND_FROM_EMAIL,env.CONTACT_NOTIFY_EMAIL]))
-  const reservation=await db.call<{state:string;id?:string;lease?:string;templateFormat?:number}>('contact_reserve',{p_id:attempt.id,p_fingerprint:fingerprint,p_client:hash('client:'+(isIP(client)?client:'shared-untrusted-ingress')),p_email:hash('email:'+data.email),p_format:1})
+  const reservation=await db.call<{state:string;id?:string;lease?:string;templateFormat?:number}>('contact_reserve',{p_id:attempt.id,p_fingerprint:fingerprint,p_client:hash('client:'+(isIP(client)?client:'shared-untrusted-ingress')),p_email:hash('email:'+data.email),p_format:2})
   if(reservation.state==='accepted')return response(200,{status:'accepted'})
   if(reservation.state==='rate_limited')return response(429,{error:{code:'rate_limited'}})
   if(reservation.state==='conflict')return response(409,{error:{code:'attempt_conflict'}})
@@ -42,7 +42,8 @@ export async function contactRequest(request:Request,deps:Dependencies){
   if(!reservation.id||!reservation.lease)throw Error('invalid_receipt')
   const subject='Contact Chibasko Games'
   const text=`Prénom : ${data.firstName}\nNom : ${data.lastName}\nE-mail : ${data.email}\n\n${data.message}`
-  const html=reservation.templateFormat===1?brandedEmail({identity:'noreply',subject,text,automatic:'reply'}).html:undefined
+  const logoVersion=reservation.templateFormat
+  const html=logoVersion===1||logoVersion===2?brandedEmail({identity:'noreply',subject,text,automatic:'reply',logoVersion}).html:undefined
   let accepted=false
   try{
    accepted=await withTimeout((async()=>{

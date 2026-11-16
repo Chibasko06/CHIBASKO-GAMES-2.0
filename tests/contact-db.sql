@@ -63,6 +63,15 @@ begin
  update public.contact_dispatches set next_attempt_at=now() where id=branded;
  if public.contact_reserve(branded,repeat('cd',32),repeat('ac',32),repeat('bc',32))->>'state' is distinct from 'waiting'
   then raise exception 'Ancien portail autorisé à reprendre un envoi HTML'; end if;
+ item:=public.contact_reserve(branded,repeat('cd',32),repeat('ac',32),repeat('bc',32),2);
+ if item->>'templateFormat' is distinct from '1' then raise exception 'Premier modèle HTML modifié lors de la reprise'; end if;
+ branded:=gen_random_uuid();
+ item:=public.contact_reserve(branded,repeat('de',32),repeat('ac',32),repeat('bc',32),2);
+ if item->>'templateFormat' is distinct from '2' then raise exception 'Nouveau modèle HTML absent'; end if;
+ perform public.contact_finish(branded,(item->>'lease')::uuid,false);
+ update public.contact_dispatches set next_attempt_at=now() where id=branded;
+ if public.contact_reserve(branded,repeat('de',32),repeat('ac',32),repeat('bc',32),1)->>'state' is distinct from 'waiting'
+  then raise exception 'Ancien modèle autorisé à reprendre un envoi du nouveau format'; end if;
  if has_function_privilege('anon','public.contact_reserve(uuid,text,text,text,integer)','execute')
   or has_function_privilege('authenticated','public.contact_reserve(uuid,text,text,text,integer)','execute')
   then raise exception 'Réservation HTML accessible publiquement'; end if;

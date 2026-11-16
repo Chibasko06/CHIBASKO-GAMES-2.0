@@ -58,7 +58,7 @@ for(const mode of ['classic','sdk','external']){
    assert.equal(init.headers['Idempotency-Key'],'submission-review/'+id)
    assert.ok(message.text.endsWith(external?'/admin/game-builds':'/admin/game-builds/'+id))
    assert.ok(message.text.includes(external?'Révision URL : '+id:'Version : 1.0.0'))
-   assert.match(message.html,/chibaskogames-logo\.png/)
+   assert.match(message.html,/chibaskogames-email-logo-v2\.png/)
    assert.match(message.html,/Ouvrir la revue/)
    return Response.json({id:'fixture-email'})
   }
