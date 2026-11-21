@@ -14,10 +14,14 @@ begin
  receipt:=public.distribution_claim_submission_email(submission);first_lease:=(receipt->>'lease')::uuid;
  if first_lease is null then raise exception 'Notification non réservable'; end if;
  perform public.distribution_prepare_submission_email(submission,first_lease,'{"text":"fixture privée"}');
+ if public.distribution_prepare_submission_email(submission,first_lease,'{"text":"nouveau modèle","to":["developers@example.test"]}') <> '{"text":"fixture privée"}'::jsonb then
+  raise exception 'Le payload figé a été remplacé';
+ end if;
  perform public.distribution_finish_submission_email(submission,first_lease,false);
  if not exists(select 1 from public.game_submission_notifications where submission_id=submission and next_attempt_at=now()+interval '5 minutes' and message->>'text'='fixture privée') then raise exception 'Backoff initial ou message perdu'; end if;
  update public.game_submission_notifications set next_attempt_at=now()-interval '1 second' where submission_id=submission;
  receipt:=public.distribution_claim_submission_email(submission);
+ if receipt->'message' <> '{"text":"fixture privée"}'::jsonb then raise exception 'La reprise a reconstruit le message'; end if;
  begin perform public.distribution_finish_submission_email(submission,first_lease,true);raise exception 'Ancien lease accepté';exception when raise_exception then if sqlerrm<>'lease_lost' then raise;end if;end;
  perform public.distribution_finish_submission_email(submission,(receipt->>'lease')::uuid,false);
  if not exists(select 1 from public.game_submission_notifications where submission_id=submission and next_attempt_at=now()+interval '10 minutes') then raise exception 'Backoff exponentiel absent'; end if;

@@ -5,6 +5,60 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare'
 import {readFile} from 'node:fs/promises'
 import ts from 'typescript'
 
+test('le Worker et le portail préparent le même payload pour les trois types de soumission',async()=>{
+ const source=await build({entryPoints:['lib/emailMessages.ts'],bundle:true,write:false,platform:'node',format:'esm'})
+ const {submissionEmailMessage}=await import('data:text/javascript;base64,'+Buffer.from(source.outputFiles[0].text).toString('base64'))
+ const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'ts',contents:`import worker from './cloudflare/session-maintenance';export default {async fetch(request,env){await worker.scheduled({},env);return new Response('completed')}}`},bundle:true,write:false,platform:'browser',format:'esm'})
+ for(const mode of ['classic','sdk','external']){
+  const job={id:'fa800000-0000-4000-8000-000000000010',lease:'fa800000-0000-4000-8000-000000000011',message:null,
+   contact:{firstName:'Élodie',lastName:'Fixture',contactEmail:'fixture@example.test'},title:'Jeu de test',version:mode==='external'?null:'1.0.0',kind:'new',
+   uploadId:mode==='external'?null:'fa800000-0000-4000-8000-000000000012',externalRevisionId:mode==='external'?'fa800000-0000-4000-8000-000000000013':null,studio:'Studio de test'}
+  const bindings={SUPABASE_URL:'https://db.example.test',SUPABASE_SERVICE_ROLE_KEY:'fixture-only',GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'1',RESEND_API_KEY:'fixture-only',RESEND_FROM_EMAIL:'noreply@chibaskogames.fr',GAME_SUBMISSION_NOTIFY_EMAIL:'developers@chibaskogames.fr',NEXT_PUBLIC_SITE_URL:'https://chibaskogames.fr'}
+  const expected=submissionEmailMessage(job,bindings.RESEND_FROM_EMAIL,bindings.GAME_SUBMISSION_NOTIFY_EMAIL,bindings.NEXT_PUBLIC_SITE_URL)
+  let claimed=false,prepared,sent=0,acknowledged=false
+  const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-10-18',script:bundle.outputFiles[0].text,bindings,outboundService:async request=>{
+   const url=new URL(request.url),body=await request.json()
+   if(url.hostname==='api.resend.com'){
+    assert.equal(request.headers.get('Idempotency-Key'),'submission-review/'+job.id)
+    assert.deepEqual(body,expected);assert.deepEqual(body,prepared)
+    assert.match(body.html,/chibaskogames-email-logo-v2\.png/);assert.match(body.html,/light only/)
+    assert.ok(body.text);sent++;return Response.json({id:'fixture-receipt'})
+   }
+   assert.equal(url.hostname,'db.example.test')
+   if(url.pathname.endsWith('distribution_claim_submission_email')){if(claimed)return Response.json(null);claimed=true;return Response.json(job)}
+   if(url.pathname.endsWith('distribution_prepare_submission_email')){prepared=body.p_message;return Response.json(prepared)}
+   if(url.pathname.endsWith('distribution_finish_submission_email')){assert.equal(body.p_success,true);acknowledged=true;return Response.json(null)}
+   if(url.pathname.endsWith('distribution_maintenance_health'))return Response.json({})
+   assert.fail('RPC imprévue')
+  }}))
+  try{assert.equal((await runtime.dispatchFetch('https://maintenance.test')).status,200);assert.equal(sent,1);assert.equal(acknowledged,true)}finally{await runtime.dispose()}
+ }
+})
+
+test('le Worker conserve un ancien payload et la même clé après un acquittement perdu',async()=>{
+ const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'ts',contents:`import worker from './cloudflare/session-maintenance';export default {async fetch(request,env){await worker.scheduled({},env);return new Response('completed')}}`},bundle:true,write:false,platform:'browser',format:'esm'})
+ const frozen={from:'ancien@example.test',to:['archive@example.test'],reply_to:'fixture@example.test',subject:'Ancien objet',text:'Message déjà préparé'}
+ const job={id:'fa800000-0000-4000-8000-000000000020',lease:'fa800000-0000-4000-8000-000000000021',message:frozen}
+ let claimed=false,cycle=0,accepted=false;const sent=[],keys=[],receipts=new Set()
+ const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-10-18',script:bundle.outputFiles[0].text,bindings:{SUPABASE_URL:'https://db.example.test',SUPABASE_SERVICE_ROLE_KEY:'fixture-only',GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'1',RESEND_API_KEY:'fixture-only',RESEND_FROM_EMAIL:'noreply@chibaskogames.fr',GAME_SUBMISSION_NOTIFY_EMAIL:'developers@chibaskogames.fr'},outboundService:async request=>{
+  const url=new URL(request.url),body=await request.json()
+  if(url.hostname==='api.resend.com'){assert.deepEqual(body,frozen);sent.push(body);keys.push(request.headers.get('Idempotency-Key'));receipts.add(keys.at(-1));return Response.json({id:'same-receipt'})}
+  assert.equal(url.hostname,'db.example.test')
+  if(url.pathname.endsWith('distribution_claim_submission_email')){if(claimed||accepted)return Response.json(null);claimed=true;return Response.json(job)}
+  if(url.pathname.endsWith('distribution_prepare_submission_email')){assert.deepEqual(body.p_message,frozen);return Response.json(frozen)}
+  if(url.pathname.endsWith('distribution_finish_submission_email')){if(cycle===0)return Response.json({code:'08006'},{status:503});assert.equal(body.p_success,true);accepted=true;return Response.json(null)}
+  if(url.pathname.endsWith('distribution_maintenance_health'))return Response.json({})
+  assert.fail('RPC imprévue')
+ }}))
+ try{
+  await runtime.dispatchFetch('https://maintenance.test');cycle++;claimed=false
+  await runtime.dispatchFetch('https://maintenance.test');claimed=false
+  await runtime.dispatchFetch('https://maintenance.test')
+  assert.equal(sent.length,2);assert.equal(receipts.size,1);assert.equal(accepted,true)
+  assert.deepEqual(keys,['submission-review/'+job.id,'submission-review/'+job.id])
+ }finally{await runtime.dispose()}
+})
+
 test('le Worker reprend une alerte de modération sans nouveau cron et attend son acquittement',async()=>{
  const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'ts',contents:`import worker from './cloudflare/session-maintenance';export default {async fetch(request,env){await worker.scheduled({},env);return new Response('completed')}}`},bundle:true,write:false,platform:'browser',format:'esm'})
  const calls=[];let claimed=false,message

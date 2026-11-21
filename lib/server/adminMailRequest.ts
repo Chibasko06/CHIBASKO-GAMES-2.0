@@ -1,6 +1,6 @@
 import 'server-only'
 import {createHash} from 'node:crypto'
-import {brandedEmail} from '../brandedEmail'
+import {adminEmailMessage} from '../emailMessages'
 import {adminMailSenders,type MailSender,type MailStatus,type MailEntry} from '../adminMail'
 import {uploadRepository} from '../game-distribution/uploads/repository'
 import {UploadError} from '../game-distribution/uploads/policy'
@@ -62,13 +62,12 @@ export async function adminMailRequest(request:Request,deps=defaults) {
     })
     if(!reservation.reserved)return adminJson({status:reservation.status})
 
-    const identity=adminMailSenders[sender]
     let status:MailStatus='unconfirmed',providerStatus:number|null=null,providerId:string|null=null
     try {
       await withTimeout((async()=>{
         const response=await deps.send('https://api.resend.com/emails',{
           method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json','Idempotency-Key':'admin-mail/'+id},
-          body:JSON.stringify({from:identity.label+' <'+identity.address+'>',to:[recipient],reply_to:identity.address,subject,...brandedEmail({identity:sender,subject,text})}),
+          body:JSON.stringify(adminEmailMessage(sender,recipient,subject,text)),
           signal:AbortSignal.timeout(8000),
         })
         providerStatus=response.status

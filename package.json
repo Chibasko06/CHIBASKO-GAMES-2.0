@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "diagnose:email": "node scripts/email-diagnostic.mjs",
+    "test:email-diagnostic": "node --import ./tests/reliability-register.mjs --test tests/email-diagnostic.test.mjs",
     "build:maintenance": "node scripts/build-maintenance.mjs",
     "check:maintenance": "wrangler deploy --config cloudflare/wrangler.maintenance.production.jsonc --dry-run",
     "deploy:maintenance": "wrangler deploy --config cloudflare/wrangler.maintenance.production.jsonc",

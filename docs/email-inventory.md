@@ -1,12 +1,12 @@
 # Circuits d’e-mails
 
-Inventaire du portail, des migrations et des Workers versionnés. « Activé » désigne le réglage versionné de production. Les versions effectivement actives, les journaux des fournisseurs et les modèles hébergés dans Supabase ne sont pas établis par le dépôt.
+Inventaire du portail, des migrations et des Workers versionnés. « Activé » désigne le réglage versionné de production. Le [contrôle du 21 novembre 2026](email-production-alignment.md) distingue ces réglages des versions actives, vérifiées en lecture seule dans Cloudflare. Les modèles hébergés dans Supabase Auth et les rapports de réception restent à inspecter séparément.
 
 Dans le tableau, **automatique** désigne l’adresse `RESEND_FROM_EMAIL`, configurée à `noreply@chibaskogames.fr`. Les lignes Resend utilisaient déjà le modèle HTML partagé, avec un texte brut en parallèle. Les anciens corps enregistrés sont conservés.
 
 | Déclencheur et origine | Fournisseur et expéditeur | Destinataire et Reply-To | État, conditions et protections | Modèle et correction |
 | --- | --- | --- | --- | --- |
-| Envoi confirmé dans `/admin/messagerie` via `/api/admin/mail` | Resend, Contact ou Developers au choix | Une adresse saisie, réponse à l’expéditeur | Réservé aux admins, clé Resend, réservation SQL, 5/min et 50/24 h, identifiant unique | HTML partagé, logo à corriger |
+| Envoi confirmé dans `/admin/messagerie` via `/api/admin/mail` | Resend, Contact ou Developers au choix | Une adresse saisie, réponse à l’expéditeur | Réservé aux admins, clé Resend, réservation SQL, 5/min et 50/24 h, identifiant unique | HTML partagé ; transformations des couleurs par certains clients toujours possibles |
 | Envoi du formulaire `/contact` via `/api/contact` | Resend, automatique | `CONTACT_NOTIFY_EMAIL`, contact@, réponse à l’auteur | Flag activé, contrôle d’origine, champ anti-spam, quotas SQL, fingerprint, lease et clé stable | HTML partagé pour les nouvelles demandes, texte brut historique conservé lors d’une reprise |
 | Dépôt ou mise à jour ZIP classique ou SDK, nouvelle révision URL | Resend, automatique | `GAME_SUBMISSION_NOTIFY_EMAIL`, developers@, réponse au contact développeur | Triggers de soumission et de révision, file unique par soumission, envoi après réponse ou par maintenance. Flag activé, lease, reprise bornée et contenu enregistré | HTML partagé avec lien vers la revue |
 | Signalement de joueur/profil ou de jeu via `/api/reports` | Resend, automatique | Alerte à `CONTACT_NOTIFY_EMAIL`, sans Reply-To | Modération et maintenance activées dans Wrangler, vérifications et quotas selon le parcours, file SQL par dossier et version | HTML partagé avec lien administratif |
