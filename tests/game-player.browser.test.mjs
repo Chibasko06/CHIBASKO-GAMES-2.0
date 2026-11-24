@@ -81,7 +81,7 @@ for(const kind of ['legacy','artifact'])for(const width of [390,1366])test('cons
   assert.equal(await x.page.getByRole('region',{name:'Jeu Chibasko Games',exact:true}).getByRole('complementary').count(),0)
   if(kind==='legacy')await x.page.getByRole('button',{name:'Jouer',exact:true}).click();else await startLocal(x.page)
   await x.page.locator('iframe').waitFor();const source=await x.page.locator('iframe').getAttribute('src')
-  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
+  await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
   assert.equal(await x.page.evaluate(()=>document.fullscreenElement.contains(document.querySelector('[aria-label="Conseil pour le confort de jeu"]'))),false)
   await x.page.evaluate(()=>document.exitFullscreen())
   await banner.getByRole('button',{name:'Masquer ce conseil pendant 30 jours'}).click();assert.equal(await banner.count(),0)
@@ -129,7 +129,7 @@ for(const sameOrigin of [false,true])test(`isolation navigateur legacy ${sameOri
   const download=x.page.waitForEvent('download',{timeout:400}).catch(()=>null)
   await frame.locator('#download').click();assert.equal(await download,null)
   await frame.locator('#fullscreen').click();await frame.locator('body[data-fullscreen="blocked"]').waitFor()
-  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click()
+  await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click()
   await x.page.waitForFunction(()=>document.fullscreenElement?.matches('[aria-label="Jeu Chibasko Games"]'))
   await x.page.evaluate(()=>document.exitFullscreen())
   await x.page.waitForFunction(()=>!document.fullscreenElement)
@@ -178,14 +178,13 @@ test('legacy launcher has exactly one Play action and returns to the identical l
   await x.page.getByRole('button',{name:'Jouer',exact:true}).click();await x.page.locator('iframe').waitFor()
  }finally{await x.context.close()}
 })
-test('artifact requires explicit local click and keeps three declared modes on the same launcher',async()=>{
+test('artifact requires explicit local click and does not advertise unavailable modes',async()=>{
  const x=await setup()
  try{
   await assertIdle(x);const initial=await launcher(x.page).innerHTML()
-  assert.equal(await launcher(x.page).getByRole('button').count(),3)
+  assert.equal(await launcher(x.page).getByRole('button').count(),1)
   for(const name of [/^Jouer en ligne/,/^Partie privée/]){
-   const button=x.page.getByRole('button',{name});assert.equal(await button.isDisabled(),true)
-   await button.evaluate(node=>node.click())
+   assert.equal(await x.page.getByRole('button',{name}).count(),0)
   }
   assert.ok(!x.calls.some(call=>call.path.startsWith('/api/')))
   await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor();await oneDock(x.page)
@@ -202,7 +201,7 @@ test('multiple available modes launch inside the same fullscreen player and retu
   await assertIdle(x);const initial=await launcher(x.page).innerHTML()
   assert.equal(await launcher(x.page).getByRole('button',{disabled:false}).count(),3)
   if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({fullPage:true,path:'.distribution/game-launcher.png'})
-  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
+  await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
   await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()
   await oneDock(x.page);await assertPlayerLayout(x.page,true)
   assert.equal(x.page.url(),'https://portal.test/games/fixture')
@@ -254,7 +253,7 @@ for(const viewport of [{width:1366,height:768},{width:1920,height:1080},{width:3
   else{await x.page.getByRole('button',{name:'Jouer',exact:true}).click();await x.page.frameLocator('iframe').getByText('Legacy HTML5 fixture').waitFor()}
   await oneDock(x.page);await assertPlayerLayout(x.page)
   assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),boxSize(initialSurface))
-  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
+  await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement)
   await assertPlayerLayout(x.page,true)
   if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({path:'.distribution/'+kind+'-fullscreen-'+viewport.width+'x'+viewport.height+'.png'})
   await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForFunction(()=>!document.fullscreenElement)
@@ -290,7 +289,7 @@ test('SDK receives real viewport dimensions and native resize events',async()=>{
  const canvas=await frame.locator('canvas').boundingBox();assert.ok(Math.abs(canvas.width-box.width)<=1 && Math.abs(canvas.height-box.height)<=1)
  }
  assert.ok(await frame.evaluate(()=>window.resizeCount)>0)
- await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForTimeout(100);await assertPlayerLayout(x.page,true)
+ await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.waitForTimeout(100);await assertPlayerLayout(x.page,true)
  await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForTimeout(100);await assertPlayerLayout(x.page)
  }finally{await x.context.close()}
 })
@@ -306,7 +305,7 @@ test('fixed SDK compatibility viewport is uniformly contained through resize and
  const canvas=await x.page.frames()[1].locator('canvas').evaluate(element=>({width:element.getBoundingClientRect().width,height:element.getBoundingClientRect().height}));assert.deepEqual(canvas,fixedViewport)
  assert.deepEqual(await x.page.frames()[1].evaluate(()=>({width:innerWidth,height:innerHeight})),fixedViewport)
  }
- await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForTimeout(100);await assertPlayerLayout(x.page,true)
+ await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.waitForTimeout(100);await assertPlayerLayout(x.page,true)
  await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForTimeout(100);await assertPlayerLayout(x.page)
  }finally{await x.context.close()}
 })
@@ -399,7 +398,7 @@ for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:7
  if(process.env.RUNTIME_SCREENSHOTS==='1')await x.page.screenshot({fullPage:true,path:'.distribution/recommendations-'+kind+'-'+viewport.width+'.png'})
  if(kind==='artifact'){await startLocal(x.page);await x.page.locator('[data-phase="running"]').waitFor()}else{await x.page.getByRole('button',{name:'Jouer',exact:true}).click();await x.page.locator('iframe').waitFor()}
  assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),original)
- await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement);await assertPlayerLayout(x.page,true)
+ await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement);await assertPlayerLayout(x.page,true)
  await x.page.evaluate(()=>document.exitFullscreen());await x.page.waitForFunction(()=>!document.fullscreenElement)
  assert.deepEqual(boxSize(await x.page.locator('[data-player-surface]').boundingBox()),original)
  await x.page.getByRole('button',{name:'Quitter le jeu',exact:true}).click();await launcher(x.page).waitFor()
@@ -420,7 +419,7 @@ test('SDK audio dock negotiates support, persists mute/volume over reload and fu
   await frame().waitForFunction(()=>window.fixture.audio?.volume===1)
   await x.page.getByRole('button',{name:'Couper le son',exact:true}).click();await frame().waitForFunction(()=>window.fixture.audio?.muted===true)
   await x.page.evaluate(()=>gamePlayerFixture.audio({muted:true,volume:.25}));await frame().waitForFunction(()=>window.fixture.audio?.volume===.25)
-  await x.page.getByRole('button',{name:'Plein écran',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement);assert.equal(await frame().evaluate(()=>fixture.audio.muted),true)
+  await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.waitForFunction(()=>!!document.fullscreenElement);assert.equal(await frame().evaluate(()=>fixture.audio.muted),true)
   await x.page.evaluate(()=>document.exitFullscreen());await x.page.getByRole('button',{name:'Réactiver le son',exact:true}).click();await frame().waitForFunction(()=>window.fixture.audio?.muted===false)
   const options=await x.page.evaluate(()=>gamePlayerFixture.last);await x.page.reload();await x.page.waitForFunction(()=>!!window.gamePlayerFixture);await x.page.evaluate(options=>gamePlayerFixture.render(options),options)
   await startLocal(x.page);await x.page.getByRole('button',{name:'Couper le son',exact:true}).waitFor();await frame().waitForFunction(()=>window.fixture.audio?.volume===.25&&window.fixture.audio?.muted===false)

@@ -48,7 +48,16 @@
 
 .shell:fullscreen, .shell[data-presentation="legacy"]:fullscreen { height:100dvh; grid-template-rows:minmax(0,1fr); }
 .shell:fullscreen > .surface { height:100dvh; aspect-ratio:auto; }
-.shell:fullscreen > .dock { display:none; }
+.shell:fullscreen > .dock { display:contents; }
+/* Le pseudo-état natif restitue la géométrie avant même la notification JavaScript de sortie. */
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) {width:100%;max-width:none;height:100vh;height:100dvh;margin:0;border:0;border-radius:0;grid-template-rows:minmax(0,1fr)}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) > .surface {height:100vh;height:100dvh;aspect-ratio:auto}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) > .dock,.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) .actions {display:contents}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) .dock > :not(.actions),.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) .actions > :not([data-player-expand]) {display:none}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) [data-player-expand] {position:absolute;z-index:5;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));background:#09090be6;border-color:#475569;color:#ecfeff}
+.shell[data-expansion="immersive"] {position:fixed;inset:auto;left:var(--player-view-left,0px);top:var(--player-view-top,0px);width:var(--player-view-width,100vw);height:var(--player-view-height,100dvh);max-width:none;margin:0;border:0;border-radius:0;z-index:2147483647;grid-template-rows:minmax(0,1fr) auto;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:#09090b;overscroll-behavior:none}
+.shell[data-expansion="immersive"] > .surface {height:auto;aspect-ratio:auto}
+.expansionStatus {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
 @media(max-width:600px) and (min-height:501px){
  .launcher{padding:14px}.launcherContent{gap:12px}.cover{width:min(100%,160px);border-radius:12px}

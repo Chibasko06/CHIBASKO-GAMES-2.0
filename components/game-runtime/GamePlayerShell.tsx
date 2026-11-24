@@ -2,26 +2,28 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react'
 import styles from './GameRuntime.module.css'
 import PlayerIcon from './PlayerIcon'
+import {createPlayerExpansion,type PlayerExpansionMode} from '@/lib/game-runtime/playerExpansion'
 
 export type PlayerAudioControl={muted:boolean;onToggle:()=>void;disabled?:boolean}
 type Props={presentation?:'legacy'|'sdk';children:ReactNode;onLeave:()=>void;socialControls?:ReactNode;audioControl?:PlayerAudioControl;phase?:string;canLeave?:boolean}
 export default function GamePlayerShell({children,onLeave,socialControls,audioControl,phase,canLeave=true,presentation='sdk'}:Props){
   const shell=useRef<HTMLElement>(null)
-  const [isFullscreen,setIsFullscreen]=useState(false),[fullscreenError,setFullscreenError]=useState(false)
+  const expansion=useRef<ReturnType<typeof createPlayerExpansion>|null>(null)
+  const [mode,setMode]=useState<PlayerExpansionMode>('inline'),[fullscreenError,setFullscreenError]=useState(false)
   useEffect(()=>{
-    const document=shell.current!.ownerDocument
-    const sync=()=>setIsFullscreen(document.fullscreenElement===shell.current)
-    document.addEventListener('fullscreenchange',sync)
-    return()=>document.removeEventListener('fullscreenchange',sync)
+    const control=createPlayerExpansion(shell.current!,setMode,()=>setFullscreenError(true));expansion.current=control
+    return()=>{control.dispose();expansion.current=null}
   },[])
-  async function fullscreen(){const element=shell.current;if(!element)return;try{if(element.ownerDocument.fullscreenElement===element)await element.ownerDocument.exitFullscreen();else await element.requestFullscreen();setFullscreenError(false)}catch{setFullscreenError(true)}}
-  const fullscreenLabel=isFullscreen?'Quitter le plein écran':'Plein écran'
+  function fullscreen(){setFullscreenError(false);void expansion.current?.toggle()}
+  async function leave(){await expansion.current?.exit();onLeave()}
+  const fullscreenLabel=mode==='native'?'Quitter le plein écran':mode==='immersive'?'Réduire le jeu':'Agrandir le jeu'
   const audioPending=['launcher','resolving','launching','loading'].includes(phase??'')
   const audioLabel=audioControl && !audioControl.disabled?(audioControl.muted?'Réactiver le son':'Couper le son'):audioPending?'Disponible pendant la partie':'Ce jeu ne prend pas en charge le contrôle audio'
-  return <section ref={shell} className={styles.shell} aria-label="Jeu Chibasko Games" data-phase={phase} data-presentation={presentation}>
+  return <section ref={shell} className={styles.shell} aria-label="Jeu Chibasko Games" data-phase={phase} data-presentation={presentation} data-expansion={mode}>
     <div className={styles.surface} data-player-surface>
       {children}
-      {fullscreenError?<p className={styles.notice} role="status">Le plein écran n’est pas disponible. Tu peux continuer ici.</p>:null}
+      {fullscreenError?<p className={styles.notice} role="status">Le navigateur n’a pas confirmé le changement d’affichage. Utilisez son geste de sortie si nécessaire.</p>:null}
+      {mode==='immersive'&&<p className={styles.expansionStatus} role="status">Mode immersif web. Les barres du navigateur peuvent rester visibles.</p>}
     </div>
     <div className={styles.dock} data-player-dock role="group" aria-label="Commandes du lecteur">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -34,8 +36,8 @@ export default function GamePlayerShell({children,onLeave,socialControls,audioCo
           <button className={styles.iconButton} type="button" aria-label={audioLabel} title={audioLabel} aria-pressed={audioControl?.muted} disabled={!audioControl || audioControl.disabled} onClick={audioControl?.onToggle}><PlayerIcon name={!audioControl || audioControl.muted?'muted':'volume'}/></button>
           <span className={styles.tooltip} aria-hidden="true">{audioLabel}</span>
         </span>
-        <button className={styles.iconButton} type="button" aria-label={fullscreenLabel} title={fullscreenLabel} aria-pressed={isFullscreen} onClick={fullscreen} disabled={phase==='closed'}><PlayerIcon name={isFullscreen?'restore':'fullscreen'}/><span className={styles.tooltip} aria-hidden="true">{fullscreenLabel}</span></button>
-        <button className={styles.iconButton} type="button" aria-label="Quitter le jeu" title="Quitter le jeu" disabled={!canLeave} onClick={onLeave}><PlayerIcon name="close"/><span className={styles.tooltip} aria-hidden="true">Quitter le jeu</span></button>
+        <button data-player-expand className={styles.iconButton} type="button" aria-label={fullscreenLabel} title={fullscreenLabel} aria-pressed={mode!=='inline'} onClick={fullscreen} disabled={phase==='closed'&&mode==='inline'}><PlayerIcon name={mode==='inline'?'fullscreen':'restore'}/><span className={styles.tooltip} aria-hidden="true">{fullscreenLabel}</span></button>
+        <button className={styles.iconButton} type="button" aria-label="Quitter le jeu" title="Quitter le jeu" disabled={!canLeave} onClick={()=>void leave()}><PlayerIcon name="close"/><span className={styles.tooltip} aria-hidden="true">Quitter le jeu</span></button>
       </div>
     </div>
 

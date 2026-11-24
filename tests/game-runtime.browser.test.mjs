@@ -122,6 +122,21 @@ test('Navigateur : origine stable et SDK réel conservent le protocole existant'
  try{const frame=await x.running();await frame.waitForFunction(()=>document.body.dataset.started==='yes');assert.equal((await x.page.evaluate(()=>runtimeFixture.observations))[0].mode,'sdk')}finally{await x.context.close()}
 })
 
+test('Navigateur : le SDK réel conserve sa session et son iframe pendant les immersions web',async()=>{
+ const x=await setup('solo','published','real-sdk',{width:390,height:844},false,'chibaskogames-play.fr','sdk',true)
+ try{
+  const frame=await x.running();await frame.waitForFunction(()=>document.body.dataset.started==='yes')
+  const marker=await frame.evaluate(()=>{window.expansionMarker=crypto.randomUUID();return window.expansionMarker})
+  const sessions=[...x.h.sessions.keys()],launches=x.requests.filter(r=>r.path==='/api/game-launches'&&r.method==='POST').length
+  await x.page.evaluate(()=>{window.expansionFrame=document.querySelector('iframe');Object.defineProperty(Element.prototype,'requestFullscreen',{configurable:true,value:undefined});for(const name of ['webkitRequestFullscreen','webkitRequestFullScreen'])Object.defineProperty(HTMLElement.prototype,name,{configurable:true,value:undefined})})
+  for(let i=0;i<3;i++){
+   await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click();await x.page.locator('[data-expansion=immersive]').waitFor();await x.page.setViewportSize(i%2?{width:390,height:844}:{width:844,height:390});await x.page.getByRole('button',{name:'Réduire le jeu',exact:true}).click();await x.page.locator('[data-expansion=inline]').waitFor()
+   assert.equal(await frame.evaluate(()=>window.expansionMarker),marker);assert.equal(await x.page.evaluate(()=>window.expansionFrame===document.querySelector('iframe')),true)
+  }
+  assert.deepEqual([...x.h.sessions.keys()],sessions);assert.equal(x.h.released.length,0);assert.equal(x.requests.filter(r=>r.path==='/api/game-launches'&&r.method==='POST').length,launches);assert.equal((await x.page.evaluate(()=>runtimeFixture.observations)).length,1)
+ }finally{await x.context.close()}
+})
+
 test('Navigateur : refus du cookie de livraison sans accès de secours au jeu',async()=>{
  const x=await setup('solo','published','normal',{width:390,height:844},false,'chibaskogames-play.fr','classic',true,true)
  try{await x.page.locator('[data-phase="failed"]').waitFor();await x.page.getByText(/L’accès au jeu n’a pas pu être établi/).waitFor();assert.equal(await x.page.locator('iframe').count(),0);assert.equal((await x.page.evaluate(()=>runtimeFixture.observations)).length,0)}finally{await x.context.close()}
@@ -281,13 +296,13 @@ test('browser fullscreen is host-controlled and hides the dock',async()=>{
     await frame.evaluate(()=>{const button=document.createElement('button');button.textContent='Fullscreen fixture';button.onclick=()=>{document.body.requestFullscreen().then(()=>window.childFullscreen='allowed',()=>window.childFullscreen='denied')};document.body.append(button)})
     await x.page.frameLocator('iframe').getByRole('button',{name:'Fullscreen fixture'}).click()
     await frame.waitForFunction(()=>window.childFullscreen==='denied')
-    await x.page.getByRole('button',{name:'Plein écran',exact:true}).click()
+    await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).click()
     await x.page.waitForFunction(()=>document.fullscreenElement?.getAttribute('aria-label')==='Jeu Chibasko Games')
     assert.equal(await x.page.getByRole('button',{name:'Quitter le jeu'}).isVisible(),false)
     await assertPlayerLayout(x.page,true)
     await x.page.evaluate(()=>document.exitFullscreen())
     await x.page.waitForFunction(()=>document.fullscreenElement===null)
-    await x.page.getByRole('button',{name:'Plein écran',exact:true}).waitFor()
+    await x.page.getByRole('button',{name:'Agrandir le jeu',exact:true}).waitFor()
   }finally{await x.context.close()}
 })
 test('attached dock retains accessible labels, keyboard focus, tooltips and exit',async()=>{
@@ -300,7 +315,7 @@ test('attached dock retains accessible labels, keyboard focus, tooltips and exit
     assert.equal(await audio.locator('span').isVisible(),true)
     assert.equal(await audio.getByRole('button').isDisabled(),true)
     await x.page.keyboard.press('Tab')
-    const fullscreen=x.page.getByRole('button',{name:'Plein écran',exact:true})
+    const fullscreen=x.page.getByRole('button',{name:'Agrandir le jeu',exact:true})
     assert.equal(await fullscreen.evaluate(node=>document.activeElement===node),true)
     assert.equal(await fullscreen.locator('span').isVisible(),true)
     await x.page.keyboard.press('Tab')

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:player-expansion": "node --test tests/player-expansion.browser.test.mjs",
     "diagnose:email": "node scripts/email-diagnostic.mjs",
     "test:email-diagnostic": "node --import ./tests/reliability-register.mjs --test tests/email-diagnostic.test.mjs",
     "test:developer-email": "node --import ./tests/register.mjs --test tests/developer-professional-email.test.mjs",
