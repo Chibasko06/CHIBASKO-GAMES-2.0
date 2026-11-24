@@ -6,6 +6,7 @@ const statuses: Record<string,number> = {delivery_version_conflict:409,integrati
   external_review_conflict:409,external_catalogue_conflict:409,revision_not_found:404,
   version_not_found:404,version_not_previewable:409,preview_forbidden:403,preview_expired:403,preview_replayed:409,unsupported_execution:400,
   launch_expired:403,invalid_launch_request:400,online_session_required:409,online_session_unavailable:409,invalid_online_roster:400,invalid_deployment:409,ticket_replayed:409,invalid_credential:401}
+Object.assign(statuses,{developer_email_unverified:409,email_revision_changed:409,email_delivery_in_progress:409,verification_invalid:400,verification_expired:410,verification_locked:429,verification_unavailable:503})
 /** Backend-only capability. Never returned to a game/client. */
 export type RpcDiagnostic = {
   event: 'distribution_rpc_failed'; requestId: string; operation: string; durationMs: number

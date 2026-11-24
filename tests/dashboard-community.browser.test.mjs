@@ -2,9 +2,8 @@ import test,{before,after} from 'node:test'
 import assert from 'node:assert/strict'
 import {build} from 'esbuild'
 import {chromium} from '@playwright/test'
-import {readFileSync} from 'node:fs'
+import {readFileSync,mkdirSync} from 'node:fs'
 import {resolve,join} from 'node:path'
-import {tmpdir} from 'node:os'
 import postcss from 'postcss'
 import tailwind from '@tailwindcss/postcss'
 
@@ -41,6 +40,7 @@ async function fixture(query='',viewport={width:1366,height:768},accountEnabled=
   const url=new URL(route.request().url());assert.equal(url.origin,'https://portal.test','Aucun accès distant dans les fixtures')
   if(url.pathname==='/host.js')return route.fulfill({contentType:'text/javascript',body:Buffer.from(script)})
   if(url.pathname==='/style.css')return route.fulfill({contentType:'text/css',body:css})
+  if(url.pathname==='/chibaskogames-logo-small.webp')return route.fulfill({contentType:'image/webp',body:readFileSync('public/chibaskogames-logo-small.webp')})
   if(url.pathname==='/thumbnail.svg')return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="80" height="45"><rect width="80" height="45" fill="#164e63"/></svg>'})
   if(url.pathname==='/api/social')return route.fulfill({json:{items:[],nextCursor:null}})
   if(url.pathname==='/api/social/notifications')return route.fulfill({json:{data:{avatarUrl:null,isAdmin:false,unreadCount:0}}})
@@ -62,6 +62,7 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
    assert.equal(await x.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
    assert.equal(await x.page.locator('h1').count(),1)
    if(kind==='dashboard'){
+    const developerLink=x.page.getByRole('link',{name:'Ouvrir mon Espace développeur',exact:true});assert.equal(await developerLink.getAttribute('href'),'/developer');assert.equal(await x.page.locator('section[aria-labelledby="my-profile-title"]').getByRole('link',{name:'Ouvrir mon Espace développeur',exact:true}).count(),1)
     assert.equal(await x.page.getByText('private@example.test',{exact:true}).count(),1)
     assert.equal(await x.page.getByRole('heading',{name:'Mon profil',exact:true}).count(),1)
     assert.equal(await x.page.getByRole('link',{name:/Voir mon profil public/}).getAttribute('href'),'/players/@camille')
@@ -74,7 +75,7 @@ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,
     assert.equal(await x.page.locator('main li').count(),0)
     assert.doesNotMatch(await x.page.locator('main').textContent(),/private@example|fixture-token/)
    }
-   if(viewport.width===390||viewport.width===1366)await x.page.screenshot({path:join(tmpdir(),`chibasko-${kind}-${viewport.width}.png`),fullPage:true})
+   if(viewport.width===390||viewport.width===1366){const output=join(process.cwd(),'.distribution/developer-coherence');mkdirSync(output,{recursive:true});await x.page.screenshot({path:join(output,`${kind}-${viewport.width}.png`),fullPage:true})}
   }finally{await x.context.close()}}
  })
 }

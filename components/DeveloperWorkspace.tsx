@@ -4,7 +4,7 @@ import Link from 'next/link'
 import {useRouter} from 'next/navigation'
 import {useAuth} from '@/components/AuthProvider'
 import AuthRequired from './AuthRequired'
-import {developerJson} from '@/lib/game-distribution/browser-upload'
+import {developerJson,SubmissionError} from '@/lib/game-distribution/browser-upload'
 import {buildStatus,externalStatus,decisionLabels,projectStatus,type Build,type Revision,type DecisionEvent,type WorkspaceData} from '@/lib/developerPresentation'
 import ExternalGamePlayer from './game-runtime/ExternalGamePlayer'
 import {Overview,Library,Statistics} from './developer/DeveloperSections'
@@ -33,7 +33,7 @@ function Workspace({token,gameId,view}:{token:string;gameId?:string;view:string}
   if(locked.current||!window.confirm('Préparer un nouveau build ? Les versions et décisions précédentes seront conservées.'))return
   locked.current=true;setBusy(true)
   try{const {data}=await developerJson('/api/developer/drafts',token,{method:'POST',body:JSON.stringify({action:'prepare-correction',gameId,uploadId:build.id})});router.push(data.mode==='update'?'/publier-un-jeu?mode=update&game='+encodeURIComponent(data.gameId):'/publier-un-jeu?draft='+encodeURIComponent(data.gameId))}
-  catch{setError('La correction n’a pas pu être préparée. Rechargez le dossier avant de réessayer.')}finally{locked.current=false;setBusy(false)}
+  catch(cause){setError(cause instanceof SubmissionError&&cause.code==='developer_email_unverified'?'Vérifiez votre adresse dans Mon profil développeur avant de préparer cette correction.':'La correction n’a pas pu être préparée. Rechargez le dossier avant de réessayer.')}finally{locked.current=false;setBusy(false)}
  }
  function changePage(value:number){setData(null);setOffset(value)}
  const project=data?.games[0],title=gameId?project?.title??'Gestion du jeu':view==='statistics'?'Statistiques':view==='games'?'Mes jeux':'Vue d’ensemble'

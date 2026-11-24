@@ -5,6 +5,8 @@
   "scripts": {
     "diagnose:email": "node scripts/email-diagnostic.mjs",
     "test:email-diagnostic": "node --import ./tests/reliability-register.mjs --test tests/email-diagnostic.test.mjs",
+    "test:developer-email": "node --import ./tests/register.mjs --test tests/developer-professional-email.test.mjs",
+    "test:developer-email-db": "node tests/production-schema-reference.mjs --focus-professional-email",
     "test:developer-workspace": "node --import ./tests/register.mjs --test tests/developer-workspace.test.mjs && node --import ./tests/product-register.mjs --test tests/developer-workspace-ui.test.mjs",
     "test:developer-ux": "node --import ./tests/product-register.mjs --test tests/developer-presentation.test.mjs && node --test tests/developer-workspace.browser.test.mjs",
     "test:developer-workspace-db": "node tests/production-schema-reference.mjs --focus-developer-workspace",

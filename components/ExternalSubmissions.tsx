@@ -60,7 +60,7 @@ function RevisionForm({row,token,onSubmitted}:{row:Revision;token:string;onSubmi
         body:JSON.stringify({gameId:row.gameId,revisionId:request.current??=crypto.randomUUID(),url,ownership:true})})
       setUrl('');request.current=null;onSubmitted()
     }catch(cause){
-      setError(cause instanceof SubmissionError&&cause.code==='invalid_external_game_url'
+      setError(cause instanceof SubmissionError&&cause.code==='developer_email_unverified'?'Vérifiez votre adresse dans Mon profil développeur avant de proposer une nouvelle URL.':cause instanceof SubmissionError&&cause.code==='invalid_external_game_url'
         ?'Saisissez une URL HTTPS publique valide.':'Impossible de soumettre cette révision. Actualisez le dossier avant de réessayer.')
     }finally{locked.current=false;setBusy(false)}
   }

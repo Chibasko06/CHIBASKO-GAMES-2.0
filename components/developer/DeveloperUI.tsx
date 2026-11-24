@@ -1,7 +1,7 @@
 'use client'
 import type {ReactNode} from 'react'
 import Link from 'next/link'
-import {useAuth} from '@/components/AuthProvider'
+import ProfessionalEmailNotice from './ProfessionalEmailNotice'
 import {developerDate,developerNumber,type Tone} from '@/lib/developerPresentation'
 import styles from './developer.module.css'
 
@@ -12,5 +12,5 @@ export function DevDate({value,withTime=false}:{value:string|null|undefined;with
 export function PageHeader({eyebrow,title,description,action=true}:{eyebrow?:string;title:string;description:string;action?:boolean}){return <header className={styles.header}><div>{eyebrow&&<p className={styles.eyebrow}>{eyebrow}</p>}<h1>{title}</h1><p className={styles.intro}>{description}</p></div>{action&&<Link className={styles.button} href="/publier-un-jeu"><DevIcon name="plus"/>Soumettre un jeu</Link>}</header>}
 export function Empty({title,children,icon='game'}:{title:string;children:ReactNode;icon?:string}){return <div className={styles.empty}><DevIcon name={icon}/><h2>{title}</h2><p>{children}</p></div>}
 export function Metrics({items}:{items:{label:string;value:unknown;hint:string;icon:string}[]}){return <dl className={styles.metrics}>{items.map(item=><div key={item.label} className={styles.metric}><dt><DevIcon name={item.icon}/>{item.label}</dt><dd>{developerNumber(item.value)}</dd><p>{item.hint}</p></div>)}</dl>}
-export function EmailNotice(){const {session}=useAuth();if(!session)return null;const user=session.user;return !user.email_confirmed_at?<aside className={styles.notice} data-tone="warning" aria-label="Confirmation de votre adresse e-mail"><strong>Votre adresse e-mail n’est pas confirmée.</strong>Aucune notification développeur ne peut être adressée à ce compte tant que l’adresse n’est pas confirmée. Ouvrez le lien envoyé par Supabase lors de votre inscription. Le suivi de vos jeux reste accessible ici. <a href="mailto:developers@chibaskogames.fr">Besoin d’aide ?</a></aside>:null}
+export function EmailNotice(){return <ProfessionalEmailNotice/>}
 export function Pagination({offset,size,hasNext,onChange}:{offset:number;size:number;hasNext:boolean;onChange:(offset:number)=>void}){return <nav className={styles.pagination} aria-label="Pagination"><button className={styles.secondary} disabled={!offset} onClick={()=>onChange(Math.max(0,offset-size))}>Précédent</button><span>Page {Math.floor(offset/size)+1}</span><button className={styles.secondary} disabled={!hasNext} onClick={()=>onChange(offset+size)}>Suivant</button></nav>}

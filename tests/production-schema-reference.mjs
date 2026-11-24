@@ -55,6 +55,14 @@ try {
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261029000200_profile_privacy.sql')]),error=>/profile_public_projection_required/.test(error.stderr));
  assert.deepEqual(await snapshot(),base,'Une fermeture prématurée ne modifie aucun privilège');
  for(const name of migrations) {
+  let professionalHistory
+  if(name==='20261124000100_developer_professional_email.sql'){
+   await query("insert into auth.users(id,email,email_confirmed_at) values('eb240000-0000-4000-8000-000000000001','legacy-auth@example.test',now());insert into developer_contacts(user_id,first_name,last_name,contact_email,public_name) values('eb240000-0000-4000-8000-000000000001','Historical','Fixture','legacy-professional@example.test','Unchanged studio');insert into game_submissions(id,name_or_studio,email,game_title,demo_url,game_type,description) values('eb240000-0000-4000-8000-000000000002','Historical','legacy-professional@example.test','Historical game','https://example.test','web','Fixture');insert into game_submission_notifications(submission_id,event_key,contact_snapshot,message,sent_at,attempts) values('eb240000-0000-4000-8000-000000000002','internal','{}','{\"text\":\"internal frozen\"}',now(),1);insert into game_submission_notifications(id,submission_id,event_key,contact_snapshot,notification,message,lease_token,lease_until) values('eb240000-0000-4000-8000-000000000003','eb240000-0000-4000-8000-000000000002','review:historical','{}','{\"event\":\"correction\",\"recipient\":\"legacy-auth@example.test\"}','{\"text\":\"historical confidential frozen\"}',gen_random_uuid(),now()+interval '2 minutes')")
+   professionalHistory=(await query("select md5(jsonb_agg(jsonb_build_array(id,submission_id,event_key,message,sent_at,attempts) order by id)::text) from game_submission_notifications where submission_id='eb240000-0000-4000-8000-000000000002'")).stdout.trim()
+   await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations',name)]),error=>/developer_email_lease_active/.test(error.stderr))
+   assert.equal((await query("select not exists(select 1 from information_schema.columns where table_schema='public' and table_name='developer_contacts' and column_name='email_revision')")).stdout.trim(),'t','Une migration refusée est intégralement annulée')
+   await query("update game_submission_notifications set lease_token=null,lease_until=null where id='eb240000-0000-4000-8000-000000000003'")
+  }
   if(name==='20261123000200_developer_email_events.sql'){
    // Supabase ne donne pas de SELECT Auth au rôle applicatif, même avec BYPASSRLS.
    await query('revoke all on auth.users from public,anon,authenticated,service_role')
@@ -140,9 +148,29 @@ try {
   if(faqBefore!==null)assert.equal((await query("select md5(coalesce(string_agg((to_jsonb(f)-'sort_order')::text,',' order by id),'')) from faq_entries f")).stdout,faqBefore,'Les identifiants, dates, réponses et statuts sont préservés')
   if(googleBefore!==null)assert.equal((await query("select md5(coalesce(string_agg(to_jsonb(p)::text,',' order by id),'')) from profiles p")).stdout,googleBefore,'Aucun profil existant modifié à la migration')
   reference.migrations.push({name,sha256:sqlSha256(await readFile(file))})
+  if(name==='20261124000100_developer_professional_email.sql'){
+   assert.equal((await query("select md5(jsonb_agg(jsonb_build_array(id,submission_id,event_key,message,sent_at,attempts) order by id)::text) from game_submission_notifications where submission_id='eb240000-0000-4000-8000-000000000002'")).stdout.trim(),professionalHistory,'Les corps, identités et acquittements historiques sont préservés')
+   assert.equal((await query("select email_verified_at is null and contact_email='legacy-professional@example.test' and public_name='Unchanged studio' from developer_contacts where user_id='eb240000-0000-4000-8000-000000000001'")).stdout.trim(),'t','Aucun profil ancien implicitement confirmé ni réécrit')
+   assert.equal((await query("select delivery_hold='legacy_recipient' and last_error='attention_required' from game_submission_notifications where id='eb240000-0000-4000-8000-000000000003'")).stdout.trim(),'t','Ancien destinataire Auth non réémis')
+   await query("delete from game_submissions where id='eb240000-0000-4000-8000-000000000002'")
+  }
   const state=await snapshot();snapshots.push(state);reference.stages.push(state.objects)
  }
- if(process.argv.includes('--focus-developer-workspace')){
+ if(process.argv.includes('--focus-professional-email')){
+  assert.equal(compareSchema(await snapshot(),reference).status,'PASS')
+  const preflight=JSON.parse((await run('psql',[...args,'-qAt','-f',join(root,'docs/sql/developer-professional-email-preflight.sql')])).stdout.trim())
+  assert.equal(preflight.workspace,true);assert.equal(preflight.email_events,true);assert.equal(preflight.already_applied,true)
+  const postflight=JSON.parse((await run('psql',[...args,'-qAt','-f',join(root,'docs/sql/developer-professional-email-postflight.sql')])).stdout.trim())
+  assert.equal(postflight.challenge_rls,true)
+  for(const permission of postflight.permissions.filter(p=>p.role!=='service_role'))assert.deepEqual([permission.status_execute,permission.challenge_select,permission.proof_update],[false,false,false])
+  assert.equal(postflight.guards.length,4)
+  await run('psql',[...args,'-f',join(root,'tests/developer-professional-email-db.sql')])
+  const {professionalEmailPipeline}=await import('./developer-professional-email-pipeline-db.mjs')
+  await professionalEmailPipeline(async sql=>(await query(sql)).stdout.trim())
+  if(process.argv.includes('--write'))await writeFile(join(root,'contracts/production-schema.v1.json'),JSON.stringify(reference)+'\n')
+  else assert.deepEqual(JSON.parse(await readFile(join(root,'contracts/production-schema.v1.json'),'utf8')),reference)
+  console.log('Professional email SQL PASS: independent confirmation, quotas, retries, privacy, immutable events and submission guards.')
+ }else if(process.argv.includes('--focus-developer-workspace')){
   assert.equal(compareSchema(await snapshot(),reference).status,'PASS')
   for(const name of ['developer-workspace-db.sql','external-developer-submission-db.sql','external-game-publication-db.sql','maintenance-db.sql'])await run('psql',[...args,'-f',join(root,'tests',name)])
   const {developerEmailPipeline}=await import('./developer-email-pipeline-db.mjs')

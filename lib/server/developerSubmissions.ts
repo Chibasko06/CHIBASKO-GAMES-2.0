@@ -56,6 +56,7 @@ export async function developerSubmissionRequest(request:Request,operation:'game
       assertUploadId(body.gameId);assertUploadId(body.revisionId)
       let external
       try{external=externalGameUrl(body.url)}catch{throw new UploadError('invalid_external_game_url')}
+      await db.call('distribution_require_verified_email',{p_actor:actor})
       let coverUrl=null
       if(cover){
         await db.call('distribution_owned_draft',{p_actor:actor,p_game:body.gameId})
@@ -78,6 +79,7 @@ export async function developerSubmissionRequest(request:Request,operation:'game
     phase='request_validation'
     if(operation==='submissions' && request.headers.get('content-type')?.startsWith('multipart/form-data')){
       const {body,cover}=await readCatalogueForm(request),input=catalogueInput(body)
+      await db.call('distribution_require_verified_email',{p_actor:actor})
       phase='rpc'
       const context=await db.call<{submissionId:string|null}>('distribution_editorial_context',{p_actor:actor,p_upload:input.p_upload})
       if(context.submissionId)return submitted(context.submissionId)
@@ -100,6 +102,7 @@ export async function developerSubmissionRequest(request:Request,operation:'game
     }
     const input=catalogueInput(body)
     if(input.p_kind!=='update')throw new UploadError('invalid_request')
+    await db.call('distribution_require_verified_email',{p_actor:actor})
     phase='rpc'
     return submitted(await db.call<string>('distribution_submit_catalogue',{p_actor:actor,...input,p_cover:null}))
   }catch(error){const safe=error instanceof UploadError?error:error instanceof InputError?new UploadError('invalid_request',error.status):new UploadError('service_unavailable',503)

@@ -24,6 +24,7 @@ export default async function FaqPage() {
       </p>
 
       <div className="mt-10 space-y-4">
+        <section className="rounded-[24px] border border-cyan-900 bg-black/30 p-6" aria-labelledby="developer-faq-title"><h2 id="developer-faq-title" className="text-lg font-bold text-white">Publier et suivre mon jeu</h2><p className="mt-3 text-sm leading-7 text-zinc-300">Vous pouvez soumettre un ZIP HTML5 classique, un ZIP utilisant le SDK ou une URL HTTPS externe classique. Créez votre fiche dans l’Espace développeur et vérifiez votre adresse professionnelle avant un dépôt ou une correction. Chaque version reste soumise à une revue humaine.</p><p className="mt-3 text-sm leading-7 text-zinc-300">Les décisions, motifs de correction et versions se consultent dans « Mes soumissions ». L’envoi d’un e-mail n’est pas une preuve de publication ; le statut du dossier reste disponible même si une notification échoue.</p><div className="mt-3 flex flex-wrap gap-4 text-sm text-cyan-300"><Link href="/developer">Espace développeur</Link><Link href="/developer/profile">Mon profil développeur</Link><Link href="/developpeurs">Préparer une soumission</Link></div></section>
         {faqEntries.length === 0 ? (
           <section className="rounded-[24px] border border-zinc-800 bg-black/30 p-6">
             <h2 className="text-lg font-black uppercase text-white">FAQ en preparation</h2>

@@ -2,14 +2,16 @@ import type {UploadRepository} from './uploads/contracts'
 import type {DeveloperContact} from './developer-profile'
 import {withTimeout} from '../asyncOperation'
 import {submissionEmailMessage,type SubmissionEmailData} from '../emailMessages'
-export type NotificationEnvironment={GAME_DEVELOPER_NOTIFICATIONS_ENABLED?:string;GAME_SUBMISSION_NOTIFICATIONS_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;GAME_SUBMISSION_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string}
-type Job={id:string;lease:string;message:Record<string,unknown>|null;contact:DeveloperContact;title:string;version:string|null;kind:string;uploadId:string|null;externalRevisionId?:string|null;studio:string;notification?:SubmissionEmailData['notification']}
+import {decryptDeveloperEmail,type EncryptedEmail,type VerificationBinding} from './developer-email-code'
+export type NotificationEnvironment={DEVELOPER_EMAIL_CODE_SECRET?:string;DEVELOPER_EMAIL_VERIFICATION_ENABLED?:string;GAME_DEVELOPER_NOTIFICATIONS_ENABLED?:string;GAME_SUBMISSION_NOTIFICATIONS_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;GAME_SUBMISSION_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string}
+type Job={id:string;lease:string;message:Record<string,unknown>|null;contact:DeveloperContact;title:string;version:string|null;kind:string;uploadId:string|null;externalRevisionId?:string|null;studio:string;notification?:SubmissionEmailData['notification'];verification?:VerificationBinding}
 type Log={event:'submission_email_delivery';outcome:'sent'|'failed'|'attention_required'|'configuration_missing';phase:'configuration'|'claim'|'prepare'|'send'|'ack'}
-export async function deliverSubmissionNotifications(db:UploadRepository,env:NotificationEnvironment,options:{submissionId?:string;limit?:number;fetcher?:typeof fetch;log?:(entry:Log)=>void;operationMs?:number;signal?:AbortSignal}={}){
- if(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='0')return 0
+export async function deliverSubmissionNotifications(db:UploadRepository,env:NotificationEnvironment,options:{kind?:'verification';actorId?:string;submissionId?:string;limit?:number;fetcher?:typeof fetch;log?:(entry:Log)=>void;operationMs?:number;signal?:AbortSignal}={}){
+ const verification=options.kind==='verification'
+ if(verification?env.DEVELOPER_EMAIL_VERIFICATION_ENABLED!=='1':env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='0')return 0
  const log=(entry:Omit<Log,'event'>)=>{try{(options.log??(e=>console.info(JSON.stringify(e))))({event:'submission_email_delivery',...entry})}catch{/* Une panne de journalisation ne change pas la livraison. */}}
  const apiKey=env.RESEND_API_KEY?.trim(),from=env.RESEND_FROM_EMAIL?.trim(),to=env.GAME_SUBMISSION_NOTIFY_EMAIL?.trim()
- if(!apiKey||!from||/[\r\n]/.test(from)||!to||!/^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(to)){log({phase:'configuration',outcome:'configuration_missing'});return 0}
+ if(!apiKey||!from||/[\r\n]/.test(from)||(verification?!(env.DEVELOPER_EMAIL_CODE_SECRET&&env.DEVELOPER_EMAIL_CODE_SECRET.length>=32):!to||!/^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(to))){log({phase:'configuration',outcome:'configuration_missing'});return 0}
  if(options.limit!==undefined&&(!Number.isSafeInteger(options.limit)||options.limit<1))throw Error('invalid_notification_limit')
  const limit=Math.min(5,options.limit??1),operationMs=options.operationMs??10_000;let sent=0
  if(!Number.isSafeInteger(operationMs)||operationMs<1||operationMs>10_000)throw Error('invalid_notification_timeout')
@@ -17,13 +19,14 @@ export async function deliverSubmissionNotifications(db:UploadRepository,env:Not
   let job:Job|null=null,phase:Log['phase']='claim'
   try{
    options.signal?.throwIfAborted()
-   job=await withTimeout(db.call<Job|null>(env.GAME_DEVELOPER_NOTIFICATIONS_ENABLED==='1'?'distribution_claim_submission_email_events':'distribution_claim_submission_email',{p_submission:options.submissionId??null}),15_000);if(!job)break
+   job=await withTimeout(db.call<Job|null>(verification?'distribution_claim_developer_verification':env.GAME_DEVELOPER_NOTIFICATIONS_ENABLED==='1'?'distribution_claim_submission_email_events':'distribution_claim_submission_email',verification?{p_actor:options.actorId??null}:{p_submission:options.submissionId??null}),15_000);if(!job)break
    phase='prepare'
    let message=job.message
-   if(!message){
-    message=submissionEmailMessage(job,from,to,env.NEXT_PUBLIC_SITE_URL)
+   if(!message&&!verification){
+    message=submissionEmailMessage(job,from,to!,env.NEXT_PUBLIC_SITE_URL)
    }
    message=await withTimeout(db.call<Record<string,unknown>>('distribution_prepare_submission_email',{p_id:job.id,p_lease:job.lease,p_message:message}),15_000)
+   if(verification){if(!job.verification)throw Error('invalid_verification_job');message=await decryptDeveloperEmail(env.DEVELOPER_EMAIL_CODE_SECRET,job.verification,message as unknown as EncryptedEmail)}
    phase='send';options.signal?.throwIfAborted()
    const result=await withTimeout((async()=>{
     const response=await (options.fetcher??fetch)('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json','Idempotency-Key':'submission-review/'+job!.id},body:JSON.stringify(message),signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(operationMs)]):AbortSignal.timeout(operationMs)})

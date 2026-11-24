@@ -250,7 +250,6 @@ export default function DashboardPage() {
   </div>
   const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-cyan-600 focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-40'
   return <div className="mx-auto w-full max-w-6xl space-y-6">
-    <Link className="inline-block rounded-xl border border-cyan-800 px-4 py-3 text-cyan-200" href="/developer">Espace développeur — projets, versions et soumissions</Link>
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-800 pb-6">
       <div>
         <h1 className="text-3xl font-bold text-white sm:text-4xl">Tableau de bord</h1>
@@ -299,6 +298,7 @@ export default function DashboardPage() {
             <button type="submit" className={button + ' border-cyan-500 bg-cyan-400 !text-black'} disabled={savingProfile || uploadingAvatar || !draftProfile.username.trim()}>{savingProfile ? 'Sauvegarde…' : 'Sauvegarder'}</button>
           </div>
         </form> : <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">{profile.bio || 'Ajoutez une biographie pour vous présenter à la communauté.'}</p>}
+        <div className="mt-5 rounded-xl border border-cyan-950 bg-cyan-950/20 p-4"><h3 className="font-semibold text-cyan-100">Vous créez des jeux ?</h3><p className="mt-1 text-sm text-zinc-400">Votre fiche professionnelle, vos projets et le suivi de leurs versions se trouvent dans l’Espace développeur.</p><Link className="mt-2 inline-flex min-h-11 items-center text-sm text-cyan-300 underline" href="/developer">Ouvrir mon Espace développeur</Link></div>
         {profileMessage && <p role="status" className="mt-4 break-words text-sm text-cyan-200">{profileMessage}</p>}
       </section>
       <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6" aria-labelledby="security-title">

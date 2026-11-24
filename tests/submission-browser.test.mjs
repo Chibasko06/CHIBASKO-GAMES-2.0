@@ -1,9 +1,11 @@
+import postcss from 'postcss'
+import tailwind from '@tailwindcss/postcss'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
 import {build} from 'esbuild'
 import {chromium} from '@playwright/test'
-import {readFile,readdir,mkdtemp} from 'node:fs/promises'
+import {readFile,mkdtemp,mkdir} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {ZipReader,Uint8ArrayReader,TextWriter,ZipWriter,Uint8ArrayWriter,TextReader} from '@zip.js/zip.js'
@@ -36,16 +38,11 @@ const bundle=await build({stdin:{contents:`import React from 'react';import{crea
  api.onLoad({filter:/.*/,namespace:'fixture'},args=>({loader:'jsx',resolveDir:process.cwd(),contents:args.path==='next/navigation'?`export function useSearchParams(){return new URLSearchParams(location.search)}`:args.path==='next/link'?`import React from 'react';export default function Link(props){return <a {...props}/>}`:`export function useAuth(){return {loading:false,session:new URLSearchParams(location.search).has('anonymous')?null:{user:{id:new URLSearchParams(location.search).has('other')?'other-user':'fixture-user'},access_token:new URLSearchParams(location.search).has('other')?'other-token':'fixture-token'}}}`}))
 }}]})
 let contact={firstName:'Fixture',lastName:'Developer',contactEmail:'contact@example.test',publicName:'Studio fixture',website:null,otherContact:null}
+let professionalVerified=true,professionalChallenge=null
 let publishedParts=0,submissions=[],requests=[],draft=null,registrations=0,failPart=false,uploadFailure=''
 let externalSubmission
 const freshDraft=title=>({gameId:game,title,metadata:{title,studio:'',releaseDate:'',description:'',categories:[],mobile:null,technology:''},version:'',revision:0,updatedAt:'2026-10-20T10:00:00Z',requestId:'57575757-5757-4757-8757-575757575757',file:null,hashes:{},submitted:false,coverUrl:null,state:'draft',upload:null})
-let styles=''
-if(process.env.SUBMISSION_VISUAL_CHECK==='1'){
- const directory=join(process.cwd(),'.next/static/css')
- const names=(await readdir(directory)).filter(name=>name.endsWith('.css'))
- styles=(await Promise.all(names.map(name=>readFile(join(directory,name),'utf8')))).join('\n')
- assert.ok(styles,'Build Next.js before the visual check')
-}
+const styles=(await postcss([tailwind()]).process(await readFile('app/globals.css','utf8'),{from:join(process.cwd(),'app/globals.css')})).css
 const json=(response,body)=>{response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify(body))}
 const storage=createServer((request,response)=>{if(request.method==='OPTIONS'){
  response.writeHead(204,{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'PUT','Access-Control-Allow-Headers':'content-type'});response.end();return
@@ -64,6 +61,7 @@ const server=createServer(async(request,response)=>{
    json(response,{data:{revisionId:upload,url:'https://play.example.com/game'}});return
  }
  if(url.pathname==='/api/developer/profile'&&request.method==='GET'){json(response,{data:request.headers.authorization==='Bearer fixture-token'?contact:null});return}
+ if(url.pathname==='/api/developer/profile/email'&&request.method==='GET'){json(response,{enabled:true,data:{verified:!!contact&&professionalVerified,profileRequired:!contact,revision:game,retryAfter:0,challenge:professionalChallenge}});return}
  if(url.pathname==='/api/developer/drafts'&&request.method==='GET'){
   const owned=request.headers.authorization==='Bearer fixture-token'?draft:null
   if(url.searchParams.has('gameId')&&(!owned||url.searchParams.get('gameId')!==game)){response.writeHead(404,{'Content-Type':'application/json'});response.end(JSON.stringify({error:{code:'draft_not_found'}}));return}
@@ -72,7 +70,12 @@ const server=createServer(async(request,response)=>{
  if(url.pathname==='/api/developer/games'&&request.method==='GET'){json(response,{data:[{id:game,title:'Managed fixture'}],maxArchiveBytes:524288000});return}
  const chunks=[];for await(const chunk of request)chunks.push(chunk)
  const bytes=Buffer.concat(chunks)
- if(url.pathname==='/api/developer/profile'&&request.method==='PUT'){contact=JSON.parse(bytes);json(response,{data:contact});return}
+ if(url.pathname==='/api/developer/profile'&&request.method==='PUT'){const next=JSON.parse(bytes);if(!contact||contact.contactEmail!==next.contactEmail){professionalVerified=false;professionalChallenge=null}contact=next;json(response,{data:contact});return}
+ if(url.pathname==='/api/developer/profile/email'&&request.method==='POST'){
+  const body=JSON.parse(bytes);if(body.action==='send')professionalChallenge={id:body.requestId,expiresAt:new Date(Date.now()+600000).toISOString(),attemptsRemaining:5,acceptedByProvider:true};
+  else{assert.equal(body.code,'000123');assert.equal(body.challengeId,professionalChallenge.id);professionalVerified=true;professionalChallenge=null}
+  json(response,{data:{verified:professionalVerified,profileRequired:false,revision:game,retryAfter:0,challenge:professionalChallenge}});return
+ }
  if(url.pathname==='/api/developer/drafts'){
   const body=JSON.parse(bytes)
   if(body.action==='save'){draft.metadata=body.metadata;draft.title=body.metadata.title;draft.version=body.version;draft.revision++}
@@ -162,19 +165,19 @@ try{
   }
   uploadFailure='';await page.close()
  })
- await test('Chrome: contact is required, saved once, restored and editable independently of drafts',async()=>{
-  contact=null;const page=await browser.newPage();await page.goto(origin)
-  await page.getByLabel('Prénom',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Créer le jeu privé et obtenir son gameId',exact:true}).isDisabled(),true)
-  await page.getByLabel('Prénom',{exact:true}).fill('Fixture');await page.getByLabel('Nom',{exact:true}).fill('Developer');await page.getByLabel('E-mail de contact',{exact:true}).fill('contact@example.test');await page.getByLabel('Nom public / studio',{exact:true}).fill('Studio fixture')
-  await page.getByRole('button',{name:'Enregistrer la fiche développeur'}).click();await page.getByText('Fiche développeur enregistrée.',{exact:true}).waitFor()
-  await page.reload();await page.waitForFunction(()=>document.querySelector('input[type=email]')?.value==='contact@example.test')
-  assert.equal(await page.getByLabel('Prénom',{exact:true}).inputValue(),'Fixture')
-  await page.getByLabel('Prénom',{exact:true}).fill('Edited');await page.getByRole('button',{name:'Enregistrer la fiche développeur'}).click();await page.getByText('Fiche développeur enregistrée.',{exact:true}).waitFor();assert.equal(contact.firstName,'Edited')
-  await page.close()
+ await test('Chrome: publishing shows only a profile summary and gates all submissions on verification',async()=>{
+  const page=await browser.newPage();contact=null;professionalVerified=false;await page.goto(origin);await page.getByRole('link',{name:'Créer mon profil développeur',exact:true}).waitFor();assert.equal(await page.getByLabel('Prénom',{exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Créer le jeu privé et obtenir son gameId',exact:true}).isDisabled(),true)
+  contact={firstName:'Fixture',lastName:'Developer',contactEmail:'contact@example.test',publicName:'Studio fixture',website:null,otherContact:null};await page.reload();await page.getByRole('link',{name:'Vérifier mon adresse professionnelle',exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:'Vérifier mon adresse professionnelle',exact:true}).getAttribute('href'),'/developer/profile');assert.equal(await page.getByRole('button',{name:'Recevoir un code de vérification',exact:true}).count(),0)
+  const output=join(process.cwd(),'.distribution/developer-coherence');await mkdir(output,{recursive:true})
+  for(const verified of [false,true])for(const width of [1440,390]){
+   professionalVerified=verified;await page.setViewportSize({width,height:1000});await page.reload();await page.getByText('Studio fixture · contact@example.test',{exact:true}).waitFor();assert.equal(await page.getByRole('group',{name:'Soumission du build',exact:true}).evaluate(e=>e.disabled),!verified);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+   await page.screenshot({path:join(output,'publication-'+width+'-'+(verified?'verified':'unverified')+'.png'),fullPage:true})
+  }
+  assert.equal(contact.firstName,'Fixture');await page.close()
  })
  await test('Chrome: anonymous sees no private identity; tabs isolate new metadata and managed update picker',async()=>{
    draft=null;const page=await browser.newPage();await page.goto(origin+'/?anonymous=1')
-   await page.getByText('Un compte est nécessaire',{exact:false}).waitFor()
+   await page.getByText('Un compte et une adresse professionnelle vérifiée sont nécessaires',{exact:false}).waitFor()
    assert.equal(await page.locator('input[type=file]').count(),0)
    assert.ok(!(await page.locator('body').innerText()).includes(game))
    await page.goto(origin)

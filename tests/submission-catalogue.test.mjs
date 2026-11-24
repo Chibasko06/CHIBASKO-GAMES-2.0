@@ -19,8 +19,8 @@ test('multipart authenticates, authorizes known upload, validates image and send
  const deps={authenticate:async()=>id,enabled:()=>true,cover:async()=>{uploaded++;return 'https://assets.chibaskogames.fr/game-thumbnails/'+id+'.png'},db:()=>({call:async(name,args)=>{calls.push({name,args});return name==='distribution_editorial_context'?{submissionId:null}:id}})}
  const response=await developerSubmissionRequest(request(),'submissions',deps)
  assert.equal(response.status,201);assert.equal(uploaded,1)
- assert.equal(calls[0].name,'distribution_editorial_context');assert.equal(calls[1].name,'distribution_submit_catalogue')
- assert.equal(calls[1].args.p_actor,id);assert.deepEqual(calls[1].args.p_metadata,metadata)
+ assert.equal(calls[0].name,'distribution_require_verified_email');assert.equal(calls[1].name,'distribution_editorial_context');assert.equal(calls[2].name,'distribution_submit_catalogue')
+ assert.equal(calls[2].args.p_actor,id);assert.deepEqual(calls[2].args.p_metadata,metadata)
  assert.doesNotMatch(await response.text(),/staging_key|service_role|lease_token|game-thumbnails/)
  const denied={...deps,db:()=>({call:async()=>{throw new UploadError('forbidden',403)}})}
  assert.equal((await developerSubmissionRequest(request(),'submissions',denied)).status,403);assert.equal(uploaded,1)
@@ -38,4 +38,11 @@ test('multipart body has a strict size bound; JSON cannot bypass the new cover r
  await assert.rejects(readCatalogueForm(new Request('https://site.example',{method:'POST',headers:{'content-length':String(9*1024**2),'content-type':'multipart/form-data'},body:'fixture'})),{status:413})
  const response=await developerSubmissionRequest(new Request('https://site.example/api/developer/submissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)}),'submissions',{authenticate:async()=>id,enabled:()=>true,db:()=>({call:()=>assert.fail()})})
  assert.equal(response.status,400)
+})
+
+test('unverified professional contact is refused before any R2 cover write',async()=>{
+ let coverWrites=0;const calls=[]
+ const deps={authenticate:async()=>id,enabled:()=>true,cover:async()=>{coverWrites++;return 'unused'},db:()=>({call:async name=>{calls.push(name);throw new UploadError('developer_email_unverified',409)}})}
+ const response=await developerSubmissionRequest(request(),'submissions',deps)
+ assert.equal(response.status,409);assert.equal(coverWrites,0);assert.deepEqual(calls,['distribution_require_verified_email'])
 })

@@ -27,10 +27,10 @@ test('publication charts derive only recorded deposits, honour filters and ignor
  assert.equal(activityInPeriod(rows,0,now).length,2)
  assert.deepEqual(monthlyActivity(activityInPeriod(rows,0,now)).map(r=>[r.month,r.count]),[['2026-10',1],['2026-11',1]])
 })
-test('unconfirmed accounts get a clear notice, with no promise of an enabled email stream',()=>{
+test('professional verification is read separately and never inferred from the Auth claim',()=>{
  globalThis.__productAuth={session:{user:{id:'fixture',email:'fixture@example.test',email_confirmed_at:null}},loading:false}
- const html=renderToStaticMarkup(createElement(EmailNotice));assert.match(html,/n’est pas confirmée/);assert.match(html,/Aucune notification développeur/);assert.doesNotMatch(html,/notifications.*sont envoyées|fixture@example/)
- globalThis.__productAuth.session.user.email_confirmed_at='2026-11-23T12:00:00Z';assert.equal(renderToStaticMarkup(createElement(EmailNotice)),'')
+ const html=renderToStaticMarkup(createElement(EmailNotice));assert.match(html,/Vérification du profil développeur/);assert.doesNotMatch(html,/notifications.*sont envoyées|fixture@example/)
+ globalThis.__productAuth.session.user.email_confirmed_at='2026-11-23T12:00:00Z';assert.equal(renderToStaticMarkup(createElement(EmailNotice)),html)
  globalThis.__productAuth={session:null,loading:false};assert.equal(renderToStaticMarkup(createElement(EmailNotice)),'')
 })
 test('developer entry lives in account menu and dashboard, not public primary navigation',async()=>{
@@ -39,8 +39,7 @@ test('developer entry lives in account menu and dashboard, not public primary na
  assert.match(dropdown,/href="\/developer"/);assert.match(dashboard,/href="\/developer"/)
  assert.match(navbar,/Mon compte[\s\S]*href="\/developer"/)
 })
-test('verified recipient still comes exclusively from the existing guarded SQL helper',async()=>{
- const sql=await readFile(new URL('../supabase/migrations/20261123000200_developer_email_events.sql',import.meta.url),'utf8')
- assert.match(sql,/a.email_confirmed_at is not null/);assert.match(sql,/distribution_confirmed_submission_email\(s.id\)/);assert.match(sql,/from public,anon,authenticated,service_role/)
- const config=await readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8');assert.match(config,/"GAME_DEVELOPER_NOTIFICATIONS_ENABLED": "0"/)
+test('verified recipient comes from the professional profile, not from Auth',async()=>{
+ const sql=await readFile(new URL('../supabase/migrations/20261124000100_developer_professional_email.sql',import.meta.url),'utf8')
+ assert.match(sql,/c.email_verified_at is not null then c.contact_email/);assert.match(sql,/recipient_revision/);assert.match(sql,/from public,anon,authenticated/)
 })

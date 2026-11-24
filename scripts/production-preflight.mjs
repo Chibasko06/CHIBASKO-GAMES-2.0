@@ -81,6 +81,7 @@ export const migrations = Object.freeze([
   '20261116000400_admin_mail_history_and_logo.sql',
   '20261123000100_developer_workspace.sql',
   '20261123000200_developer_email_events.sql',
+  '20261124000100_developer_professional_email.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']
@@ -107,6 +108,12 @@ export function environmentChecks(component, env) {
   }
   if(env.CONTACT_FORM_ENABLED!==undefined)add('CONTACT_FORM_ENABLED:boolean',['0','1'].includes(env.CONTACT_FORM_ENABLED))
   if(env.GAME_DEVELOPER_NOTIFICATIONS_ENABLED!==undefined)add('GAME_DEVELOPER_NOTIFICATIONS_ENABLED:boolean',['0','1'].includes(env.GAME_DEVELOPER_NOTIFICATIONS_ENABLED))
+  if(env.DEVELOPER_EMAIL_VERIFICATION_ENABLED!==undefined)add('DEVELOPER_EMAIL_VERIFICATION_ENABLED:boolean',['0','1'].includes(env.DEVELOPER_EMAIL_VERIFICATION_ENABLED))
+  if(['portal','maintenance'].includes(component)&&env.DEVELOPER_EMAIL_VERIFICATION_ENABLED==='1'){
+    add('DEVELOPER_EMAIL_CODE_SECRET:length',typeof env.DEVELOPER_EMAIL_CODE_SECRET==='string'&&env.DEVELOPER_EMAIL_CODE_SECRET.length>=32)
+    add('RESEND_API_KEY:developer_verification',Boolean(env.RESEND_API_KEY?.trim()))
+    add('RESEND_FROM_EMAIL:developer_verification',env.RESEND_FROM_EMAIL==='noreply@chibaskogames.fr')
+  }
   if(component==='portal'&&env.CONTACT_FORM_ENABLED==='1'){
     for(const name of ['CONTACT_NOTIFY_EMAIL','RESEND_FROM_EMAIL'])add(name+':contact_email',/^[^\s@<>]+@[^\s@<>]+[.][^\s@<>]+$/.test(env[name]??''))
     add('CONTACT_HASH_SECRET:length',typeof env.CONTACT_HASH_SECRET==='string'&&env.CONTACT_HASH_SECRET.length>=32)

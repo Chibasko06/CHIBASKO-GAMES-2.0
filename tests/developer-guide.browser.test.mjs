@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
-import {readFile,readdir,mkdtemp} from 'node:fs/promises'
-import {tmpdir} from 'node:os'
+import {readFile,mkdir} from 'node:fs/promises'
+import postcss from 'postcss'
+import tailwind from '@tailwindcss/postcss'
 import {join} from 'node:path'
 import {createElement} from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
@@ -13,13 +14,11 @@ import Cookies from '../app/cookies/page.tsx'
 import Legal from '../app/mentions-legales/page.tsx'
 import Footer from '../components/Footer.tsx'
 const pages={'/developpeurs':Guide,'/confidentialite':Privacy,'/cookies':Cookies,'/mentions-legales':Legal}
-async function cssFiles(directory){const files=[];for(const item of await readdir(directory,{withFileTypes:true})){const path=join(directory,item.name);if(item.isDirectory())files.push(...await cssFiles(path));else if(item.name.endsWith('.css'))files.push(path)}return files}
-const css=(await Promise.all((await cssFiles('.next/static')).map(path=>readFile(path,'utf8')))).join('\n')
-assert.ok(css,'Run the Next build before the documentation browser check')
-const server=createServer((request,response)=>{if(request.url==='/styles.css'){response.setHeader('Content-Type','text/css');response.end(css);return}const component=pages[request.url];if(!component){response.writeHead(404);response.end();return}response.setHeader('Content-Type','text/html; charset=utf-8');response.end('<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body class="bg-zinc-950 text-white"><main class="p-4">'+renderToStaticMarkup(createElement(component))+'</main>'+renderToStaticMarkup(createElement(Footer))+'</body></html>')})
+const css=(await postcss([tailwind()]).process(await readFile('app/globals.css','utf8'),{from:join(process.cwd(),'app/globals.css')})).css
+const server=createServer(async(request,response)=>{if(request.url==='/chibaskogames-logo-small.webp'){response.setHeader('Content-Type','image/webp');response.end(await readFile('public/chibaskogames-logo-small.webp'));return}if(request.url==='/styles.css'){response.setHeader('Content-Type','text/css');response.end(css);return}const component=pages[request.url];if(!component){response.writeHead(404);response.end();return}response.setHeader('Content-Type','text/html; charset=utf-8');response.end('<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body class="bg-zinc-950 text-white"><main class="p-4">'+renderToStaticMarkup(createElement(component))+'</main>'+renderToStaticMarkup(createElement(Footer))+'</body></html>')})
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
 const browser=await chromium.launch({channel:'chrome',headless:true})
-const screenshots=await mkdtemp(join(tmpdir(),'chibasko-developer-guide-'))
+const screenshots=join(process.cwd(),'.distribution/developer-coherence');await mkdir(screenshots,{recursive:true})
 console.log('Documentation screenshots:',screenshots)
 try{
  for(const viewport of [{width:1366,height:768},{width:390,height:844}])await test('Chrome developer/legal pages '+viewport.width,async()=>{

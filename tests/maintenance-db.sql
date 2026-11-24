@@ -6,6 +6,7 @@ begin
  insert into auth.users(id,email) values(actor,'maintenance-fixture@example.test');
  insert into public.developer_contacts(user_id,first_name,last_name,contact_email,public_name)
  values(actor,'Fixture','Maintenance','maintenance-contact@example.test','Studio');
+ if exists(select 1 from pg_attribute where attrelid='public.developer_contacts'::regclass and attname='email_verified_at' and not attisdropped) then update public.developer_contacts set email_verified_at=now() where user_id=actor;end if;
  game:=public.distribution_register_game(actor,gen_random_uuid(),'Jeu maintenance');
  insert into public.game_build_uploads(id,game_id,created_by,request_id,version,status,expected_size,policy,expires_at,lease_token,lease_until)
  values(upload,game,actor,gen_random_uuid(),'1.0.0','validating',100,'{"revision":"1","maxAttempts":3}',now()+interval '1 day',gen_random_uuid(),now()-interval '1 minute');

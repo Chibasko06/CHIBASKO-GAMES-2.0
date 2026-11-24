@@ -14,7 +14,7 @@ test('anonymous publish page explains account and preserves authentication retur
  globalThis.__productAuth={session:null,loading:false}
  const html=renderToStaticMarkup(createElement(Submit,{categories:[]}))
  assert.match(html,/login\?next=%2Fpublier-un-jeu/);assert.match(html,/register\?next=%2Fpublier-un-jeu/)
- assert.doesNotMatch(html,/type="file"/);assert.match(html,/compte est nécessaire/)
+ assert.doesNotMatch(html,/type="file"/);assert.match(html,/compte et une adresse professionnelle vérifiée sont nécessaires/)
 })
 
 test('feedback distinguishes errors, statuses, warnings, information and secondary help; identity is copyable',()=>{

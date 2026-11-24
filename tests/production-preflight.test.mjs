@@ -6,6 +6,15 @@ import {mkdtemp,mkdir,cp,readFile,writeFile,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join,dirname} from 'node:path'
 
+test('professional verification requires its secret in both sending runtimes only when enabled',()=>{
+ for(const component of ['portal','maintenance']){
+  const enabled={DEVELOPER_EMAIL_VERIFICATION_ENABLED:'1',RESEND_API_KEY:'fixture',RESEND_FROM_EMAIL:'noreply@chibaskogames.fr'}
+  assert.equal(environmentChecks(component,enabled).find(c=>c.check==='DEVELOPER_EMAIL_CODE_SECRET:length').ok,false)
+  assert.equal(environmentChecks(component,{...enabled,DEVELOPER_EMAIL_CODE_SECRET:'x'.repeat(32)}).find(c=>c.check==='DEVELOPER_EMAIL_CODE_SECRET:length').ok,true)
+  assert.equal(environmentChecks(component,{DEVELOPER_EMAIL_VERIFICATION_ENABLED:'0'}).some(c=>c.check==='DEVELOPER_EMAIL_CODE_SECRET:length'),false)
+ }
+})
+
 test('la suppression des comptes exige la reprise technique des uploads',()=>{
  const checks=environmentChecks('maintenance',{GAME_ACCOUNT_DELETIONS_ENABLED:'1',GAME_UPLOAD_MAINTENANCE_ENABLED:'0'})
  assert.equal(checks.find(item=>item.check==='GAME_UPLOAD_MAINTENANCE_ENABLED:account_recovery').ok,false)
@@ -36,8 +45,8 @@ test('production notifications require server configuration on portal and enable
 test('local inventory checks registry dependencies and ordered transactional migrations', async () => {
   const result = await localChecks(fileURLToPath(new URL('../', import.meta.url)))
   assert.equal(result.checks.every(check => check.ok), true)
-  assert.equal(result.migrations.length, 54)
-  assert.equal(result.migrations.at(-1).name,'20261123000200_developer_email_events.sql')
+  assert.equal(result.migrations.length, 55)
+  assert.equal(result.migrations.at(-1).name,'20261124000100_developer_professional_email.sql')
   assert.equal(result.baselineMigrations.length, 15)
   assert.equal(result.migrations.every(item => /^[a-f0-9]{64}$/.test(item.sha256)), true)
 })

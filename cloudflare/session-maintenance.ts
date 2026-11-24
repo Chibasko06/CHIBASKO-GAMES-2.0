@@ -18,7 +18,7 @@ type Task='moderation'|'social'|'sessions'|'previews'|'launches'|'uploads'|'cont
 type Log={component:'maintenance';runId:string;task:Task;outcome:'completed'|'failed'|'deferred'|'attention_required';durationMs:number;count?:number;metric?:string}
 type Options={db?:UploadRepository;log?:(event:Log)=>void;operationMs?:number;accountMs?:number;notificationMs?:number;notifications?:()=>Promise<number>;account?:(signal:AbortSignal)=>Promise<{state:string}|null>}
 export async function runMaintenance(env:Environment,options:Options={}){
- const flags=[env.MODERATION_MAINTENANCE_ENABLED,env.GAME_SESSION_MAINTENANCE_ENABLED,env.GAME_UPLOAD_MAINTENANCE_ENABLED,env.CONTACT_RECEIPTS_MAINTENANCE_ENABLED,env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED,env.GAME_ACCOUNT_DELETIONS_ENABLED]
+ const flags=[env.MODERATION_MAINTENANCE_ENABLED,env.GAME_SESSION_MAINTENANCE_ENABLED,env.GAME_UPLOAD_MAINTENANCE_ENABLED,env.CONTACT_RECEIPTS_MAINTENANCE_ENABLED,env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED,env.GAME_ACCOUNT_DELETIONS_ENABLED,env.DEVELOPER_EMAIL_VERIFICATION_ENABLED]
  if(!flags.some(flag=>flag==='1'))return
  const runId=crypto.randomUUID(),start=Date.now(),operationMs=options.operationMs??8000,accountMs=options.accountMs??90000,notificationMs=options.notificationMs??75000
  if(!Number.isInteger(operationMs)||operationMs<1||operationMs>8000||!Number.isInteger(accountMs)||accountMs<1||accountMs>90000||!Number.isInteger(notificationMs)||notificationMs<1||notificationMs>75000)throw Error('invalid_maintenance_budget')
@@ -46,11 +46,18 @@ export async function runMaintenance(env:Environment,options:Options={}){
   },25000)
   if(env.GAME_UPLOAD_MAINTENANCE_ENABLED==='1')await task('uploads',()=>db.call('distribution_maintenance_uploads',{}))
   if(env.CONTACT_RECEIPTS_MAINTENANCE_ENABLED==='1')await task('contact',()=>db.call('contact_cleanup',{}))
-  if(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='1')await task('notifications',async()=>{
+  if(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='1'||env.DEVELOPER_EMAIL_VERIFICATION_ENABLED==='1')await task('notifications',async()=>{
    if(options.notifications)return options.notifications()
    let failed=false
    const signal=AbortSignal.timeout(Math.max(1,notificationMs-1))
-   const count=await deliverSubmissionNotifications(db,env,{limit:env.GAME_ACCOUNT_DELETIONS_ENABLED==='1'?1:5,signal,log:entry=>{if(entry.outcome==='failed'||entry.outcome==='configuration_missing')failed=true;if(entry.outcome==='attention_required')log('notifications','attention_required',Date.now())}})
+   const record=(entry:{outcome:string})=>{if(entry.outcome==='failed'||entry.outcome==='configuration_missing')failed=true;if(entry.outcome==='attention_required')log('notifications','attention_required',Date.now())}
+   const limit=env.GAME_ACCOUNT_DELETIONS_ENABLED==='1'?1:5
+   let count=0
+   if(env.DEVELOPER_EMAIL_VERIFICATION_ENABLED==='1'){
+    await db.call('distribution_cleanup_developer_email',{})
+    count=await deliverSubmissionNotifications(db,env,{kind:'verification',limit:1,signal,log:record})
+   }
+   if(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='1'&&count<limit)count+=await deliverSubmissionNotifications(db,env,{limit:limit-count,signal,log:record})
    if(failed)throw Error('notification_delivery_failed')
    return count
   },notificationMs)

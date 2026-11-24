@@ -12,6 +12,11 @@
 | `/developer/submissions` | Liste historique existante, conservée et paginée |
 | `/developer/statistics` | Compteurs réellement disponibles |
 | `/developer/resources` | Guide, SDK facultatif, validateur et contact développeurs |
+| `/developer/profile` | Fiche professionnelle unique, consultation, modification et vérification de l’adresse |
+
+La fiche est en lecture seule par défaut. « Modifier » ouvre les champs ; « Annuler » rétablit les valeurs enregistrées sans requête d’écriture. Une modification de nom, studio ou portfolio conserve la vérification. Un changement réel d’adresse affiche un avertissement et demande confirmation avant sauvegarde, puis nécessite un nouveau code. Une différence de casse ou des espaces périphériques ne constituent pas un changement d’adresse.
+
+Les formulaires de dépôt affichent uniquement un résumé de cette fiche et son état de vérification. Leur lien conduit à `/developer/profile` pour créer, modifier ou vérifier les coordonnées. Aucun second formulaire de profil n’est intégré à un brouillon. Le raccourci du Dashboard se trouve dans la section « Mon profil » ; l’accès principal reste dans « Mon compte ».
 
 La confirmation d’un dépôt ouvre directement son dossier. Une correction ZIP appelle la préparation existante du brouillon, conserve le `gameId` et les anciens builds, puis ouvre le formulaire approprié. Une correction URL crée toujours une révision immuable. Les mises à jour depuis un dossier conservent le contexte du jeu sélectionné.
 
@@ -45,7 +50,7 @@ Le statut historique `published` d’un build ZIP correspond à une version acce
 
 ## E-mails transactionnels
 
-Les messages développeur vont à **l’adresse du compte déposant vérifiée par Supabase Auth** (`auth.users.email`, avec `email_confirmed_at`). Une adresse de contact saisie dans le profil n’est pas une preuve de possession et ne devient pas une destination automatique. Elle conserve son rôle dans les échanges internes existants. Aucun compte ni paramètre Auth n’est modifié par cette évolution. Le [contrat utilisateur Supabase](https://supabase.com/docs/guides/auth/users) distingue la confirmation de l’e-mail de celle d’un téléphone.
+Les nouveaux messages développeur utilisent l’adresse professionnelle du profil, vérifiée indépendamment. La confirmation Supabase Auth ne confirme pas cette adresse. Voir [la vérification professionnelle](developer-professional-email.md) pour les quotas, les messages historiques et la procédure de déploiement.
 
 | Événement futur | Déclenchement |
 | --- | --- |

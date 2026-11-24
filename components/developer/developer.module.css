@@ -21,3 +21,4 @@
 @media(max-width:430px){.library{grid-template-columns:1fr}.header>.button{width:100%}.filters label{min-width:130px}.actions>.button,.actions>.secondary{width:100%}.metric dd{font-size:23px}.submission .split>.badge{margin-top:2px}}
 @media(max-width:760px){.nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;padding-bottom:0}.nav a{white-space:normal;min-height:42px}.nav a:last-child{grid-column:1/-1}}
 .header>div{min-width:0}.header h1,.row h3,.metric dd{overflow-wrap:anywhere}
+@media(max-width:760px){.nav a:last-child{grid-column:auto}.nav a:last-child:nth-child(odd){grid-column:1/-1}}

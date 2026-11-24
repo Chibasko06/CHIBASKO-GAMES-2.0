@@ -84,7 +84,7 @@ test('external submission derives actor, normalizes HTTPS and refuses invalid in
  const result=await developerSubmissionRequest(post('https://PLAY.example.com:443/game'),'external',deps)
  assert.equal(result.status,201)
  assert.equal(result.headers.get('cache-control'),'private, no-store')
- assert.deepEqual(calls,[{name:'distribution_submit_external',args:{
+ assert.deepEqual(calls,[{name:'distribution_require_verified_email',args:{p_actor:id}},{name:'distribution_submit_external',args:{
    p_actor:id,p_game:id,p_revision:id,p_url:'https://play.example.com/game',p_origin:'https://play.example.com',p_cover:null
  }}])
 })

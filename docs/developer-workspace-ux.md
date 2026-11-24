@@ -36,9 +36,9 @@ La bibliothèque et les soumissions gardent leur pagination et indiquent que leu
 
 L’inscription appelle déjà Supabase Auth `signUp`, avec le callback existant ; sans session immédiate, elle invite à confirmer l’adresse reçue par e-mail. Ce parcours n’est pas remplacé et aucun nouveau circuit d’envoi n’est ajouté.
 
-Dans l’espace connecté, l’indication repose sur `session.user.email_confirmed_at`, pas sur `confirmed_at` ni sur le profil éditable. Un compte sans adresse confirmée reçoit une explication et une aide ; le suivi en ligne reste disponible. L’affichage n’accorde aucun droit et ne décide pas du destinataire serveur.
+Dans l’espace connecté, l’avertissement repose sur la vérification professionnelle retournée par le serveur. Le suivi reste accessible ; le profil permet de demander et confirmer son code. L’affichage n’accorde aucun droit.
 
-Pour les nouveaux événements développeur, `distribution_confirmed_submission_email` résout le déposant réel et ne retourne son adresse Auth que si `email_confirmed_at` est renseigné. L’adresse libre du profil n’est jamais utilisée comme destinataire automatique développeur. La confirmation est vérifiée au moment de la mise en file ; les destinataires et corps déjà préparés restent figés pour préserver l’idempotence. Les anciennes alertes internes sont un circuit distinct et restent inchangées.
+Les nouveaux événements utilisent uniquement l’adresse professionnelle vérifiée. Les messages historiques sont conservés sans réémission ; les alertes internes restent inchangées. Voir [le contrat actuel](developer-professional-email.md).
 
 Les flags de notification restent à `0`. L’interface ne promet ni activation ni réception effective d’un e-mail. Le 24 novembre, une lecture du seul endpoint public Supabase Auth `/auth/v1/settings` a confirmé `external.email=true` et `mailer_autoconfirm=false` : l’auto-confirmation des adresses est désactivée en production. Aucun réglage Auth, compte ou modèle distant n’a été modifié. Les parcours d’inscription et de notification n’ont pas été déclenchés réellement ; ils sont examinés dans le code et les fixtures locales.
 

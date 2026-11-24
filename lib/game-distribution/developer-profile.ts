@@ -1,4 +1,5 @@
 export type DeveloperContact={firstName:string;lastName:string;contactEmail:string;publicName:string;website:string|null;otherContact:string|null}
+export function professionalEmail(value:string){return value.length<=254&&/^[^\s@<>,;:"()]+@[^\s@<>,;:"()]+[.][^\s@<>,;:"()]+$/.test(value)}
 export function developerContact(value:unknown):DeveloperContact|null {
  if(!value||typeof value!=='object'||Array.isArray(value))return null
  const p=value as Record<string,unknown>,keys=['firstName','lastName','contactEmail','publicName','website','otherContact']

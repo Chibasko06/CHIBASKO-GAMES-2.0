@@ -2,6 +2,8 @@ begin;
 insert into auth.users(id) values ('ef400000-0000-4000-8000-000000000001'),('ef400000-0000-4000-8000-000000000002'),
  ('ef400000-0000-4000-8000-000000000099');
 insert into public.admin_users(user_id) values ('ef400000-0000-4000-8000-000000000001');
+insert into public.developer_contacts(user_id,first_name,last_name,contact_email,public_name) values ('ef400000-0000-4000-8000-000000000002','Owner','Fixture','owner-fixture@example.com','Studio');
+do $$begin if exists(select 1 from pg_attribute where attrelid='public.developer_contacts'::regclass and attname='email_verified_at' and not attisdropped) then update public.developer_contacts set email_verified_at=now() where user_id='ef400000-0000-4000-8000-000000000002';end if;end $$;
 insert into public.games(id,title,slug,game_url,game_type,is_published)
  values ('ef400000-0000-4000-8000-000000000003','Fixture external','fixture-external','https://play.example.com/old','classic',false);
 insert into public.games(id,title,slug,game_url,game_type,is_published)

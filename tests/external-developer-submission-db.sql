@@ -4,6 +4,8 @@ update auth.users set email='external-creator@example.test',email_confirmed_at=n
 insert into public.admin_users(user_id) values ('ef410000-0000-4000-8000-000000000003');
 insert into public.developer_contacts(user_id,first_name,last_name,contact_email,public_name)
  values ('ef410000-0000-4000-8000-000000000001','Test','Fixture','fixture@example.com','Fixture Studio');
+insert into public.developer_contacts(user_id,first_name,last_name,contact_email,public_name) values ('ef410000-0000-4000-8000-000000000002','Other','Fixture','other-fixture@example.com','Other');
+do $$begin if exists(select 1 from pg_attribute where attrelid='public.developer_contacts'::regclass and attname='email_verified_at' and not attisdropped) then update public.developer_contacts set email_verified_at=now() where user_id::text like 'ef410000-%';end if;end $$;
 insert into public.categories(id,name,slug)
  values ('ef410000-0000-4000-8000-000000000007','Fixture external category','fixture-external-category');
 do $$
