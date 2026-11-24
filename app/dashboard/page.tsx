@@ -250,6 +250,7 @@ export default function DashboardPage() {
   </div>
   const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-cyan-600 focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-40'
   return <div className="mx-auto w-full max-w-6xl space-y-6">
+    <Link className="inline-block rounded-xl border border-cyan-800 px-4 py-3 text-cyan-200" href="/developer">Espace développeur — projets, versions et soumissions</Link>
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-800 pb-6">
       <div>
         <h1 className="text-3xl font-bold text-white sm:text-4xl">Tableau de bord</h1>

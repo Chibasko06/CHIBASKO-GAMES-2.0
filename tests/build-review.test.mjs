@@ -20,8 +20,8 @@ test('local review checks final persisted outcome, handles duplicates and refuse
 })
 test('developer statuses distinguish technical completion from publication',()=>{
   const base={decision:'pending',versionStatus:null,reason:null}
-  for(const [technicalStatus,label] of [['created','Reçu'],['queued','En attente de vérification'],['validating','Vérification en cours'],['completed','Vérification technique réussie'],['failed','Vérification technique échouée']])assert.equal(reviewLabel({...base,technicalStatus}),label)
-  assert.equal(reviewLabel({...base,technicalStatus:'completed',versionStatus:'published'}),'Publié')
+  for(const [technicalStatus,label] of [['created','Envoi créé'],['queued','En attente de vérification'],['validating','Vérification en cours'],['completed','Vérification technique réussie'],['failed','Vérification technique échouée']])assert.equal(reviewLabel({...base,technicalStatus}),label)
+  assert.equal(reviewLabel({...base,technicalStatus:'completed',versionStatus:'published'}),'Version acceptée')
   assert.equal(reviewLabel({...base,technicalStatus:'completed',decision:'rejected'}),'Refusé')
 })
 test('admin endpoint authenticates before RPC, uses verified actor and exposes only safe projection',async t=>{

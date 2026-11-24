@@ -106,7 +106,7 @@ with managed as (
     and i.indnkeyatts=1 and i.indkey[0]=(select attnum from pg_attribute where attrelid=i.indrelid and attname='slug')),
   'serviceProfileRead',case when to_regclass('public.profiles') is null then false else has_table_privilege('service_role','public.profiles','SELECT') end,
   'legacyTriggers',coalesce((select jsonb_agg(jsonb_build_object('name',t.tgname,'definition',pg_get_triggerdef(t.oid),'enabled',t.tgenabled) order by t.tgname)
-    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname not in ('guard_active_game_version','account_asset_guard','moderation_game_publication_guard','distribution_guard_external_catalogue')),'[]'::jsonb),
+    from pg_trigger t where t.tgrelid=to_regclass('public.games') and not t.tgisinternal and t.tgname not in ('guard_active_game_version','account_asset_guard','moderation_game_publication_guard','distribution_guard_external_catalogue','notify_developer_publication')),'[]'::jsonb),
   'gamesRls',(select relrowsecurity from pg_class where oid=to_regclass('public.games')),
   'adminRls',(select relrowsecurity from pg_class where oid=to_regclass('public.admin_users')),
   'browserCatalogueWrites',coalesce((select bool_or(has_column_privilege(r.role_name,c.oid,a.attnum,'INSERT') or has_column_privilege(r.role_name,c.oid,a.attnum,'UPDATE')

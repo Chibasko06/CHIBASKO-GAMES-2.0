@@ -1,9 +1,9 @@
 import type {UploadRepository} from './uploads/contracts'
 import type {DeveloperContact} from './developer-profile'
 import {withTimeout} from '../asyncOperation'
-import {submissionEmailMessage} from '../emailMessages'
-export type NotificationEnvironment={GAME_SUBMISSION_NOTIFICATIONS_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;GAME_SUBMISSION_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string}
-type Job={id:string;lease:string;message:Record<string,unknown>|null;contact:DeveloperContact;title:string;version:string|null;kind:string;uploadId:string|null;externalRevisionId?:string|null;studio:string}
+import {submissionEmailMessage,type SubmissionEmailData} from '../emailMessages'
+export type NotificationEnvironment={GAME_DEVELOPER_NOTIFICATIONS_ENABLED?:string;GAME_SUBMISSION_NOTIFICATIONS_ENABLED?:string;RESEND_API_KEY?:string;RESEND_FROM_EMAIL?:string;GAME_SUBMISSION_NOTIFY_EMAIL?:string;NEXT_PUBLIC_SITE_URL?:string}
+type Job={id:string;lease:string;message:Record<string,unknown>|null;contact:DeveloperContact;title:string;version:string|null;kind:string;uploadId:string|null;externalRevisionId?:string|null;studio:string;notification?:SubmissionEmailData['notification']}
 type Log={event:'submission_email_delivery';outcome:'sent'|'failed'|'attention_required'|'configuration_missing';phase:'configuration'|'claim'|'prepare'|'send'|'ack'}
 export async function deliverSubmissionNotifications(db:UploadRepository,env:NotificationEnvironment,options:{submissionId?:string;limit?:number;fetcher?:typeof fetch;log?:(entry:Log)=>void;operationMs?:number;signal?:AbortSignal}={}){
  if(env.GAME_SUBMISSION_NOTIFICATIONS_ENABLED==='0')return 0
@@ -17,7 +17,7 @@ export async function deliverSubmissionNotifications(db:UploadRepository,env:Not
   let job:Job|null=null,phase:Log['phase']='claim'
   try{
    options.signal?.throwIfAborted()
-   job=await withTimeout(db.call<Job|null>('distribution_claim_submission_email',{p_submission:options.submissionId??null}),15_000);if(!job)break
+   job=await withTimeout(db.call<Job|null>(env.GAME_DEVELOPER_NOTIFICATIONS_ENABLED==='1'?'distribution_claim_submission_email_events':'distribution_claim_submission_email',{p_submission:options.submissionId??null}),15_000);if(!job)break
    phase='prepare'
    let message=job.message
    if(!message){

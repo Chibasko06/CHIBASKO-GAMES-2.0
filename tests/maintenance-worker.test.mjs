@@ -5,15 +5,16 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare'
 import {readFile} from 'node:fs/promises'
 import ts from 'typescript'
 
-test('le Worker et le portail préparent le même payload pour les trois types de soumission',async()=>{
+test('le Worker et le portail partagent les messages ZIP, URL et transactionnels développeur',async()=>{
  const source=await build({entryPoints:['lib/emailMessages.ts'],bundle:true,write:false,platform:'node',format:'esm'})
  const {submissionEmailMessage}=await import('data:text/javascript;base64,'+Buffer.from(source.outputFiles[0].text).toString('base64'))
  const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'ts',contents:`import worker from './cloudflare/session-maintenance';export default {async fetch(request,env){await worker.scheduled({},env);return new Response('completed')}}`},bundle:true,write:false,platform:'browser',format:'esm'})
- for(const mode of ['classic','sdk','external']){
+ for(const mode of ['classic','sdk','external','developer']){
   const job={id:'fa800000-0000-4000-8000-000000000010',lease:'fa800000-0000-4000-8000-000000000011',message:null,
    contact:{firstName:'Élodie',lastName:'Fixture',contactEmail:'fixture@example.test'},title:'Jeu de test',version:mode==='external'?null:'1.0.0',kind:'new',
    uploadId:mode==='external'?null:'fa800000-0000-4000-8000-000000000012',externalRevisionId:mode==='external'?'fa800000-0000-4000-8000-000000000013':null,studio:'Studio de test'}
   const bindings={SUPABASE_URL:'https://db.example.test',SUPABASE_SERVICE_ROLE_KEY:'fixture-only',GAME_SUBMISSION_NOTIFICATIONS_ENABLED:'1',RESEND_API_KEY:'fixture-only',RESEND_FROM_EMAIL:'noreply@chibaskogames.fr',GAME_SUBMISSION_NOTIFY_EMAIL:'developers@chibaskogames.fr',NEXT_PUBLIC_SITE_URL:'https://chibaskogames.fr'}
+  if(mode==='developer'){job.notification={event:'correction',gameId:'fa800000-0000-4000-8000-000000000012',recipient:'fixture@example.test',reason:'Corriger le manifeste'};bindings.GAME_DEVELOPER_NOTIFICATIONS_ENABLED='1'}
   const expected=submissionEmailMessage(job,bindings.RESEND_FROM_EMAIL,bindings.GAME_SUBMISSION_NOTIFY_EMAIL,bindings.NEXT_PUBLIC_SITE_URL)
   let claimed=false,prepared,sent=0,acknowledged=false
   const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:'2026-10-18',script:bundle.outputFiles[0].text,bindings,outboundService:async request=>{
@@ -25,7 +26,7 @@ test('le Worker et le portail préparent le même payload pour les trois types d
     assert.ok(body.text);sent++;return Response.json({id:'fixture-receipt'})
    }
    assert.equal(url.hostname,'db.example.test')
-   if(url.pathname.endsWith('distribution_claim_submission_email')){if(claimed)return Response.json(null);claimed=true;return Response.json(job)}
+   if(url.pathname.endsWith(mode==='developer'?'distribution_claim_submission_email_events':'distribution_claim_submission_email')){if(claimed)return Response.json(null);claimed=true;return Response.json(job)}
    if(url.pathname.endsWith('distribution_prepare_submission_email')){prepared=body.p_message;return Response.json(prepared)}
    if(url.pathname.endsWith('distribution_finish_submission_email')){assert.equal(body.p_success,true);acknowledged=true;return Response.json(null)}
    if(url.pathname.endsWith('distribution_maintenance_health'))return Response.json({})

@@ -7,11 +7,14 @@ export function reviewLabel(value:ReviewSummary) {
   if(value.decision==='pending'&&value.reason)return 'Correction demandée'
   if(value.technicalStatus==='failed')return 'Vérification technique échouée'
   if(value.technicalStatus==='expired')return 'Archive expirée'
-  if(value.versionStatus==='published')return 'Publié'
+  if(value.versionStatus==='published')return 'Version acceptée'
   if(value.technicalStatus==='completed')return 'Vérification technique réussie'
   if(value.technicalStatus==='validating')return 'Vérification en cours'
   if(value.technicalStatus==='queued')return 'En attente de vérification'
-  return 'Reçu'
+  if(value.technicalStatus==='created')return 'Envoi créé'
+  if(value.technicalStatus==='uploading')return 'Téléversement en cours'
+  if(value.technicalStatus==='finalizing')return 'Finalisation de l’envoi'
+  return 'État indéterminé'
 }
 export const REVIEW_NOTICE='La vérification manuelle peut prendre 24 à 48 h. Une validation technique réussie ne garantit pas la publication.'
 export type AdminBuild={integration?:import('./integration').IntegrationReport;developerProfile?:DeveloperContact|null;id:string;gameId:string;game:string;developer:string;description:string|null;version:string;createdAt:string;updatedAt:string;archiveSize:number;

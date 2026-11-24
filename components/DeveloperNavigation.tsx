@@ -1,0 +1,2 @@
+import Link from 'next/link'
+export default function DeveloperNavigation(){return <nav aria-label="Espace développeur" className="flex flex-wrap gap-3 border-b border-zinc-800 pb-4">{[['/developer','Vue d’ensemble'],['/developer/games','Mes jeux'],['/developer/submissions','Mes soumissions'],['/developer/statistics','Statistiques'],['/developer/resources','SDK et documentation']].map(([url,label])=><Link className="rounded border border-zinc-800 px-3 py-2 hover:border-cyan-700 focus-visible:outline focus-visible:outline-cyan-300" href={url} key={url}>{label}</Link>)}</nav>}

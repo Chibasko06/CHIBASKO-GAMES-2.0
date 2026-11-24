@@ -30,20 +30,20 @@ function available(row:Revision):Action[]{
   return actions
 }
 
-export default function ExternalBuildReviews({token,refresh}:{token?:string;refresh:number}){
+export default function ExternalBuildReviews({token,refresh,revisionId}:{token?:string;refresh:number;revisionId?:string}){
   const [rows,setRows]=useState<Revision[]>([]),[offset,setOffset]=useState(0)
-  const [selected,setSelected]=useState<string>(),[pending,setPending]=useState(false)
+  const [selected,setSelected]=useState<string|undefined>(revisionId),[pending,setPending]=useState(false)
   const [error,setError]=useState(''),[reload,setReload]=useState(0)
   useEffect(()=>{
     if(!token)return
     const abort=new AbortController()
-    fetch(endpoint+'?offset='+offset,{headers:{Authorization:'Bearer '+token},cache:'no-store',
+    fetch(endpoint+'?offset='+offset+(revisionId?'&revisionId='+encodeURIComponent(revisionId):''),{headers:{Authorization:'Bearer '+token},cache:'no-store',
       signal:AbortSignal.any([abort.signal,AbortSignal.timeout(15_000)])})
       .then(async response=>{if(!response.ok)throw Error();return response.json()})
       .then(({data})=>{if(!abort.signal.aborted){setRows(data);setPending(false);setError('')}})
       .catch(()=>{if(!abort.signal.aborted){setRows([]);setPending(false);setError('Impossible de charger les révisions externes.')}})
     return()=>abort.abort()
-  },[token,offset,refresh,reload])
+  },[token,offset,refresh,reload,revisionId])
   if(!token)return null
   const row=rows.find(item=>item.id===selected)
   return <ReviewCard title="Soumissions hébergées à l’extérieur">

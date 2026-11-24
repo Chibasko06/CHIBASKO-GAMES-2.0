@@ -79,6 +79,8 @@ export const migrations = Object.freeze([
   '20261116000200_contact_email_template.sql',
   '20261116000300_contact_email_logo.sql',
   '20261116000400_admin_mail_history_and_logo.sql',
+  '20261123000100_developer_workspace.sql',
+  '20261123000200_developer_email_events.sql',
 ])
 
 const shared = ['GAME_CONTENT_BASE_DOMAIN', 'GAME_CONTENT_PUBLIC_BASE', 'GAME_CONTENT_PREVIEW_BASE', 'GAME_PORTAL_ORIGINS']
@@ -104,6 +106,7 @@ export function environmentChecks(component, env) {
     if(env.MODERATION_MEASURES_ENABLED==='1')add('MODERATION_MEASURES_RETENTION_DAYS:policy',/^[1-9][0-9]{0,3}$/.test(env.MODERATION_MEASURES_RETENTION_DAYS??'')&&Number(env.MODERATION_MEASURES_RETENTION_DAYS)<=3650)
   }
   if(env.CONTACT_FORM_ENABLED!==undefined)add('CONTACT_FORM_ENABLED:boolean',['0','1'].includes(env.CONTACT_FORM_ENABLED))
+  if(env.GAME_DEVELOPER_NOTIFICATIONS_ENABLED!==undefined)add('GAME_DEVELOPER_NOTIFICATIONS_ENABLED:boolean',['0','1'].includes(env.GAME_DEVELOPER_NOTIFICATIONS_ENABLED))
   if(component==='portal'&&env.CONTACT_FORM_ENABLED==='1'){
     for(const name of ['CONTACT_NOTIFY_EMAIL','RESEND_FROM_EMAIL'])add(name+':contact_email',/^[^\s@<>]+@[^\s@<>]+[.][^\s@<>]+$/.test(env[name]??''))
     add('CONTACT_HASH_SECRET:length',typeof env.CONTACT_HASH_SECRET==='string'&&env.CONTACT_HASH_SECRET.length>=32)

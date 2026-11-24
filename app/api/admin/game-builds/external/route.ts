@@ -14,9 +14,11 @@ export async function GET(request:NextRequest){
   const admin=await requireAdmin(request)
   if('error' in admin)return admin.error
   const offset=Number(request.nextUrl.searchParams.get('offset')??0)
+  const revision=request.nextUrl.searchParams.get('revisionId')
+  if(revision&&!UUID.test(revision))return adminJson({error:'Révision invalide.'},{status:400})
   if(!Number.isInteger(offset)||offset<0||offset>100000)return adminJson({error:'Page invalide.'},{status:400})
   try{
-    return adminJson({data:await repository().call('distribution_admin_external_reviews',{p_actor:admin.user.id,p_offset:offset})})
+    return adminJson({data:await repository().call(revision?'distribution_admin_external_review_detail':'distribution_admin_external_reviews',revision?{p_actor:admin.user.id,p_revision:revision}:{p_actor:admin.user.id,p_offset:offset})})
   }catch{return adminJson({error:'Impossible de charger les révisions externes.'},{status:503})}
 }
 export async function POST(request:NextRequest){

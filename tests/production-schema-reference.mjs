@@ -55,6 +55,11 @@ try {
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261029000200_profile_privacy.sql')]),error=>/profile_public_projection_required/.test(error.stderr));
  assert.deepEqual(await snapshot(),base,'Une fermeture prématurée ne modifie aucun privilège');
  for(const name of migrations) {
+  if(name==='20261123000200_developer_email_events.sql'){
+   // Supabase ne donne pas de SELECT Auth au rôle applicatif, même avec BYPASSRLS.
+   await query('revoke all on auth.users from public,anon,authenticated,service_role')
+   await query("insert into public.game_submissions(id,name_or_studio,email,game_title,demo_url,game_type,description) values('eb230000-0000-4000-8000-000000000001','Historique','historical@example.test','Notification historique','https://example.test','web','Fixture');insert into public.game_submission_notifications(submission_id,contact_snapshot,message,sent_at,attempts) values('eb230000-0000-4000-8000-000000000001','{}','{\"from\":\"ancienne@example.test\",\"to\":[\"historical@example.test\"],\"text\":\"Payload fixe\"}',now(),1)")
+  }
   if(name==='20261110000100_faq_ordering.sql')await query("insert into faq_entries(question,answer,sort_order,is_published) values('FAQ doublon A','[uBlock Origin](https://github.com/gorhill/uBlock#installation)',1,true),('FAQ doublon B','Reponse preservee',1,false),('FAQ zero','Derniere reponse',0,true)")
   const faqBefore=name==='20261110000100_faq_ordering.sql'?(await query("select md5(coalesce(string_agg((to_jsonb(f)-'sort_order')::text,',' order by id),'')) from faq_entries f")).stdout:null
   const googleBefore=name==='20261109000100_google_profile_initialization.sql'?(await query("select md5(coalesce(string_agg(to_jsonb(p)::text,',' order by id),'')) from profiles p")).stdout:null
@@ -100,6 +105,11 @@ try {
    assert.deepEqual(await snapshot(),before,'La migration interrompue conserve le contrat précédent')
   }
   await run('psql',[...args,'-f',file])
+  if(name==='20261123000200_developer_email_events.sql'){
+   assert.equal((await query("select count(*) from public.game_submission_notifications where submission_id='eb230000-0000-4000-8000-000000000001' and id=submission_id and event_key='internal' and notification is null and sent_at is not null and attempts=1 and message='{\"from\":\"ancienne@example.test\",\"to\":[\"historical@example.test\"],\"text\":\"Payload fixe\"}'::jsonb")).stdout.trim(),'1','Une notification acquittée conserve identité, corps et statut')
+   assert.equal((await query("select count(*) from public.game_submission_notifications where submission_id='eb230000-0000-4000-8000-000000000001'")).stdout.trim(),'1','Aucune notification historique supplémentaire')
+   await query("delete from public.game_submissions where id='eb230000-0000-4000-8000-000000000001'")
+  }
   if(name==='20261107000100_remove_moderation_qualification.sql'){
    assert.equal((await query("select to_regclass('public.moderation_measure_scope') is null and to_regclass('public.moderation_qualification_targets') is null")).stdout.trim(),'t')
    assert.deepEqual(await moderationHistory(),savedModerationHistory,'Les historiques et notifications préexistants sont inchangés')
@@ -132,7 +142,15 @@ try {
   reference.migrations.push({name,sha256:sqlSha256(await readFile(file))})
   const state=await snapshot();snapshots.push(state);reference.stages.push(state.objects)
  }
- if(process.argv.includes('--focus-external-publication')){
+ if(process.argv.includes('--focus-developer-workspace')){
+  assert.equal(compareSchema(await snapshot(),reference).status,'PASS')
+  for(const name of ['developer-workspace-db.sql','external-developer-submission-db.sql','external-game-publication-db.sql','maintenance-db.sql'])await run('psql',[...args,'-f',join(root,'tests',name)])
+  const {developerEmailPipeline}=await import('./developer-email-pipeline-db.mjs')
+  await developerEmailPipeline(async sql=>(await query(sql)).stdout.trim())
+  if(process.argv.includes('--write'))await writeFile(join(root,'contracts/production-schema.v1.json'),JSON.stringify(reference)+'\n')
+  else assert.deepEqual(JSON.parse(await readFile(join(root,'contracts/production-schema.v1.json'),'utf8')),reference)
+  console.log('Developer workspace SQL PASS: ownership, statistics, correction, shared review queue, ZIP/URL lifecycle, immutable payloads, historical notifications and grants.')
+ }else if(process.argv.includes('--focus-external-publication')){
   await run('psql',[...args,'-f',join(root,'tests/external-game-publication-db.sql')])
   await run('psql',[...args,'-f',join(root,'tests/external-developer-submission-db.sql')])
   const fixture=await readFile(join(root,'tests/external-game-publication-db.sql'),'utf8')
@@ -155,6 +173,8 @@ try {
   await run('psql',[...args,'-f',join(root,'scripts/sql/public-game-origins-preflight.sql')])
  }else{
  const final=await snapshot()
+ await run('psql',[...args,'-f',join(root,'tests/developer-workspace-db.sql')])
+ await run('psql',[...args,'-f',join(root,'tests/external-developer-submission-db.sql')])
  await assert.rejects(run('psql',[...args,'-f',join(root,'supabase/migrations/20261024000100_account_deletion.sql')]))
  assert.equal(compareSchema(base,reference).status,'MIGRATIONS_REQUIRED',JSON.stringify(compareSchema(base,reference).rows.filter(row=>row.status==='BLOCKING_DRIFT')))
  assert.equal(compareSchema(base,reference).rows.some(row=>row.status==='DIFFERENCE_EXPECTED'),true)

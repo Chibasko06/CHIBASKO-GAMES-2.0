@@ -1,5 +1,6 @@
 begin;
 insert into auth.users(id) values ('ef410000-0000-4000-8000-000000000001'),('ef410000-0000-4000-8000-000000000002'),('ef410000-0000-4000-8000-000000000003');
+update auth.users set email='external-creator@example.test',email_confirmed_at=now() where id='ef410000-0000-4000-8000-000000000001';
 insert into public.admin_users(user_id) values ('ef410000-0000-4000-8000-000000000003');
 insert into public.developer_contacts(user_id,first_name,last_name,contact_email,public_name)
  values ('ef410000-0000-4000-8000-000000000001','Test','Fixture','fixture@example.com','Fixture Studio');
@@ -23,7 +24,7 @@ begin
  sid:=public.distribution_submit_external(owner_id,g,revision,origin||'/old',origin,cover);
  if public.distribution_submit_external(owner_id,g,revision,origin||'/old',origin,cover)<>sid then
    raise exception 'idempotence failure'; end if;
- if (select count(*) from public.game_submission_notifications where submission_id=sid)<>1
+ if (select count(*) from public.game_submission_notifications where submission_id=sid and event_key='internal')<>1
    then raise exception 'external notification missing or duplicated'; end if;
  job:=public.distribution_claim_submission_email(sid);
  if job->>'externalRevisionId' is distinct from revision::text
@@ -36,8 +37,9 @@ begin
    or public.distribution_developer_external(owner_id,0)->0->>'url'<>origin||'/old' then
    raise exception 'incorrect visibility'; end if;
  perform public.distribution_external_review(admin_id,revision,'correction','Remplacer l’URL');
+ if (select count(*) from public.game_submission_notifications where submission_id=sid and notification->>'event'='correction')<>1 then raise exception 'Missing developer correction'; end if;
  next_sid:=public.distribution_submit_external(owner_id,g,next_revision,origin||'/new',origin,cover);
- if (select count(*) from public.game_submission_notifications where submission_id=next_sid)<>1
+ if (select count(*) from public.game_submission_notifications where submission_id=next_sid and event_key='internal')<>1
    then raise exception 'external resubmission did not create its own notification'; end if;
  if next_sid=sid or not exists(select 1 from public.game_external_revisions where id=revision and submitted_url=origin||'/old')
    or not exists(select 1 from public.game_external_review_events where revision_id=revision and action='correction')
@@ -55,6 +57,8 @@ begin
    where item->>'id'=next_revision::text and item->>'url'=origin||'/new') then raise exception 'missing review dossier'; end if;
  perform public.distribution_external_review(admin_id,next_revision,'approve',null,origin,true);
  perform public.distribution_external_review(admin_id,next_revision,'publish');
+ if (select count(*) from public.game_submission_notifications where submission_id=next_sid and notification->>'event' in ('received','accepted','published'))<>3 then raise exception 'Missing developer lifecycle event'; end if;
+ if jsonb_array_length(public.distribution_admin_external_review_detail(admin_id,next_revision))<>1 then raise exception 'Wrong revision detail'; end if;
  if not exists(select 1 from public.games where id=g and title='Fixture' and thumbnail_url=cover)
    or not exists(select 1 from public.game_categories where game_id=g and category_id='ef410000-0000-4000-8000-000000000007')
    or not exists(select 1 from jsonb_array_elements(public.catalogue_page(p_slug=>(select slug from public.games where id=g))->'items') as item

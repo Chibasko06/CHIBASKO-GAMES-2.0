@@ -19,8 +19,8 @@ export default function AdminOverview({ token }: { token: string | null }) {
     <button className="mt-3 text-cyan-300 underline" onClick={() => setReload(n => n + 1)}>Réessayer</button>
   </div>
   if (!data) return <p role="status" className="text-sm text-zinc-400">Chargement de la vue d’ensemble…</p>
-  const metrics = [['Jeux au catalogue', data.games, '/admin?section=games'], ['Jeux publiés', data.publishedGames, '/admin?section=games&status=published'], ['Utilisateurs', data.users, '/admin?section=users'], ['Soumissions à examiner', data.buildsAwaitingReview, '/admin/game-builds']] as const
-  const tasks = [['Soumissions à examiner', data.buildsAwaitingReview, '/admin/game-builds'], ['Vérifications techniques en attente', data.buildsAwaitingValidation, '/admin/game-builds'], ['Suppressions à vérifier', data.deletionsAwaitingReview, '/admin/account-deletions'], ['Suppressions nécessitant une intervention', data.deletionsBlocked, '/admin/account-deletions']] as const
+  const metrics = [['Jeux au catalogue', data.games, '/admin?section=games'], ['Jeux publiés', data.publishedGames, '/admin?section=games&status=published'], ['Utilisateurs', data.users, '/admin?section=users'], ['Soumissions à examiner', data.buildsAwaitingReview, '/admin/game-builds?view=review']] as const
+  const tasks = [['Soumissions à examiner', data.buildsAwaitingReview, '/admin/game-builds?view=review'], ['Vérifications techniques en attente', data.buildsAwaitingValidation, '/admin/game-builds?view=validation'], ['Suppressions à vérifier', data.deletionsAwaitingReview, '/admin/account-deletions'], ['Suppressions nécessitant une intervention', data.deletionsBlocked, '/admin/account-deletions']] as const
   return <div className="space-y-6">
     <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">{metrics.map(([label, count, href]) =>
       <div key={label} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">

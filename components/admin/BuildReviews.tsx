@@ -15,12 +15,15 @@ import {ReviewBadge,ReviewCard,reviewButton,reviewPrimary} from './ReviewPrimiti
 import LegacySubmissions from './LegacySubmissions'
 import ExternalBuildReviews from './ExternalBuildReviews'
 import BuildValidationDiagnostic from './BuildValidationDiagnostic'
+import ReviewQueue from './ReviewQueue'
 import {parseValidationEvent,parsePlaytestEvent,describeValidation} from '@/lib/game-distribution/validation-diagnostics'
 import {integrationLabel} from '@/lib/game-distribution/integration'
 import type {IntegrationObservation} from '@/lib/game-runtime/contracts'
 const GameRuntime=dynamic(()=>import('@/components/game-runtime/GameRuntime'),{ssr:false})
-export default function BuildReviews({id}:{id?:string}){
+export default function BuildReviews({id,queue,revisionId}:{id?:string;queue?:'review'|'validation';revisionId?:string}){
  const {session}=useAuth()
+ if(queue)return <AdminShell active="submissions"><ReviewQueue key={queue} kind={queue} token={session?.access_token}/></AdminShell>
+ if(revisionId)return <AdminShell active="submissions"><ExternalBuildReviews key={revisionId} token={session?.access_token} refresh={0} revisionId={revisionId}/></AdminShell>
  return <Panel key={(session?.user.id??'anonymous')+':'+(id??'list')} id={id} token={session?.access_token}/>
 }
 function Panel({id,token}:{id?:string;token?:string}){

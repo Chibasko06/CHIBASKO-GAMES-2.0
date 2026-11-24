@@ -43,7 +43,7 @@ function Workspace({actor,token,categories}:{actor:string;token:string;categorie
    {!profileReady&&<FormFeedback tone="info" title="Complétez votre fiche développeur avant d’envoyer une soumission"><p>Les coordonnées sont conservées pour les prochaines soumissions. Vos brouillons restent privés et enregistrés séparément.</p></FormFeedback>}
    <SubmissionTabs mode={mode} disabled={editing} onChange={setMode}/>
    <fieldset disabled={!profileReady} className="min-w-0 border-0 p-0"><legend className="sr-only">Soumission du build</legend><section role="tabpanel" id="submission-panel" aria-labelledby={'tab-'+mode}>
-     {mode==='new'?<NewGamePublication token={token} categories={categories} onEditingChange={setEditing} external={external}/>:external?<ExternalSubmissions token={token} updatesOnly/>:<UpdateGamePublication actor={actor} token={token}/>}
+     {mode==='new'?<NewGamePublication token={token} categories={categories} onEditingChange={setEditing} external={external}/>:external?<ExternalSubmissions token={token} updatesOnly gameId={query.get('game')??undefined}/>:<UpdateGamePublication actor={actor} token={token}/>}
    </section></fieldset>
  </div>
 }

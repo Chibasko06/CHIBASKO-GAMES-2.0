@@ -12,17 +12,17 @@ const statuses:Record<string,string> = {
 }
 const revisable = new Set(['correction','reject','publish','suspend','withdraw'])
 
-export default function ExternalSubmissions({token,updatesOnly=false}:{token:string;updatesOnly?:boolean}){
+export default function ExternalSubmissions({token,updatesOnly=false,gameId}:{token:string;updatesOnly?:boolean;gameId?:string}){
   const [rows,setRows]=useState<Revision[]>([])
   const [offset,setOffset]=useState(0),[reload,setReload]=useState(0)
   const [loading,setLoading]=useState(true),[error,setError]=useState(false)
   useEffect(()=>{
     const controller=new AbortController()
-    developerJson('/api/developer/submissions/external?offset='+offset,token,{signal:controller.signal})
-      .then(({data})=>{if(!controller.signal.aborted){setRows(data);setError(false);setLoading(false)}})
+    developerJson(gameId?'/api/developer/workspace?gameId='+encodeURIComponent(gameId):'/api/developer/submissions/external?offset='+offset,token,{signal:controller.signal})
+      .then(({data})=>{if(!controller.signal.aborted){setRows(gameId?data.external.map((row:Revision&{history:{reason:string|null}[]},index:number)=>({...row,gameId,title:data.games[0].title,latest:index===0,updateOnly:!!data.games[0].externalRevisionId,reason:row.history[0]?.reason??null})):data);setError(false);setLoading(false)}})
       .catch(()=>{if(!controller.signal.aborted){setRows([]);setError(true);setLoading(false)}})
     return()=>controller.abort()
-  },[token,offset,reload])
+  },[token,offset,reload,gameId])
   const shown=updatesOnly?rows.filter(row=>row.latest&&row.updateOnly):rows
   return <section className="space-y-3" aria-label="Soumissions externes">
     <h2 className="text-xl">Hébergement externe</h2>
@@ -42,8 +42,8 @@ export default function ExternalSubmissions({token,updatesOnly=false}:{token:str
         : <Link className="text-cyan-300 underline" href={'/publier-un-jeu?hosting=external&draft='+encodeURIComponent(row.gameId)}>Soumettre une nouvelle URL depuis le brouillon</Link>)}
     </article>)}
     <div className="flex gap-4">
-      <button type="button" disabled={!offset} onClick={()=>setOffset(n=>n-50)}>Précédent</button>
-      <button type="button" disabled={rows.length<50} onClick={()=>setOffset(n=>n+50)}>Suivant</button>
+      {!gameId&&<><button type="button" disabled={!offset} onClick={()=>setOffset(n=>n-50)}>Précédent</button>
+      <button type="button" disabled={rows.length<50} onClick={()=>setOffset(n=>n+50)}>Suivant</button></>}
       <button type="button" onClick={()=>setReload(n=>n+1)}>Actualiser</button>
     </div>
   </section>

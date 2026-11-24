@@ -16,11 +16,13 @@ export default function UpdateGamePublication({actor,token}:{actor:string;token:
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false),[progress,setProgress]=useState(0),[received,setReceived]=useState<string|null>(null)
  const zip=usePublicationZip(file,game,version,max)
  const controller=useRef<AbortController|null>(null)
+ const contextualGame=useRef<string|null>(null)
  const [errorCode,setErrorCode]=useState('')
  function clearError(){setError('');setErrorCode('')}
  const feedback=(location:string)=><PublicationError code={errorCode} message={error} version={version} id="update-error" location={location}/>
  useEffect(()=>()=>controller.current?.abort(),[])
- useEffect(()=>{const abort=new AbortController();developerJson('/api/developer/games?offset='+offset,token,{signal:abort.signal}).then(body=>{if(!abort.signal.aborted){setGames(body.data);setMax(body.maxArchiveBytes);setLoading(false)}}).catch(()=>{if(!abort.signal.aborted){setError('Impossible de charger les jeux gérés.');setLoading(false)}});return()=>abort.abort()},[token,offset])
+ useEffect(()=>{const selected=new URLSearchParams(window.location.search).get('game');if(!selected||contextualGame.current===selected)return;const c=new AbortController();developerJson('/api/developer/workspace?gameId='+encodeURIComponent(selected),token,{signal:c.signal}).then(({data})=>{if(!c.signal.aborted&&data.games[0]){contextualGame.current=selected;setGame(selected);setGames(existing=>existing.some(row=>row.id===selected)?existing:[{id:selected,title:data.games[0].title},...existing]);if(draft&&draft.gameId!==selected){setDraft(null);setFile(null);setReceived(null);setVersion('')}}}).catch(()=>{if(!c.signal.aborted)setError('Jeu introuvable ou accès refusé.')});return()=>c.abort()},[token,draft])
+ useEffect(()=>{const abort=new AbortController();developerJson('/api/developer/games?offset='+offset,token,{signal:abort.signal}).then(body=>{if(!abort.signal.aborted){setGames(previous=>{const selected=previous.find(row=>row.id===new URLSearchParams(window.location.search).get('game'));return selected&&!body.data.some((row:ManagedGame)=>row.id===selected.id)?[selected,...body.data]:body.data});setMax(body.maxArchiveBytes);setLoading(false)}}).catch(()=>{if(!abort.signal.aborted){setError('Impossible de charger les jeux gérés.');setLoading(false)}});return()=>abort.abort()},[token,offset])
  useEffect(()=>{const upload=new URLSearchParams(window.location.search).get('upload');if(!upload)return;const abort=new AbortController();developerJson('/api/developer/submissions?uploadId='+encodeURIComponent(upload),token,{signal:abort.signal}).then(({data})=>{if(!abort.signal.aborted&&data.kind==='update'){setGame(data.gameId);setVersion(data.version);setReceived(upload)}}).catch(()=>{if(!abort.signal.aborted)setError('Envoi introuvable ou accès refusé.')});return()=>abort.abort()},[token])
  function save(value:UploadDraft){setDraft({...value});try{sessionStorage.setItem(key,JSON.stringify(value))}catch{}}
  async function send(){clearError();if(!received&&(!file||!zipFileAllowed(file,max))){const code=file&&file.size>max?'file_too_large':'invalid_zip';setErrorCode(code);setError(submissionError(code));return}
@@ -36,7 +38,7 @@ export default function UpdateGamePublication({actor,token}:{actor:string;token:
  }
  useEffect(()=>{if(error)document.getElementById('update-error')?.focus()},[error])
  const button='rounded-lg border border-cyan-700 px-4 py-2 disabled:opacity-40'
- if(done)return <FormFeedback tone="success" title="Jeu reçu — vérification sous 24 à 48 h"><Link href="/developer/submissions">Mes soumissions</Link></FormFeedback>
+ if(done)return <FormFeedback tone="success" title="Dépôt reçu — en attente de revue"><Link href={'/developer/games/'+game}>Ouvrir le dossier du jeu</Link></FormFeedback>
  return <form className="space-y-5" onSubmit={event=>{event.preventDefault();void send()}}>
    <fieldset disabled={busy||!!draft?.uploadId||!!received} className="space-y-4"><legend className="text-xl">Version d’un jeu existant</legend><ManagedGamePicker games={games} value={game} loading={loading} onChange={value=>{setGame(value);if(draft&&!draft.uploadId){setDraft(null);try{sessionStorage.removeItem(key)}catch{}}clearError()}}/>
    <div className="flex gap-3"><button type="button" className={button} disabled={!offset} onClick={()=>setOffset(value=>Math.max(0,value-50))}>Jeux précédents</button><button type="button" className={button} disabled={games.length<50} onClick={()=>setOffset(value=>value+50)}>Jeux suivants</button></div></fieldset>
