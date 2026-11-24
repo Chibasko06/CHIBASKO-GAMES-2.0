@@ -3,19 +3,20 @@ import Link from 'next/link'
 import {useEffect,useRef,useState} from 'react'
 import {developerJson,SubmissionError} from '@/lib/game-distribution/browser-upload'
 import ExternalGamePlayer from './game-runtime/ExternalGamePlayer'
+import {externalStatus} from '@/lib/developerPresentation'
+import {Badge,DevDate,Pagination,Empty} from './developer/DeveloperUI'
+import styles from './developer/developer.module.css'
 
 type Revision = {id:string;gameId:string;title:string;url:string;createdAt:string;status:string;action:string|null;reason:string|null;latest:boolean;updateOnly:boolean}
-const statuses:Record<string,string> = {
-  pending:'En attente de revue', reviewing:'En cours de revue', accepted:'Approuvée',
-  rejected:'Refusée', archived:'Retirée', correction:'Correction demandée', publish:'Publiée',
-  suspend:'Suspendue', withdraw:'Retirée',
-}
 const revisable = new Set(['correction','reject','publish','suspend','withdraw'])
 
-export default function ExternalSubmissions({token,updatesOnly=false,gameId}:{token:string;updatesOnly?:boolean;gameId?:string}){
+type Props={token:string;updatesOnly?:boolean;gameId?:string}
+export default function ExternalSubmissions(props:Props){return <RevisionList key={props.token+':'+(props.gameId??'')+':'+!!props.updatesOnly} {...props}/>}
+function RevisionList({token,updatesOnly=false,gameId}:Props){
   const [rows,setRows]=useState<Revision[]>([])
   const [offset,setOffset]=useState(0),[reload,setReload]=useState(0)
   const [loading,setLoading]=useState(true),[error,setError]=useState(false)
+  const [preview,setPreview]=useState<string|null>(null)
   useEffect(()=>{
     const controller=new AbortController()
     developerJson(gameId?'/api/developer/workspace?gameId='+encodeURIComponent(gameId):'/api/developer/submissions/external?offset='+offset,token,{signal:controller.signal})
@@ -24,27 +25,26 @@ export default function ExternalSubmissions({token,updatesOnly=false,gameId}:{to
     return()=>controller.abort()
   },[token,offset,reload,gameId])
   const shown=updatesOnly?rows.filter(row=>row.latest&&row.updateOnly):rows
-  return <section className="space-y-3" aria-label="Soumissions externes">
-    <h2 className="text-xl">Hébergement externe</h2>
-    {loading?<p role="status">Chargement des révisions…</p>:error?<p role="alert">Impossible de charger les révisions externes.</p>:!shown.length?<p>Aucune révision externe sur cette page.</p>:null}
-    {shown.map(row=><article key={row.id} className="space-y-2 rounded border border-zinc-700 p-4">
-      <h3 className="font-semibold">{row.title}</h3>
-      <p>{statuses[row.action??'']??statuses[row.status]??'En attente de revue'}</p>
-      <p className="break-all">URL : {row.url}</p>
-      <p className="break-all text-sm">Révision {row.id} · {new Date(row.createdAt).toLocaleDateString('fr-FR')}</p>
-      {row.reason&&<p>{row.reason}</p>}
-      {!updatesOnly&&<details>
-        <summary className="cursor-pointer text-cyan-300">Prévisualisation privée</summary>
-        <ExternalGamePlayer title={row.title} revisionId={row.id} token={token}/>
+  return <section className={styles.stack} aria-label="Soumissions externes">
+    <h2 className="text-xl">Hébergement externe</h2><p className={styles.muted}>Chaque URL est enregistrée dans une révision. Une correction conserve la précédente et repasse en revue.</p>
+    {loading?<p role="status">Chargement des révisions…</p>:error?<p role="alert" className={styles.notice}>Impossible de charger les révisions externes.</p>:!shown.length?<Empty title="Aucune révision externe" icon="globe">Les jeux proposés par URL HTTPS apparaîtront ici.</Empty>:null}
+    {!loading&&shown.map(row=><article key={row.id} className={styles.submission}>
+      <div className={styles.split}><div><p className={styles.eyebrow}>URL externe · HTML5 classique</p><h3><Link href={'/developer/games/'+row.gameId}>{row.title}</Link></h3><p className={styles.small}>Déposée le <DevDate value={row.createdAt} withTime/></p></div><Badge {...externalStatus(row.action,row.status)}/></div>
+      <p className={styles.identifier}>URL : {row.url}</p>
+      <details className={styles.details}><summary>Identifiant de révision</summary><p className={styles.identifier}>{row.id}</p></details>
+      {row.reason&&<div className={styles.reason}><strong>Motif de la revue</strong><p>{row.reason}</p></div>}
+      {!updatesOnly&&<details onToggle={e=>setPreview(e.currentTarget.open?row.id:null)}>
+        <summary className="cursor-pointer py-3 text-cyan-300">Prévisualisation privée</summary>
+        {preview===row.id&&<ExternalGamePlayer title={row.title} revisionId={row.id} token={token}/>}
       </details>}
       {row.latest&&row.action&&revisable.has(row.action)&&(row.updateOnly
         ? <RevisionForm key={row.id} row={row} token={token} onSubmitted={()=>{setOffset(0);setReload(n=>n+1)}}/>
-        : <Link className="text-cyan-300 underline" href={'/publier-un-jeu?hosting=external&draft='+encodeURIComponent(row.gameId)}>Soumettre une nouvelle URL depuis le brouillon</Link>)}
+        : <Link className={styles.secondary} href={'/publier-un-jeu?hosting=external&draft='+encodeURIComponent(row.gameId)}>Soumettre une nouvelle URL depuis le brouillon</Link>)}
+      {!updatesOnly&&<Link className={styles.link} href={'/developer/games/'+row.gameId}>Historique du jeu →</Link>}
     </article>)}
-    <div className="flex gap-4">
-      {!gameId&&<><button type="button" disabled={!offset} onClick={()=>setOffset(n=>n-50)}>Précédent</button>
-      <button type="button" disabled={rows.length<50} onClick={()=>setOffset(n=>n+50)}>Suivant</button></>}
-      <button type="button" onClick={()=>setReload(n=>n+1)}>Actualiser</button>
+    <div className={styles.stack}>
+      {!gameId&&<Pagination offset={offset} size={50} hasNext={rows.length===50} onChange={n=>{setLoading(true);setPreview(null);setOffset(n)}}/>}
+      <button type="button" className={styles.secondary} onClick={()=>{setLoading(true);setReload(n=>n+1)}}>Recharger les révisions</button>
     </div>
   </section>
 }

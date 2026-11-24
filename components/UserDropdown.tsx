@@ -126,6 +126,7 @@ export default function UserDropdown({
           >
             MES FAVORIS
           </Link>
+          <Link href="/developer" className="block border-b border-zinc-900 px-4 py-3 text-xs font-bold text-cyan-200 hover:bg-zinc-900" onClick={()=>setOpen(false)}>ESPACE DÉVELOPPEUR</Link>
           {isAdmin ? (
             <Link
               href="/admin"

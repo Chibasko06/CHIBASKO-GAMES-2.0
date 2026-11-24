@@ -94,7 +94,6 @@ export function Navbar() {
               Tous les jeux
             </Link>
             <Link href="/multiplayer" className={sharedLinkClass}>Multijoueur</Link>
-            <Link href="/developer" className={sharedLinkClass}>Espace développeur</Link>
             <Link href="/players" className={sharedLinkClass}>
               Communaute
             </Link>
@@ -158,7 +157,6 @@ export function Navbar() {
               Tous les jeux
             </Link>
             <Link href="/multiplayer" onClick={handleCloseMobileMenu} className="rounded-2xl border border-cyan-900 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] text-cyan-200">Multijoueur</Link>
-            <Link href="/developer" onClick={handleCloseMobileMenu} className="rounded-2xl border border-cyan-900 px-4 py-3 text-sm font-bold text-cyan-200">Espace développeur</Link>
             <Link href="/players" onClick={handleCloseMobileMenu} className="rounded-2xl border border-zinc-800 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em]">
               Communaute
             </Link>
@@ -197,6 +195,7 @@ export function Navbar() {
                         <p className="truncate text-xs text-zinc-500">{user.email}</p>
                       </div>
                     </div>
+                    <Link href="/developer" onClick={handleCloseMobileMenu} className="mt-4 block rounded-xl border border-cyan-900 px-4 py-3 text-sm font-semibold text-cyan-200">Espace développeur</Link>
                     <button
                       type="button"
                       onClick={() => void handleLogout()}

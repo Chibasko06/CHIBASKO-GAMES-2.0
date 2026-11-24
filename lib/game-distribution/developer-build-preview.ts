@@ -45,7 +45,7 @@ export type DeveloperBuildDetails = ReturnType<typeof developerBuildDetails>
 
 export function previewUnavailable(build: DeveloperBuildDetails) {
   if (build.onlineOnly) return 'Ce build nécessite une session multijoueur. Le test local du lecteur est indisponible.'
-  if (build.versionStatus === 'published') return 'Cette version est publiée. Testez-la depuis sa fiche publique.'
+  if (build.versionStatus === 'published') return 'Cette version a été acceptée. Consultez le dossier du jeu pour connaître sa visibilité publique.'
   if (build.technicalStatus === 'failed' || build.technicalStatus === 'expired') return 'La vérification technique doit réussir avant de pouvoir lancer ce build.'
   if (['archived', 'rejected'].includes(build.decision)) return 'La décision de revue ferme la prévisualisation de ce build.'
   if (build.decision === 'pending' && build.reason) return 'Une correction est attendue. Consultez les résultats avant d’envoyer un nouveau build.'
