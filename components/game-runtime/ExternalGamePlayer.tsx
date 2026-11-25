@@ -5,15 +5,15 @@ import {externalFramePolicy} from '@/lib/game-runtime/iframePolicy'
 import GameLauncher from './GameLauncher'
 import GamePlayerShell from './GamePlayerShell'
 import GamePlayerError from './GamePlayerError'
-import PlayerFrame,{legacyViewport} from './PlayerFrame'
+import PlayerFrame,{legacyViewport,type PlayerSizing} from './PlayerFrame'
 import PreviewManualChecks from './PreviewManualChecks'
 import styles from './GameRuntime.module.css'
 
-type Props = {title:string;coverUrl?:string|null;developerName?:string|null} &
+type Props = {sizing?:PlayerSizing;title:string;coverUrl?:string|null;developerName?:string|null} &
   ({gameId:string;revisionId?:never;token?:never}|{gameId?:never;revisionId:string;token:string})
 type Phase = 'launcher'|'launching'|'playing'|'error'
 
-export default function ExternalGamePlayer({title,coverUrl,developerName,gameId,revisionId,token}:Props){
+export default function ExternalGamePlayer({title,coverUrl,developerName,gameId,revisionId,token,sizing}:Props){
   const [phase,setPhase]=useState<Phase>('launcher')
   const [frame,setFrame]=useState<{policy:ReturnType<typeof externalFramePolicy>;revisionId:string}|null>(null)
   const request=useRef<AbortController|null>(null)
@@ -62,7 +62,7 @@ export default function ExternalGamePlayer({title,coverUrl,developerName,gameId,
     <GamePlayerShell presentation="legacy" phase={phase} canLeave={phase!=='launcher'} onLeave={close}>
       {phase==='launcher'&&<GameLauncher title={title} coverUrl={coverUrl} developerName={developerName}
         actions={[{id:'play',label:preview?'Lancer la prévisualisation':'Jouer',available:true}]} onPlay={()=>void launch()}/>}
-      {frame&&(phase==='launching'||phase==='playing')&&<PlayerFrame viewport={legacyViewport}>
+      {frame&&(phase==='launching'||phase==='playing')&&<PlayerFrame viewport={legacyViewport} sizing={sizing}>
         <iframe title={preview?'Prévisualisation du jeu externe':'Jeu HTML5 externe'} {...frame.policy}
           className={styles.legacyFrame} onLoad={()=>setPhase('playing')} onError={()=>setPhase('error')}/>
       </PlayerFrame>}

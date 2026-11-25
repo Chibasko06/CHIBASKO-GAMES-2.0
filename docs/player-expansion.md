@@ -4,10 +4,27 @@ Le bouton « Agrandir le jeu » appartient au lecteur commun, pas au jeu embarqu
 
 ## Modes
 
-- **Natif** : API standard si elle est disponible et autorisée, sinon API WebKit préfixée lorsqu’elle existe. Le lecteur suit les événements standard et préfixés. La commande de sortie reste visible dans un coin de la surface native ; les autres éléments du dock conservent leur comportement antérieur.
-- **Immersif web** : repli automatique si l’entrée native est absente, refusée, lève une exception ou ne confirme pas son entrée après 1,5 seconde. Le lecteur remplit le viewport visible et conserve son dock, notamment la sortie et l’audio. Les barres de Safari peuvent rester visibles : ce mode ne prétend pas les supprimer.
+- **Natif** : API standard si elle est disponible et autorisée, sinon API WebKit préfixée lorsqu’elle existe. Le lecteur suit les événements standard et préfixés.
+- **Immersif web** : repli automatique si l’entrée native est absente, refusée, lève une exception ou ne confirme pas son entrée après 1,5 seconde. Le lecteur remplit le viewport visible. Les barres de Safari peuvent rester visibles : ce mode ne prétend pas les supprimer.
+
+Dans les deux modes agrandis, aucune ligne permanente n’est réservée aux commandes. La sortie et l’ouverture du panneau restent visibles, avec des cibles tactiles de 44 pixels. Le panneau regroupe réactions, audio, fermeture de la partie et déplacement des commandes ; son ouverture ne redimensionne pas le jeu. Sa hauteur est bornée et ses premières commandes restent accessibles pendant son défilement.
+
+Les commandes privilégient les marges connues autour du contenu. Le lecteur ne lit pas le DOM du jeu cross-origin et ne prétend pas détecter son HUD. Le joueur peut déplacer le panneau entre les quatre coins. Échap ferme d’abord le panneau, puis réduit le mode immersif lorsqu’il atteint le document du portail.
 
 Le lecteur et son iframe ne changent jamais de parent. Aucun `src`, sandbox, permission, origine ou ticket n’est modifié par l’agrandissement. Une sortie du mode agrandi ne quitte pas la partie. « Quitter le jeu » conserve son effet habituel et restitue d’abord l’affichage du portail.
+
+## Dimensionnement
+
+`PlayerSizing` est indépendant de l’hébergement et de l’intégration :
+
+- `responsive` fournit au jeu toute la surface utile ; son moteur reste responsable de son rendu interne ;
+- `fixed` fournit un viewport logique déclaré et le contient par une échelle uniforme, sans étirement ni rognage.
+
+Les composants des quatre parcours acceptent cette politique. Les anciens paramètres `viewport`, `nativeViewport` et `fixedViewport` restent compatibles. Sans déclaration explicite, les URL et les jeux legacy conservent leur viewport 1280 × 720 ; les builds R2 gardent le comportement qu’ils avaient déjà. Aucun jeu GameMonetize n’est reclassé automatiquement.
+
+La politique est un contrat des composants fourni par le portail. Elle n’est pas déduite du SDK, d’un domaine, d’un paramètre d’URL utilisateur ou d’un message du jeu. Ce lot n’ajoute pas de déclaration publique dans le manifeste ni de champ SQL : une future déclaration persistée devra être validée et liée au build ou à la révision examinée.
+
+La fixture Freehead Skate reproduit son viewport logique 720 × 405 et son letterboxing, sans exécuter le jeu tiers. Dans un viewport paysage de 844 × 281 avec 59 pixels sûrs à gauche et à droite et 20 en bas, la surface utile est de 726 × 261. Le jeu occupe désormais 464 × 261, contre environ 363 × 204 avec la ligne de commandes de 57 pixels : +27,94 % par dimension, soit environ +63,7 % de surface. En portrait, il reste limité par la largeur : les bandes ne sont pas supprimées artificiellement. Cette mesure est identique avec une iframe fixe et une iframe responsive lorsque le jeu conserve lui-même son ratio 16:9.
 
 ## Restauration
 
@@ -41,15 +58,16 @@ WebKit Playwright sous Windows ne remplace pas Safari sur appareil Apple. Avant 
 
 Aucune migration ni nouvelle configuration d’infrastructure n’est nécessaire. Le correctif est livré avec le portail ; il ne nécessite aucun changement du Gateway ou du SDK.
 
-## Résultats locaux du 24 novembre 2026
+## Résultats locaux du 25 novembre 2026
 
 | Contrôle | Résultat |
 | --- | --- |
-| Chrome, agrandissement et restauration | 16 tests réussis |
-| WebKit Playwright sous Windows | 16 tests réussis |
+| Chrome, agrandissement, dimensionnement et commandes compactes | 26 tests réussis |
+| WebKit Playwright sous Windows | 26 tests réussis |
 | Lecteur existant, sandbox, audio, sessions et SDK | 97 tests réussis |
 | SDK réel sur origine stable, immersion répétée sans nouvelle session | 1 test réussi |
 | Runtime, intégrations et diagnostics unitaires | 39 tests réussis |
+| Politiques de dimensionnement et placement des commandes | 2 tests réussis |
 | TypeScript, ESLint ciblé, `git diff --check` | Réussis |
 | Build Cloudflare Linux et démarrage isolé du Worker OpenNext | Réussis |
 

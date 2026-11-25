@@ -1,4 +1,4 @@
-.shell{box-sizing:border-box;position:relative;isolation:isolate;display:grid;grid-template-rows:auto auto;container-type:inline-size;width:100%;max-width:1282px;margin-inline:auto;height:auto;min-height:0;background:#090d16;color:#f8fafc;border:1px solid #25404b;border-radius:12px;box-shadow:0 12px 36px #0004;overflow:hidden;font-family:system-ui,sans-serif}
+.shell{--player-safe-top:env(safe-area-inset-top);--player-safe-right:env(safe-area-inset-right);--player-safe-bottom:env(safe-area-inset-bottom);--player-safe-left:env(safe-area-inset-left);box-sizing:border-box;position:relative;isolation:isolate;display:grid;grid-template-rows:auto auto;container-type:inline-size;width:100%;max-width:1282px;margin-inline:auto;height:auto;min-height:0;background:#090d16;color:#f8fafc;border:1px solid #25404b;border-radius:12px;box-shadow:0 12px 36px #0004;overflow:hidden;font-family:system-ui,sans-serif}
 .shell:fullscreen{width:100%;max-width:none;margin:0;height:100dvh;min-height:0;border:0;border-radius:0;background:#09090b}
 .surface{container:game-surface / size;position:relative;min-width:0;min-height:0;height:56.25cqw;aspect-ratio:16/9;overflow:hidden}
 .viewport{position:absolute;inset:0;min-width:0;min-height:0}
@@ -50,13 +50,28 @@
 .shell:fullscreen > .surface { height:100dvh; aspect-ratio:auto; }
 .shell:fullscreen > .dock { display:contents; }
 /* Le pseudo-état natif restitue la géométrie avant même la notification JavaScript de sortie. */
-.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) {width:100%;max-width:none;height:100vh;height:100dvh;margin:0;border:0;border-radius:0;grid-template-rows:minmax(0,1fr)}
-.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) > .surface {height:100vh;height:100dvh;aspect-ratio:auto}
-.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) > .dock,.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) .actions {display:contents}
-.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) .dock > :not(.actions),.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) .actions > :not([data-player-expand]) {display:none}
-.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) [data-player-expand] {position:absolute;z-index:5;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));background:#09090be6;border-color:#475569;color:#ecfeff}
-.shell[data-expansion="immersive"] {position:fixed;inset:auto;left:var(--player-view-left,0px);top:var(--player-view-top,0px);width:var(--player-view-width,100vw);height:var(--player-view-height,100dvh);max-width:none;margin:0;border:0;border-radius:0;z-index:2147483647;grid-template-rows:minmax(0,1fr) auto;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:#09090b;overscroll-behavior:none}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) {width:100%;max-width:none;height:100vh;height:100dvh;margin:0;border:0;border-radius:0;grid-template-rows:minmax(0,1fr);padding:var(--player-safe-top) var(--player-safe-right) var(--player-safe-bottom) var(--player-safe-left)}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"]) > .surface {height:auto;aspect-ratio:auto}
+.shell[data-expansion="immersive"] {position:fixed;inset:auto;left:var(--player-view-left,0px);top:var(--player-view-top,0px);width:var(--player-view-width,100vw);height:var(--player-view-height,100dvh);max-width:none;margin:0;border:0;border-radius:0;z-index:2147483647;grid-template-rows:minmax(0,1fr);padding:var(--player-safe-top) var(--player-safe-right) var(--player-safe-bottom) var(--player-safe-left);background:#09090b;overscroll-behavior:none}
 .shell[data-expansion="immersive"] > .surface {height:auto;aspect-ratio:auto}
+.compactOnly {display:none}
+/* Le panneau reste dans le lecteur et ne consomme aucune ligne de la surface agrandie. */
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) > .dock {position:absolute;z-index:5;display:grid;grid-template-columns:44px 44px;gap:4px;width:auto;max-width:calc(100% - var(--player-safe-left) - var(--player-safe-right) - 16px);padding:4px;border:1px solid #475569;border-radius:12px;background:#09090be6;pointer-events:none;top:calc(var(--player-safe-top) + 8px);left:calc(var(--player-safe-left) + 8px);right:auto;bottom:auto}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) .dock > .logo {display:none}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) .actions {display:contents}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) .dock .iconButton {pointer-events:auto}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) [data-player-expand] {grid-row:1;grid-column:1}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) [data-player-menu] {display:grid;grid-row:1;grid-column:2}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) :is(.reactions,.control,[data-player-leave],[data-player-move]) {display:none}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-open="true"] > .dock {width:176px;grid-template-columns:repeat(2,minmax(44px,1fr));gap:6px;padding:6px;pointer-events:auto;background:#09090bf5;max-height:calc(100% - var(--player-safe-top) - var(--player-safe-bottom) - 16px);overflow-y:auto;overscroll-behavior:contain}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-open="true"] .reactions {display:flex;grid-row:2;grid-column:1/-1;justify-content:center}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-open="true"] .control {display:block;grid-row:3;grid-column:1}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-open="true"] [data-player-leave] {display:grid;grid-row:3;grid-column:2;justify-self:end}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-open="true"] [data-player-move] {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;grid-row:4;grid-column:1/-1;font-size:12px}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-corner$="right"] > .dock {left:auto;right:calc(var(--player-safe-right) + 8px)}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-corner^="bottom"] > .dock {top:auto;bottom:calc(var(--player-safe-bottom) + 8px)}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"])[data-controls-open="true"] :is([data-player-expand],[data-player-menu]) {position:sticky;top:0;z-index:2;background:#09090b}
+.shell:is(:fullscreen,[data-expansion="native"][data-native-api="webkit"],[data-expansion="immersive"]) .dock .tooltip {display:none}
 .expansionStatus {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
 @media(max-width:600px) and (min-height:501px){

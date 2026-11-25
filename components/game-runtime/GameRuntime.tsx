@@ -7,10 +7,10 @@ import type {LaunchClient,LaunchRequest,RuntimeState,IntegrationObservation} fro
 import GamePlayerShell,{type PlayerAudioControl} from './GamePlayerShell'
 import styles from './GameRuntime.module.css'
 import GamePlayerError from './GamePlayerError'
-import PlayerFrame,{type PlayerViewport} from './PlayerFrame'
+import PlayerFrame,{type PlayerViewport,type PlayerSizing} from './PlayerFrame'
 const defaultClient=httpLaunchClient()
-type Props=LaunchRequest & {onRuntimeState?:(state:RuntimeState)=>void;onIntegration?:(observation:IntegrationObservation)=>void;onFailure?:(code:string)=>void;onAudioSupport?:(supported:boolean)=>void;onLeave:()=>void;client?:LaunchClient;socialControls?:ReactNode;audioControl?:PlayerAudioControl;embedded?:boolean;fixedViewport?:PlayerViewport}
-export default function GameRuntime({gameId,gameVersionId,execution,audience,locale,onlineSessionReference,onLeave,client=defaultClient,socialControls,audioControl,embedded=false,fixedViewport,onAudioSupport,onFailure,onIntegration,onRuntimeState}:Props){
+type Props=LaunchRequest & {onRuntimeState?:(state:RuntimeState)=>void;onIntegration?:(observation:IntegrationObservation)=>void;onFailure?:(code:string)=>void;onAudioSupport?:(supported:boolean)=>void;onLeave:()=>void;client?:LaunchClient;socialControls?:ReactNode;audioControl?:PlayerAudioControl;embedded?:boolean;fixedViewport?:PlayerViewport;sizing?:PlayerSizing}
+export default function GameRuntime({gameId,gameVersionId,execution,audience,locale,onlineSessionReference,onLeave,client=defaultClient,socialControls,audioControl,embedded=false,fixedViewport,sizing,onAudioSupport,onFailure,onIntegration,onRuntimeState}:Props){
   const {audio,toggle}=usePlayerAudio(),audioRef=useRef(audio),support=useRef(onAudioSupport)
   const [audioSupported,setAudioSupported]=useState(false)
   useEffect(()=>{support.current=onAudioSupport},[onAudioSupport])
@@ -32,7 +32,7 @@ export default function GameRuntime({gameId,gameVersionId,execution,audience,loc
   useEffect(()=>{audioRef.current=audio;controller.current?.updateAudio()},[audio])
   const busy=['resolving','launching','loading'].includes(state.phase)
   const content=<>
-    <PlayerFrame viewport={fixedViewport}><div ref={container} className={styles.viewport} aria-busy={busy}/></PlayerFrame>
+    <PlayerFrame viewport={fixedViewport} sizing={sizing}><div ref={container} className={styles.viewport} aria-busy={busy}/></PlayerFrame>
     {busy?<div className={styles.overlay}><p className={styles.message} role="status" aria-live="polite">Chargement du jeu…</p></div>:null}
     {state.phase==='failed'?<GamePlayerError message={state.error==='delivery_version_conflict'?'Une mise à jour de ce jeu attend la fin des sessions précédentes. Réessayez plus tard.':state.error==='delivery_cookie_unavailable'?'L’accès au jeu n’a pas pu être établi. Vérifiez les restrictions de stockage du navigateur ou réessayez.':state.error==='launch_expired'?'La session de jeu a expiré.':['hello_timeout','handshake_timeout','game_ready_timeout'].includes(state.error ?? '')?'Le jeu n’a pas terminé son initialisation.':'Le jeu ne peut pas continuer pour le moment.'} onRetry={()=>setAttempt(n=>n+1)} onBack={embedded?()=>controller.current?.close():undefined}/>:null}
 

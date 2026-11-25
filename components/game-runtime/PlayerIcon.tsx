@@ -1,4 +1,4 @@
-type IconName='like'|'dislike'|'favorite'|'volume'|'muted'|'fullscreen'|'restore'|'close'
+type IconName='like'|'dislike'|'favorite'|'volume'|'muted'|'fullscreen'|'restore'|'close'|'controls'|'move'
 const paths:Record<IconName,string>={
   like:'M7 10v10H3V10h4Zm0 0 5-7c2 0 2 2 1 6h6a2 2 0 0 1 2 2l-2 7a3 3 0 0 1-3 2H7',
   dislike:'M7 14V4H3v10h4Zm0 0 5 7c2 0 2-2 1-6h6a2 2 0 0 0 2-2l-2-7a3 3 0 0 0-3-2H7',
@@ -8,6 +8,8 @@ const paths:Record<IconName,string>={
   fullscreen:'M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5',
   restore:'M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5',
   close:'m6 6 12 12M18 6 6 18',
+  controls:'M4 6h16M4 12h16M4 18h16',
+  move:'M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4',
 }
 export default function PlayerIcon({name}:{name:IconName}){
   return <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]}/></svg>

@@ -11,7 +11,7 @@ export async function assertPlayerLayout(page,fullscreen=false){
     assert.ok(bounds.y>=dock.y && bounds.y+bounds.height<=dock.y+dock.height)
   }
   }
-  if(fullscreen)assert.equal(dock,null)
+  if(fullscreen){assert.ok(dock.width<=190&&dock.height<=64,'expanded controls are compact');assert.ok(dock.x>=surface.x&&dock.y>=surface.y&&dock.x+dock.width<=surface.x+surface.width+1&&dock.y+dock.height<=surface.y+surface.height+1);assert.equal(await page.locator('[data-player-expand]').isVisible(),true)}
   if(await page.locator('iframe').count()){
     const frame=await page.locator('iframe').boundingBox()
     assert.ok(frame.x>=surface.x-1 && frame.y>=surface.y-1)

@@ -47,7 +47,7 @@ export function createPlayerExpansion(element:HTMLElement,onChange:(mode:PlayerE
    element.style.setProperty('--player-view-top',`${visual?.offsetTop??0}px`)
   }
   const schedule=()=>{if(!frame)frame=win.requestAnimationFrame(()=>{frame=0;viewport()})}
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();leaveImmersive()}}
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!element.querySelector('[data-player-menu][aria-expanded="true"]')){event.preventDefault();leaveImmersive()}}
   const containFocus=(event:FocusEvent)=>{if(event.target instanceof win.Node&&!element.contains(event.target))focusControl()}
   const leaveImmersive=(restoreFocus=true)=>{
    if(stopped)return;stopped=true
