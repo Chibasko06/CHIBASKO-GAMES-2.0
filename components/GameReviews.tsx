@@ -1,5 +1,5 @@
 'use client'
-import AuthRequired from '@/components/AuthRequired'
+import {requestAuthentication} from '@/lib/authInvitation'
 
 import Image from '@/components/ProfileAvatarImage'
 import { useEffect, useState } from 'react'
@@ -28,13 +28,12 @@ type Props = {
 }
 
 export default function GameReviews({ gameId }: Props) {
-  const { session, user } = useAuth()
+  const { session, user, loading:authLoading } = useAuth()
   const [reviews, setReviews] = useState<Review[]>([])
   const [page,setPage]=useState(1),[total,setTotal]=useState(0),[averageRating,setAverageRating]=useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const {pending: submitting, blocked, mutate, check} = useMutationRecovery(gameId + ':' + (user?.id ?? ''))
-  const [needsAuth, setNeedsAuth] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
@@ -65,14 +64,14 @@ export default function GameReviews({ gameId }: Props) {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (submitting) {
+    if (submitting||authLoading) {
       return
     }
 
     setMessage(null)
 
     if (!user) {
-      setNeedsAuth(true)
+      requestAuthentication('Connectez-vous pour publier un commentaire sur ce jeu.',event.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]')??undefined)
       setMessage(null)
       return
     }
@@ -100,7 +99,6 @@ export default function GameReviews({ gameId }: Props) {
     }
     setComment('')
     setRating(5)
-    setNeedsAuth(false)
     setMessage('Ton avis a été publié.')
     await refreshReviews(false)
   }
@@ -132,7 +130,7 @@ export default function GameReviews({ gameId }: Props) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 rounded-[20px] border border-zinc-800 bg-black/30 p-4">
-        <fieldset className="space-y-2" disabled={submitting}>
+        <fieldset className="space-y-2" disabled={submitting||authLoading}>
         <legend className="text-sm font-semibold text-zinc-300">Ta note sur 5</legend>
         <div className="flex flex-wrap gap-2">
           {[1, 2, 3, 4, 5].map((value) => (
@@ -163,13 +161,10 @@ export default function GameReviews({ gameId }: Props) {
         {message ? (
           <p id="review-feedback" role="status" className="text-sm text-cyan-300">{message}</p>
         ) : null}
-        {!user && needsAuth ? (
-          <AuthRequired/>
-        ) : null}
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting||authLoading}
           className="rounded-full bg-cyan-400 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-black disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting ? 'Vérification...' : blocked ? 'Vérifier les avis' : 'Publier mon avis'}
@@ -183,7 +178,7 @@ export default function GameReviews({ gameId }: Props) {
           ))}
         </div>
       ) : loadError ? (
-        <p role="alert">Impossible de charger les avis. <button type="button" className="text-cyan-300 underline" disabled={submitting} onClick={() => {void refreshReviews()}}>Réessayer</button></p>
+        <p role="alert">Impossible de charger les avis. <button type="button" className="text-cyan-300 underline" disabled={submitting||authLoading} onClick={() => {void refreshReviews()}}>Réessayer</button></p>
       ) : reviews.length === 0 ? (
         <div className="rounded-2xl border border-zinc-800 bg-black/20 p-6 text-sm text-zinc-400">
           Aucun commentaire pour le moment. Sois le premier a noter ce jeu.
@@ -219,7 +214,7 @@ export default function GameReviews({ gameId }: Props) {
                       <button
                         type="button"
                         onClick={() => void handleDelete(review.id)}
-                        disabled={submitting}
+                        disabled={submitting||authLoading}
                         className="ml-auto rounded-full border border-red-900 px-3 py-1 text-xs font-bold text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
                         title="Supprimer mon commentaire"
                         aria-label="Supprimer mon commentaire"

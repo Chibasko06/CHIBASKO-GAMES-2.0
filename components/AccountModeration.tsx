@@ -1,6 +1,7 @@
 'use client'
 import {useCallback,useEffect,useRef,useState} from 'react'
 import Link from 'next/link'
+import AuthRequired from './AuthRequired'
 import {useAuth} from './AuthProvider'
 import {supabase} from '@/lib/supabaseClient'
 import {fetchJson} from '@/lib/asyncOperation'
@@ -35,7 +36,7 @@ function AccountModerationContent(){
   finally{if(version===epoch.current){locked.current=false;setBusy(false)}}
  }
  return <main className="mx-auto max-w-3xl space-y-6 px-4 py-8"><h1 className="text-3xl font-bold">Mes avertissements et sanctions</h1><p className="text-sm leading-6 text-zinc-400">Cet espace reste accessible pendant une restriction de ton compte Chibasko Games. Il présente les motifs communicables et permet un réexamen.</p>
-  {!loading&&!session?<Link href="/login?next=%2Faccount%2Fmoderation" className={socialButton}>Se connecter</Link>:<>
+  {!loading&&!session?<AuthRequired next="/account/moderation" message="Connectez-vous pour consulter vos décisions et recours."/>:<>
    {error&&<p role="alert" className="text-red-200">{error}</p>}{(loading||busy)&&<p role="status">Chargement…</p>}
    {data&&<p className="rounded-xl border border-cyan-900 p-4">{data.blocked?'Ton compte fait actuellement l’objet d’une restriction.':'Aucune restriction active sur ton compte.'}{data.endsAt&&data.blocked?' Fin prévue : '+new Date(data.endsAt).toLocaleString('fr-FR'):''}</p>}
    {data?.current&&<section className="space-y-3 rounded-xl border border-rose-900 p-4"><h2 className="font-semibold">Motif de la restriction active</h2><p className="whitespace-pre-wrap break-words text-sm">{data.current.reason}</p>{!data.current.appeal&&<button disabled={busy} className={socialButton} onClick={()=>{setSelected(data.current!.id);setDescription('')}}>Contester la restriction active</button>}</section>}

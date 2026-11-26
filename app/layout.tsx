@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/AuthProvider'
 import { Navbar } from '@/components/Navbar'
 import ClientEnhancements from '@/components/ClientEnhancements'
 import Footer from '@/components/Footer'
+import AuthInvitationHost from '@/components/AuthInvitationHost'
 import { siteConfig, serializeJsonLd } from '@/lib/seo'
 
 
@@ -117,6 +118,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
         />
         <AuthProvider>
+            <AuthInvitationHost />
             <ClientEnhancements />
             <Navbar />
             <main id="main-content" tabIndex={-1} className="site-content mx-auto w-full max-w-[2200px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 xl:px-10 2xl:px-12">

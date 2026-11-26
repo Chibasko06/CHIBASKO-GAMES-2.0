@@ -1,7 +1,8 @@
 "use client";
+import AuthRequired from '@/components/AuthRequired'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+
 import { usePathname, useSearchParams } from 'next/navigation'
 import GamePagination from '@/components/GamePagination'
 import { pageNumber } from '@/lib/pagination'
@@ -105,19 +106,7 @@ function FavoritesPanel(){
           ))}
         </div>
       ) : needsAuth ? (
-        <div className="border border-zinc-800 bg-zinc-950 p-6 space-y-4">
-          <p className="text-zinc-300">
-            Connecte-toi pour acceder a ta liste de favoris.
-          </p>
-          <div className="flex gap-4">
-            <Link href="/login" className="bg-cyan-600 px-4 py-2 font-bold text-black">
-              Connexion
-            </Link>
-            <Link href="/register" className="border border-cyan-700 px-4 py-2 font-bold text-white">
-              Inscription
-            </Link>
-          </div>
-        </div>
+        <AuthRequired message="Connectez-vous pour retrouver vos jeux favoris."/>
       ) : loadError ? (
         <div role="alert" className="space-y-3 rounded-lg border border-zinc-800 p-6"><p>{loadError}</p><button type="button" className="text-cyan-300 underline" onClick={() => window.dispatchEvent(new Event('focus'))}>Réessayer</button></div>
       ) : games.length === 0 ? (

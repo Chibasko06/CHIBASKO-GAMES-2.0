@@ -9,9 +9,9 @@ import tailwind from '@tailwindcss/postcss'
 let browser,script,css
 before(async()=>{
  const result=await build({stdin:{resolveDir:process.cwd(),loader:'tsx',contents:`
- import {createRoot} from 'react-dom/client';import Search from './components/PlayerSearch';import AuthRequired from './components/AuthRequired';import FaqAnswer from './components/FaqAnswer';import UserDropdown from './components/UserDropdown';import Reactions from './components/GameReactions';import Reviews from './components/GameReviews';import Favorite from './components/FavoriteButton';import Login from './app/login/page';import Register from './app/register/page';import Callback from './app/auth/callback/page';
+ import AuthInvitationHost from './components/AuthInvitationHost';import {createRoot} from 'react-dom/client';import Search from './components/PlayerSearch';import AuthRequired from './components/AuthRequired';import FaqAnswer from './components/FaqAnswer';import UserDropdown from './components/UserDropdown';import Reactions from './components/GameReactions';import Reviews from './components/GameReviews';import Favorite from './components/FavoriteButton';import Login from './app/login/page';import Register from './app/register/page';import Callback from './app/auth/callback/page';
  const kind=new URLSearchParams(location.search).get('view');const content=kind==='login'?<Login/>:kind==='register'?<Register/>:kind==='callback'?<Callback/>:kind==='actions'?<><Reactions gameId="fixture"/><Favorite gameId="fixture"/><Reviews gameId="fixture"/></>:<><Search initialSearch=""/><AuthRequired/><FaqAnswer text="Utiliser [uBlock Origin](https://github.com/gorhill/uBlock#installation)."/><UserDropdown user={{id:'viewer',email:'fixture@example.test'}} isAdmin={false}/></>;
- createRoot(document.getElementById('root')).render(<main>{content}</main>);
+ createRoot(document.getElementById('root')).render(<><AuthInvitationHost/><main>{content}</main></>);
  `},bundle:true,write:false,outdir:'ux-fixture',jsx:'automatic',platform:'browser',format:'iife',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'services-isoles',setup(b){
  b.onResolve({filter:/^@\/components\/AuthProvider$/},()=>({path:'auth',namespace:'fixture'}));b.onResolve({filter:/^@\/lib\/profileSync$/},()=>({path:'sync',namespace:'fixture'}));b.onResolve({filter:/supabaseClient$/},()=>({path:'db',namespace:'fixture'}));b.onResolve({filter:/^next\/(link|image|navigation)$/},({path})=>({path:path.split('/')[1],namespace:'fixture'}));
  b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',resolveDir:process.cwd(),contents:{
@@ -23,7 +23,7 @@ before(async()=>{
  }[path]}))
  }}]})
  script=result.outputFiles.find(file=>!file.path.endsWith('.css')).text
- css=(await postcss([tailwind()]).process(readFileSync('app/globals.css','utf8'),{from:'app/globals.css'})).css
+ css=(result.outputFiles.find(file=>file.path.endsWith('.css'))?.text??'')+'\n'+(await postcss([tailwind()]).process(readFileSync('app/globals.css','utf8'),{from:'app/globals.css'})).css
  browser=await chromium.launch({channel:'chrome',headless:true})
 })
 after(async()=>browser?.close())

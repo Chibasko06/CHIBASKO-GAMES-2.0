@@ -22,7 +22,7 @@ export default function GamePlayerShell({children,onLeave,socialControls,audioCo
     if(!controlsOpen||!expanded)return
     const doc=shell.current!.ownerDocument,win=doc.defaultView!
     const outside=(event:PointerEvent)=>{if(event.target instanceof win.Node&&!dock.current?.contains(event.target))setControlsOpen(false)}
-    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();setControlsOpen(false);menu.current?.focus({preventScroll:true})}}
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!(event.target instanceof win.Element&&event.target.closest('dialog[open]'))){event.preventDefault();event.stopPropagation();setControlsOpen(false);menu.current?.focus({preventScroll:true})}}
     const blur=()=>setControlsOpen(false)
     doc.addEventListener('pointerdown',outside);doc.addEventListener('keydown',escape,true);win.addEventListener('blur',blur)
     return()=>{doc.removeEventListener('pointerdown',outside);doc.removeEventListener('keydown',escape,true);win.removeEventListener('blur',blur)}

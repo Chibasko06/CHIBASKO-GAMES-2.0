@@ -2,6 +2,7 @@
 import {developersEmail,developersMailto} from '@/lib/siteContacts'
 import DeveloperContactSummary from './DeveloperContactSummary'
 import Link from 'next/link'
+import AuthRequired from './AuthRequired'
 import {useSearchParams} from 'next/navigation'
 import {useEffect,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
@@ -18,7 +19,7 @@ const developerContact=<p className="text-sm text-zinc-300">Questions sur la pub
 export default function SubmitGamePageClient({categories}:{categories:PublicationCategory[]}){
  const {session,loading}=useAuth()
  if(loading)return <div className="mx-auto max-w-3xl p-6"><FormFeedback tone="info" title="Chargement du compte…" announce/></div>
- if(!session)return <div className="mx-auto max-w-3xl space-y-5 p-6"><h1 className="text-3xl font-bold">Publier un jeu</h1><Link className="text-cyan-300 underline" href="/developpeurs">Consulter le guide développeur</Link><FormFeedback tone="info" title="Connectez-vous pour soumettre un jeu"><p>Un compte et une adresse professionnelle vérifiée sont nécessaires pour soumettre un ZIP HTML5 ou une URL HTTPS et suivre leur revue.</p></FormFeedback><HelpText>{REVIEW_NOTICE}</HelpText><nav className="flex gap-4"><Link href="/login?next=%2Fpublier-un-jeu">Se connecter</Link><Link href="/register?next=%2Fpublier-un-jeu">Créer un compte</Link></nav>{developerContact}</div>
+ if(!session)return <div className="mx-auto max-w-3xl space-y-5 p-6"><h1 className="text-3xl font-bold">Publier un jeu</h1><Link className="text-cyan-300 underline" href="/developpeurs">Consulter le guide développeur</Link><FormFeedback tone="info" title="Connectez-vous pour soumettre un jeu"><p>Un compte et une adresse professionnelle vérifiée sont nécessaires pour soumettre un ZIP HTML5 ou une URL HTTPS et suivre leur revue.</p></FormFeedback><HelpText>{REVIEW_NOTICE}</HelpText><AuthRequired next="/publier-un-jeu" message="Connectez-vous pour préparer et suivre votre soumission."/>{developerContact}</div>
  return <Workspace key={session.user.id} actor={session.user.id} token={session.access_token} categories={categories}/>
 }
 function Workspace({actor,token,categories}:{actor:string;token:string;categories:PublicationCategory[]}){

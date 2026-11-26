@@ -1,5 +1,5 @@
 'use client'
-import AuthRequired from '@/components/AuthRequired'
+import {requestAuthentication} from '@/lib/authInvitation'
 import {useEffect,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
 import ReportButton from '@/components/ReportButton'
@@ -8,7 +8,7 @@ import {socialButton,type SocialPage} from '@/lib/social'
 import {readShareFriends,notificationCall} from '@/lib/socialNotifications'
 
 export default function GameSharingMenu({gameId,title,url}:{gameId:string;title:string;url:string}){
- const {user,session}=useAuth(),[open,setOpen]=useState(false),[notice,setNotice]=useState(''),[fallback,setFallback]=useState(false)
+ const {user,session,loading}=useAuth(),[open,setOpen]=useState(false),[notice,setNotice]=useState(''),[fallback,setFallback]=useState(false)
  const menu=useRef<HTMLDetailsElement>(null),sharing=useRef(false)
  async function publicShare(){
   if(sharing.current)return
@@ -22,7 +22,7 @@ export default function GameSharingMenu({gameId,title,url}:{gameId:string;title:
   <details ref={menu} onKeyDown={event=>{if(event.key==='Escape'&&menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus()}}}>
    <summary className={socialButton+' cursor-pointer list-none px-4'} aria-label="Partager ce jeu">···</summary>
    <div className="absolute right-0 z-30 mt-2 w-60 rounded-xl border border-zinc-700 bg-zinc-950 p-2 shadow-xl">
-    {user&&session?<button className={socialButton+' w-full'} onClick={()=>{if(menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus()}setOpen(true)}}>Partager à un ami</button>:<AuthRequired/>}
+    <button disabled={loading} className={socialButton+' w-full'} onClick={()=>{const trigger=menu.current?.querySelector('summary');if(menu.current)menu.current.open=false;if(user&&session){trigger?.focus();setOpen(true)}else requestAuthentication('Connectez-vous pour partager ce jeu à un ami.',trigger??undefined)}}>Partager à un ami</button>
     <button className={socialButton+' mt-2 w-full'} onClick={()=>void publicShare()}>Partager un lien</button>
     <ReportButton kind="game" target={gameId}/>
    </div>

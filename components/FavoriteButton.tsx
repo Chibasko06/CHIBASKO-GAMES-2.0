@@ -1,5 +1,5 @@
 'use client'
-import AuthRequired from '@/components/AuthRequired'
+import {requestAuthentication} from '@/lib/authInvitation'
 
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
@@ -19,7 +19,6 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [needsAuth,setNeedsAuth]=useState(false)
   const [loadError, setLoadError] = useState(false)
   const [reload, setReload] = useState(0)
   const requestIdRef = useRef(0)
@@ -81,14 +80,14 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
     )
   }
 
-  const toggleFavorite = async () => {
+  const toggleFavorite = async (event: {currentTarget:HTMLElement}) => {
     if (loadError) { setLoading(true); setReload(value => value + 1); return }
     if (pending) {
       return
     }
 
     if (!userId) {
-      setNeedsAuth(true)
+      requestAuthentication('Connectez-vous pour retrouver ce jeu dans vos favoris.',event.currentTarget)
       return
     }
 
@@ -133,9 +132,8 @@ export default function FavoriteButton({ gameId, compact=false }: Props) {
     } finally { setPending(false) }
   }
 
-  if(!user && needsAuth)return <AuthRequired/>
 
-  if(compact)return <button type="button" className={playerStyles.iconButton} aria-label="Favori" aria-pressed={loadError ? undefined : isGameFavorite} disabled={loading || pending} title={loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'} onClick={()=>void toggleFavorite()}><PlayerIcon name="favorite"/><span className={playerStyles.tooltip} aria-hidden="true">{loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'}</span></button>
+  if(compact)return <button type="button" className={playerStyles.iconButton} aria-label="Favori" aria-pressed={loadError ? undefined : isGameFavorite} disabled={loading || pending} title={loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'} onClick={event=>void toggleFavorite(event)}><PlayerIcon name="favorite"/><span className={playerStyles.tooltip} aria-hidden="true">{loadError?'Favoris indisponibles · Réessayer':loading?'Chargement des favoris':isGameFavorite?'Retirer des favoris':'Ajouter aux favoris'}</span></button>
 
   if (loading) {
     return <div className="w-10 h-10 bg-zinc-900 animate-pulse border border-zinc-800" />

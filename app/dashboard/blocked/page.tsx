@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import AuthRequired from '@/components/AuthRequired'
 import Image from 'next/image'
 import {useEffect,useRef,useState} from 'react'
 import {useAuth} from '@/components/AuthProvider'
@@ -15,7 +16,7 @@ async function read(token:string,cursor:Cursor|null){
 export default function BlockedAccounts(){
  const {session,loading}=useAuth(),token=session?.access_token
  if(loading)return <p role="status">Chargement du compte…</p>
- if(!token)return <p><Link href="/login?next=/dashboard/blocked" className="text-cyan-300 underline">Connecte-toi pour gérer tes comptes bloqués.</Link></p>
+ if(!token)return <AuthRequired next="/dashboard/blocked" message="Connectez-vous pour gérer vos comptes bloqués."/>
  return <BlockedList key={token} token={token}/>
 }
 function BlockedList({token}:{token:string}){

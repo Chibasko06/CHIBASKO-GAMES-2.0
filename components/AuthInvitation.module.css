@@ -1,0 +1,13 @@
+.dialog {box-sizing:border-box;position:fixed;inset:auto;margin:0;left:calc(var(--auth-left,0px) + env(safe-area-inset-left,0px) + (var(--auth-width,100vw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))/2);top:calc(var(--auth-top,0px) + env(safe-area-inset-top,0px) + (var(--auth-height,100dvh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))/2);transform:translate(-50%,-50%);width:min(440px,calc(var(--auth-width,100vw) - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px) - 24px));max-height:calc(var(--auth-height,100dvh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px);overflow:auto;overscroll-behavior:contain;border:1px solid #475569;border-radius:20px;background:#090d16;color:#f4f4f5;padding:20px;box-shadow:0 20px 60px #0008;font:14px/1.5 Arial,sans-serif;overflow-wrap:anywhere}
+.dialog::backdrop {background:#000b}
+.header {position:sticky;top:0;z-index:1;background:#090d16;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.header h2 {margin:0;font-size:20px;line-height:1.3}
+.close {flex-shrink:0;min-width:44px;min-height:44px;border:1px solid #475569;border-radius:10px;background:#181e2a;color:#fff;font:inherit;cursor:pointer}
+.dialog p {margin:0 0 12px}
+.note {color:#a1a1aa;font-size:13px}
+.dialog [data-auth-actions] {display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.dialog [data-auth-actions] a {box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;border:1px solid #0e7490;border-radius:10px;padding:10px 14px;text-decoration:none;font-size:14px;font-weight:600;line-height:1.4;text-align:center;overflow-wrap:anywhere}
+.dialog [data-auth-primary] {background:#22d3ee;color:#09090b}
+.dialog [data-auth-actions] a:not([data-auth-primary]) {background:#090d16;color:#a5f3fc}
+.close:focus-visible,.dialog [data-auth-actions] a:focus-visible {outline:2px solid #67e8f9;outline-offset:3px}
+@media(max-width:380px){.dialog [data-auth-actions]>*{flex:1 1 100%}.dialog{padding:16px}.header h2{font-size:18px}}

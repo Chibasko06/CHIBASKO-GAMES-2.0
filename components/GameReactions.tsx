@@ -1,5 +1,5 @@
 'use client'
-import AuthRequired from '@/components/AuthRequired'
+import {requestAuthentication} from '@/lib/authInvitation'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { ensureProfile } from '@/lib/profileSync'
@@ -12,13 +12,12 @@ import playerStyles from './game-runtime/GameRuntime.module.css'
 
 type Reaction = 'like' | 'dislike' | null
 export default function GameReactions({ gameId, initialLikes, initialDislikes, compact=false }: { gameId: string; initialLikes: number; initialDislikes: number; compact?:boolean }) {
-  const { session, user } = useAuth()
+  const { session, user, loading:authLoading } = useAuth()
   const [likes, setLikes] = useState(initialLikes)
   const [dislikes, setDislikes] = useState(initialDislikes)
   const [reaction, setReaction] = useState<Reaction>(null)
   const [loadError, setLoadError] = useState(false)
   const [countsError, setCountsError] = useState(false)
-  const [needsAuth,setNeedsAuth]=useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const {pending, blocked, mutate, check} = useMutationRecovery(gameId + ':' + (user?.id ?? ''))
 
@@ -56,9 +55,9 @@ export default function GameReactions({ gameId, initialLikes, initialDislikes, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, user?.id])
 
-  const applyReaction = async (nextReaction: Exclude<Reaction, null>) => {
-    if (pending) return
-    if (!user) { setNeedsAuth(true); return }
+  const applyReaction = async (nextReaction: Exclude<Reaction, null>,trigger:HTMLElement) => {
+    if (pending||authLoading) return
+    if (!user) { requestAuthentication('Connectez-vous pour donner votre avis sur ce jeu.',trigger); return }
     if (blocked) { await reloadReaction(); return }
     const target = reaction === nextReaction ? null : nextReaction
     const previous = reaction
@@ -89,22 +88,20 @@ export default function GameReactions({ gameId, initialLikes, initialDislikes, c
   const label = (value: 'like' | 'dislike') => feedback || (value === 'like' ? 'J’aime · ' + likes : 'Je n’aime pas · ' + dislikes)
 
   if(compact)return <div className={playerStyles.reactionButtons}>
-    {!user && needsAuth && <AuthRequired/>}
     {feedback && <span role="status" className="sr-only">{feedback}</span>}
-    {(['like','dislike'] as const).map(value=><button key={value} className={playerStyles.iconButton} type="button" aria-label={value==='like'?'J’aime':'Je n’aime pas'} aria-pressed={loadError ? undefined : reaction===value} title={label(value)} disabled={pending} onClick={()=>void applyReaction(value)}><PlayerIcon name={value}/><span className={playerStyles.tooltip} aria-hidden="true">{label(value)}</span></button>)}
+    {(['like','dislike'] as const).map(value=><button key={value} className={playerStyles.iconButton} type="button" aria-label={value==='like'?'J’aime':'Je n’aime pas'} aria-pressed={loadError ? undefined : reaction===value} title={label(value)} disabled={pending||authLoading} onClick={event=>void applyReaction(value,event.currentTarget)}><PlayerIcon name={value}/><span className={playerStyles.tooltip} aria-hidden="true">{label(value)}</span></button>)}
   </div>
 
   return (
         <div className="flex flex-wrap items-center gap-2">
-          {!user && needsAuth && <AuthRequired/>}
           {feedback && <p role="status">{feedback}</p>}
           <button
             type="button"
             aria-label="J’aime"
-            disabled={pending}
+            disabled={pending||authLoading}
             aria-pressed={loadError ? undefined : reaction === 'like'}
             title={label('like')}
-            onClick={() => void applyReaction('like')}
+            onClick={event => void applyReaction('like',event.currentTarget)}
             className={`rounded-full border px-3 py-2 text-sm font-bold transition sm:px-4 ${
               reaction === 'like'
                 ? 'border-cyan-400 bg-cyan-400 text-black'
@@ -116,10 +113,10 @@ export default function GameReactions({ gameId, initialLikes, initialDislikes, c
           <button
             type="button"
             aria-label="Je n’aime pas"
-            disabled={pending}
+            disabled={pending||authLoading}
             aria-pressed={loadError ? undefined : reaction === 'dislike'}
             title={label('dislike')}
-            onClick={() => void applyReaction('dislike')}
+            onClick={event => void applyReaction('dislike',event.currentTarget)}
             className={`rounded-full border px-3 py-2 text-sm font-bold transition sm:px-4 ${
               reaction === 'dislike'
                 ? 'border-red-400 bg-red-400 text-black'
