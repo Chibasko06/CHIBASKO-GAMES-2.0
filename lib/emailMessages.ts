@@ -43,6 +43,6 @@ export function submissionEmailMessage(job:SubmissionEmailData,from:string,to:st
     'Type : '+(job.kind==='update'?'Mise à jour':'Nouveau jeu'),
     'Développeur : '+job.contact.firstName+' '+job.contact.lastName,'Studio : '+job.studio,
     'E-mail : '+job.contact.contactEmail,'',url.href].join('\n')
-  return {from:automaticEmailSender(from),to:[to],reply_to:job.contact.contactEmail,subject,text,
-    html:brandedEmail({identity:'noreply',subject,text,automatic:'reply',action:{url,label:'Ouvrir la revue'}}).html}
+  return {from:automaticEmailSender(from),to:[to],subject,text,
+    html:brandedEmail({identity:'noreply',subject,text,automatic:'no-reply',action:{url,label:'Ouvrir la revue'}}).html}
 }

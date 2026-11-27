@@ -54,7 +54,10 @@ for(const mode of ['classic','sdk','external']){
   const fetcher=async(_url,init)=>{
    const message=JSON.parse(init.body)
    assert.deepEqual(message.to,['developers@chibaskogames.fr'])
-   assert.equal(message.reply_to,'creator@example.test')
+   assert.equal(Object.hasOwn(message,'reply_to'),false)
+   assert.match(message.text,/E-mail : creator@example.test/)
+   assert.match(message.html,/E-mail : creator@example.test/)
+   assert.doesNotMatch(message.html,/Vous pouvez répondre à cet e-mail/)
    assert.equal(init.headers['Idempotency-Key'],'submission-review/'+id)
    assert.ok(message.text.endsWith(external?'/admin/game-builds':'/admin/game-builds/'+id))
    assert.ok(message.text.includes(external?'Révision URL : '+id:'Version : 1.0.0'))

@@ -29,11 +29,13 @@ test('diagnostics use production builders and identical fictitious editorial tex
  const automatic=diagnosticMessage(options(),builders,env)
  assert.deepEqual(admin,adminEmailMessage('developers','recipient@example.test',automatic.subject,automatic.text))
  assert.equal(automatic.from,'Chibasko Games <noreply@chibaskogames.fr>')
- assert.equal(automatic.reply_to,'createur@example.com')
+ assert.equal(Object.hasOwn(automatic,'reply_to'),false)
+ assert.match(automatic.text,/createur@example.com/)
  assert.match(automatic.html,/Ouvrir la revue/)
  for(const mode of ['classic','sdk','external']){
   const configuration=diagnosticOptions(['--type','submission','--mode',mode,'--to','recipient@example.test'])
   const message=diagnosticMessage(configuration,builders,env)
+  assert.equal(Object.hasOwn(message,'reply_to'),false)
   assert.match(message.text,mode==='external'?/Révision URL : /:/Version : 1\.0\.0/)
  }
  assert.deepEqual(diagnosticMessage({...options(),mode:'classic'},builders,env),

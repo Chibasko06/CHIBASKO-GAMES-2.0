@@ -13,6 +13,14 @@ test('un échec transitoire ne bloque pas la notification suivante du lot',async
  assert.equal(await deliverSubmissionNotifications(h.db,env,{limit:2,log(){},fetcher:async()=>++attempts===1?Response.json({}, {status:503}):Response.json({id:'receipt'})}),1)
  assert.equal(attempts,2);assert.deepEqual(h.acks.map(e=>e.args.p_success),[false,true])
 })
+
+test('un ancien payload préparé conserve ses en-têtes et sa clé pendant une reprise',async()=>{
+ const message={from:'Chibasko Games <noreply@chibaskogames.fr>',to:['developers@chibaskogames.fr'],reply_to:'creator@example.test',subject:'Ancien message',html:'<p>Message préparé</p>',text:'Message préparé'}
+ const job={id:randomUUID(),lease:randomUUID(),message},calls=[]
+ const db={async call(name,args){calls.push(name);if(name==='distribution_claim_submission_email')return job;if(name==='distribution_prepare_submission_email'){assert.deepEqual(args.p_message,message);return message}assert.equal(name,'distribution_finish_submission_email');assert.equal(args.p_success,true)}}
+ assert.equal(await deliverSubmissionNotifications(db,env,{log(){},fetcher:async(_url,init)=>{assert.deepEqual(JSON.parse(init.body),message);assert.equal(init.headers['Idempotency-Key'],'submission-review/'+job.id);return Response.json({id:'fixture-receipt'})}}),1)
+ assert.deepEqual(calls,['distribution_claim_submission_email','distribution_prepare_submission_email','distribution_finish_submission_email'])
+})
 test('une erreur permanente est mise en attention, un conflit concurrent reste réessayable',async()=>{
  const h=jobs(),logs=[];let count=0
  await deliverSubmissionNotifications(h.db,env,{limit:2,log:e=>logs.push(e),fetcher:async()=>++count===1?Response.json({name:'invalid_idempotent_request',message:'private'},{status:409}):Response.json({name:'concurrent_idempotent_requests'},{status:409})})

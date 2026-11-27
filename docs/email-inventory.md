@@ -1,5 +1,17 @@
 # Circuits d’e-mails
 
+## Reply-To des soumissions internes
+
+Les nouveaux messages internes ZIP classique, ZIP SDK et URL omettent le Reply-To. Le contact développeur reste dans le corps du message et dans le dossier administratif. Les notifications adressées aux développeurs conservent leur réponse vers `developers@chibaskogames.fr`.
+
+Les payloads déjà préparés restent figés, même s’ils contiennent encore un ancien Reply-To. Ne pas réinitialiser une notification ni réécrire son payload pour changer cet en-tête : une tentative précédente peut avoir été acceptée par Resend sans acquittement SQL. Aucune réémission historique n’est nécessaire.
+
+Le formulaire de contact conserve son Reply-To vers l’auteur pour permettre la réponse directe. Il présente un motif d’en-tête comparable, mais son classement effectif n’est pas établi ici. La modération interne omet déjà le Reply-To ; les réponses de modération et la messagerie administrative utilisent les adresses professionnelles.
+
+La correction doit être déployée sur le portail et la maintenance, qui partagent le constructeur. Aucun changement DNS, Resend, SQL ou de flag n’est requis. Vérifier les en-têtes d’une prochaine notification légitime après déploiement ; ne pas provoquer de dépôt fictif ni réémettre un ancien message.
+
+## Inventaire
+
 Inventaire du portail, des migrations et des Workers versionnés. « Activé » désigne le réglage versionné de production. Le [contrôle du 21 novembre 2026](email-production-alignment.md) distingue ces réglages des versions actives, vérifiées en lecture seule dans Cloudflare. Les modèles hébergés dans Supabase Auth et les rapports de réception restent à inspecter séparément.
 
 Dans le tableau, **automatique** désigne l’adresse `RESEND_FROM_EMAIL`, configurée à `noreply@chibaskogames.fr`. Les lignes Resend utilisaient déjà le modèle HTML partagé, avec un texte brut en parallèle. Les anciens corps enregistrés sont conservés.
@@ -8,7 +20,7 @@ Dans le tableau, **automatique** désigne l’adresse `RESEND_FROM_EMAIL`, confi
 | --- | --- | --- | --- | --- |
 | Envoi confirmé dans `/admin/messagerie` via `/api/admin/mail` | Resend, Contact ou Developers au choix | Une adresse saisie, réponse à l’expéditeur | Réservé aux admins, clé Resend, réservation SQL, 5/min et 50/24 h, identifiant unique | HTML partagé ; transformations des couleurs par certains clients toujours possibles |
 | Envoi du formulaire `/contact` via `/api/contact` | Resend, automatique | `CONTACT_NOTIFY_EMAIL`, contact@, réponse à l’auteur | Flag activé, contrôle d’origine, champ anti-spam, quotas SQL, fingerprint, lease et clé stable | HTML partagé pour les nouvelles demandes, texte brut historique conservé lors d’une reprise |
-| Dépôt ou mise à jour ZIP classique ou SDK, nouvelle révision URL | Resend, automatique | `GAME_SUBMISSION_NOTIFY_EMAIL`, developers@, réponse au contact développeur | Triggers de soumission et de révision, file unique par soumission, envoi après réponse ou par maintenance. Flag activé, lease, reprise bornée et contenu enregistré | HTML partagé avec lien vers la revue |
+| Dépôt ou mise à jour ZIP classique ou SDK, nouvelle révision URL | Resend, automatique | `GAME_SUBMISSION_NOTIFY_EMAIL`, developers@, sans Reply-To pour les nouveaux messages | Triggers de soumission et de révision, file unique par soumission, envoi après réponse ou par maintenance. Flag activé, lease, reprise bornée et contenu enregistré | HTML partagé avec lien vers la revue |
 | Signalement de joueur/profil ou de jeu via `/api/reports` | Resend, automatique | Alerte à `CONTACT_NOTIFY_EMAIL`, sans Reply-To | Modération et maintenance activées dans Wrangler, vérifications et quotas selon le parcours, file SQL par dossier et version | HTML partagé avec lien administratif |
 | Accusé d’un signalement légal avec e-mail | Resend, automatique | Contact du déclarant, réponse à `MODERATION_APPEAL_EMAIL` ou contact@ | File `moderation_mail`, lease et reprises bornées, clé et corps conservés | HTML partagé |
 | Clôture ou classement d’un signalement légal avec e-mail | Resend, automatique | Contact du déclarant, même Reply-To que l’accusé | RPC administrative, file `moderation_mail`, notification par version, mêmes reprises | HTML partagé |

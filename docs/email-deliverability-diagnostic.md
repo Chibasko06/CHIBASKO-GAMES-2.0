@@ -12,7 +12,7 @@ Les essais comparent deux messages contemporains sur chaque filtre. Le résultat
 | Texte | Texte saisi, signature, lien du site | Informations de dépôt, version, contact développeur et lien privé | Identifiant de révision à la place de la version |
 | Objet | Saisi dans l’administration | « Nouvelle soumission de jeu sur Chibasko Games » | Même objet |
 | From | « Chibasko Games — Contact » ou « Chibasko Games — Developers » | `RESEND_FROM_EMAIL`, actuellement « Chibasko Games <noreply@chibaskogames.fr> » | Identique au ZIP |
-| Reply-To | Adresse professionnelle sélectionnée | Adresse de contact du développeur conservée dans la soumission | Identique au ZIP |
+| Reply-To | Adresse professionnelle sélectionnée | Absent pour les nouvelles notifications internes | Identique au ZIP |
 | Destinataire réel | Adresse saisie | `GAME_SUBMISSION_NOTIFY_EMAIL`, actuellement developers@ | Identique au ZIP |
 | Requête | POST JSON vers `https://api.resend.com/emails` | Même endpoint et méthode | Identique au ZIP |
 | En-têtes HTTP | Authorization, Content-Type et Idempotency-Key `admin-mail/<id>` | Mêmes noms, clé `submission-review/<id>` | Identique au ZIP |
@@ -64,7 +64,7 @@ npm run diagnose:email -- --type admin --sender developers --to developers@chiba
 npm run diagnose:email -- --type submission --mode classic --to developers@chibaskogames.fr --send
 ```
 
-Les quatre essais utilisent Camille Martin, Atelier Démo, Jeu de diagnostic et le même texte de dépôt fictif comme contenu rédactionnel. Le modèle administratif lui ajoute sa signature habituelle. Le modèle automatique conserve sa mise en page et son bouton de revue. Le Reply-To automatique est `createur@example.com`, une adresse fictive réservée à l’exemple. Éviter d’y répondre. Les identifiants de build et de révision sont fictifs et ne désignent pas des dossiers réels.
+Les quatre essais utilisent Camille Martin, Atelier Démo, Jeu de diagnostic et le même texte de dépôt fictif comme contenu rédactionnel. Le modèle administratif lui ajoute sa signature habituelle. Le modèle automatique conserve sa mise en page et son bouton de revue, sans Reply-To. L’adresse fictive `createur@example.com` reste dans les détails du dépôt. Les identifiants de build et de révision sont fictifs et ne désignent pas des dossiers réels.
 
 Pour examiner les variantes de dépôt, remplacer `--mode classic` par `--mode sdk` ou `--mode external`. Le choix Contact est disponible avec `--type admin --sender contact`. Chaque essai supplémentaire doit être relevé séparément.
 
@@ -103,6 +103,6 @@ Le [contrôle de production du 21 novembre 2026](email-production-alignment.md) 
 
 Les constructeurs sont ceux utilisés par les envois de production. Le CLI substitue uniquement les données fictives et le destinataire volontaire. Il génère une clé isolée `admin-mail/diagnostic-<uuid>` ou `submission-review/diagnostic-<uuid>`. Le diagnostic n’enregistre rien dans Supabase et ne reproduit pas le scheduler, les quotas SQL ou les reprises de production.
 
-La connexion sort de la machine locale, le lieu et l’heure d’appel diffèrent de Cloudflare, et Resend peut choisir une IP différente. Le MIME, Message-ID, Date, Return-Path, les signatures et les autres en-têtes de transport sont générés par le fournisseur. La fidélité du payload ne garantit pas l’identité de ces en-têtes. Les données fictives, notamment Reply-To et liens de dossier inexistants, peuvent aussi influencer un filtre.
+La connexion sort de la machine locale, le lieu et l’heure d’appel diffèrent de Cloudflare, et Resend peut choisir une IP différente. Le MIME, Message-ID, Date, Return-Path, les signatures et les autres en-têtes de transport sont générés par le fournisseur. La fidélité du payload ne garantit pas l’identité de ces en-têtes. Les données fictives, notamment les coordonnées et les liens de dossier inexistants, peuvent aussi influencer un filtre.
 
 Références fournisseur [API d’envoi](https://resend.com/docs/api-reference/emails/send-email) et [idempotence](https://resend.com/docs/dashboard/emails/idempotency-keys).
